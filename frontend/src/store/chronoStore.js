@@ -2,7 +2,14 @@ import { create } from "zustand";
 
 export const TIMELINE_MIN = "1906-07-13";
 export const TIMELINE_MAX = "2027-12-31";
-export const DEFAULT_FOCUSED_DATE = "1947-08-15";
+
+export function currentUtcDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Start on today's UTC date. The date only changes when the user selects a
+// timeline marker, event, future ladder entry, or precise datetime.
+export const DEFAULT_FOCUSED_DATE = currentUtcDate();
 
 export const useChronoStore = create((set) => ({
   focusedDate: DEFAULT_FOCUSED_DATE,
