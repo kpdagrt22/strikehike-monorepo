@@ -31,7 +31,7 @@ def test_energy_score_is_bounded():
 
 
 def test_seed_and_query(seeded_db):
-    assert seeded_db == 29
+    assert seeded_db == 129
 
     result = hp.find_historical_parallels("2008-09-15", limit=3)
 
@@ -44,6 +44,31 @@ def test_seed_and_query(seeded_db):
         "Science",
         "Politics",
         "Finance",
+        "Culture/Religion",
+        "Natural Disasters",
+    }
+
+
+def test_seed_category_distribution(seeded_db):
+    import sqlite3
+
+    with sqlite3.connect(hp.DB_PATH) as connection:
+        counts = dict(
+            connection.execute(
+                """
+                SELECT category, COUNT(*)
+                FROM historical_events
+                GROUP BY category
+                """
+            ).fetchall()
+        )
+
+    assert counts == {
+        "Science": 35,
+        "Politics": 35,
+        "Finance": 24,
+        "Culture/Religion": 20,
+        "Natural Disasters": 15,
     }
 
 

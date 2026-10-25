@@ -1,0 +1,36 @@
+name: Reseed historical events
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: historical-reseed
+  cancel-in-progress: false
+
+jobs:
+  reseed:
+    name: Force reseed production historical events
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run force reseed in the production backend container
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 8m
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
+            cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
+            echo "Reseeding from $(pwd)"
+
+            docker compose -p strikehike-chrono exec -T backend \
+              python scripts/force_reseed_db.py

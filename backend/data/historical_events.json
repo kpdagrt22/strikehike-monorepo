@@ -2,10 +2,112 @@
   "source": "Curated major global events; dates are UTC calendar dates.",
   "events": [
     {
+      "date": "1900-09-08",
+      "name": "Galveston hurricane",
+      "category": "Natural Disasters",
+      "description": "A hurricane struck Galveston, Texas, killing thousands and destroying much of the city."
+    },
+    {
+      "date": "1901-01-22",
+      "name": "Queen Victoria dies",
+      "category": "Culture/Religion",
+      "description": "Queen Victoria died at Osborne House, ending a 63-year reign."
+    },
+    {
+      "date": "1901-12-12",
+      "name": "First transatlantic radio signal",
+      "category": "Science",
+      "description": "Guglielmo Marconi received the first transatlantic radio signal at Signal Hill, Newfoundland."
+    },
+    {
       "date": "1903-12-17",
       "name": "Wright brothers' first powered flight",
       "category": "Science",
       "description": "The Wright Flyer made the first controlled, sustained powered flight at Kitty Hawk."
+    },
+    {
+      "date": "1905-06-30",
+      "name": "Einstein publishes special relativity",
+      "category": "Science",
+      "description": "Albert Einstein published the special theory of relativity in Annalen der Physik."
+    },
+    {
+      "date": "1906-04-18",
+      "name": "San Francisco earthquake and fire",
+      "category": "Natural Disasters",
+      "description": "A major earthquake and subsequent fires devastated San Francisco."
+    },
+    {
+      "date": "1907-10-16",
+      "name": "Panic of 1907",
+      "category": "Finance",
+      "description": "A run on New York's Knickerbocker Trust triggered the Panic of 1907 and a nationwide banking crisis."
+    },
+    {
+      "date": "1908-12-28",
+      "name": "Messina earthquake and tsunami",
+      "category": "Natural Disasters",
+      "description": "An earthquake and tsunami devastated Messina and nearby communities in Sicily and Calabria."
+    },
+    {
+      "date": "1913-05-29",
+      "name": "The Rite of Spring premieres",
+      "category": "Culture/Religion",
+      "description": "Igor Stravinsky's The Rite of Spring premiered in Paris, provoking a famous audience riot."
+    },
+    {
+      "date": "1913-12-23",
+      "name": "Federal Reserve Act signed",
+      "category": "Finance",
+      "description": "President Woodrow Wilson signed the Federal Reserve Act, creating the Federal Reserve System."
+    },
+    {
+      "date": "1914-06-28",
+      "name": "Assassination of Archduke Franz Ferdinand",
+      "category": "Politics",
+      "description": "Archduke Franz Ferdinand of Austria was assassinated in Sarajevo, setting off the July Crisis."
+    },
+    {
+      "date": "1917-11-07",
+      "name": "October Revolution",
+      "category": "Politics",
+      "description": "The Bolsheviks seized power in Petrograd, beginning the Russian Revolution."
+    },
+    {
+      "date": "1918-11-11",
+      "name": "Armistice ends World War I",
+      "category": "Politics",
+      "description": "Germany signed the Armistice of Compiegne, ending fighting in World War I."
+    },
+    {
+      "date": "1919-05-29",
+      "name": "Eddington eclipse confirms general relativity",
+      "category": "Science",
+      "description": "Arthur Eddington's solar-eclipse observations confirmed Einstein's prediction of light bending."
+    },
+    {
+      "date": "1919-06-28",
+      "name": "Treaty of Versailles signed",
+      "category": "Politics",
+      "description": "The Treaty of Versailles formally ended World War I and imposed terms on Germany."
+    },
+    {
+      "date": "1922-11-04",
+      "name": "Tutankhamun's tomb discovered",
+      "category": "Science",
+      "description": "Howard Carter discovered the tomb of Tutankhamun in the Valley of the Kings."
+    },
+    {
+      "date": "1923-09-01",
+      "name": "Great Kanto earthquake",
+      "category": "Natural Disasters",
+      "description": "The Great Kanto earthquake devastated Tokyo and Yokohama."
+    },
+    {
+      "date": "1927-10-06",
+      "name": "The Jazz Singer premieres",
+      "category": "Culture/Religion",
+      "description": "The Jazz Singer premiered, introducing synchronized sound to mainstream feature films."
     },
     {
       "date": "1928-09-28",
@@ -14,52 +116,70 @@
       "description": "Alexander Fleming observed that Penicillium mould inhibited bacterial growth."
     },
     {
+      "date": "1929-10-29",
+      "name": "Wall Street Crash",
+      "category": "Finance",
+      "description": "The New York Stock Exchange suffered the crash that preceded the Great Depression."
+    },
+    {
+      "date": "1931-08-18",
+      "name": "China floods",
+      "category": "Natural Disasters",
+      "description": "Severe flooding along the Yangtze and Huai rivers affected millions across central China."
+    },
+    {
+      "date": "1933-01-30",
+      "name": "Hitler appointed German chancellor",
+      "category": "Politics",
+      "description": "President Paul von Hindenburg appointed Adolf Hitler chancellor of Germany."
+    },
+    {
+      "date": "1933-03-06",
+      "name": "US national bank holiday",
+      "category": "Finance",
+      "description": "President Franklin D. Roosevelt declared a national bank holiday to stabilize the banking system."
+    },
+    {
+      "date": "1936-07-17",
+      "name": "Spanish Civil War begins",
+      "category": "Politics",
+      "description": "A military uprising in Spanish Morocco began the Spanish Civil War."
+    },
+    {
+      "date": "1938-12-17",
+      "name": "Nuclear fission discovered",
+      "category": "Science",
+      "description": "Otto Hahn and Fritz Strassmann discovered nuclear fission of uranium."
+    },
+    {
+      "date": "1939-09-01",
+      "name": "World War II begins in Europe",
+      "category": "Politics",
+      "description": "Germany invaded Poland, beginning World War II in Europe."
+    },
+    {
+      "date": "1944-07-22",
+      "name": "Bretton Woods Conference concludes",
+      "category": "Finance",
+      "description": "The Bretton Woods Conference concluded with agreements creating the IMF and World Bank."
+    },
+    {
+      "date": "1945-05-08",
+      "name": "Victory in Europe Day",
+      "category": "Politics",
+      "description": "Germany surrendered unconditionally, ending the war in Europe."
+    },
+    {
       "date": "1945-07-16",
       "name": "Trinity test",
       "category": "Science",
       "description": "The first detonation of a nuclear weapon took place at Alamogordo, New Mexico."
     },
     {
-      "date": "1957-10-04",
-      "name": "Sputnik 1 launched",
-      "category": "Science",
-      "description": "The Soviet Union placed the first artificial satellite into Earth orbit."
-    },
-    {
-      "date": "1961-04-12",
-      "name": "First human spaceflight",
-      "category": "Science",
-      "description": "Yuri Gagarin completed one orbit of Earth aboard Vostok 1."
-    },
-    {
-      "date": "1969-07-16",
-      "name": "Apollo 11 launch",
-      "category": "Science",
-      "description": "Apollo 11 launched from Kennedy Space Center on the first crewed Moon-landing mission."
-    },
-    {
-      "date": "1990-04-24",
-      "name": "Hubble Space Telescope launched",
-      "category": "Science",
-      "description": "The Hubble Space Telescope was deployed into low Earth orbit aboard Space Shuttle Discovery."
-    },
-    {
-      "date": "2003-04-14",
-      "name": "Human Genome Project completed",
-      "category": "Science",
-      "description": "The international consortium announced that the human genome had been sequenced to near-completion."
-    },
-    {
-      "date": "2012-07-04",
-      "name": "Higgs boson discovery announced",
-      "category": "Science",
-      "description": "CERN announced the observation of a new particle consistent with the Higgs boson."
-    },
-    {
-      "date": "2016-02-11",
-      "name": "Gravitational waves announced",
-      "category": "Science",
-      "description": "LIGO reported the first direct detection of gravitational waves from merging black holes."
+      "date": "1945-08-06",
+      "name": "Atomic bomb dropped on Hiroshima",
+      "category": "Politics",
+      "description": "The United States dropped an atomic bomb on Hiroshima, Japan."
     },
     {
       "date": "1945-10-24",
@@ -74,10 +194,94 @@
       "description": "India became independent from British rule and a new sovereign state was established."
     },
     {
+      "date": "1947-12-23",
+      "name": "Transistor demonstrated",
+      "category": "Science",
+      "description": "Bell Labs demonstrated the first working point-contact transistor."
+    },
+    {
+      "date": "1948-01-30",
+      "name": "Mahatma Gandhi assassinated",
+      "category": "Culture/Religion",
+      "description": "Mahatma Gandhi was assassinated in New Delhi by Nathuram Godse."
+    },
+    {
+      "date": "1948-05-14",
+      "name": "State of Israel proclaimed",
+      "category": "Politics",
+      "description": "David Ben-Gurion proclaimed the establishment of the State of Israel."
+    },
+    {
+      "date": "1949-04-04",
+      "name": "NATO founded",
+      "category": "Politics",
+      "description": "Twelve nations signed the North Atlantic Treaty in Washington, D.C."
+    },
+    {
       "date": "1949-10-01",
       "name": "People's Republic of China founded",
       "category": "Politics",
       "description": "Mao Zedong proclaimed the People's Republic of China in Beijing."
+    },
+    {
+      "date": "1953-01-31",
+      "name": "North Sea flood",
+      "category": "Natural Disasters",
+      "description": "A storm surge flooded the Netherlands, Belgium, and the United Kingdom, causing major loss of life."
+    },
+    {
+      "date": "1953-04-25",
+      "name": "DNA double helix published",
+      "category": "Science",
+      "description": "James Watson and Francis Crick published the double-helix structure of DNA in Nature."
+    },
+    {
+      "date": "1954-07-19",
+      "name": "Elvis Presley's first single",
+      "category": "Culture/Religion",
+      "description": "Elvis Presley's first commercial single, 'That's All Right,' was released on Sun Records."
+    },
+    {
+      "date": "1955-04-18",
+      "name": "Bandung Conference opens",
+      "category": "Politics",
+      "description": "Asian and African states convened in Bandung, Indonesia, to promote decolonization and cooperation."
+    },
+    {
+      "date": "1957-10-04",
+      "name": "Sputnik 1 launched",
+      "category": "Science",
+      "description": "The Soviet Union placed the first artificial satellite into Earth orbit."
+    },
+    {
+      "date": "1957-11-03",
+      "name": "Sputnik 2 carries Laika",
+      "category": "Science",
+      "description": "The Soviet Union launched Sputnik 2 with Laika, the first animal to orbit Earth."
+    },
+    {
+      "date": "1960-05-22",
+      "name": "Valdivia earthquake",
+      "category": "Natural Disasters",
+      "description": "The 1960 Valdivia earthquake, the most powerful ever recorded, struck southern Chile and generated a Pacific-wide tsunami."
+    },
+    {
+      "date": "1961-04-12",
+      "name": "First human spaceflight",
+      "category": "Science",
+      "description": "Yuri Gagarin completed one orbit of Earth aboard Vostok 1."
+    },
+    {
+      "date": "1961-08-13",
+      "name": "Berlin Wall construction begins",
+      "category": "Politics",
+      "description": "East Germany began constructing the Berlin Wall, sealing the border between East and West Berlin."
+    },
+    {
+      "date": "1962-10-28",
+      "name": "Cuban Missile Crisis ends",
+      "category": "Politics",
+      "description": "The Cuban Missile Crisis ended after the Soviet Union agreed to withdraw its missiles from Cuba."
     },
     {
       "date": "1963-08-28",
@@ -86,46 +290,64 @@
       "description": "More than 200,000 people gathered in Washington, D.C.; Martin Luther King Jr. delivered 'I Have a Dream'."
     },
     {
-      "date": "1989-11-09",
-      "name": "Berlin Wall opened",
+      "date": "1963-11-22",
+      "name": "Assassination of John F. Kennedy",
       "category": "Politics",
-      "description": "East Germany opened its border crossings, leading to the fall of the Berlin Wall."
+      "description": "President John F. Kennedy was assassinated in Dallas, Texas."
     },
     {
-      "date": "1991-12-26",
-      "name": "Soviet Union dissolved",
-      "category": "Politics",
-      "description": "The Supreme Soviet formally dissolved the Soviet Union, creating fifteen independent republics."
+      "date": "1964-02-09",
+      "name": "The Beatles on The Ed Sullivan Show",
+      "category": "Culture/Religion",
+      "description": "The Beatles made their first live American television appearance on The Ed Sullivan Show."
     },
     {
-      "date": "2001-09-11",
-      "name": "September 11 attacks",
+      "date": "1964-07-02",
+      "name": "US Civil Rights Act signed",
       "category": "Politics",
-      "description": "Coordinated terrorist attacks struck the World Trade Center and the Pentagon."
+      "description": "President Lyndon B. Johnson signed the Civil Rights Act into law."
     },
     {
-      "date": "2008-11-04",
-      "name": "Barack Obama elected",
-      "category": "Politics",
-      "description": "Barack Obama was elected the first African American president of the United States."
+      "date": "1965-12-08",
+      "name": "Second Vatican Council closes",
+      "category": "Culture/Religion",
+      "description": "The Second Vatican Council closed after four sessions and major reforms in the Catholic Church."
     },
     {
-      "date": "2016-06-23",
-      "name": "Brexit referendum",
+      "date": "1968-04-04",
+      "name": "Assassination of Martin Luther King Jr.",
       "category": "Politics",
-      "description": "The United Kingdom voted to leave the European Union."
+      "description": "Martin Luther King Jr. was assassinated in Memphis, Tennessee."
     },
     {
-      "date": "2020-11-03",
-      "name": "US presidential election",
-      "category": "Politics",
-      "description": "Joe Biden defeated incumbent Donald Trump in the US presidential election."
+      "date": "1969-06-28",
+      "name": "Stonewall uprising",
+      "category": "Culture/Religion",
+      "description": "The Stonewall uprising began after a police raid on a gay bar in New York City."
     },
     {
-      "date": "1929-10-29",
-      "name": "Wall Street Crash",
-      "category": "Finance",
-      "description": "The New York Stock Exchange suffered the crash that preceded the Great Depression."
+      "date": "1969-07-16",
+      "name": "Apollo 11 launch",
+      "category": "Science",
+      "description": "Apollo 11 launched from Kennedy Space Center on the first crewed Moon-landing mission."
+    },
+    {
+      "date": "1969-07-20",
+      "name": "Apollo 11 Moon landing",
+      "category": "Science",
+      "description": "Neil Armstrong and Buzz Aldrin landed the Lunar Module Eagle on the Moon while Michael Collins remained in lunar orbit."
+    },
+    {
+      "date": "1969-08-15",
+      "name": "Woodstock opens",
+      "category": "Culture/Religion",
+      "description": "The Woodstock Music and Art Fair opened on a dairy farm in Bethel, New York."
+    },
+    {
+      "date": "1970-11-12",
+      "name": "Bhola cyclone",
+      "category": "Natural Disasters",
+      "description": "The Bhola cyclone struck East Pakistan and the Bay of Bengal, causing one of the deadliest tropical-cyclone disasters."
     },
     {
       "date": "1971-08-15",
@@ -134,10 +356,148 @@
       "description": "President Nixon ended the dollar's convertibility into gold, ending the Bretton Woods system."
     },
     {
+      "date": "1971-10-25",
+      "name": "China seated at the United Nations",
+      "category": "Politics",
+      "description": "The United Nations General Assembly seated the People's Republic of China and expelled the Republic of China."
+    },
+    {
+      "date": "1973-01-27",
+      "name": "Paris Peace Accords signed",
+      "category": "Politics",
+      "description": "The United States, North Vietnam, South Vietnam, and the Viet Cong signed the Paris Peace Accords."
+    },
+    {
+      "date": "1973-10-17",
+      "name": "OPEC oil embargo",
+      "category": "Finance",
+      "description": "Arab oil-producing states imposed an oil embargo, triggering the 1973 oil crisis."
+    },
+    {
+      "date": "1976-07-28",
+      "name": "Tangshan earthquake",
+      "category": "Natural Disasters",
+      "description": "A magnitude 7.8 earthquake struck Tangshan, China, causing massive casualties."
+    },
+    {
+      "date": "1977-05-25",
+      "name": "Star Wars premieres",
+      "category": "Culture/Religion",
+      "description": "Star Wars premiered in U.S. theaters, launching a global science-fiction franchise."
+    },
+    {
+      "date": "1977-09-05",
+      "name": "Voyager 1 launched",
+      "category": "Science",
+      "description": "NASA launched Voyager 1 on a mission to the outer planets and interstellar space."
+    },
+    {
+      "date": "1979-02-11",
+      "name": "Iranian Revolution",
+      "category": "Politics",
+      "description": "The Iranian Revolution culminated in the collapse of the Pahlavi monarchy."
+    },
+    {
+      "date": "1979-10-06",
+      "name": "Volcker shock begins",
+      "category": "Finance",
+      "description": "The Federal Reserve under Paul Volcker began a sustained campaign of high interest rates to break inflation."
+    },
+    {
+      "date": "1980-05-18",
+      "name": "Mount St. Helens eruption",
+      "category": "Natural Disasters",
+      "description": "Mount St. Helens erupted in Washington State, removing its summit and spreading ash across the region."
+    },
+    {
+      "date": "1981-04-12",
+      "name": "First Space Shuttle launch",
+      "category": "Science",
+      "description": "Space Shuttle Columbia launched on STS-1, the first flight of the reusable shuttle program."
+    },
+    {
+      "date": "1981-07-29",
+      "name": "Royal wedding of Charles and Diana",
+      "category": "Culture/Religion",
+      "description": "Prince Charles married Lady Diana Spencer in a globally televised ceremony at St Paul's Cathedral."
+    },
+    {
+      "date": "1982-08-12",
+      "name": "Latin American debt crisis",
+      "category": "Finance",
+      "description": "Mexico suspended payments on its foreign debt, setting off the Latin American debt crisis."
+    },
+    {
+      "date": "1985-11-13",
+      "name": "Nevado del Ruiz eruption",
+      "category": "Natural Disasters",
+      "description": "A volcanic eruption triggered deadly lahars that buried the town of Armero, Colombia."
+    },
+    {
       "date": "1987-10-19",
       "name": "Black Monday",
       "category": "Finance",
       "description": "Global stock markets crashed on a single day, with the Dow Jones falling more than 20%."
+    },
+    {
+      "date": "1989-11-09",
+      "name": "Berlin Wall opened",
+      "category": "Politics",
+      "description": "East Germany opened its border crossings, leading to the fall of the Berlin Wall."
+    },
+    {
+      "date": "1990-04-24",
+      "name": "Hubble Space Telescope launched",
+      "category": "Science",
+      "description": "The Hubble Space Telescope was deployed into low Earth orbit aboard Space Shuttle Discovery."
+    },
+    {
+      "date": "1990-10-03",
+      "name": "German reunification",
+      "category": "Politics",
+      "description": "East and West Germany formally reunified."
+    },
+    {
+      "date": "1991-12-26",
+      "name": "Soviet Union dissolved",
+      "category": "Politics",
+      "description": "The Supreme Soviet formally dissolved the Soviet Union, creating fifteen independent republics."
+    },
+    {
+      "date": "1992-09-16",
+      "name": "Black Wednesday",
+      "category": "Finance",
+      "description": "Britain was forced out of the European Exchange Rate Mechanism on Black Wednesday."
+    },
+    {
+      "date": "1994-05-10",
+      "name": "Nelson Mandela inaugurated",
+      "category": "Politics",
+      "description": "Nelson Mandela was inaugurated as South Africa's first Black president."
+    },
+    {
+      "date": "1995-01-17",
+      "name": "Kobe earthquake",
+      "category": "Natural Disasters",
+      "description": "The Great Hanshin earthquake struck Kobe and the surrounding region in Japan."
+    },
+    {
+      "date": "1995-10-06",
+      "name": "First exoplanet around a Sun-like star",
+      "category": "Science",
+      "description": "Michel Mayor and Didier Queloz announced the first exoplanet orbiting a Sun-like star, 51 Pegasi b."
+    },
+    {
+      "date": "1997-02-22",
+      "name": "Dolly the sheep announced",
+      "category": "Science",
+      "description": "The Roslin Institute announced the birth of Dolly, the first mammal cloned from an adult cell."
+    },
+    {
+      "date": "1997-08-31",
+      "name": "Diana, Princess of Wales, dies",
+      "category": "Culture/Religion",
+      "description": "Diana, Princess of Wales, died after a car crash in Paris."
     },
     {
       "date": "1997-10-27",
@@ -146,10 +506,76 @@
       "description": "Currency and market turmoil spread across East and Southeast Asia."
     },
     {
+      "date": "1999-01-01",
+      "name": "Euro introduced",
+      "category": "Finance",
+      "description": "The euro was introduced as the common currency of eleven European Union member states."
+    },
+    {
       "date": "2000-03-24",
       "name": "Dot-com peak",
       "category": "Finance",
       "description": "The Nasdaq Composite reached its dot-com bubble peak before a multi-year decline."
+    },
+    {
+      "date": "2000-06-26",
+      "name": "Human genome draft announced",
+      "category": "Science",
+      "description": "The Human Genome Project and Celera jointly announced a working draft of the human genome."
+    },
+    {
+      "date": "2001-09-11",
+      "name": "September 11 attacks",
+      "category": "Politics",
+      "description": "Coordinated terrorist attacks struck the World Trade Center and the Pentagon."
+    },
+    {
+      "date": "2001-12-23",
+      "name": "Argentina sovereign default",
+      "category": "Finance",
+      "description": "Argentina defaulted on its sovereign debt amid a severe economic and political crisis."
+    },
+    {
+      "date": "2003-04-14",
+      "name": "Human Genome Project completed",
+      "category": "Science",
+      "description": "The international consortium announced that the human genome had been sequenced to near-completion."
+    },
+    {
+      "date": "2004-01-04",
+      "name": "Spirit rover lands on Mars",
+      "category": "Science",
+      "description": "NASA's Spirit rover landed on Mars to begin the Mars Exploration Rover mission."
+    },
+    {
+      "date": "2004-02-04",
+      "name": "Facebook launches",
+      "category": "Culture/Religion",
+      "description": "Mark Zuckerberg launched Facebook from his Harvard dormitory."
+    },
+    {
+      "date": "2004-12-26",
+      "name": "Indian Ocean earthquake and tsunami",
+      "category": "Natural Disasters",
+      "description": "A magnitude 9.1 earthquake off Sumatra triggered a tsunami that devastated coastlines across the Indian Ocean."
+    },
+    {
+      "date": "2005-08-29",
+      "name": "Hurricane Katrina",
+      "category": "Natural Disasters",
+      "description": "Hurricane Katrina made landfall on the U.S. Gulf Coast, breaching levees and flooding New Orleans."
+    },
+    {
+      "date": "2007-01-09",
+      "name": "iPhone announced",
+      "category": "Culture/Religion",
+      "description": "Steve Jobs unveiled the first iPhone at Macworld in San Francisco."
+    },
+    {
+      "date": "2008-08-08",
+      "name": "Beijing Olympics open",
+      "category": "Culture/Religion",
+      "description": "The Beijing Summer Olympics opened with a widely watched opening ceremony."
     },
     {
       "date": "2008-09-15",
@@ -158,10 +584,124 @@
       "description": "Lehman Brothers filed for bankruptcy, precipitating the global financial crisis."
     },
     {
+      "date": "2008-09-16",
+      "name": "AIG rescued",
+      "category": "Finance",
+      "description": "The U.S. government rescued American International Group with an $85 billion emergency loan."
+    },
+    {
+      "date": "2008-11-04",
+      "name": "Barack Obama elected",
+      "category": "Politics",
+      "description": "Barack Obama was elected the first African American president of the United States."
+    },
+    {
+      "date": "2010-05-06",
+      "name": "Flash Crash",
+      "category": "Finance",
+      "description": "U.S. stock indices plunged and recovered within minutes in the 2010 Flash Crash."
+    },
+    {
+      "date": "2011-03-11",
+      "name": "Tohoku earthquake and tsunami",
+      "category": "Natural Disasters",
+      "description": "A magnitude 9.0 earthquake and tsunami struck northeastern Japan, causing the Fukushima nuclear accident."
+    },
+    {
+      "date": "2011-04-29",
+      "name": "William and Catherine marry",
+      "category": "Culture/Religion",
+      "description": "Prince William married Catherine Middleton at Westminster Abbey."
+    },
+    {
+      "date": "2011-05-02",
+      "name": "Osama bin Laden killed",
+      "category": "Politics",
+      "description": "United States forces killed Osama bin Laden in Abbottabad, Pakistan."
+    },
+    {
+      "date": "2012-07-04",
+      "name": "Higgs boson discovery announced",
+      "category": "Science",
+      "description": "CERN announced the observation of a new particle consistent with the Higgs boson."
+    },
+    {
+      "date": "2012-07-26",
+      "name": "Draghi's 'whatever it takes' pledge",
+      "category": "Finance",
+      "description": "ECB President Mario Draghi pledged to do 'whatever it takes' to preserve the euro."
+    },
+    {
+      "date": "2012-08-06",
+      "name": "Curiosity rover lands on Mars",
+      "category": "Science",
+      "description": "NASA's Curiosity rover landed in Gale Crater to study Mars' habitability."
+    },
+    {
+      "date": "2013-03-13",
+      "name": "Pope Francis elected",
+      "category": "Culture/Religion",
+      "description": "Cardinal Jorge Mario Bergoglio was elected Pope Francis."
+    },
+    {
+      "date": "2015-08-24",
+      "name": "China Black Monday",
+      "category": "Finance",
+      "description": "A sharp selloff in Chinese equities triggered a global market slump."
+    },
+    {
+      "date": "2015-09-14",
+      "name": "LIGO detects gravitational waves",
+      "category": "Science",
+      "description": "The LIGO observatories detected gravitational waves from merging black holes for the first time."
+    },
+    {
+      "date": "2016-02-11",
+      "name": "Gravitational waves announced",
+      "category": "Science",
+      "description": "LIGO reported the first direct detection of gravitational waves from merging black holes."
+    },
+    {
+      "date": "2016-06-23",
+      "name": "Brexit referendum",
+      "category": "Politics",
+      "description": "The United Kingdom voted to leave the European Union."
+    },
+    {
+      "date": "2019-04-10",
+      "name": "First image of a black hole",
+      "category": "Science",
+      "description": "The Event Horizon Telescope collaboration released the first image of a black hole's shadow."
+    },
+    {
+      "date": "2019-04-15",
+      "name": "Notre-Dame Cathedral fire",
+      "category": "Culture/Religion",
+      "description": "A fire severely damaged Notre-Dame Cathedral in Paris."
+    },
+    {
+      "date": "2020-01-11",
+      "name": "SARS-CoV-2 genome shared",
+      "category": "Science",
+      "description": "Chinese researchers shared the first complete genome sequence of SARS-CoV-2."
+    },
+    {
       "date": "2020-02-19",
       "name": "COVID-19 market crash",
       "category": "Finance",
       "description": "Global equity markets began a rapid sell-off as the COVID-19 pandemic spread."
+    },
+    {
+      "date": "2020-11-03",
+      "name": "US presidential election",
+      "category": "Politics",
+      "description": "Joe Biden defeated incumbent Donald Trump in the US presidential election."
+    },
+    {
+      "date": "2021-12-25",
+      "name": "James Webb Space Telescope launched",
+      "category": "Science",
+      "description": "NASA launched the James Webb Space Telescope aboard an Ariane 5 rocket."
     },
     {
       "date": "2022-01-03",
@@ -170,10 +710,70 @@
       "description": "Global markets began repricing sharply as central banks signaled rapid rate increases."
     },
     {
+      "date": "2022-02-24",
+      "name": "Russia invades Ukraine",
+      "category": "Politics",
+      "description": "Russia launched a full-scale invasion of Ukraine."
+    },
+    {
+      "date": "2022-07-12",
+      "name": "JWST first science images",
+      "category": "Science",
+      "description": "NASA released the first full-color science images from the James Webb Space Telescope."
+    },
+    {
+      "date": "2022-09-08",
+      "name": "Queen Elizabeth II dies",
+      "category": "Culture/Religion",
+      "description": "Queen Elizabeth II died at Balmoral Castle after a 70-year reign."
+    },
+    {
+      "date": "2022-12-05",
+      "name": "Fusion ignition achieved",
+      "category": "Science",
+      "description": "The National Ignition Facility achieved the first controlled fusion reaction that produced more energy than the laser energy delivered to the target."
+    },
+    {
+      "date": "2023-03-10",
+      "name": "Silicon Valley Bank collapses",
+      "category": "Finance",
+      "description": "Silicon Valley Bank collapsed after a bank run, becoming the largest U.S. bank failure since 2008."
+    },
+    {
+      "date": "2023-04-04",
+      "name": "Finland joins NATO",
+      "category": "Politics",
+      "description": "Finland formally joined NATO, ending decades of military non-alignment."
+    },
+    {
+      "date": "2023-07-01",
+      "name": "Euclid space telescope launched",
+      "category": "Science",
+      "description": "The European Space Agency launched the Euclid space telescope to map dark matter and dark energy."
+    },
+    {
+      "date": "2024-06-25",
+      "name": "Chang'e 6 returns lunar far-side samples",
+      "category": "Science",
+      "description": "China's Chang'e 6 mission returned the first samples from the Moon's far side."
+    },
+    {
+      "date": "2024-07-26",
+      "name": "Paris Olympics open",
+      "category": "Culture/Religion",
+      "description": "The Paris Summer Olympics opened with an opening ceremony on the River Seine."
+    },
+    {
       "date": "2024-08-05",
       "name": "Yen carry unwind",
       "category": "Finance",
       "description": "A sharp unwind of yen-funded positions triggered a global risk-off move."
+    },
+    {
+      "date": "2024-10-13",
+      "name": "Starship booster caught at launch tower",
+      "category": "Science",
+      "description": "SpaceX's Starship Super Heavy booster returned to its launch tower and was caught by mechanical arms."
     }
   ]
 }

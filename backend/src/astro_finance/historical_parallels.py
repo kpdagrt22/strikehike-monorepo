@@ -306,7 +306,15 @@ def _create_schema(connection: sqlite3.Connection, drop: bool = False) -> None:
             event_date TEXT NOT NULL,
             name TEXT NOT NULL,
             category TEXT NOT NULL
-                CHECK (category IN ('Science', 'Politics', 'Finance')),
+                CHECK (
+                    category IN (
+                        'Science',
+                        'Politics',
+                        'Finance',
+                        'Culture/Religion',
+                        'Natural Disasters'
+                    )
+                ),
             description TEXT NOT NULL,
             geometry_json TEXT NOT NULL,
             energy_score INTEGER NOT NULL
