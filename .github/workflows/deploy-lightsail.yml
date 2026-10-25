@@ -91,11 +91,8 @@ jobs:
             set -euo pipefail
 
             APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
-            case "$APP_DIR" in
-              /*) ;;
-              *) APP_DIR="$HOME/$APP_DIR" ;;
-            esac
-            cd "$APP_DIR"
+            cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
+            echo "Deploying from $(pwd)"
 
             git fetch origin main
             git checkout main
