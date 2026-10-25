@@ -26,6 +26,7 @@ from astro_finance.energy_metric_compiler import (  # noqa: E402
 from astro_finance.historical_parallels import (  # noqa: E402
     ensure_event_database,
     find_historical_parallels,
+    list_events_by_category,
 )
 
 app = FastAPI(title="Astro-Finance API")
@@ -285,6 +286,18 @@ def historical_parallels_get(
         raise HTTPException(
             status_code=503,
             detail="Historical parallels service is unavailable",
+        ) from exc
+
+
+@app.get("/api/v1/events")
+def historical_events():
+    """Return the curated event roster grouped into the five public categories."""
+    try:
+        return list_events_by_category()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Historical events service is unavailable",
         ) from exc
 
 

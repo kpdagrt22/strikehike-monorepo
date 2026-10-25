@@ -13,8 +13,15 @@ export const useChronoStore = create((set) => ({
   parallels: [],
   marketEnergy: null,
   sources: null,
+  cameraView: "orbital",
+  cameraRevision: 0,
 
   setFocusedDate: (focusedDate) => set({ focusedDate }),
+  setCameraView: (cameraView) =>
+    set((state) => ({
+      cameraView,
+      cameraRevision: state.cameraRevision + 1,
+    })),
 
   setPositions: (payload) =>
     set((state) =>

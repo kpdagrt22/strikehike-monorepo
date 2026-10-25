@@ -72,6 +72,19 @@ def test_seed_category_distribution(seeded_db):
     }
 
 
+def test_events_grouped_by_category(seeded_db):
+    roster = hp.list_events_by_category()
+
+    assert roster["total"] == 129
+    assert set(roster["categories"]) == set(hp.EVENT_CATEGORIES)
+    assert sum(len(events) for events in roster["categories"].values()) == 129
+    assert len(roster["categories"]["Science"]) == 35
+    assert len(roster["categories"]["Politics"]) == 35
+    assert len(roster["categories"]["Finance"]) == 24
+    assert len(roster["categories"]["Culture/Religion"]) == 20
+    assert len(roster["categories"]["Natural Disasters"]) == 15
+
+
 def test_provided_geometry_matches_date_geometry(seeded_db):
     geometry = hp.geometry_for_date("1947-08-15")
     result = hp.find_historical_parallels(

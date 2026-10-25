@@ -425,6 +425,35 @@ def _load_events() -> list[sqlite3.Row]:
         connection.close()
 
 
+EVENT_CATEGORIES = (
+    "Science",
+    "Politics",
+    "Finance",
+    "Culture/Religion",
+    "Natural Disasters",
+)
+
+
+def list_events_by_category() -> dict:
+    """Return the curated event roster grouped into the five public categories."""
+    ensure_event_database()
+    rows = _load_events()
+    grouped = {category: [] for category in EVENT_CATEGORIES}
+
+    for row in rows:
+        category = str(row["category"])
+        grouped.setdefault(category, []).append(
+            {
+                "date": str(row["event_date"]),
+                "name": str(row["name"]),
+                "description": str(row["description"]),
+                "energy_score": int(row["energy_score"]),
+            }
+        )
+
+    return {"total": len(rows), "categories": grouped}
+
+
 def find_historical_parallels(
     target_date: str,
     geometry: dict | None = None,
