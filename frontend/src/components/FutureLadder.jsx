@@ -8,6 +8,8 @@ import { useChronoStore } from "@/store/chronoStore";
 export function FutureLadder() {
   const [ladder, setLadder] = useState(null);
   const [error, setError] = useState(false);
+  const mobileSheet = useChronoStore((state) => state.mobileSheet);
+  const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const setFocusedDate = useChronoStore((state) => state.setFocusedDate);
 
   useEffect(() => {
@@ -33,18 +35,44 @@ export function FutureLadder() {
   const matches = ladder?.matches ?? [];
 
   return (
-    <div className="pointer-events-auto fixed left-3 top-[23.5rem] z-30 w-[min(16.5rem,calc(100vw-1.5rem))] sm:left-5">
-      <div className="overflow-hidden rounded-2xl border border-black/10 bg-white/35 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-black/25 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
-        <div className="border-b border-black/10 px-3.5 py-3 dark:border-white/10">
-          <p className="text-[8px] font-medium uppercase tracking-[0.24em] text-black/40 dark:text-white/35">
-            Future ladder
-          </p>
-          <p className="mt-1 text-[9px] text-black/35 dark:text-white/30">
-            Next 180 days · 85%+ geometry
-          </p>
+    <div
+      className={`${
+        mobileSheet === "future"
+          ? "fixed inset-x-3 bottom-[4.25rem] z-50 block max-h-[70dvh] overflow-y-auto"
+          : "hidden"
+      } pointer-events-auto lg:fixed lg:left-5 lg:top-[23.5rem] lg:z-30 lg:block lg:w-[min(16.5rem,calc(100vw-1.5rem))] lg:max-h-none lg:overflow-visible`}
+    >
+      <div className="overflow-hidden rounded-2xl border border-black/10 bg-white/55 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/55 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/35 lg:dark:bg-black/25">
+        <div className="flex items-start justify-between gap-2 border-b border-black/10 px-3.5 py-3 dark:border-white/10">
+          <div>
+            <p className="text-[8px] font-medium uppercase tracking-[0.24em] text-black/40 dark:text-white/35">
+              Future ladder
+            </p>
+            <p className="mt-1 text-[9px] text-black/35 dark:text-white/30">
+              Next 180 days · 85%+ geometry
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileSheet(null)}
+            aria-label="Close future ladder"
+            className="grid h-7 w-7 place-items-center rounded-full border border-black/10 text-black/35 lg:hidden dark:border-white/10 dark:text-white/35"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+          </button>
         </div>
 
-        <div className="max-h-[min(16rem,40vh)] overflow-y-auto p-1.5 [scrollbar-width:thin]">
+        <div className="max-h-[min(24rem,55dvh)] overflow-y-auto p-1.5 [scrollbar-width:thin] lg:max-h-[min(16rem,40vh)]">
           {error ? (
             <p className="px-2 py-3 text-[9px] text-[#c0442f] dark:text-[#ff8b77]">
               Forecast unavailable
@@ -70,7 +98,10 @@ export function FutureLadder() {
               <motion.button
                 key={`${match.date}-${match.event.name}`}
                 type="button"
-                onClick={() => setFocusedDate(match.date)}
+                onClick={() => {
+                  setFocusedDate(match.date);
+                  setMobileSheet(null);
+                }}
                 whileHover={{ x: 2 }}
                 className="group flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-black/[0.035] dark:hover:bg-white/[0.045]"
               >

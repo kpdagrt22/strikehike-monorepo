@@ -58,12 +58,20 @@ export function TimeControls() {
   );
   const setPositions = useChronoStore((state) => state.setPositions);
   const setStatus = useChronoStore((state) => state.setStatus);
+  const setTimeControlsExpanded = useChronoStore(
+    (state) => state.setTimeControlsExpanded,
+  );
   const status = useChronoStore((state) => state.status);
   const source = useChronoStore((state) => state.source);
 
   const [expanded, setExpanded] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const selectedDateTime = `${focusedDate}T${focusedTime}`;
+
+  useEffect(() => {
+    setTimeControlsExpanded(expanded);
+    return () => setTimeControlsExpanded(false);
+  }, [expanded, setTimeControlsExpanded]);
 
   useEffect(() => {
     const controller = new AbortController();

@@ -23,6 +23,8 @@ export const useChronoStore = create((set) => ({
   sources: null,
   cameraView: "orbital",
   cameraRevision: 0,
+  mobileSheet: null,
+  timeControlsExpanded: false,
 
   setFocusedDate: (focusedDate) =>
     set({ focusedDate, focusedTime: "00:00" }),
@@ -37,6 +39,9 @@ export const useChronoStore = create((set) => ({
       cameraView,
       cameraRevision: state.cameraRevision + 1,
     })),
+  setMobileSheet: (mobileSheet) => set({ mobileSheet }),
+  setTimeControlsExpanded: (timeControlsExpanded) =>
+    set({ timeControlsExpanded }),
 
   setPositions: (payload) =>
     set((state) => {

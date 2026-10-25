@@ -35,10 +35,25 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 
 export function RightPanel() {
   const [open, setOpen] = useState(true);
+  const mobileSheet = useChronoStore((state) => state.mobileSheet);
+  const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const positions = useChronoStore((state) => state.positions);
   const focusedDate = useChronoStore((state) => state.focusedDate);
   const focusedTime = useChronoStore((state) => state.focusedTime);
   const status = useChronoStore((state) => state.status);
+  const mobileOpen = mobileSheet === "alignment";
+  const panelOpen = mobileOpen || open;
+
+  const closePanel = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 1023px)").matches
+    ) {
+      setMobileSheet(null);
+    } else {
+      setOpen(false);
+    }
+  };
 
   const displayDate = new Date(`${focusedDate}T00:00:00Z`);
   const dateLabel = Number.isNaN(displayDate.getTime())
@@ -47,16 +62,22 @@ export function RightPanel() {
   const timeLabel = focusedTime !== "00:00" ? ` · ${focusedTime} UTC` : "";
 
   return (
-    <div className="pointer-events-auto fixed right-3 top-[6.75rem] z-30 sm:right-5">
+    <div
+      className={`${
+        mobileOpen
+          ? "fixed inset-x-3 bottom-[4.25rem] z-50 block max-h-[70dvh] overflow-y-auto"
+          : "hidden"
+      } pointer-events-auto lg:fixed lg:right-5 lg:top-[6.75rem] lg:z-30 lg:block lg:max-h-none lg:overflow-visible`}
+    >
       <AnimatePresence initial={false} mode="wait">
-        {open ? (
+        {panelOpen ? (
           <motion.aside
             key="alignment-panel"
             initial={{ opacity: 0, x: 12, width: 0 }}
             animate={{ opacity: 1, x: 0, width: "auto" }}
             exit={{ opacity: 0, x: 10, width: 0 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/25 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)]"
+            className="w-full overflow-hidden rounded-2xl border border-black/10 bg-white/55 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl lg:w-[min(19rem,calc(100vw-1.5rem))] lg:bg-white/45 dark:border-white/10 dark:bg-black/55 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:dark:bg-black/25"
           >
             <div className="flex items-start justify-between gap-3 border-b border-black/10 px-4 py-3.5 dark:border-white/10">
               <div>
@@ -70,8 +91,12 @@ export function RightPanel() {
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Collapse current alignment panel"
+                onClick={closePanel}
+                aria-label={
+                  mobileOpen
+                    ? "Close current alignment panel"
+                    : "Collapse current alignment panel"
+                }
                 className="grid h-7 w-7 place-items-center rounded-full border border-black/10 text-black/40 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/40 dark:hover:bg-white/[0.06]"
               >
                 <svg
@@ -83,7 +108,11 @@ export function RightPanel() {
                   strokeLinecap="round"
                   aria-hidden="true"
                 >
-                  <path d="M6 3.5 10.5 8 6 12.5" />
+                  {mobileOpen ? (
+                    <path d="M4 4l8 8M12 4l-8 8" />
+                  ) : (
+                    <path d="M6 3.5 10.5 8 6 12.5" />
+                  )}
                 </svg>
               </button>
             </div>

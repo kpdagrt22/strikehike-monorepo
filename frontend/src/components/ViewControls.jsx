@@ -33,7 +33,7 @@ export function ViewControls() {
   const setCameraView = useChronoStore((state) => state.setCameraView);
 
   return (
-    <div className="pointer-events-auto fixed bottom-20 right-3 z-30 sm:bottom-24 sm:right-5">
+    <div className="pointer-events-auto fixed bottom-20 right-3 z-30 hidden sm:bottom-24 sm:right-5 lg:block">
       <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/45 p-1 shadow-[0_16px_50px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/30 dark:shadow-[0_16px_50px_rgba(0,0,0,0.45)]">
         {VIEWS.map((view) => {
           const active = cameraView === view.id;

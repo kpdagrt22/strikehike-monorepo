@@ -29,7 +29,7 @@ export function Tooltip() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-none absolute right-3 bottom-24 z-20 w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 font-sans text-[#14121a] shadow-[0_10px_40px_rgba(0,0,0,0.12)] backdrop-blur-md backdrop-saturate-150 lg:bottom-auto lg:right-[21.5rem] lg:top-5 dark:border-white/15 dark:bg-white/10 dark:text-[#f2ede4] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)]"
+          className="pointer-events-none absolute right-3 bottom-32 z-20 w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 font-sans text-[#14121a] shadow-[0_10px_40px_rgba(0,0,0,0.12)] backdrop-blur-md backdrop-saturate-150 lg:bottom-auto lg:right-[21.5rem] lg:top-5 dark:border-white/15 dark:bg-white/10 dark:text-[#f2ede4] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)]"
           style={{ borderTopColor: category.color }}
         >
           <div className="flex items-center gap-3">

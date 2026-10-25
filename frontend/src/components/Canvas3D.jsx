@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import gsap from "gsap";
@@ -10,6 +10,7 @@ import { useChronoStore } from "@/store/chronoStore";
 
 // Camera keys are calibrated to the compact orrery radius (not literal AU scale).
 const ORBITAL_VIEW = { x: 0, y: 8, z: 14 };
+const PORTRAIT_ORBITAL_VIEW = { x: 0, y: 12, z: 22 };
 const ZENITH_VIEW = { x: 0, y: 22, z: 0 };
 const INTRO_START = { x: 0, y: 55, z: 95 };
 const INTRO_DURATION = 3;
@@ -17,7 +18,12 @@ const AUTO_ROTATE_SPEED = 0.16;
 const IDLE_RESUME_MS = 4200;
 
 function CameraRig({ onIntroComplete }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
+  const isPortrait = size.width / Math.max(size.height, 1) < 0.8;
+  const orbitalTarget = useMemo(
+    () => (isPortrait ? PORTRAIT_ORBITAL_VIEW : ORBITAL_VIEW),
+    [isPortrait],
+  );
   const controlsRef = useRef(null);
   const idleTimerRef = useRef(null);
   const appliedViewRef = useRef(false);
@@ -63,7 +69,7 @@ function CameraRig({ onIntroComplete }) {
     }
 
     const tween = gsap.to(camera.position, {
-      ...ORBITAL_VIEW,
+      ...orbitalTarget,
       duration: INTRO_DURATION,
       ease: "power3.inOut",
       onUpdate: () => controlsRef.current?.update(),
@@ -78,7 +84,7 @@ function CameraRig({ onIntroComplete }) {
       tween.kill();
       clearTimeout(idleTimerRef.current);
     };
-  }, [camera, emitCameraState]);
+  }, [camera, emitCameraState, orbitalTarget]);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -113,7 +119,12 @@ function CameraRig({ onIntroComplete }) {
       return undefined;
     }
 
-    const target = cameraView === "zenith" ? ZENITH_VIEW : ORBITAL_VIEW;
+    const target =
+      cameraView === "zenith"
+        ? isPortrait
+          ? { x: 0, y: 28, z: 0 }
+          : ZENITH_VIEW
+        : orbitalTarget;
     setViewTweening(true);
     const tween = gsap.to(camera.position, {
       ...target,
@@ -136,6 +147,8 @@ function CameraRig({ onIntroComplete }) {
     cameraRevision,
     emitCameraState,
     introComplete,
+    isPortrait,
+    orbitalTarget,
   ]);
 
   const shouldAutoRotate =

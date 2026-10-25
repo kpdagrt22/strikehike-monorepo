@@ -12,6 +12,8 @@ export function FilterControls() {
   const [roster, setRoster] = useState(null);
   const [error, setError] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
+  const mobileSheet = useChronoStore((state) => state.mobileSheet);
+  const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const focusedDate = useChronoStore((state) => state.focusedDate);
   const setFocusedDate = useChronoStore((state) => state.setFocusedDate);
 
@@ -48,19 +50,48 @@ export function FilterControls() {
   const travelToEvent = (eventDate) => {
     setFocusedDate(eventDate);
     setActiveCategory(null);
+    setMobileSheet(null);
   };
 
   return (
-    <div className="pointer-events-auto fixed left-3 top-[6.75rem] z-30 sm:left-5">
+    <div
+      className={`${
+        mobileSheet === "archive"
+          ? "fixed inset-x-3 bottom-[4.25rem] z-50 block max-h-[70dvh] overflow-y-auto"
+          : "hidden"
+      } pointer-events-auto lg:fixed lg:left-5 lg:top-[6.75rem] lg:z-30 lg:block lg:max-h-none lg:overflow-visible`}
+    >
       <div className="relative">
-        <div className="rounded-[1.6rem] border border-black/10 bg-white/45 p-2 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-black/25 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
-          <div className="px-2 pb-1.5 pt-1">
-            <p className="text-[8px] font-medium uppercase tracking-[0.24em] text-black/40 dark:text-white/35">
-              Event archive
-            </p>
-            <p className="mt-0.5 text-[9px] tabular-nums text-black/30 dark:text-white/25">
-              {roster?.total ? `${roster.total} curated moments` : "129 moments"}
-            </p>
+        <div className="rounded-[1.6rem] border border-black/10 bg-white/55 p-2 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/55 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25">
+          <div className="flex items-start justify-between gap-2 px-2 pb-1.5 pt-1">
+            <div>
+              <p className="text-[8px] font-medium uppercase tracking-[0.24em] text-black/40 dark:text-white/35">
+                Event archive
+              </p>
+              <p className="mt-0.5 text-[9px] tabular-nums text-black/30 dark:text-white/25">
+                {roster?.total
+                  ? `${roster.total} curated moments`
+                  : "129 moments"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileSheet(null)}
+              aria-label="Close event archive"
+              className="grid h-7 w-7 place-items-center rounded-full border border-black/10 text-black/35 lg:hidden dark:border-white/10 dark:text-white/35"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                className="h-3 w-3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M4 4l8 8M12 4l-8 8" />
+              </svg>
+            </button>
           </div>
 
           <div className="space-y-1">
@@ -111,7 +142,7 @@ export function FilterControls() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: -6, scale: 0.985 }}
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute left-0 top-full mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-white/75 shadow-[0_20px_70px_rgba(20,18,26,0.16)] backdrop-blur-2xl sm:left-full sm:top-0 sm:ml-2 sm:mt-0 dark:border-white/10 dark:bg-black/65 dark:shadow-[0_20px_70px_rgba(0,0,0,0.55)]"
+              className="absolute left-0 top-full mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-white/80 shadow-[0_20px_70px_rgba(20,18,26,0.18)] backdrop-blur-2xl lg:left-full lg:top-0 lg:ml-2 lg:mt-0 dark:border-white/10 dark:bg-black/75 dark:shadow-[0_20px_70px_rgba(0,0,0,0.6)]"
               role="region"
               aria-label={`${activeCategory} events`}
             >
