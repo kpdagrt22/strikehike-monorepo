@@ -1,0 +1,4 @@
+strikehike.com, www.strikehike.com {
+	encode gzip
+	reverse_proxy frontend:3000
+}

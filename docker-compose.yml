@@ -1,4 +1,4 @@
-name: strikehike
+name: strikehike-chrono
 
 services:
   backend:
@@ -49,8 +49,8 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: 0.0.0.0
-    ports:
-      - "80:3000"
+    expose:
+      - "3000"
     depends_on:
       backend:
         condition: service_healthy
@@ -75,9 +75,33 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - strikehike
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   strikehike:
     driver: bridge
 
 volumes:
   historical-data:
+  caddy-data:
+  caddy-config:

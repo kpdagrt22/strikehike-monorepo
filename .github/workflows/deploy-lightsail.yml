@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Pull and rebuild on Lightsail
+      - name: Build new stack, stop legacy edge, cut over
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
@@ -90,20 +90,79 @@ jobs:
           script: |
             set -euo pipefail
 
-            cd "${{ secrets.LIGHTSAIL_APP_DIR }}"
+            APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
+            case "$APP_DIR" in
+              /*) ;;
+              *) APP_DIR="$HOME/$APP_DIR" ;;
+            esac
+            cd "$APP_DIR"
 
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
 
-            docker compose up -d --build --remove-orphans
-            docker compose ps
+            # Build the new stack while the existing site is still serving.
+            docker compose -p strikehike-chrono build
 
-            curl --fail --silent --show-error \
-              --retry 12 --retry-delay 5 --retry-connrefused \
-              http://127.0.0.1:8010/health
+            OLD_IDS="$(docker ps -aq --filter 'label=com.docker.compose.project=strikehike' || true)"
+            OLD_CONFIG=""
+            if [ -n "$OLD_IDS" ]; then
+              OLD_FIRST="$(printf '%s\n' "$OLD_IDS" | head -n 1)"
+              OLD_CONFIG="$(docker inspect "$OLD_FIRST" --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null || true)"
+            fi
 
-            curl --fail --silent --show-error \
+            rollback() {
+              echo "::error::New strikehike-chrono stack failed; rolling back to legacy strikehike stack."
+              docker compose -p strikehike-chrono down --remove-orphans || true
+              if [ -n "$OLD_CONFIG" ] && [ -f "$OLD_CONFIG" ]; then
+                docker compose -f "$OLD_CONFIG" -p strikehike up -d --remove-orphans || true
+              elif [ -n "$OLD_IDS" ]; then
+                docker start $OLD_IDS || true
+              fi
+              exit 1
+            }
+
+            # Free ports 80/443 only after the new images are built.
+            if [ -n "$OLD_IDS" ]; then
+              if [ -n "$OLD_CONFIG" ] && [ -f "$OLD_CONFIG" ]; then
+                if ! docker compose -f "$OLD_CONFIG" -p strikehike down --remove-orphans; then
+                  docker update --restart=no $OLD_IDS || true
+                  docker stop $OLD_IDS || true
+                fi
+              else
+                docker update --restart=no $OLD_IDS || true
+                docker stop $OLD_IDS || true
+              fi
+            fi
+
+            if ! docker compose -p strikehike-chrono up -d --remove-orphans; then
+              rollback
+            fi
+
+            docker compose -p strikehike-chrono ps
+
+            if ! curl --fail --silent --show-error \
               --retry 12 --retry-delay 5 --retry-connrefused \
-              "http://127.0.0.1/api/chrono/positions?date=2008-09-15" \
-              > /dev/null
+              http://127.0.0.1:8010/health; then
+              rollback
+            fi
+
+            if ! curl --fail --silent --show-error \
+              --retry 36 --retry-delay 5 --retry-connrefused \
+              --resolve strikehike.com:443:127.0.0.1 \
+              https://strikehike.com/ > /dev/null; then
+              rollback
+            fi
+
+            if ! curl --fail --silent --show-error \
+              --retry 12 --retry-delay 5 --retry-connrefused \
+              --resolve strikehike.com:443:127.0.0.1 \
+              "https://strikehike.com/api/chrono/positions?date=2008-09-15" \
+              > /dev/null; then
+              rollback
+            fi
+
+            # The old containers can be removed after the new stack is healthy.
+            if [ -n "$OLD_IDS" ]; then
+              docker rm $OLD_IDS 2>/dev/null || true
+            fi
