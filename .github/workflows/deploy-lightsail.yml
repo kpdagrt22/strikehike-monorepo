@@ -136,6 +136,9 @@ jobs:
               rollback
             fi
 
+            # Reclaim disk space from unused images, stopped containers, and stale build cache.
+            docker system prune -a -f --filter "until=24h"
+
             # Give Caddy a baseline window to provision the certificate before probing TLS.
             sleep 15
 
