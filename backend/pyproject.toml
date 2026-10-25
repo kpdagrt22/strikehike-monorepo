@@ -1,0 +1,33 @@
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astro_finance"
+version = "0.1.0"
+description = "Astro Finance Market Regime Intelligence"
+authors = [
+    {name = "Antigravity", email = "agent@google.com"},
+]
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "torch",
+    "xgboost",
+    "hmmlearn",
+    "python-socketio",
+    "loguru",
+    "skyfield",
+    "ephem"
+]
+requires-python = ">=3.9"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["astro_finance"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"

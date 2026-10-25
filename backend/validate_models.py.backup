@@ -1,0 +1,191 @@
+"""
+Model Validation Script
+=======================
+
+Run this to validate your models meet the excellence standard:
+- Accuracy > 60% on regime changes
+- Sharpe ratio > 1.5
+- Walk-forward analysis (no overfitting)
+
+THIS IS YOUR PROOF. Run before any marketing.
+"""
+
+from astro_finance.validation.backtesting import WalkForwardValidator, PerformanceTracker
+from astro_finance.modeling.sequential import NeuralHMMWrapper
+from astro_finance.modeling.clustering import MarketRegimeHMM
+from astro_finance.modeling.supervised import XGBoostPredictor
+from loguru import logger
+import pandas as pd
+import numpy as np
+import os
+from datetime import datetime
+
+
+def load_data(data_path: str = "data/processed/merged_data.csv") -> pd.DataFrame:
+    """Load historical data for validation"""
+    logger.info(f"Loading data from {data_path}")
+    
+    if not os.path.exists(data_path):
+        logger.error(f"Data file not found: {data_path}")
+        logger.error("Run the training pipeline first: python run_pipeline.py")
+        raise FileNotFoundError(data_path)
+    
+    df = pd.read_csv(data_path, index_col=0, parse_dates=True)
+    logger.success(f"Loaded {len(df)} rows from {df.index[0]} to {df.index[-1]}")
+    
+    return df
+
+
+def validate_neural_hmm(data: pd.DataFrame) -> pd.DataFrame:
+    """Validate NeuralHMM (Planetary → Regime prediction)"""
+    logger.info("\n" + "="*60)
+    logger.info("VALIDATING: NeuralHMM (Planetary → Market Regime)")
+    logger.info("="*60)
+    
+    # Prepare data
+    exclude_cols = ['Close', 'Open', 'High', 'Low', 'Volume', 'Adj Close', 
+                    'Returns', 'Volatility', 'Crash_Minor', 'Crash_Major']
+    
+    feature_cols = [c for c in data.columns if c not in exclude_cols + ['Market_Regime']]
+    feature_cols = data[feature_cols].select_dtypes(include=[np.number]).columns.tolist()
+    
+    logger.info(f"Using {len(feature_cols)} features")
+    
+    # Ensure Market_Regime exists
+    if 'Market_Regime' not in data.columns:
+        logger.warning("Market_Regime not found, creating placeholder")
+        data['Market_Regime'] = 0  # Placeholder
+    
+
+        data=validation_data,
+        model=model,
+        target_col='Market_Regime'
+    )
+    
+    # Save results
+    results.to_csv('data/validation_results_neural_hmm.csv', index=False)
+    logger.success("Results saved to data/validation_results_neural_hmm.csv")
+    
+    return results
+
+
+def validate_crash_predictor(data: pd.DataFrame) -> pd.DataFrame:
+    """Validate XGBoost Crash Predictor"""
+    logger.info("\n" + "="*60)
+    logger.info("VALIDATING: XGBoost (Crash Prediction)")
+    logger.info("="*60)
+    
+    if 'Crash_Minor' not in data.columns:
+        logger.error("Crash_Minor column not found. Run feature engineering first.")
+        return pd.DataFrame()
+    
+    # Prepare features
+    exclude_cols = ['Close', 'Open', 'High', 'Low', 'Volume', 'Adj Close', 
+                    'Returns', 'Volatility', 'Crash_Minor', 'Crash_Major']
+    
+    feature_cols = [c for c in data.columns if c not in exclude_cols]
+    feature_cols = data[feature_cols].select_dtypes(include=[np.number]).columns.tolist()
+    
+    validation_data = data[data['Crash_Minor'].notna()].copy()
+    
+    logger.info(f"Validation dataset: {len(validation_data)} samples")
+    logger.info(f"Crash events: {validation_data['Crash_Minor'].sum()} ({validation_data['Crash_Minor'].mean():.2%})")
+    
+
+        data=validation_data,
+        model=model,
+        target_col='Crash_Minor'
+    )
+    
+    results.to_csv('data/validation_results_crash.csv', index=False)
+    logger.success("Results saved to data/validation_results_crash.csv")
+    
+    return results
+
+
+def generate_public_track_record(results: pd.DataFrame):
+    """Generate public-facing track record page"""
+    logger.info("\n" + "="*60)
+    logger.info("GENERATING PUBLIC TRACK RECORD")
+    logger.info("="*60)
+    
+    summary = {
+        'validation_date': datetime.now().isoformat(),
+        'total_periods': len(results),
+        'date_range': f"{results['period_start'].min()} to {results['period_end'].max()}",
+        'metrics': {
+            'accuracy': {
+                'mean': float(results['accuracy'].mean()),
+                'median': float(results['accuracy'].median()),
+                'std': float(results['accuracy'].std()),
+                'min': float(results['accuracy'].min()),
+                'max': float(results['accuracy'].max())
+            },
+            'sharpe_ratio': {
+                'mean': float(results['sharpe_ratio'].mean()),
+                'median': float(results['sharpe_ratio'].median())
+            },
+            'win_rate': {
+                'mean': float(results['win_rate'].mean())
+            }
+        },
+        'passed_criteria': {
+            'accuracy_gt_60': bool(results['accuracy'].mean() > 0.60),
+            'sharpe_gt_1_5': bool(results['sharpe_ratio'].mean() > 1.5)
+        }
+    }
+    
+    # Save as JSON for website
+    import json
+    os.makedirs('web/public', exist_ok=True)
+    with open('web/public/track_record.json', 'w') as f:
+        json.dump(summary, f, indent=2)
+    
+    logger.success("Track record saved to web/public/track_record.json")
+    logger.info(f"Overall Accuracy: {summary['metrics']['accuracy']['mean']:.2%}")
+    logger.info(f"Overall Sharpe: {summary['metrics']['sharpe_ratio']['mean']:.2f}")
+    
+    if all(summary['passed_criteria'].values()):
+        logger.success("✅ READY FOR PUBLIC LAUNCH")
+    else:
+        logger.warning("⚠️  Models need improvement before launch")
+
+
+def main():
+    """Run full validation suite"""
+    logger.info("="*60)
+    logger.info("ASTRO FINANCE - MODEL VALIDATION")
+    logger.info("="*60)
+    logger.info("This validates your models meet excellence standards.")
+    logger.info("Targets: Accuracy >60%, Sharpe >1.5")
+    logger.info("")
+    
+    try:
+        # Load data
+        data = load_data()
+        
+        # Validate NeuralHMM
+        neural_results = validate_neural_hmm(data)
+        
+        # Validate Crash Predictor
+        crash_results = validate_crash_predictor(data)
+        
+        # Generate public track record
+        if len(neural_results) > 0:
+            generate_public_track_record(neural_results)
+        
+        logger.success("\n✅ VALIDATION COMPLETE")
+        logger.info("Review results in data/validation_results_*.csv")
+        logger.info("Public track record: web/public/track_record.json")
+        
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

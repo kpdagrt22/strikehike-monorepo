@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#091226"/>
+  <text
+    x="16"
+    y="24"
+    text-anchor="middle"
+    font-family="'Arial Black', Arial, sans-serif"
+    font-size="22"
+    font-weight="900"
+    fill="#f05d49"
+  >S</text>
+  <circle cx="26" cy="23" r="2.5" fill="#f05d49"/>
+</svg>

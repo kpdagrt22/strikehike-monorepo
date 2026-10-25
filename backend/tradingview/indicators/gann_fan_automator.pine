@@ -1,0 +1,159 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © AstroFinance
+
+//@version=5
+indicator("Gann Fan Automator", overlay=true, max_lines_count=500)
+
+// ============================================
+// INPUTS
+// ============================================
+swing_lookback = input.int(10, "Swing Detection Lookback", minval=3, maxval=50)
+show_1x1 = input.bool(true, "Show 1x1 (45°)")
+show_2x1 = input.bool(true, "Show 2x1 Angles")
+show_3x1 = input.bool(true, "Show 3x1 Angles")
+show_4x1 = input.bool(true, "Show 4x1 Angles")
+show_8x1 = input.bool(false, "Show 8x1 Angles")
+
+gann_1x1_color = input.color(color.rgb(139, 92, 246), "1x1 Color")  // Purple
+gann_2x1_color = input.color(color.rgb(6, 182, 212), "2x1 Color")   // Cyan
+gann_3x1_color = input.color(color.rgb(59, 130, 246), "3x1 Color")  // Blue
+gann_extend = input.int(50, "Extend Lines (bars)", minval=10, maxval=200)
+
+// ============================================
+// SWING DETECTION (Fractal Method)
+// ============================================
+
+// Detect swing highs
+is_swing_high = ta.highestbars(high, swing_lookback) == 0
+
+// Detect swing lows
+is_swing_low = ta.lowestbars(low, swing_lookback) == 0
+
+// Store last swing point
+var float last_swing_price = na
+var int last_swing_bar = na
+var bool last_swing_is_high = na
+
+if is_swing_high
+    last_swing_price := high
+    last_swing_bar := bar_index
+    last_swing_is_high := true
+
+if is_swing_low
+    last_swing_price := low
+    last_swing_bar := bar_index
+    last_swing_is_high := false
+
+// ============================================
+// GANN ANGLE CALCULATIONS
+// ============================================
+
+// Calculate price per bar for 1x1 angle (45 degrees)
+// 1x1 means 1 unit of price per 1 unit of time
+float price_per_bar_1x1 = na
+float price_per_bar_2x1 = na
+float price_per_bar_3x1 = na
+float price_per_bar_4x1 = na
+float price_per_bar_8x1 = na
+
+if not na(last_swing_price)
+    // Calculate based on average price movement
+    avg_range = ta.sma(high - low, 20)
+    
+    // 1x1: 1 unit price per 1 unit time
+    price_per_bar_1x1 := avg_range
+    
+    // 2x1: 2 units price per 1 unit time (steeper)
+    price_per_bar_2x1 := avg_range * 2
+    
+    // 3x1: 3 units price per 1 unit time
+    price_per_bar_3x1 := avg_range * 3
+    
+    // 4x1: Even steeper
+    price_per_bar_4x1 := avg_range * 4
+    
+    // 8x1: Very steep
+    price_per_bar_8x1 := avg_range * 8
+
+// ============================================
+// DRAW GANN FAN LINES
+// ============================================
+
+// Function to draw Gann line
+draw_gann_line(is_bullish, price_per_bar, line_color, line_width) =>
+    if not na(last_swing_price) and not na(last_swing_bar)
+        bars_since_swing = bar_index - last_swing_bar
+        
+        // Only draw if we're past the swing point
+        if bars_since_swing >= 0 and bars_since_swing <= gann_extend
+            direction = is_bullish ? 1 : -1
+            current_price = last_swing_price + (direction * price_per_bar * bars_since_swing)
+            
+            // Plot the line point
+            current_price
+
+// Draw 1x1 angle (most important - the "money line")
+gann_1x1_bull = show_1x1 and not na(last_swing_price) and not last_swing_is_high ? 
+     draw_gann_line(true, price_per_bar_1x1, gann_1x1_color, 3) : na
+     
+gann_1x1_bear = show_1x1 and not na(last_swing_price) and last_swing_is_high ? 
+     draw_gann_line(false, price_per_bar_1x1, gann_1x1_color, 3) : na
+
+plot(gann_1x1_bull, "Gann 1x1 Bull", gann_1x1_color, 3, plot.style_linebr)
+plot(gann_1x1_bear, "Gann 1x1 Bear", gann_1x1_color, 3, plot.style_linebr)
+
+// Draw 2x1 angles
+gann_2x1_bull = show_2x1 and not na(last_swing_price) and not last_swing_is_high ? 
+     draw_gann_line(true, price_per_bar_2x1, gann_2x1_color, 2) : na
+     
+gann_2x1_bear = show_2x1 and not na(last_swing_price) and last_swing_is_high ? 
+     draw_gann_line(false, price_per_bar_2x1, gann_2x1_color, 2) : na
+
+plot(gann_2x1_bull, "Gann 2x1 Bull", gann_2x1_color, 2, plot.style_linebr, style=plot.style_stepline)
+plot(gann_2x1_bear, "Gann 2x1 Bear", gann_2x1_color, 2, plot.style_linebr, style=plot.style_stepline)
+
+// Draw 3x1 angles
+gann_3x1_bull = show_3x1 and not na(last_swing_price) and not last_swing_is_high ? 
+     draw_gann_line(true, price_per_bar_3x1, gann_3x1_color, 1) : na
+     
+gann_3x1_bear = show_3x1 and not na(last_swing_price) and last_swing_is_high ? 
+     draw_gann_line(false, price_per_bar_3x1, gann_3x1_color, 1) : na
+
+plot(gann_3x1_bull, "Gann 3x1 Bull", gann_3x1_color, 1, plot.style_linebr)
+plot(gann_3x1_bear, "Gann 3x1 Bear", gann_3x1_color, 1, plot.style_linebr)
+
+// Mark swing points
+plotshape(is_swing_high, "Swing High", shape.triangledown, location.abovebar, color.red, size=size.tiny)
+plotshape(is_swing_low, "Swing Low", shape.triangleup, location.belowbar, color.green, size=size.tiny)
+
+// ============================================
+// ALERTS
+// ============================================
+
+// Alert when price crosses 1x1 angle
+bull_cross = ta.crossover(close, gann_1x1_bull)
+bear_cross = ta.crossunder(close, gann_1x1_bear)
+
+alertcondition(bull_cross, "Price Above 1x1", "Price crossed above bullish Gann 1x1 angle")
+alertcondition(bear_cross, "Price Below 1x1", "Price crossed below bearish Gann 1x1 angle")
+
+// ============================================
+// INFO TABLE
+// ============================================
+
+var table info_table = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 80), border_width=1)
+
+if barstate.islast
+    table.cell(info_table, 0, 0, "Gann Fan", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 0, "Active", text_color=color.lime, text_size=size.small)
+    
+    swing_type = last_swing_is_high ? "High" : "Low"
+    table.cell(info_table, 0, 1, "Last Swing", text_color=color.gray, text_size=size.tiny)
+    table.cell(info_table, 1, 1, swing_type, text_color=color.white, text_size=size.tiny)
+    
+    table.cell(info_table, 0, 2, "Swing Price", text_color=color.gray, text_size=size.tiny)
+    table.cell(info_table, 1, 2, str.tostring(last_swing_price, "#.##"), text_color=color.white, text_size=size.tiny)
+    
+    bars_ago = bar_index - last_swing_bar
+    table.cell(info_table, 0, 3, "Bars Ago", text_color=color.gray, text_size=size.tiny)
+    table.cell(info_table, 1, 3, str.tostring(bars_ago), text_color=color.white, text_size=size.tiny)

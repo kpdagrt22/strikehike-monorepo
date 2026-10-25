@@ -1,0 +1,28 @@
+# Environment and secrets
+.env
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependency and build caches
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+
+# Generated runtime data
+**/data/historical_events.db
+
+# Test artifacts
+**/artifacts/
+**/test-results/
+**/playwright-report/
+**/coverage/

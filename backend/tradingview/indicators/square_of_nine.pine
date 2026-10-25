@@ -1,0 +1,138 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © AstroFinance
+
+//@version=5
+indicator("Square of 9 Levels", overlay=true, max_boxes_count=500)
+
+// ============================================
+// SQUARE OF 9 CALCULATOR
+// ============================================
+
+// Inputs
+num_levels = input.int(5, "Number of Levels", minval=1, maxval=20)
+show_support = input.bool(true, "Show Support Levels")
+show_resistance = input.bool(true, "Show Resistance Levels")
+support_color = input.color(color.rgb(6, 182, 212, 30), "Support Color")
+resistance_color = input.color(color.rgb(139, 92, 246, 30), "Resistance Color")
+
+// Function to calculate Square of 9 rotation
+sq9_rotate(price, rotations) =>
+    sqrt_price = math.sqrt(price)
+    rotated = (sqrt_price + rotations) * (sqrt_price + rotations)
+    rotated
+
+// Get current price
+current_price = close[0]
+
+// Calculate support levels (rotate down)
+var float[] support_levels = array.new_float()
+array.clear(support_levels)
+
+for i = 1 to num_levels
+    support = sq9_rotate(current_price, -i * 0.25) // 90 degree rotations
+    array.push(support_levels, support)
+
+// Calculate resistance levels (rotate up)
+var float[] resistance_levels = array.new_float()
+array.clear(resistance_levels)
+
+for i = 1 to num_levels
+    resistance = sq9_rotate(current_price, i * 0.25)
+    array.push(resistance_levels, resistance)
+
+// ============================================
+// PLOT LEVELS
+// ============================================
+
+// Plot support levels
+for i = 0 to array.size(support_levels) - 1
+    level = array.get(support_levels, i)
+    if show_support
+        line.new(bar_index - 100, level, bar_index + 50, level, 
+                 color=support_color, 
+                 style=line.style_dashed, 
+                 width=1)
+        
+        // Add label
+        if i == 0
+            label.new(bar_index, level, "SQ9 S" + str.tostring(i+1), 
+                     color=color.new(support_color, 50), 
+                     textcolor=color.white, 
+                     style=label.style_label_left, 
+                     size=size.tiny)
+
+// Plot resistance levels
+for i = 0 to array.size(resistance_levels) - 1
+    level = array.get(resistance_levels, i)
+    if show_resistance
+        line.new(bar_index - 100, level, bar_index + 50, level, 
+                 color=resistance_color, 
+                 style=line.style_dashed, 
+                 width=1)
+        
+        // Add label
+        if i == 0
+            label.new(bar_index, level, "SQ9 R" + str.tostring(i+1), 
+                     color=color.new(resistance_color, 50), 
+                     textcolor=color.white, 
+                     style=label.style_label_left, 
+                     size=size.tiny)
+
+// ============================================
+// HIGHLIGHT PRICE AT HARMONIC LEVELS
+// ============================================
+
+// Check if price is near a key harmonic (45, 90, 180 degrees)
+sqrt_current = math.sqrt(current_price)
+fractional_part = sqrt_current - math.floor(sqrt_current)
+
+is_near_harmonic = fractional_part < 0.05 or fractional_part > 0.95 or 
+                   math.abs(fractional_part - 0.25) < 0.05 or 
+                   math.abs(fractional_part - 0.5) < 0.05 or 
+                   math.abs(fractional_part - 0.75) < 0.05
+
+bgcolor(is_near_harmonic ? color.new(color.purple, 90) : na, title="Harmonic Zone")
+
+// ============================================
+// INFO TABLE
+// ============================================
+
+var table sq9_table = table.new(position.bottom_right, 2, 6, bgcolor=color.new(color.black, 80), border_width=1)
+
+if barstate.islast
+    table.cell(sq9_table, 0, 0, "Square of 9", text_color=color.white, text_size=size.small)
+    table.cell(sq9_table, 1, 0, "Levels", text_color=color.lime, text_size=size.small)
+    
+    // Show nearest support
+    if array.size(support_levels) > 0
+        nearest_support = array.get(support_levels, 0)
+        dist_support = ((current_price - nearest_support) / current_price) * 100
+        
+        table.cell(sq9_table, 0, 1, "Support 1", text_color=color.gray, text_size=size.tiny)
+        table.cell(sq9_table, 1, 1, str.tostring(nearest_support, "#.##"), text_color=support_color, text_size=size.tiny)
+        
+        table.cell(sq9_table, 0, 2, "Distance", text_color=color.gray, text_size=size.tiny)
+        table.cell(sq9_table, 1, 2, str.tostring(dist_support, "#.##") + "%", text_color=color.white, text_size=size.tiny)
+    
+    // Show nearest resistance
+    if array.size(resistance_levels) > 0
+        nearest_resistance = array.get(resistance_levels, 0)
+        dist_resistance = ((nearest_resistance - current_price) / current_price) * 100
+        
+        table.cell(sq9_table, 0, 3, "Resistance 1", text_color=color.gray, text_size=size.tiny)
+        table.cell(sq9_table, 1, 3, str.tostring(nearest_resistance, "#.##"), text_color=resistance_color, text_size=size.tiny)
+        
+        table.cell(sq9_table, 0, 4, "Distance", text_color=color.gray, text_size=size.tiny)
+        table.cell(sq9_table, 1, 4, str.tostring(dist_resistance, "#.##") + "%", text_color=color.white, text_size=size.tiny)
+    
+    // Harmonic status
+    harmonic_text = is_near_harmonic ? "YES" : "NO"
+    harmonic_color = is_near_harmonic ? color.lime : color.gray
+    table.cell(sq9_table, 0, 5, "At Harmonic", text_color=color.gray, text_size=size.tiny)
+    table.cell(sq9_table, 1, 5, harmonic_text, text_color=harmonic_color, text_size=size.tiny)
+
+// ============================================
+// ALERTS
+// ============================================
+
+alertcondition(is_near_harmonic, "Harmonic Level", "Price is at a Square of 9 harmonic angle")

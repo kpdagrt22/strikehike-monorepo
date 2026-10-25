@@ -1,0 +1,25 @@
+defaults:
+  - _self_
+
+hydra:
+  run:
+    dir: logs/latest
+
+app:
+  name: "astro_finance_enterprise"
+  log_level: "DEBUG"
+
+data:
+  start_date: "1900-01-01"
+  end_date: "2025-01-01"
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  stock_ticker: "^DJI"
+
+model:
+  type: "RandomForest"
+  n_estimators: 100
+  random_state: 42
+
+schedule:
+  interval_minutes: 60

@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* next-themes writes `.dark` on <html>; Tailwind 4 needs the class strategy declared. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-onest), "Onest", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --engine-fallback: #e3dbcf;
+}
+
+.dark {
+  color-scheme: dark;
+  --engine-fallback: #020204;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--engine-fallback);
+    color: #14121a;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark body {
+    color: #f2ede4;
+  }
+}
+
+/* Timeline scrubber: a hairline track with a small pearl/obsidian thumb. */
+.chrono-range {
+  --chrono-thumb: #14121a;
+  --chrono-thumb-border: rgba(255, 255, 255, 0.85);
+  --chrono-focus: rgba(240, 93, 73, 0.55);
+}
+
+.dark .chrono-range {
+  --chrono-thumb: #f2ede4;
+  --chrono-thumb-border: rgba(20, 18, 26, 0.85);
+}
+
+.chrono-range::-webkit-slider-runnable-track {
+  height: 2px;
+  background: transparent;
+}
+
+.chrono-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4.5px;
+  border: 2px solid var(--chrono-thumb-border);
+  border-radius: 9999px;
+  background: var(--chrono-thumb);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 0 16px rgba(240, 93, 73, 0.35);
+  cursor: grab;
+}
+
+.chrono-range:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+.chrono-range::-moz-range-track {
+  height: 2px;
+  background: transparent;
+}
+
+.chrono-range::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--chrono-thumb-border);
+  border-radius: 9999px;
+  background: var(--chrono-thumb);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 0 16px rgba(240, 93, 73, 0.35);
+  cursor: grab;
+}
+
+.chrono-range:focus-visible {
+  outline: 2px solid var(--chrono-focus);
+  outline-offset: 4px;
+  border-radius: 9999px;
+}

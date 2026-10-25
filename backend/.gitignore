@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.venv
+venv/
+ENV/
+env/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+.next/
+out/
+build/
+
+# Project Data (Optional - usually exclude raw data)
+# data/raw/
+# data/processed/
+# Keeping processed models may be desired for this demo repo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cleanup & Debug
+*.log
+*.tmp
+archive/
+debug_*.py
+test_*.py
+!tests/test_*.py
+compare_*.py
+cols.txt
+
+# Generated historical parallels database (seed JSON is tracked)
+data/historical_events.db

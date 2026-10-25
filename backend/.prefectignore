@@ -1,0 +1,72 @@
+# Prefect Deployment Ignore Patterns
+# Similar to .gitignore, excludes files from deployments
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data (exclude large datasets from deployment)
+data/raw/
+data/processed/*.csv
+data/processed/*.parquet
+*.csv
+*.parquet
+
+# Model weights (if storing locally)
+models/
+*.pkl
+*.pth
+*.h5
+
+# Logs
+*.log
+logs/
+
+# Web frontend (deployed separately)
+web/node_modules/
+web/.next/
+web/out/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+temp/
+tmp/

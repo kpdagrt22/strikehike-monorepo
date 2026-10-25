@@ -1,0 +1,56 @@
+from pathlib import Path
+
+import pytest
+
+from astro_finance import historical_parallels as hp
+
+
+@pytest.fixture()
+def seeded_db(tmp_path, monkeypatch):
+    monkeypatch.setattr(hp, "DB_PATH", tmp_path / "historical_events.db")
+    monkeypatch.setattr(
+        hp,
+        "SEED_PATH",
+        Path(__file__).resolve().parents[1] / "data" / "historical_events.json",
+    )
+    count = hp.seed_event_database(force=True)
+    return count
+
+
+def test_geometry_has_nine_bodies():
+    geometry = hp.geometry_for_date("1969-07-16")
+    assert set(geometry) == set(hp.ALL_BODIES)
+    assert 0 <= geometry["Sun"]["lon"] < 360
+    assert isinstance(geometry["Rahu"]["retro"], bool)
+
+
+def test_energy_score_is_bounded():
+    score = hp.geometry_energy_score(hp.geometry_for_date("2008-09-15"))
+    assert isinstance(score, int)
+    assert 0 <= score <= 100
+
+
+def test_seed_and_query(seeded_db):
+    assert seeded_db == 29
+
+    result = hp.find_historical_parallels("2008-09-15", limit=3)
+
+    assert result["date"] == "2008-09-15"
+    assert result["energy_source"] == "planetary_geometry"
+    assert 2 <= len(result["matches"]) <= 3
+    assert all(0 <= match["similarity_percent"] <= 100 for match in result["matches"])
+    assert all(match["date"] != "2008-09-15" for match in result["matches"])
+    assert {match["category"] for match in result["matches"]} <= {
+        "Science",
+        "Politics",
+        "Finance",
+    }
+
+
+def test_provided_geometry_matches_date_geometry(seeded_db):
+    geometry = hp.geometry_for_date("1947-08-15")
+    result = hp.find_historical_parallels(
+        "1947-08-15", geometry=geometry, limit=2
+    )
+    assert len(result["matches"]) == 2
+    assert all(match["date"] != "1947-08-15" for match in result["matches"])
