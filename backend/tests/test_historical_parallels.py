@@ -85,6 +85,27 @@ def test_events_grouped_by_category(seeded_db):
     assert len(roster["categories"]["Natural Disasters"]) == 15
 
 
+def test_crisis_waypoints_are_calibrated_above_85(seeded_db):
+    for waypoint in ("2008-09-15", "1929-10-24"):
+        result = hp.find_historical_parallels(waypoint, limit=3)
+        assert result["energy"]["score"] > 85
+        assert result["energy"]["calibration"] in {
+            "stress_window",
+            "historical_percentile",
+        }
+        assert result["energy"]["raw_score"] <= 100
+
+
+def test_forecast_ladder_returns_qualified_upcoming_matches(seeded_db):
+    result = hp.forecast_ladder(days=180, threshold=85, limit=3)
+
+    assert result["window_days"] == 180
+    assert result["threshold"] == 85
+    assert len(result["matches"]) <= 3
+    assert all(match["similarity_percent"] >= 85 for match in result["matches"])
+    assert all(match["days_ahead"] >= 1 for match in result["matches"])
+
+
 def test_provided_geometry_matches_date_geometry(seeded_db):
     geometry = hp.geometry_for_date("1947-08-15")
     result = hp.find_historical_parallels(

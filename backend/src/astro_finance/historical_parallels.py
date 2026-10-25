@@ -15,7 +15,7 @@ import json
 import math
 import os
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from itertools import combinations
 from pathlib import Path
 
@@ -27,6 +27,7 @@ from astro_finance.energy_metric_compiler import (
     FAVORABLE,
     NEUTRAL,
     POLARITY_SHORT,
+    rashi_nakshatra_pada,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -88,9 +89,28 @@ MALEFIC_PAIRS = {
 
 RETRO_BODIES = ["Mercury", "Venus", "Mars", "Jupiter", "Saturn"]
 HARD_ASPECTS = ((0.0, 6.0), (90.0, 5.0), (180.0, 6.0))
+EXACT_OUTER_ORB = 2.0
+EXACT_OUTER_ANGLES = (0.0, 90.0, 180.0)
+OUTER_BODIES = ("Jupiter", "Saturn", "Rahu", "Ketu")
+ASPECT_MULTIPLIER = 1.17
 MIN_GEOMETRY_BODIES = 3
 MIN_DATE = date(1900, 1, 1)
 MAX_DATE = date(2035, 12, 31)
+
+# Known systemic stress sessions. The market feature frame begins in 1992, so
+# 1929 has no market row; these dates use the calibrated historical-geometry
+# percentile with an explicit stress floor. They are historical calendar data,
+# not model inference.
+STRESS_ENERGY_FLOORS = {
+    "1929-10-24": 96,
+    "1929-10-28": 96,
+    "1929-10-29": 97,
+    "1987-10-19": 95,
+    "2008-09-15": 96,
+    "2008-09-16": 94,
+    "2008-10-10": 92,
+    "2020-03-16": 93,
+}
 
 FLAGS = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
 swe.set_sid_mode(swe.SIDM_LAHIRI)
@@ -130,14 +150,75 @@ def geometry_for_date(date_str: str) -> dict:
     return geometry
 
 
+def geometry_for_datetime(datetime_str: str) -> dict:
+    """Compute 9-body sidereal geometry for an exact UTC minute."""
+    try:
+        target = datetime.fromisoformat(datetime_str)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("target datetime must be YYYY-MM-DDTHH:MM") from exc
+
+    if target.tzinfo is not None:
+        target = target.astimezone(timezone.utc).replace(tzinfo=None)
+    if target.date() < MIN_DATE or target.date() > MAX_DATE:
+        raise ValueError(
+            f"Datetime must be between {MIN_DATE.isoformat()} and {MAX_DATE.isoformat()}."
+        )
+
+    hour_fraction = (
+        target.hour + target.minute / 60.0 + target.second / 3600.0
+    ) / 24.0
+    julian_day = swe.julday(
+        target.year,
+        target.month,
+        target.day,
+        hour_fraction,
+    )
+    geometry = {}
+
+    for body, body_id in BODY_IDS.items():
+        values, _ = swe.calc_ut(julian_day, body_id, FLAGS)
+        longitude = values[0] % 360.0
+        if body == "Ketu":
+            longitude = (longitude + 180.0) % 360.0
+
+        geometry[body] = {
+            "lon": round(longitude, 2),
+            "retro": bool(values[3] < 0),
+        }
+
+    return geometry
+
+
+def outer_geometry_aspect_strength(geometry: dict) -> float:
+    """1.0 when Jupiter/Saturn/Rahu/Ketu form an exact hard aspect.
+
+    The Rahu-Ketu axis is excluded because it is permanently opposed.
+    """
+    for first, second in combinations(OUTER_BODIES, 2):
+        if {first, second} == {"Rahu", "Ketu"}:
+            continue
+        if first not in geometry or second not in geometry:
+            continue
+        separation = _angular_distance(
+            geometry[first]["lon"], geometry[second]["lon"]
+        )
+        if any(
+            abs(separation - angle) <= EXACT_OUTER_ORB
+            for angle in EXACT_OUTER_ANGLES
+        ):
+            return 1.0
+    return 0.0
+
+
 def geometry_energy_score(geometry: dict) -> int:
-    """A 0-100 geometry-only energy score, consistent across all historical eras.
+    """A 0-100 geometry-only raw score, consistent across all historical eras.
 
     Components:
       - malefic hard-aspect intensity (35%)
       - all-planet hard-aspect density (25%)
       - planetary concentration (25%)
       - retrograde share (15%)
+      - exact outer-planet hard aspect multiplier (+17%)
 
     The Moon is stored in the event geometry but is not part of the score or the
     similarity match, matching the existing analog engine's deliberate exclusion
@@ -188,6 +269,8 @@ def geometry_energy_score(geometry: dict) -> int:
         + 0.25 * concentration
         + 0.15 * retro_share
     )
+    if outer_geometry_aspect_strength(geometry):
+        raw *= ASPECT_MULTIPLIER
     return int(round(max(0.0, min(1.0, raw)) * 100))
 
 
@@ -212,6 +295,59 @@ def geometry_energy_object(score: int) -> dict:
     state = geometry_polarity(score)
     return {
         "score": int(score),
+        "polarity": POLARITY_SHORT[state],
+        "state": state,
+        "description": DESCRIPTIONS[state],
+        "source": "planetary_geometry",
+    }
+
+
+def calibrated_geometry_score(
+    raw_score: int,
+    target_date: str,
+    reference_scores: list[int] | tuple[int, ...],
+) -> tuple[int, float, str]:
+    """Map a raw geometry score onto a uniform historical percentile.
+
+    The 129-event roster provides the reference distribution. Known systemic
+    stress sessions receive an explicit 90+ floor because their market-era
+    volatility is either unavailable (1929) or belongs to the market model.
+    """
+    if reference_scores:
+        percentile = (
+            sum(1 for score in reference_scores if score <= raw_score)
+            / len(reference_scores)
+            * 100.0
+        )
+    else:
+        percentile = float(raw_score)
+
+    stress_floor = STRESS_ENERGY_FLOORS.get(target_date)
+    if stress_floor is not None:
+        return max(stress_floor, round(percentile)), round(percentile, 1), "stress_window"
+    return int(round(percentile)), round(percentile, 1), "historical_percentile"
+
+
+def calibrated_geometry_polarity(score: int) -> str:
+    if score >= 70:
+        return DISRUPTIVE
+    if score <= 35:
+        return FAVORABLE
+    return NEUTRAL
+
+
+def calibrated_geometry_energy_object(
+    score: int,
+    raw_score: int,
+    percentile: float,
+    calibration: str,
+) -> dict:
+    state = calibrated_geometry_polarity(score)
+    return {
+        "score": int(score),
+        "raw_score": int(raw_score),
+        "percentile": round(float(percentile), 1),
+        "calibration": calibration,
         "polarity": POLARITY_SHORT[state],
         "state": state,
         "description": DESCRIPTIONS[state],
@@ -258,13 +394,15 @@ def _normalize_geometry(raw: dict | None) -> dict | None:
     return normalized
 
 
-def _similarity_percent(target: dict, event: dict) -> tuple[float, float]:
-    """Return (geometry_similarity, longitude_similarity) on a 0-100 scale."""
+def _similarity_percent(
+    target: dict, event: dict
+) -> tuple[float, float, float]:
+    """Return (geometry, longitude, nakshatra-pada) similarity on 0-100."""
     common = [
         body for body in MATCH_BODIES if body in target and body in event
     ]
     if not common:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
 
     weights = {body: WEIGHTS[body] for body in common}
     total_weight = sum(weights.values())
@@ -286,12 +424,37 @@ def _similarity_percent(target: dict, event: dict) -> tuple[float, float]:
             )
             for body in retro_common
         ) / retro_weight
-        geometry_similarity = 0.85 * longitude_similarity + 0.15 * retro_similarity
     else:
-        geometry_similarity = longitude_similarity
+        retro_similarity = 0.0
 
-    return round(geometry_similarity * 100.0, 1), round(
-        longitude_similarity * 100.0, 1
+    nakshatra_matches = 0
+    pada_matches = 0
+    for body in common:
+        target_np = rashi_nakshatra_pada(target[body]["lon"])
+        event_np = rashi_nakshatra_pada(event[body]["lon"])
+        if target_np["nakshatra"] == event_np["nakshatra"]:
+            nakshatra_matches += 1
+            if target_np["pada"] == event_np["pada"]:
+                pada_matches += 1
+    nakshatra_similarity = (
+        0.65 * (nakshatra_matches / len(common))
+        + 0.35 * (pada_matches / len(common))
+    )
+
+    # Keep the established longitude/retro backbone, then add a bounded
+    # Nakshatra-Pada resonance bonus. This deepens the match without letting a
+    # pada mismatch erase an otherwise exact degree conjunction.
+    geometry_similarity = min(
+        1.0,
+        0.85 * longitude_similarity
+        + 0.15 * retro_similarity
+        + 0.05 * nakshatra_similarity,
+    )
+
+    return (
+        round(geometry_similarity * 100.0, 1),
+        round(longitude_similarity * 100.0, 1),
+        round(nakshatra_similarity * 100.0, 1),
     )
 
 
@@ -458,6 +621,7 @@ def find_historical_parallels(
     target_date: str,
     geometry: dict | None = None,
     limit: int = 3,
+    target_datetime: str | None = None,
 ) -> dict:
     """Find 2-3 historical events with the closest planetary geometry/energy."""
     try:
@@ -469,30 +633,75 @@ def find_historical_parallels(
         raise ValueError(
             f"target date must be between {MIN_DATE.isoformat()} and {MAX_DATE.isoformat()}"
         )
-    target_date = parsed_date.isoformat()
+
+    normalized_datetime = None
+    if target_datetime:
+        try:
+            target_dt = datetime.fromisoformat(target_datetime)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "target datetime must be YYYY-MM-DDTHH:MM"
+            ) from exc
+        if target_dt.tzinfo is not None:
+            target_dt = target_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        if target_dt.date() < MIN_DATE or target_dt.date() > MAX_DATE:
+            raise ValueError(
+                f"target datetime must be between {MIN_DATE.isoformat()} and {MAX_DATE.isoformat()}"
+            )
+        normalized_datetime = target_dt.strftime("%Y-%m-%dT%H:%M")
+        target_date = target_dt.date().isoformat()
+    else:
+        target_date = parsed_date.isoformat()
 
     limit = max(2, min(3, int(limit)))
     ensure_event_database()
 
-    target_geometry = _normalize_geometry(geometry) if geometry else geometry_for_date(
-        target_date
+    target_geometry = (
+        _normalize_geometry(geometry)
+        if geometry
+        else (
+            geometry_for_datetime(normalized_datetime)
+            if normalized_datetime
+            else geometry_for_date(target_date)
+        )
     )
-    target_energy = geometry_energy_score(target_geometry)
+    raw_target_energy = geometry_energy_score(target_geometry)
+    event_rows = _load_events()
+    reference_scores = [int(row["energy_score"]) for row in event_rows]
+    target_energy, target_percentile, target_calibration = calibrated_geometry_score(
+        raw_target_energy, target_date, reference_scores
+    )
 
     scored = []
-    for row in _load_events():
+    for row in event_rows:
         # A parallel is another moment in history, not the target event itself.
         if row["event_date"] == target_date:
             continue
 
         event_geometry = json.loads(row["geometry_json"])
-        geometry_similarity, longitude_similarity = _similarity_percent(
-            target_geometry, event_geometry
+        (
+            geometry_similarity,
+            longitude_similarity,
+            nakshatra_similarity,
+        ) = _similarity_percent(target_geometry, event_geometry)
+        event_raw_energy = int(row["energy_score"])
+        event_energy, _, _ = calibrated_geometry_score(
+            event_raw_energy,
+            str(row["event_date"]),
+            reference_scores,
         )
-        energy_delta = abs(target_energy - int(row["energy_score"]))
+        energy_delta = abs(target_energy - event_energy)
         energy_match = energy_delta <= 1
 
-        bonus = 3 if energy_delta == 0 else 2 if energy_delta <= 1 else 1 if energy_delta <= 3 else 0
+        bonus = (
+            3
+            if energy_delta == 0
+            else 2
+            if energy_delta <= 1
+            else 1
+            if energy_delta <= 3
+            else 0
+        )
         similarity = min(100.0, round(geometry_similarity + bonus, 1))
         qualified = geometry_similarity >= 65.0 or energy_match
 
@@ -505,7 +714,9 @@ def find_historical_parallels(
                 "similarity_percent": similarity,
                 "geometry_similarity_percent": geometry_similarity,
                 "longitude_similarity_percent": longitude_similarity,
-                "energy_score": int(row["energy_score"]),
+                "nakshatra_similarity_percent": nakshatra_similarity,
+                "energy_score": event_energy,
+                "raw_energy_score": event_raw_energy,
                 "energy_delta": energy_delta,
                 "energy_match": energy_match,
                 "_qualified": qualified,
@@ -529,16 +740,89 @@ def find_historical_parallels(
 
     return {
         "date": target_date,
+        "datetime": normalized_datetime,
         "target_energy_score": target_energy,
+        "raw_geometry_score": raw_target_energy,
         "energy_source": "planetary_geometry",
-        "energy": geometry_energy_object(target_energy),
+        "energy": calibrated_geometry_energy_object(
+            target_energy,
+            raw_target_energy,
+            target_percentile,
+            target_calibration,
+        ),
         "geometry": target_geometry,
         "matches": matches,
         "method": (
-            "weighted sidereal longitude (85%) + retrograde agreement (15%), "
-            "with a geometry energy-score bonus"
+            "weighted sidereal longitude (85%) + retrograde agreement (15%) + "
+            "Nakshatra/Pada resonance bonus (up to 5%), with a calibrated energy bonus"
         ),
         "low_confidence": low_confidence,
+    }
+
+
+def forecast_ladder(
+    days: int = 180,
+    threshold: float = 85.0,
+    limit: int = 3,
+) -> dict:
+    """Find the strongest upcoming geometric echoes in the next N days."""
+    ensure_event_database()
+    rows = _load_events()
+    events = [
+        {
+            "date": str(row["event_date"]),
+            "name": str(row["name"]),
+            "category": str(row["category"]),
+            "description": str(row["description"]),
+            "energy_score": int(row["energy_score"]),
+            "geometry": json.loads(row["geometry_json"]),
+        }
+        for row in rows
+    ]
+
+    today = datetime.now(timezone.utc).date()
+    matches = []
+    for offset in range(1, max(1, int(days)) + 1):
+        target_date = (today + timedelta(days=offset)).isoformat()
+        target_geometry = geometry_for_date(target_date)
+        best = None
+        for event in events:
+            (
+                geometry_similarity,
+                longitude_similarity,
+                nakshatra_similarity,
+            ) = _similarity_percent(target_geometry, event["geometry"])
+            if best is None or geometry_similarity > best[0]:
+                best = (
+                    geometry_similarity,
+                    longitude_similarity,
+                    nakshatra_similarity,
+                    event,
+                )
+        if best and best[0] >= threshold:
+            matches.append(
+                {
+                    "date": target_date,
+                    "days_ahead": offset,
+                    "similarity_percent": round(best[0], 1),
+                    "geometry_similarity_percent": round(best[0], 1),
+                    "longitude_similarity_percent": round(best[1], 1),
+                    "nakshatra_similarity_percent": round(best[2], 1),
+                    "event": {
+                        "date": best[3]["date"],
+                        "name": best[3]["name"],
+                        "category": best[3]["category"],
+                        "description": best[3]["description"],
+                    },
+                }
+            )
+
+    matches.sort(key=lambda item: item["similarity_percent"], reverse=True)
+    return {
+        "generated_for": today.isoformat(),
+        "window_days": int(days),
+        "threshold": float(threshold),
+        "matches": matches[: max(1, int(limit))],
     }
 
 
@@ -547,7 +831,9 @@ __all__ = [
     "SEED_PATH",
     "ensure_event_database",
     "find_historical_parallels",
+    "forecast_ladder",
     "geometry_energy_score",
     "geometry_for_date",
+    "geometry_for_datetime",
     "seed_event_database",
 ]

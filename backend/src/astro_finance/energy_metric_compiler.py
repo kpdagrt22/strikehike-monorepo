@@ -2,8 +2,15 @@
 
 The compiler deliberately separates three things:
   1. raw inputs (volatility, planetary intensity, regime),
-  2. normalized components (MinMaxScaler, 0-100),
+  2. normalized components (QuantileTransformer uniform, 0-100),
   3. the discrete polarity state and its human-readable description.
+
+The uniform quantile transform is intentional. A linear MinMaxScaler compressed
+the market distribution into the middle of the scale, so a crisis day such as
+2008-09-15 only read as a mid-40s score. Quantile ranks preserve the top decile
+(90-100) and keep an average day near 50. An exact outer-planet aspect (within
+two degrees, excluding the permanently opposed Rahu-Ketu axis) applies a 17%
+kinetic multiplier.
 
 `determine_polarity` is the single classification entry point. The regime mapping
 is based on the training history: in ``final_data_with_regimes.csv`` regime 2 has
@@ -23,7 +30,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
+from itertools import combinations
+from sklearn.preprocessing import QuantileTransformer
 
 FAVORABLE = "Favorable/Positive"
 DISRUPTIVE = "Disruptive/Negative"
@@ -62,6 +70,10 @@ MALEFIC_INTENSITY_WEIGHTS = {
 VOLATILITY_WEIGHT = 0.85
 INTENSITY_WEIGHT = 0.15
 VOLATILITY_CLIP_QUANTILES = (0.01, 0.99)
+EXACT_ASPECT_ORB = 2.0
+EXACT_ASPECT_ANGLES = (0.0, 90.0, 180.0)
+ASPECT_MULTIPLIER = 1.17
+OUTER_BODIES = ("Jupiter", "Saturn", "Rahu", "Ketu")
 
 BODY_NAMES = [
     "Sun",
@@ -198,6 +210,34 @@ def planetary_intensity_from_row(row: Mapping[str, Any]) -> float:
     return float(np.clip(intensity, 0.0, 1.0))
 
 
+def _angular_distance(longitude_a: float, longitude_b: float) -> float:
+    return abs((longitude_a - longitude_b + 180.0) % 360.0 - 180.0)
+
+
+def outer_planet_aspect_strength(row: Mapping[str, Any]) -> float:
+    """Return 1.0 when an exact outer-planet hard aspect exists.
+
+    Rahu-Ketu is excluded because the lunar nodes are permanently opposed and
+    would otherwise apply the multiplier on every single day. The remaining
+    outer-planet pairs are Jupiter/Saturn/Rahu/Ketu.
+    """
+    degrees = {}
+    for body in OUTER_BODIES:
+        value = _optional_float(row.get(f"{body}_Degree"))
+        if value is not None:
+            degrees[body] = value
+
+    for first, second in combinations(OUTER_BODIES, 2):
+        if {first, second} == {"Rahu", "Ketu"}:
+            continue
+        if first not in degrees or second not in degrees:
+            continue
+        separation = _angular_distance(degrees[first], degrees[second])
+        if any(abs(separation - angle) <= EXACT_ASPECT_ORB for angle in EXACT_ASPECT_ANGLES):
+            return 1.0
+    return 0.0
+
+
 def determine_polarity(model_weights: Mapping[str, Any]) -> str:
     """Return one of the three canonical polarity states.
 
@@ -238,15 +278,15 @@ def determine_polarity(model_weights: Mapping[str, Any]) -> str:
 
 
 class EnergyMetricCompiler:
-    """Fit a MinMaxScaler on historical model output and compile a 0-100 score."""
+    """Fit a uniform quantile calibration and compile a 0-100 score."""
 
     def __init__(
         self,
         *,
-        scaler: MinMaxScaler | None = None,
+        scaler: QuantileTransformer | None = None,
         volatility_bounds: tuple[float, float] | None = None,
     ) -> None:
-        self.scaler = scaler or MinMaxScaler(feature_range=(0, 100))
+        self.scaler = scaler
         self.volatility_bounds = volatility_bounds
         self._fitted = scaler is not None
 
@@ -288,7 +328,12 @@ class EnergyMetricCompiler:
             ]
         )
 
-        scaler = MinMaxScaler(feature_range=(0, 100)).fit(calibration)
+        scaler = QuantileTransformer(
+            n_quantiles=min(1000, max(2, len(calibration))),
+            output_distribution="uniform",
+            subsample=min(len(calibration), 100_000),
+            random_state=42,
+        ).fit(calibration)
         return cls(
             scaler=scaler,
             volatility_bounds=(lower, upper),
@@ -314,11 +359,34 @@ class EnergyMetricCompiler:
         intensity = float(np.clip(raw_intensity, 0.0, 1.0))
 
         scaled = self.scaler.transform([[volatility, intensity]])[0]
-        composite = (
-            VOLATILITY_WEIGHT * float(scaled[0])
-            + INTENSITY_WEIGHT * float(scaled[1])
+        weighted_score = (
+            100.0
+            * (
+                VOLATILITY_WEIGHT * float(scaled[0])
+                + INTENSITY_WEIGHT * float(scaled[1])
+            )
         )
-        score = int(np.clip(round(composite), 0, 100))
+        # Preserve the stated top-decile contract: a day in the top 10% of
+        # either volatility or intensity cannot be suppressed by a weak
+        # secondary component.
+        top_component = max(float(scaled[0]), float(scaled[1])) * 100.0
+        base_score = int(
+            np.clip(
+                round(max(weighted_score, top_component if top_component >= 90 else 0.0)),
+                0,
+                100,
+            )
+        )
+        aspect_strength = 1.0 if _as_float(
+            model_weights.get("aspect_strength", 0.0)
+        ) >= 0.5 else 0.0
+        score = int(
+            np.clip(
+                round(base_score * (ASPECT_MULTIPLIER if aspect_strength else 1.0)),
+                0,
+                100,
+            )
+        )
 
         polarity = determine_polarity(
             {**dict(model_weights), "volatility": volatility, "intensity": intensity}
@@ -326,17 +394,23 @@ class EnergyMetricCompiler:
 
         return {
             "score": score,
+            "base_score": base_score,
             "polarity": polarity,
             "polarity_short": POLARITY_SHORT[polarity],
             "description": DESCRIPTIONS[polarity],
             "components": {
-                "volatility": round(float(scaled[0]), 2),
-                "intensity": round(float(scaled[1]), 2),
+                "volatility": round(float(scaled[0]) * 100.0, 2),
+                "intensity": round(float(scaled[1]) * 100.0, 2),
             },
             "weights": {
                 "volatility": VOLATILITY_WEIGHT,
                 "intensity": INTENSITY_WEIGHT,
             },
+            "aspect": {
+                "exact_outer_hard_aspect": bool(aspect_strength),
+                "multiplier": ASPECT_MULTIPLIER if aspect_strength else 1.0,
+            },
+            "calibration": "quantile_uniform",
             "inputs": {
                 "volatility": round(raw_volatility, 6),
                 "intensity": round(raw_intensity, 4),
@@ -358,6 +432,7 @@ class EnergyMetricCompiler:
                 "volatility": row.get("Volatility", 0.0),
                 "intensity": planetary_intensity_from_row(row),
                 "regime": regime,
+                "aspect_strength": outer_planet_aspect_strength(row),
             }
         )
 
@@ -369,6 +444,7 @@ __all__ = [
     "NEUTRAL",
     "EnergyMetricCompiler",
     "determine_polarity",
+    "outer_planet_aspect_strength",
     "planetary_intensity_from_row",
     "rashi_nakshatra_pada",
 ]

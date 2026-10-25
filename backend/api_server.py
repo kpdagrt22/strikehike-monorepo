@@ -26,6 +26,7 @@ from astro_finance.energy_metric_compiler import (  # noqa: E402
 from astro_finance.historical_parallels import (  # noqa: E402
     ensure_event_database,
     find_historical_parallels,
+    forecast_ladder,
     list_events_by_category,
 )
 
@@ -247,6 +248,7 @@ def get_astro_positions(
 
 class HistoricalParallelsRequest(BaseModel):
     date: str
+    datetime: str | None = None
     geometry: dict[str, Any] | None = None
     limit: int = 3
 
@@ -259,6 +261,7 @@ def historical_parallels(payload: HistoricalParallelsRequest):
             payload.date,
             geometry=payload.geometry,
             limit=payload.limit,
+            target_datetime=payload.datetime,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -275,17 +278,41 @@ def historical_parallels_get(
         str,
         Query(description="Target date YYYY-MM-DD."),
     ],
+    datetime_value: Annotated[
+        str | None,
+        Query(alias="datetime", description="Optional exact UTC minute YYYY-MM-DDTHH:MM."),
+    ] = None,
     limit: Annotated[int, Query(ge=2, le=3)] = 3,
 ):
-    """Convenience GET; geometry is computed from the target date."""
+    """Convenience GET; geometry is computed from the target date/minute."""
     try:
-        return find_historical_parallels(date, limit=limit)
+        return find_historical_parallels(
+            date,
+            limit=limit,
+            target_datetime=datetime_value,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail="Historical parallels service is unavailable",
+        ) from exc
+
+
+@app.get("/api/v1/forecast-ladder")
+def forecast_ladder_get(
+    days: Annotated[int, Query(ge=1, le=180)] = 180,
+    threshold: Annotated[float, Query(ge=50, le=100)] = 85,
+    limit: Annotated[int, Query(ge=1, le=3)] = 3,
+):
+    """Return the top upcoming geometric echoes in the next N days."""
+    try:
+        return forecast_ladder(days=days, threshold=threshold, limit=limit)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Forecast ladder service is unavailable",
         ) from exc
 
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -27,6 +28,7 @@ function ParallelCarousel({ parallels, status }) {
 
   const parallel = parallels.length ? parallels[tick % parallels.length] : null;
   const parallelKey = parallel ? `${parallel.date}-${parallel.name}` : "empty";
+  const tone = categoryTone(parallel?.category);
 
   return (
     <div className="mt-3 h-4 w-full text-center">
@@ -38,9 +40,18 @@ function ParallelCarousel({ parallels, status }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="truncate text-[10px] font-medium tracking-[-0.01em] text-black/55 dark:text-white/55"
+            className="flex items-center justify-center gap-1.5 text-[10px] font-medium tracking-[-0.01em] text-black/55 dark:text-white/55"
           >
-            Similar Energy to: {formatYear(parallel.date)} {parallel.name}
+            <span
+              className="h-1 w-1 shrink-0 rounded-full"
+              style={{
+                backgroundColor: tone.color,
+                boxShadow: `0 0 8px ${tone.glow}`,
+              }}
+            />
+            <span className="truncate">
+              Similar Energy to: {formatYear(parallel.date)} {parallel.name}
+            </span>
           </motion.p>
         ) : (
           <motion.p

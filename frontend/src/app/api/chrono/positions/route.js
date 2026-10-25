@@ -35,7 +35,12 @@ async function fetchBackend(path) {
 }
 
 export async function GET(request) {
-  const date = new URL(request.url).searchParams.get("date");
+  const searchParams = new URL(request.url).searchParams;
+  const requestedDateTime = searchParams.get("datetime");
+  const requestedDate = searchParams.get("date");
+  const date = requestedDateTime
+    ? requestedDateTime.slice(0, 10)
+    : requestedDate;
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json(
@@ -44,7 +49,18 @@ export async function GET(request) {
     );
   }
 
-  const ms = Date.parse(`${date}T00:00:00Z`);
+  const datetime = requestedDateTime ?? `${date}T00:00`;
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(datetime) ||
+    Number.isNaN(Date.parse(`${datetime}:00Z`))
+  ) {
+    return NextResponse.json(
+      { error: "datetime must use YYYY-MM-DDTHH:MM." },
+      { status: 400 },
+    );
+  }
+
+  const ms = Date.parse(`${datetime}:00Z`);
   if (
     Number.isNaN(ms) ||
     new Date(ms).toISOString().slice(0, 10) !== date
@@ -75,7 +91,11 @@ export async function GET(request) {
   );
 
   const [historical, market] = await Promise.all([
-    fetchBackend(`/api/v1/historical-parallels?date=${date}&limit=3`),
+    fetchBackend(
+      requestedDateTime
+        ? `/api/v1/historical-parallels?datetime=${encodeURIComponent(datetime)}&date=${date}&limit=3`
+        : `/api/v1/historical-parallels?date=${date}&limit=3`,
+    ),
     fetchBackend(`/api/v1/astro-positions?date=${date}`),
   ]);
 
@@ -91,6 +111,7 @@ export async function GET(request) {
   return NextResponse.json(
     {
       date,
+      datetime,
       source: SOURCE,
       bodies,
       energy,

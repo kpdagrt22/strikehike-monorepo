@@ -21,8 +21,20 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
+const timeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
 function formatDate(iso) {
   return dateFormatter.format(new Date(`${iso}T00:00:00Z`));
+}
+
+function formatDateTime(iso, time) {
+  if (!time || time === "00:00") return formatDate(iso);
+  const label = timeFormatter.format(new Date(`${iso}T${time}:00Z`));
+  return `${formatDate(iso)} · ${label} UTC`;
 }
 
 function dateToValue(iso) {
@@ -37,9 +49,13 @@ function valueToDate(value) {
   return new Date(MIN_MS + clamped * DAY_MS).toISOString().slice(0, 10);
 }
 
-export function Timeline() {
+export function TimeControls() {
   const focusedDate = useChronoStore((state) => state.focusedDate);
+  const focusedTime = useChronoStore((state) => state.focusedTime);
   const setFocusedDate = useChronoStore((state) => state.setFocusedDate);
+  const setFocusedDateTime = useChronoStore(
+    (state) => state.setFocusedDateTime,
+  );
   const setPositions = useChronoStore((state) => state.setPositions);
   const setStatus = useChronoStore((state) => state.setStatus);
   const status = useChronoStore((state) => state.status);
@@ -47,6 +63,7 @@ export function Timeline() {
 
   const [expanded, setExpanded] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
+  const selectedDateTime = `${focusedDate}T${focusedTime}`;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,7 +72,7 @@ export function Timeline() {
 
       try {
         const response = await fetch(
-          `/api/chrono/positions?date=${encodeURIComponent(focusedDate)}`,
+          `/api/chrono/positions?datetime=${encodeURIComponent(selectedDateTime)}`,
           { signal: controller.signal },
         );
 
@@ -72,7 +89,7 @@ export function Timeline() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [focusedDate, setPositions, setStatus]);
+  }, [selectedDateTime, setPositions, setStatus]);
 
   useEffect(() => {
     if (!scrubbing) return;
@@ -124,7 +141,7 @@ export function Timeline() {
         onClick={() => setExpanded(true)}
         aria-expanded={expanded}
         aria-controls={expanded ? "chrono-timeline-controls" : undefined}
-        aria-label={`Focused date: ${formatDate(focusedDate)}. Open timeline.`}
+        aria-label={`Focused date: ${formatDateTime(focusedDate, focusedTime)}. Open timeline.`}
         className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left"
       >
         <span
@@ -140,7 +157,7 @@ export function Timeline() {
         ) : null}
 
         <span className="ml-auto whitespace-nowrap text-[12px] font-medium tabular-nums tracking-[-0.01em] text-[#14121a] dark:text-[#f2ede4]">
-          {formatDate(focusedDate)}
+          {formatDateTime(focusedDate, focusedTime)}
         </span>
       </button>
 
@@ -212,7 +229,48 @@ export function Timeline() {
                 />
               </div>
 
-              <div className="mt-0.5 flex items-center justify-between gap-3 text-[8px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+              <div className="mt-2 flex items-center gap-2.5">
+                <label
+                  htmlFor="chrono-precise-datetime"
+                  className="whitespace-nowrap text-[8px] font-medium uppercase tracking-[0.18em] text-black/35 dark:text-white/30"
+                >
+                  Precise UTC
+                </label>
+                <div className="relative min-w-0 flex-1">
+                  <svg
+                    viewBox="0 0 16 16"
+                    className="pointer-events-none absolute left-3 top-1/2 z-10 h-3 w-3 -translate-y-1/2 text-black/30 dark:text-white/30"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.1"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="8" cy="8" r="5.4" />
+                    <path d="M8 4.8V8l2.2 1.4" />
+                  </svg>
+                  <input
+                    id="chrono-precise-datetime"
+                    type="datetime-local"
+                    min={`${TIMELINE_MIN}T00:00`}
+                    max={`${TIMELINE_MAX}T23:59`}
+                    step="60"
+                    value={selectedDateTime}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      if (!next) return;
+                      const [nextDate, nextTime] = next.split("T");
+                      if (nextDate && nextTime) {
+                        setFocusedDateTime(nextDate, nextTime.slice(0, 5));
+                      }
+                    }}
+                    aria-label="Precise UTC date and time"
+                    className="h-7 w-full min-w-0 appearance-none rounded-full border border-black/10 bg-black/[0.025] py-1 pl-8 pr-2.5 text-[9px] tabular-nums tracking-[-0.01em] text-black/60 outline-none transition-colors [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 focus:border-black/20 focus:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55 dark:[color-scheme:dark] dark:focus:border-white/20 dark:focus:bg-white/[0.06]"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-3 text-[8px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
                 <span>1906</span>
                 <span
                   className={
@@ -223,7 +281,7 @@ export function Timeline() {
                 >
                   {statusLabel}
                 </span>
-                <span>2026</span>
+                <span>{TIMELINE_MAX.slice(0, 4)}</span>
               </div>
             </div>
           </motion.div>

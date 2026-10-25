@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
+import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
@@ -10,9 +11,12 @@ export function Tooltip() {
   const entity = useEntityStore((state) => state.hoveredEntity);
   const energy = useChronoStore((state) => state.energy);
   const marketEnergy = useChronoStore((state) => state.marketEnergy);
+  const parallels = useChronoStore((state) => state.parallels);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== "light";
   const tone = getEnergyTone(energy?.polarity, isDark);
+  const closestEcho = parallels?.[0] ?? null;
+  const category = categoryTone(closestEcho?.category);
 
   return (
     <AnimatePresence>
@@ -26,6 +30,7 @@ export function Tooltip() {
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           className="pointer-events-none absolute right-3 bottom-24 z-20 w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 font-sans text-[#14121a] shadow-[0_10px_40px_rgba(0,0,0,0.12)] backdrop-blur-md backdrop-saturate-150 lg:bottom-auto lg:right-[21.5rem] lg:top-5 dark:border-white/15 dark:bg-white/10 dark:text-[#f2ede4] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)]"
+          style={{ borderTopColor: category.color }}
         >
           <div className="flex items-center gap-3">
             <span
@@ -97,6 +102,27 @@ export function Tooltip() {
               </p>
             </div>
           </div>
+
+          {closestEcho ? (
+            <div className="mt-3 flex items-center gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{
+                  backgroundColor: category.color,
+                  boxShadow: `0 0 9px ${category.glow}`,
+                }}
+              />
+              <span
+                className="text-[8px] font-medium uppercase tracking-[0.16em]"
+                style={{ color: category.color }}
+              >
+                {closestEcho.category}
+              </span>
+              <span className="truncate text-[9px] text-black/40 dark:text-white/35">
+                {closestEcho.name}
+              </span>
+            </div>
+          ) : null}
 
           {entity.ml_insight ? (
             <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">

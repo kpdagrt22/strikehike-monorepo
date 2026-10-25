@@ -5,9 +5,10 @@ import { useTheme } from "next-themes";
 import { Canvas3D } from "@/components/Canvas3D";
 import { EnergyGauge } from "@/components/EnergyGauge";
 import { FilterControls } from "@/components/FilterControls";
+import { FutureLadder } from "@/components/FutureLadder";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { RightPanel } from "@/components/RightPanel";
-import { Timeline } from "@/components/Timeline";
+import { TimeControls } from "@/components/TimeControls";
 import { Tooltip } from "@/components/Tooltip";
 import { ViewControls } from "@/components/ViewControls";
 
@@ -43,8 +44,9 @@ export default function Home() {
 
       <EnergyGauge isDark={isDark} />
       <Tooltip />
-      <Timeline />
+      <TimeControls />
       <FilterControls />
+      <FutureLadder />
       <RightPanel />
       <ViewControls />
       <OnboardingOverlay introComplete={introComplete} />

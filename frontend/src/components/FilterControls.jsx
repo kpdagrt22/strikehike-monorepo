@@ -2,23 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  CATEGORY_ORDER,
+  categoryTone,
+} from "@/lib/categoryTone";
 import { useChronoStore } from "@/store/chronoStore";
-
-const CATEGORY_ORDER = [
-  "Science",
-  "Politics",
-  "Finance",
-  "Culture/Religion",
-  "Natural Disasters",
-];
-
-const CATEGORY_COLORS = {
-  Science: "#7dd3fc",
-  Politics: "#fda4af",
-  Finance: "#f6c76a",
-  "Culture/Religion": "#c4b5fd",
-  "Natural Disasters": "#fb923c",
-};
 
 export function FilterControls() {
   const [roster, setRoster] = useState(null);
@@ -63,7 +51,7 @@ export function FilterControls() {
   };
 
   return (
-    <div className="pointer-events-auto fixed left-3 top-[6.75rem] z-30 sm:left-5 sm:top-1/2 sm:-translate-y-1/2">
+    <div className="pointer-events-auto fixed left-3 top-[6.75rem] z-30 sm:left-5">
       <div className="relative">
         <div className="rounded-[1.6rem] border border-black/10 bg-white/45 p-2 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-black/25 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
           <div className="px-2 pb-1.5 pt-1">
@@ -94,7 +82,10 @@ export function FilterControls() {
                 >
                   <span
                     className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: CATEGORY_COLORS[category] }}
+                    style={{
+                      backgroundColor: categoryTone(category).color,
+                      boxShadow: `0 0 8px ${categoryTone(category).glow}`,
+                    }}
                   />
                   <span className="truncate">{category}</span>
                   <span className="ml-auto text-[8px] tabular-nums text-black/25 dark:text-white/25">
@@ -153,7 +144,13 @@ export function FilterControls() {
                           : "hover:bg-black/[0.035] dark:hover:bg-white/[0.045]"
                       }`}
                     >
-                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#f05d49]" />
+                      <span
+                        className="mt-1 h-1 w-1 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: categoryTone(activeCategory).color,
+                          boxShadow: `0 0 8px ${categoryTone(activeCategory).glow}`,
+                        }}
+                      />
                       <span className="min-w-0">
                         <span className="block text-[8px] font-medium tabular-nums uppercase tracking-[0.16em] text-black/35 dark:text-white/30">
                           {event.date}

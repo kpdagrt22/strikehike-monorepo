@@ -37,12 +37,14 @@ export function RightPanel() {
   const [open, setOpen] = useState(true);
   const positions = useChronoStore((state) => state.positions);
   const focusedDate = useChronoStore((state) => state.focusedDate);
+  const focusedTime = useChronoStore((state) => state.focusedTime);
   const status = useChronoStore((state) => state.status);
 
   const displayDate = new Date(`${focusedDate}T00:00:00Z`);
   const dateLabel = Number.isNaN(displayDate.getTime())
     ? focusedDate
     : dateFormatter.format(displayDate);
+  const timeLabel = focusedTime !== "00:00" ? ` · ${focusedTime} UTC` : "";
 
   return (
     <div className="pointer-events-auto fixed right-3 top-[6.75rem] z-30 sm:right-5">
@@ -63,6 +65,7 @@ export function RightPanel() {
                 </p>
                 <p className="mt-1 text-[10px] tabular-nums text-black/55 dark:text-white/50">
                   {dateLabel}
+                  {timeLabel}
                 </p>
               </div>
               <button
