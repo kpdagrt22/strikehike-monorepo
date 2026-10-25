@@ -60,15 +60,15 @@ function DustField({ isDark }) {
       args={[undefined, undefined, DUST_COUNT]}
       frustumCulled={false}
     >
-      <icosahedronGeometry args={[0.014, 0]} />
+      <icosahedronGeometry args={[0.0056, 0]} />
       <meshStandardMaterial
         color={isDark ? "#f4e6c8" : "#6f627d"}
         emissive={isDark ? "#f4e6c8" : "#000000"}
-        emissiveIntensity={isDark ? 0.55 : 0}
+        emissiveIntensity={isDark ? 0.22 : 0}
         metalness={0.1}
         roughness={0.65}
         transparent
-        opacity={isDark ? 0.9 : 0.34}
+        opacity={isDark ? 0.36 : 0.136}
         depthWrite={false}
       />
     </instancedMesh>
@@ -81,10 +81,12 @@ function RingMaterial({ isDark }) {
       <meshStandardMaterial
         color="#7d6cff"
         emissive="#7d6cff"
-        emissiveIntensity={2.6}
+        emissiveIntensity={1.04}
         metalness={0.6}
         roughness={0.24}
         toneMapped={false}
+        transparent
+        opacity={0.4}
       />
     );
   }
@@ -97,7 +99,7 @@ function RingMaterial({ isDark }) {
       clearcoat={1}
       clearcoatRoughness={0.14}
       transparent
-      opacity={0.9}
+      opacity={0.36}
     />
   );
 }
@@ -108,10 +110,12 @@ function TickMaterial({ isDark }) {
       <meshStandardMaterial
         color="#cdbcff"
         emissive="#9b84ff"
-        emissiveIntensity={2}
+        emissiveIntensity={0.8}
         metalness={0.45}
         roughness={0.28}
         toneMapped={false}
+        transparent
+        opacity={0.36}
       />
     );
   }
@@ -124,7 +128,7 @@ function TickMaterial({ isDark }) {
       clearcoat={1}
       clearcoatRoughness={0.16}
       transparent
-      opacity={0.82}
+      opacity={0.33}
     />
   );
 }
@@ -135,10 +139,12 @@ function NodeMaterial({ isDark }) {
       <meshStandardMaterial
         color="#ffffff"
         emissive="#a78bfa"
-        emissiveIntensity={4}
+        emissiveIntensity={1.6}
         metalness={0.2}
         roughness={0.18}
         toneMapped={false}
+        transparent
+        opacity={0.4}
       />
     );
   }
@@ -150,6 +156,8 @@ function NodeMaterial({ isDark }) {
       roughness={0.16}
       clearcoat={1}
       clearcoatRoughness={0.1}
+      transparent
+      opacity={0.4}
     />
   );
 }

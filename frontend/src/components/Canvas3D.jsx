@@ -9,9 +9,9 @@ import { PlanetarySystem } from "@/components/PlanetarySystem";
 import { useChronoStore } from "@/store/chronoStore";
 
 // Camera keys are calibrated to the compact orrery radius (not literal AU scale).
-const ORBITAL_VIEW = { x: 0, y: 12, z: 22 };
-const ZENITH_VIEW = { x: 0, y: 34, z: 0 };
-const INTRO_START = { x: 0, y: 80, z: 150 };
+const ORBITAL_VIEW = { x: 0, y: 8, z: 14 };
+const ZENITH_VIEW = { x: 0, y: 22, z: 0 };
+const INTRO_START = { x: 0, y: 55, z: 95 };
 const INTRO_DURATION = 3;
 const AUTO_ROTATE_SPEED = 0.16;
 const IDLE_RESUME_MS = 4200;

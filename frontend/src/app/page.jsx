@@ -6,6 +6,7 @@ import { Canvas3D } from "@/components/Canvas3D";
 import { EnergyGauge } from "@/components/EnergyGauge";
 import { FilterControls } from "@/components/FilterControls";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { RightPanel } from "@/components/RightPanel";
 import { Timeline } from "@/components/Timeline";
 import { Tooltip } from "@/components/Tooltip";
 import { ViewControls } from "@/components/ViewControls";
@@ -44,6 +45,7 @@ export default function Home() {
       <Tooltip />
       <Timeline />
       <FilterControls />
+      <RightPanel />
       <ViewControls />
       <OnboardingOverlay introComplete={introComplete} />
     </main>
