@@ -136,6 +136,9 @@ jobs:
               rollback
             fi
 
+            # Give Caddy a baseline window to provision the certificate before probing TLS.
+            sleep 15
+
             docker compose -p strikehike-chrono ps
 
             if ! curl --fail --silent --show-error \
