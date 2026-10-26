@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
+import { PhasePlane } from "@/components/regime/PhasePlane";
 import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
 import { SkyStrip } from "@/components/regime/SkyStrip";
+import { TransitionMatrix } from "@/components/regime/TransitionMatrix";
 import {
   formatDate,
   formatNumber,
@@ -354,6 +356,18 @@ export default function RegimePage() {
                 />
               ) : null}
             </AnimatePresence>
+
+            <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+              {skyDate ? (
+                <PhasePlane
+                  key={skyDate}
+                  asOf={skyDate}
+                  contextLabel={skyContext}
+                  isDark={isDark}
+                />
+              ) : null}
+              <TransitionMatrix isDark={isDark} />
+            </div>
 
             <MethodDetails meta={data.meta} />
 
