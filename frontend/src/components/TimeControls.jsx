@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import crashMarkers from "@/data/astro/crash_markers.json";
+import { categoryTone } from "@/lib/categoryTone";
 import {
   TIMELINE_MAX,
   TIMELINE_MIN,
+  currentUtcDate,
   useChronoStore,
 } from "@/store/chronoStore";
 
@@ -49,6 +51,124 @@ function valueToDate(value) {
   return new Date(MIN_MS + clamped * DAY_MS).toISOString().slice(0, 10);
 }
 
+function FutureLane({ matches, status, focusedDate, onSelect }) {
+  const today = currentUtcDate();
+  const todayMs = Date.parse(`${today}T00:00:00Z`);
+  const futureMatches = matches
+    .map((match) => {
+      const daysAhead = Math.round(
+        (Date.parse(`${match.date}T00:00:00Z`) - todayMs) / DAY_MS,
+      );
+      return { ...match, daysAhead };
+    })
+    .filter(
+      (match) =>
+        Number.isFinite(match.daysAhead) &&
+        match.daysAhead >= 0 &&
+        match.daysAhead <= 180,
+    )
+    .sort((a, b) => a.daysAhead - b.daysAhead)
+    .slice(0, 5);
+
+  const loading = status === "idle" || status === "loading";
+  const error = status === "error";
+
+  return (
+    <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
+      <div className="flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.1em] text-black/45 dark:text-white/40">
+        <span>Next 180 days</span>
+        <span>
+          {error
+            ? "Unavailable"
+            : loading
+              ? "Loading"
+              : `${futureMatches.length} plotted`}
+        </span>
+      </div>
+
+      {error ? (
+        <p className="mt-2 text-meta text-black/40 dark:text-white/40">
+          Upcoming events are unavailable.
+        </p>
+      ) : loading ? (
+        <div className="mt-2 h-10 animate-pulse rounded-full bg-black/[0.05] dark:bg-white/[0.06]" />
+      ) : futureMatches.length === 0 ? (
+        <p className="mt-2 text-meta text-black/40 dark:text-white/40">
+          No events in the next 180 days.
+        </p>
+      ) : (
+        <div className="relative mt-2 h-16">
+          <div className="absolute inset-x-0 top-4 h-px bg-black/15 dark:bg-white/15" />
+          <motion.div
+            initial={{ width: "0%" }}
+            animate={{ width: "100%" }}
+            transition={{ duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute left-0 top-4 h-px bg-[#f05d49] shadow-[0_0_10px_rgba(240,93,73,0.55)]"
+          />
+
+          {futureMatches.map((match, index) => {
+            const tone = categoryTone(match.event.category);
+            const left = Math.max(
+              6,
+              Math.min(94, (match.daysAhead / 180) * 100),
+            );
+            const active = focusedDate === match.date;
+            const lane = index % 2 === 0 ? "top-0" : "top-8";
+
+            return (
+              <motion.button
+                key={`${match.date}-${match.event.name}`}
+                type="button"
+                onClick={() => onSelect(match.date)}
+                title={`${match.event.name} · ${formatDate(match.date)}`}
+                aria-label={`${match.event.name}, ${formatDate(match.date)}`}
+                aria-pressed={active}
+                initial={{ opacity: 0, y: 7, scale: 0.75 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                  delay: 0.08 + index * 0.09,
+                  duration: 0.32,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                style={{ left: `${left}%` }}
+                className={`absolute ${lane} z-10 flex -translate-x-1/2 flex-col items-center`}
+              >
+                <span className="relative flex h-3.5 w-3.5 items-center justify-center">
+                  <motion.span
+                    animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
+                    transition={{
+                      duration: 2.4,
+                      repeat: Infinity,
+                      delay: index * 0.25,
+                      ease: "easeOut",
+                    }}
+                    className="absolute inset-0 rounded-full"
+                    style={{ backgroundColor: tone.color }}
+                  />
+                  <span
+                    className={`relative h-2.5 w-2.5 rounded-full border ${
+                      active
+                        ? "border-white/80"
+                        : "border-black/20 dark:border-white/30"
+                    }`}
+                    style={{
+                      backgroundColor: tone.color,
+                      boxShadow: `0 0 9px ${tone.glow}`,
+                    }}
+                  />
+                </span>
+                <span className="mt-1 whitespace-nowrap text-[10px] font-medium tabular-nums text-black/50 dark:text-white/45">
+                  +{match.daysAhead}d
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TimeControls() {
   const focusedDate = useChronoStore((state) => state.focusedDate);
   const focusedTime = useChronoStore((state) => state.focusedTime);
@@ -64,10 +184,14 @@ export function TimeControls() {
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const status = useChronoStore((state) => state.status);
   const source = useChronoStore((state) => state.source);
+  const ladderMatches = useChronoStore((state) => state.ladderMatches);
+  const ladderStatus = useChronoStore((state) => state.ladderStatus);
 
   const [expanded, setExpanded] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const selectedDateTime = `${focusedDate}T${focusedTime}`;
+  const today = currentUtcDate();
+  const isToday = focusedDate === today && focusedTime === "00:00";
 
   useEffect(() => {
     setTimeControlsExpanded(expanded);
@@ -148,30 +272,53 @@ export function TimeControls() {
           : "w-auto"
       }`}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        aria-expanded={expanded}
-        aria-controls={expanded ? "chrono-timeline-controls" : undefined}
-        aria-label={`Focused date: ${formatDateTime(focusedDate, focusedTime)}. Open timeline.`}
-        className="flex min-h-11 w-full items-center gap-2.5 px-4 py-2.5 text-left"
-      >
-        <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#f05d49] ${
-            status === "loading" ? "animate-pulse" : ""
-          }`}
-        />
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-expanded={expanded}
+          aria-controls={expanded ? "chrono-timeline-controls" : undefined}
+          aria-label={`Focused date: ${formatDateTime(focusedDate, focusedTime)}. Open timeline.`}
+          className="flex min-h-11 flex-1 items-center gap-2.5 px-4 py-2.5 text-left"
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#f05d49] ${
+              status === "loading" ? "animate-pulse" : ""
+            }`}
+          />
 
-        {expanded ? (
-          <span className="text-micro font-medium uppercase tracking-[0.16em] text-black/55 dark:text-white/55">
-            Focused date
+          {expanded ? (
+            <span className="text-micro font-medium uppercase tracking-[0.16em] text-black/55 dark:text-white/55">
+              Focused date
+            </span>
+          ) : null}
+
+          <span className="ml-auto whitespace-nowrap text-strong font-medium tabular-nums tracking-[-0.01em] text-[#14121a] dark:text-[#f2ede4]">
+            {formatDateTime(focusedDate, focusedTime)}
           </span>
-        ) : null}
+        </button>
 
-        <span className="ml-auto whitespace-nowrap text-strong font-medium tabular-nums tracking-[-0.01em] text-[#14121a] dark:text-[#f2ede4]">
-          {formatDateTime(focusedDate, focusedTime)}
-        </span>
-      </button>
+        <span className="my-2 w-px shrink-0 bg-black/10 dark:bg-white/10" />
+
+        <button
+          type="button"
+          onClick={() => setFocusedDateTime(currentUtcDate(), "00:00")}
+          aria-label="Jump to today's UTC date"
+          aria-current={isToday ? "date" : undefined}
+          className={`flex min-h-11 shrink-0 items-center gap-1.5 px-3 text-micro font-medium uppercase tracking-[0.1em] transition-colors ${
+            isToday
+              ? "text-[#c0442f] dark:text-[#ff8b77]"
+              : "text-black/50 hover:text-[#c0442f] dark:text-white/45 dark:hover:text-[#ff8b77]"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              isToday ? "bg-[#f05d49]" : "border border-current"
+            }`}
+          />
+          Today
+        </button>
+      </div>
 
       <AnimatePresence initial={false}>
         {expanded ? (
@@ -295,6 +442,13 @@ export function TimeControls() {
                 </span>
                 <span>{TIMELINE_MAX.slice(0, 4)}</span>
               </div>
+
+              <FutureLane
+                matches={ladderMatches}
+                status={ladderStatus}
+                focusedDate={focusedDate}
+                onSelect={setFocusedDate}
+              />
             </div>
           </motion.div>
         ) : null}

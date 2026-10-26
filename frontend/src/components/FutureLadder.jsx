@@ -1,41 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { categoryTone } from "@/lib/categoryTone";
 import { useChronoStore } from "@/store/chronoStore";
 
 export function FutureLadder() {
-  const [ladder, setLadder] = useState(null);
-  const [error, setError] = useState(false);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const activeEventCategory = useChronoStore(
     (state) => state.activeEventCategory,
   );
   const setFocusedDate = useChronoStore((state) => state.setFocusedDate);
+  const ladderMatches = useChronoStore((state) => state.ladderMatches);
+  const ladderStatus = useChronoStore((state) => state.ladderStatus);
+  const setLadder = useChronoStore((state) => state.setLadder);
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function loadLadder() {
+      setLadder({ status: "loading", matches: [] });
+
       try {
         const response = await fetch("/api/forecast-ladder", {
           signal: controller.signal,
           cache: "no-store",
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        setLadder(await response.json());
+        const payload = await response.json();
+        setLadder({
+          status: "ready",
+          matches: payload.matches ?? [],
+        });
       } catch (loadError) {
-        if (loadError.name !== "AbortError") setError(true);
+        if (loadError.name !== "AbortError") {
+          setLadder({ status: "error", matches: [] });
+        }
       }
     }
 
     loadLadder();
     return () => controller.abort();
-  }, []);
+  }, [setLadder]);
 
-  const matches = ladder?.matches ?? [];
+  const matches = ladderMatches;
+  const error = ladderStatus === "error";
+  const loading = ladderStatus === "idle" || ladderStatus === "loading";
 
   return (
     <div
@@ -96,13 +107,13 @@ export function FutureLadder() {
             </p>
           ) : null}
 
-          {!error && !ladder ? (
+          {!error && loading ? (
             <p className="px-2 py-3 text-meta text-black/45 dark:text-white/40">
               Reading the next sky…
             </p>
           ) : null}
 
-          {!error && ladder && matches.length === 0 ? (
+          {!error && !loading && matches.length === 0 ? (
             <p className="px-2 py-3 text-meta leading-relaxed text-black/45 dark:text-white/40">
               No 85%+ geometric echoes in this window.
             </p>

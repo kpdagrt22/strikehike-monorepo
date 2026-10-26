@@ -26,6 +26,8 @@ export const useChronoStore = create((set) => ({
   mobileSheet: null,
   timeControlsExpanded: false,
   activeEventCategory: null,
+  ladderMatches: [],
+  ladderStatus: "idle",
 
   setFocusedDate: (focusedDate) =>
     set({ focusedDate, focusedTime: "00:00" }),
@@ -45,6 +47,8 @@ export const useChronoStore = create((set) => ({
     set({ timeControlsExpanded }),
   setActiveEventCategory: (activeEventCategory) =>
     set({ activeEventCategory }),
+  setLadder: ({ matches, status }) =>
+    set({ ladderMatches: matches, ladderStatus: status }),
 
   setPositions: (payload) =>
     set((state) => {
