@@ -57,7 +57,7 @@ export function SkyStrip({ asOf, contextLabel }) {
   }, [asOf]);
 
   return (
-    <section className="mt-3 flex flex-col gap-2 rounded-2xl border border-black/10 bg-white/60 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-black/40 sm:flex-row sm:items-center sm:justify-between">
+    <section className="mt-3 flex flex-col gap-2 rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
           Sky at this date

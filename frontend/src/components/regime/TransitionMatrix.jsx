@@ -95,9 +95,9 @@ export function TransitionMatrix({ isDark }) {
   return (
     <section
       aria-labelledby="transition-matrix-title"
-      className="overflow-hidden rounded-[1.6rem] border border-black/10 bg-white/60 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
+      className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
     >
-      <div className="border-b border-black/[0.07] p-5 dark:border-white/10 sm:p-6">
+      <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
           Transition matrix
         </p>
@@ -136,7 +136,7 @@ export function TransitionMatrix({ isDark }) {
             <button
               type="button"
               onClick={handleRetry}
-              className="mt-3 rounded-full border border-black/10 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06]"
+              className="mt-3 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
             >
               Retry matrix
             </button>
@@ -230,7 +230,7 @@ export function TransitionMatrix({ isDark }) {
             {matrix.states.map((from) => (
               <div
                 key={`mobile-${from}`}
-                className="rounded-2xl border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]"
+                className="rounded-2xl border border-black/5 bg-black/[0.02] p-3 dark:border-white/5 dark:bg-white/[0.03]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-2 text-micro font-medium text-black/65 dark:text-white/65">
@@ -280,7 +280,7 @@ export function TransitionMatrix({ isDark }) {
             ))}
           </div>
 
-          <div className="border-t border-black/[0.07] px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/10 dark:text-white/40">
+          <div className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
             Includes self-transitions. Median run lengths are monthly
             observations with full composite coverage
             {matrix.sample

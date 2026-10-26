@@ -37,7 +37,7 @@ function StatusBadge({ status }) {
           };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/55 backdrop-blur-xl dark:border-white/10 dark:bg-black/30 dark:text-white/55">
+    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/55 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/55">
       <span
         className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
           config.pulse ? "animate-pulse" : ""
@@ -51,7 +51,7 @@ function StatusBadge({ status }) {
 
 function Stat({ label, value, suffix, detail }) {
   return (
-    <div className="rounded-2xl border border-black/10 bg-white/60 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-black/30">
+    <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30">
       <p className="text-micro uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
         {label}
       </p>
@@ -72,7 +72,7 @@ function Stat({ label, value, suffix, detail }) {
 
 function LoadingState() {
   return (
-    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-black/10 bg-white/60 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
+    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-micro uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
           Loading 120 years of macro history
@@ -87,7 +87,7 @@ function LoadingState() {
 
 function ErrorState({ message, onRetry }) {
   return (
-    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#ef4444]/20 bg-white/60 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-[#ef4444]/25 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
+    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#ef4444]/20 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-[#ef4444]/25 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-2xl">
           <p className="text-micro uppercase tracking-[0.16em] text-[#c0442f] dark:text-[#ff8b77]">
@@ -108,7 +108,7 @@ function ErrorState({ message, onRetry }) {
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-full border border-black/10 px-3.5 py-2 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06]"
+            className="rounded-full border border-black/5 px-3.5 py-2 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
           >
             Retry
           </button>
@@ -131,7 +131,7 @@ function MethodDetails({ meta }) {
     : [];
 
   return (
-    <details className="group mt-4 rounded-[1.4rem] border border-black/10 bg-white/45 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-black/25 sm:p-6">
+    <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 sm:p-6">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/50 [&::-webkit-details-marker]:hidden dark:text-white/50">
         Method & limits
         <span className="text-base font-normal text-black/30 transition-transform group-open:rotate-45 dark:text-white/30">
@@ -170,7 +170,7 @@ function MethodDetails({ meta }) {
         </div>
       </div>
 
-      <p className="mt-4 border-t border-black/[0.07] pt-3 text-micro leading-relaxed text-black/40 dark:border-white/10 dark:text-white/40">
+      <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
         Data version {meta?.data_version ?? "—"} ·{" "}
         {meta?.strength_version ?? "—"} · Source FRED. Descriptive historical
         research. Not investment advice.
@@ -193,7 +193,7 @@ export default function RegimePage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch("/api/v1/regime/macro-history", {
+    fetch("/api/v1/regime/macro-history?resolution=weekly", {
       signal: controller.signal,
       cache: "no-store",
     })
@@ -285,7 +285,7 @@ export default function RegimePage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={state.status} />
-            <span className="inline-flex items-center rounded-full border border-black/10 bg-white/35 px-3 py-1.5 text-micro text-black/45 backdrop-blur-xl dark:border-white/10 dark:bg-black/25 dark:text-white/45">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/45 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/45">
               FRED ·{" "}
               {data?.coverage?.start?.slice(0, 4) ?? "1854"}–
               {data?.coverage?.end?.slice(0, 4) ?? "2026"}
@@ -325,7 +325,7 @@ export default function RegimePage() {
               <Stat
                 label="NBER windows"
                 value={String(data.crashes.length)}
-                detail="Click a band to inspect"
+                detail="Select a dossier in the terminal"
               />
             </div>
 
@@ -344,6 +344,7 @@ export default function RegimePage() {
               onSelect={handleSelect}
               isDark={isDark}
               coverage={data.coverage}
+              resolution={data.resolution}
             />
 
             <AnimatePresence mode="wait" initial={false}>
@@ -371,7 +372,7 @@ export default function RegimePage() {
 
             <MethodDetails meta={data.meta} />
 
-            <footer className="mt-6 flex flex-col gap-2 border-t border-black/[0.07] pt-4 text-micro text-black/40 dark:border-white/10 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+            <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
               <span>
                 FRED macro archive ·{" "}
                 {data.meta?.strength_version ?? "v1-ma-crossover"}

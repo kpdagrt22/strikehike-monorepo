@@ -162,7 +162,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
 
   if (!geometry) {
     return (
-      <div className="grid h-[220px] place-items-center rounded-2xl border border-dashed border-black/10 text-micro text-black/45 dark:border-white/10 dark:text-white/45">
+      <div className="grid h-[220px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/45 dark:border-white/5 dark:text-white/45">
         No daily observations returned for this window.
       </div>
     );
@@ -186,8 +186,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
     equitySegments.length > 0 || strengthSegments.length > 0;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/10 bg-white/45 dark:border-white/10 dark:bg-black/25">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.07] px-4 py-3 dark:border-white/10">
+    <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/45 dark:border-white/5 dark:bg-black/25">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
         <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
           Daily window · {timeline.length} observations
         </p>

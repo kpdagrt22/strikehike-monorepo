@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { RegimeDetailChart } from "@/components/regime/RegimeDetailChart";
 import {
@@ -35,13 +35,13 @@ function PreCrashCard({ label, data }) {
         : "Positive";
   const curveClass =
     inversion == null
-      ? "border-black/10 text-black/45 dark:border-white/10 dark:text-white/45"
+      ? "border-black/5 text-black/45 dark:border-white/5 dark:text-white/45"
       : inversion
         ? "border-[#ef4444]/30 text-[#c0442f] dark:text-[#ff8b77]"
         : "border-[#0f766e]/25 text-[#0f766e] dark:text-[#5eead4]";
 
   return (
-    <div className="rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.03]">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
           {label}
@@ -70,7 +70,7 @@ function PreCrashCard({ label, data }) {
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.07] pt-3 text-micro text-black/40 dark:border-white/10 dark:text-white/40">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3 text-micro text-black/40 dark:border-white/5 dark:text-white/40">
         <span>
           Equity proxy{" "}
           {data?.sp500_proxy != null
@@ -85,7 +85,7 @@ function PreCrashCard({ label, data }) {
 
 function DetailSkeleton() {
   return (
-    <div className="animate-pulse rounded-2xl border border-black/10 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="animate-pulse rounded-2xl border border-black/5 bg-black/[0.03] p-4 dark:border-white/5 dark:bg-white/[0.04]">
       <p className="text-micro uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
         Loading the daily window
       </p>
@@ -95,7 +95,6 @@ function DetailSkeleton() {
 }
 
 export function CrashDetailPanel({ crash, isDark, onClose }) {
-  const panelRef = useRef(null);
   const reduceMotion = useReducedMotion();
   const detailStart =
     crash.zoom_window?.start ?? addMonthsIso(crash.start, -6);
@@ -109,18 +108,6 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
   );
   const [error, setError] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    const node = panelRef.current;
-    if (!node) return;
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    node.scrollIntoView({
-      behavior: reduced ? "auto" : "smooth",
-      block: "start",
-    });
-  }, []);
 
   useEffect(() => {
     if (!canFetch) return;
@@ -168,7 +155,6 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
 
   return (
     <motion.section
-      ref={panelRef}
       layout
       initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -181,9 +167,9 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
           : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }
       }
       aria-label={`${crash.name} crash detail`}
-      className="mt-4 scroll-mt-24 overflow-hidden rounded-[1.6rem] border border-black/10 bg-white/70 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/70 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
+      className="mt-4 scroll-mt-24 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/55 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/70 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
     >
-      <div className="border-b border-black/[0.07] p-5 dark:border-white/10 sm:p-6">
+      <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-micro uppercase tracking-[0.16em] text-[#c0442f] dark:text-[#ff8b77]">
@@ -207,7 +193,7 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
             type="button"
             onClick={onClose}
             aria-label="Close crash detail"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-black/10 text-black/45 transition-colors hover:bg-black/[0.04] hover:text-black/70 dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white/70"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-black/5 text-black/45 transition-colors hover:bg-black/[0.04] hover:text-black/70 dark:border-white/5 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white/70"
           >
             <svg
               viewBox="0 0 24 24"
@@ -250,7 +236,7 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
               <button
                 type="button"
                 onClick={handleRetry}
-                className="mt-3 rounded-full border border-black/10 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06]"
+                className="mt-3 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
               >
                 Retry daily window
               </button>
@@ -258,10 +244,10 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
           ) : null}
 
           {status === "unavailable" ? (
-            <div className="rounded-2xl border border-black/10 bg-black/[0.02] p-4 text-micro text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+            <div className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 text-micro text-black/45 dark:border-white/5 dark:bg-white/[0.03] dark:text-white/45">
               This peak precedes the macro archive coverage. The pre-crash
-              window is not available, but the NBER window is still shaded on
-              the hero timeline.
+              window is not available, but the NBER window is still shaded in
+              the terminal.
             </div>
           ) : null}
 

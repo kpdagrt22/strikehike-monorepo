@@ -144,9 +144,9 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
   return (
     <section
       aria-labelledby="phase-plane-title"
-      className="overflow-hidden rounded-[1.6rem] border border-black/10 bg-white/60 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
+      className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
     >
-      <div className="border-b border-black/[0.07] p-5 dark:border-white/10 sm:p-6">
+      <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
           Phase plane
         </p>
@@ -182,7 +182,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
             <button
               type="button"
               onClick={handleRetry}
-              className="mt-3 rounded-full border border-black/10 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06]"
+              className="mt-3 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
             >
               Retry phase window
             </button>
@@ -192,7 +192,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
 
       {state.status === "ready" && !analytics ? (
         <div className="p-5 sm:p-6">
-          <p className="rounded-2xl border border-black/10 bg-black/[0.02] p-4 text-micro text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+          <p className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 text-micro text-black/45 dark:border-white/5 dark:bg-white/[0.03] dark:text-white/45">
             No phase-plane observations for this date. The equity proxy begins
             in 1871; earlier selections have no volatility percentile.
           </p>
@@ -492,7 +492,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
             </svg>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 border-t border-black/[0.07] px-4 py-3 dark:border-white/10">
+          <div className="grid grid-cols-3 gap-2 border-t border-black/5 px-4 py-3 dark:border-white/5">
             <div>
               <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
                 Vol
@@ -528,7 +528,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
             </div>
           </div>
 
-          <p className="border-t border-black/[0.07] px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/10 dark:text-white/40">
+          <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
             1y volatility percentile and drawdown are read directly from the
             serialized FRED artifact. The browser only maps the last 90 daily
             observations into SVG coordinates. Pre-1971 proxy history is
