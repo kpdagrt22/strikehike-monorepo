@@ -12,10 +12,13 @@ export async function GET() {
   const timer = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${BACKEND_URL}/api/v1/forecast-ladder`, {
-      signal: controller.signal,
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${BACKEND_URL}/api/v1/forecast-ladder?days=180&threshold=75&limit=5`,
+      {
+        signal: controller.signal,
+        cache: "no-store",
+      },
+    );
 
     if (!response.ok) {
       return NextResponse.json(

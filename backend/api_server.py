@@ -304,7 +304,7 @@ def historical_parallels_get(
 def forecast_ladder_get(
     days: Annotated[int, Query(ge=1, le=180)] = 180,
     threshold: Annotated[float, Query(ge=50, le=100)] = 85,
-    limit: Annotated[int, Query(ge=1, le=3)] = 3,
+    limit: Annotated[int, Query(ge=1, le=5)] = 3,
 ):
     """Return the top upcoming geometric echoes in the next N days."""
     try:

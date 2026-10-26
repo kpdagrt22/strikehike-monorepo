@@ -57,7 +57,7 @@ export function FutureLadder() {
               Future ladder
             </p>
             <p className="mt-1 text-meta text-black/45 dark:text-white/40">
-              Next 180 days · 85%+ geometry
+              Next 180 days · top match per category
             </p>
           </div>
           <div className="flex items-center gap-1 lg:hidden">
@@ -89,7 +89,7 @@ export function FutureLadder() {
           </div>
         </div>
 
-        <div className="max-h-[min(24rem,55dvh)] overflow-y-auto p-1.5 [scrollbar-width:thin] lg:max-h-[min(16rem,40vh)]">
+        <div className="max-h-[min(24rem,55dvh)] overflow-y-auto p-1.5 [scrollbar-width:thin] lg:max-h-[min(26rem,46vh)]">
           {error ? (
             <p className="px-2 py-3 text-meta text-[#c0442f] dark:text-[#ff8b77]">
               Forecast unavailable
