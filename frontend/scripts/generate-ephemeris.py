@@ -5,7 +5,8 @@ The format matches the existing StrikeHike ephemeris:
   start, stepDays, dates, fast, slowStepDays, slow
 
 Bodies: Sun, Mercury, Venus, Mars (10-day knots);
-        Jupiter, Saturn, Rahu, Ketu (30-day knots).
+        Jupiter, Saturn, Rahu, Ketu (30-day knots);
+        Moon (daily knots, because it moves roughly 13 degrees per day).
 
 Swiss Ephemeris 2.10, Lahiri sidereal. Rahu is the mean node; Ketu is Rahu + 180.
 """
@@ -25,6 +26,7 @@ START = date(1900, 1, 1)
 END = date(2035, 12, 31)
 FAST_STEP = 10
 SLOW_STEP = 30
+MOON_STEP = 1
 
 FAST = {
     "Sun": swe.SUN,
@@ -64,6 +66,7 @@ def main() -> None:
 
     fast_dates = date_range(FAST_STEP)
     slow_dates = date_range(SLOW_STEP)
+    moon_dates = date_range(MOON_STEP)
 
     fast = {
         name: [longitude(swe.julday(d.year, d.month, d.day, 0.0), body) for d in fast_dates]
@@ -77,6 +80,11 @@ def main() -> None:
             for d in slow_dates
         ]
 
+    moon = [
+        longitude(swe.julday(d.year, d.month, d.day, 0.0), swe.MOON)
+        for d in moon_dates
+    ]
+
     payload = {
         "start": START.isoformat(),
         "stepDays": FAST_STEP,
@@ -84,6 +92,8 @@ def main() -> None:
         "fast": fast,
         "slowStepDays": SLOW_STEP,
         "slow": slow,
+        "moonStepDays": MOON_STEP,
+        "moon": moon,
         "source": "Swiss Ephemeris 2.10.03, Lahiri sidereal",
         "generated": date.today().isoformat(),
     }
@@ -92,7 +102,10 @@ def main() -> None:
     OUT.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
 
     print(f"wrote {OUT}")
-    print(f"fast knots: {len(fast_dates)}; slow knots: {len(slow_dates)}")
+    print(
+        f"fast knots: {len(fast_dates)}; slow knots: {len(slow_dates)}; "
+        f"moon knots: {len(moon_dates)}"
+    )
     print(f"size: {OUT.stat().st_size / 1024:.1f} KiB")
 
 

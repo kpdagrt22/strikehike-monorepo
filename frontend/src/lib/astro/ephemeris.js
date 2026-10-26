@@ -132,5 +132,21 @@ export function currentSky(ephemeris, ms) {
     };
   }
 
+  if (Array.isArray(ephemeris.moon) && ephemeris.moonStepDays) {
+    const { lo, frac } = bracket(
+      ephemeris,
+      ephemeris.moonStepDays,
+      ms,
+      ephemeris.moon.length,
+    );
+    const lon = lonAt(ephemeris.moon, lo, frac);
+    bodies.Moon = {
+      lon,
+      rashi: rashiOf(lon),
+      nakshatra: nakshatraOf(lon),
+      retro: retroAt(ephemeris, ephemeris.moon, ephemeris.moonStepDays, ms),
+    };
+  }
+
   return bodies;
 }

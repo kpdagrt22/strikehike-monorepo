@@ -11,6 +11,8 @@ import { useEntityStore } from "@/store/entityStore";
 
 const EARTH_RADIUS = 1.66;
 const EARTH_SIZE = 0.09;
+const MOON_SIZE = EARTH_SIZE * 0.42;
+const MOON_ORBIT_RADIUS = EARTH_SIZE * 2.8;
 const SATURN_TILT = Math.PI / 2 + 0.47;
 const TEXTURE_PATHS = [
   "/textures/sun.webp",
@@ -18,6 +20,7 @@ const TEXTURE_PATHS = [
   "/textures/earth-clouds.webp",
   "/textures/earth-normal.webp",
   "/textures/earth-specular.webp",
+  "/textures/moon.webp",
   "/textures/jupiter.webp",
   "/textures/saturn.webp",
   "/textures/saturn-ring.webp",
@@ -343,14 +346,17 @@ function SaturnRing({ texture, planetSize }) {
 function Earth({
   isDark,
   angle,
+  moonLon,
   earthMap,
   earthClouds,
   earthNormal,
   earthSpecular,
+  moonMap,
 }) {
   const groupRef = useRef(null);
   const surfaceRef = useRef(null);
   const cloudRef = useRef(null);
+  const moonOrbitRef = useRef(null);
   const initialPosition = useRef({
     x: Math.cos(angle) * EARTH_RADIUS,
     z: Math.sin(angle) * EARTH_RADIUS,
@@ -378,9 +384,15 @@ function Earth({
     return () => tween.kill();
   }, [angle]);
 
+  useLayoutEffect(() => {
+    if (!moonOrbitRef.current) return;
+    moonOrbitRef.current.rotation.y = (Number(moonLon) * Math.PI) / 180;
+  }, [moonLon]);
+
   useFrame((_, delta) => {
     if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.018;
     if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.045;
+    if (moonOrbitRef.current) moonOrbitRef.current.rotation.y += delta * 0.12;
   });
 
   return (
@@ -427,6 +439,36 @@ function Earth({
           toneMapped={false}
         />
       </mesh>
+
+      <group ref={moonOrbitRef}>
+        <mesh position={[MOON_ORBIT_RADIUS, 0, 0]} raycast={() => {}}>
+          <sphereGeometry args={[MOON_SIZE, 48, 48]} />
+          <meshStandardMaterial
+            map={moonMap}
+            roughness={0.95}
+            metalness={0}
+            emissive="#b9b2a6"
+            emissiveIntensity={0.06}
+          />
+        </mesh>
+
+        <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}>
+          <ringGeometry
+            args={[
+              MOON_ORBIT_RADIUS - 0.0012,
+              MOON_ORBIT_RADIUS + 0.0012,
+              96,
+            ]}
+          />
+          <meshBasicMaterial
+            color={isDark ? "#a8b4d8" : "#7b7088"}
+            transparent
+            opacity={0.24}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -598,6 +640,7 @@ export function PlanetarySystem({ isDark = true }) {
     earthClouds,
     earthNormal,
     earthSpecular,
+    moonMap,
     jupiterMap,
     saturnMap,
     saturnRing,
@@ -608,6 +651,7 @@ export function PlanetarySystem({ isDark = true }) {
       sunMap,
       earthMap,
       earthClouds,
+      moonMap,
       jupiterMap,
       saturnMap,
       saturnRing,
@@ -627,6 +671,7 @@ export function PlanetarySystem({ isDark = true }) {
     earthClouds,
     earthNormal,
     earthSpecular,
+    moonMap,
     jupiterMap,
     saturnMap,
     saturnRing,
@@ -675,10 +720,12 @@ export function PlanetarySystem({ isDark = true }) {
       <Earth
         isDark={isDark}
         angle={earthAngle}
+        moonLon={positions.Moon?.lon ?? 0}
         earthMap={earthMap}
         earthClouds={earthClouds}
         earthNormal={earthNormal}
         earthSpecular={earthSpecular}
+        moonMap={moonMap}
       />
     </group>
   );

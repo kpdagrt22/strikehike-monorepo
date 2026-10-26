@@ -6,6 +6,7 @@ import { useChronoStore } from "@/store/chronoStore";
 
 const PLANET_ORDER = [
   "Sun",
+  "Moon",
   "Mercury",
   "Venus",
   "Mars",
@@ -17,6 +18,7 @@ const PLANET_ORDER = [
 
 const SYMBOLS = {
   Sun: "☉",
+  Moon: "☽",
   Mercury: "☿",
   Venus: "♀",
   Mars: "♂",
