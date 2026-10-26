@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -39,6 +40,10 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
     frame["1y_volatility_percentile"] = 50.0
     frame["volatility_1y"] = 12.0
     frame["drawdown_1y"] = -5.0
+    frame["fed_cross"] = np.linspace(-0.5, 0.5, len(index))
+    frame["curve_cross"] = np.linspace(0.4, -0.4, len(index))
+    frame["sahm_alert"] = False
+    frame.loc["2020-03-01":"2020-04-30", "sahm_alert"] = True
 
     artifact = tmp_path / "macro_regime_history.parquet"
     frame.to_parquet(artifact, engine="pyarrow", compression="snappy")
@@ -155,6 +160,24 @@ def test_daily_resolution_for_short_window(tmp_path):
     assert payload["point_count"] == len(payload["timeline"])
     assert payload["range"]["start"] == "2020-01-01"
     assert payload["range"]["end"] == "2020-06-30"
+
+
+def test_forecast_returns_30_day_disruptive_probability(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+
+    payload = service.forecast()
+
+    assert payload["as_of"] == "2020-12-31"
+    assert payload["horizon_days"] == 30
+    assert payload["model"] == "logistic_regression_v2"
+    assert payload["features"] == ["fed_cross", "curve_cross", "sahm_alert"]
+    assert payload["training"]["observations"] > 250
+    assert 0.0 <= payload["disruptive_probability"] <= 1.0
+    assert 0.0 <= payload["risk_pct"] <= 100.0
+    assert payload["current"]["as_of"] == "2020-12-31"
+    assert payload["current"]["features"]["sahm_alert"] is False
+    assert service.forecast() is payload
 
 
 def test_invalid_ranges_raise_value_error(tmp_path):

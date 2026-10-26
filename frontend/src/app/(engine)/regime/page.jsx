@@ -129,6 +129,10 @@ function MethodDetails({ meta }) {
   const sources = Array.isArray(meta?.proxy_sources)
     ? meta.proxy_sources
     : [];
+  const allNotes = [
+    ...notes,
+    "The 30-day disruptive-risk estimate is a lightweight logistic regression on the V2 fed_cross, curve_cross and sahm_alert features; it is macro-regime risk, not a security-specific forecast.",
+  ];
 
   return (
     <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 sm:p-6">
@@ -141,7 +145,7 @@ function MethodDetails({ meta }) {
 
       <div className="mt-4 grid gap-5 sm:grid-cols-[1.15fr_0.85fr]">
         <ul className="space-y-2.5">
-          {notes.map((note, index) => (
+          {allNotes.map((note, index) => (
             <li
               key={`${index}-${note}`}
               className="flex gap-2 text-meta leading-relaxed text-black/55 dark:text-white/55"
@@ -184,6 +188,8 @@ export default function RegimePage() {
   const isDark = resolvedTheme !== "light";
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState("sp500");
+  const [forecast, setForecast] = useState(null);
   const [state, setState] = useState({
     status: "loading",
     data: null,
@@ -225,6 +231,31 @@ export default function RegimePage() {
             error: loadError.message,
           });
         }
+      });
+
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch("/api/v1/regime/forecast", {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then((payload) => {
+        if (payload && Number.isFinite(Number(payload.risk_pct))) {
+          setForecast(payload);
+        } else {
+          setForecast(null);
+        }
+      })
+      .catch((loadError) => {
+        if (loadError.name !== "AbortError") setForecast(null);
       });
 
     return () => controller.abort();
@@ -277,9 +308,10 @@ export default function RegimePage() {
               The 120-year macro regime atlas.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
-              NBER recession windows, a spliced long-run equity proxy and the
-              StrikeHike 0–100 macro strength meter. Descriptive history, not a
-              forecast.
+              NBER recession windows, a spliced long-run equity proxy, London
+              gold and a Treasury bond target, plus the StrikeHike 0–100 macro
+              strength meter and a lightweight 30-day disruptive-risk estimate.
+              Research, not investment advice.
             </p>
           </div>
 
@@ -345,6 +377,9 @@ export default function RegimePage() {
               isDark={isDark}
               coverage={data.coverage}
               resolution={data.resolution}
+              assetKey={selectedAsset}
+              onAssetChange={setSelectedAsset}
+              forecast={forecast}
             />
 
             <AnimatePresence mode="wait" initial={false}>
@@ -365,6 +400,7 @@ export default function RegimePage() {
                   asOf={skyDate}
                   contextLabel={skyContext}
                   isDark={isDark}
+                  assetKey={selectedAsset}
                 />
               ) : null}
               <TransitionMatrix isDark={isDark} />

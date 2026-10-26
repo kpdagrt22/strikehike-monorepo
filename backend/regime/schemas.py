@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -19,6 +21,30 @@ class TimelinePoint(BaseModel):
     )
     sp500_proxy: float | None = None
     proxy_source: str | None = None
+    gold_proxy: float | None = None
+    gold_proxy_source: str | None = None
+    gold_volatility_1y: float | None = None
+    gold_drawdown_1y: float | None = None
+    gold_volatility_percentile_1y: float | None = Field(
+        default=None,
+        alias="gold_1y_volatility_percentile",
+    )
+    bond_proxy: float | None = None
+    bond_proxy_source: str | None = None
+    bond_volatility_1y: float | None = None
+    bond_drawdown_1y: float | None = None
+    bond_volatility_percentile_1y: float | None = Field(
+        default=None,
+        alias="bond_1y_volatility_percentile",
+    )
+    dxy_proxy: float | None = None
+    dxy_proxy_source: str | None = None
+    dxy_volatility_1y: float | None = None
+    dxy_drawdown_1y: float | None = None
+    dxy_volatility_percentile_1y: float | None = Field(
+        default=None,
+        alias="dxy_1y_volatility_percentile",
+    )
     usrec: int | None = None
     phase: str | None = None
     nber_episode: int | None = None
@@ -105,6 +131,7 @@ class ResponseMeta(BaseModel):
     proxy_sources: list[ProxySource]
     nber_source: str
     transport: str | None = None
+    assets: dict[str, dict[str, Any]] | None = None
     notes: list[str]
 
 
@@ -156,3 +183,31 @@ class RegimeRunsResponse(BaseModel):
     runs: list[RegimeRun]
     transitions: RegimeTransitions
     meta: ResponseMeta
+
+
+class ForecastTraining(BaseModel):
+    start: str
+    end: str
+    observations: int
+    disruptive_base_rate: float
+
+
+class ForecastCurrent(BaseModel):
+    as_of: str
+    regime_state: str | None = None
+    macro_strength: float | None = None
+    features: dict[str, float | bool | None]
+
+
+class ForecastResponse(BaseModel):
+    as_of: str
+    horizon_days: int
+    model: str
+    features: list[str]
+    training: ForecastTraining
+    current: ForecastCurrent
+    disruptive_probability: float
+    risk_pct: float
+    coefficients: dict[str, float]
+    intercept: float
+    notes: list[str]

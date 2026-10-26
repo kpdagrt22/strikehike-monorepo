@@ -22,6 +22,7 @@ from regime.analytics import (  # noqa: E402
 from scripts.flows.macro_ingestion import (  # noqa: E402
     SERIES_REGISTRY,
     MacroConfigError,
+    build_asset_targets,
     build_macro_frame,
     parse_fred_observations,
     select_specs,
@@ -367,6 +368,45 @@ def test_sp500_proxy_priority_and_source_labels():
         "M1109BUSM293NNBR",
         "SP500",
     ]
+
+
+def test_asset_targets_serialize_gold_bonds_and_dollar():
+    index = pd.date_range("2010-01-01", periods=900, freq="D", tz="UTC")
+    frame = pd.DataFrame(
+        {
+            "GOLD_LBMA": np.linspace(1000.0, 2000.0, len(index)),
+            "DTWEXBGS": np.linspace(90.0, 120.0, len(index)),
+            "DGS10": np.linspace(4.0, 2.0, len(index)),
+        },
+        index=index,
+    )
+
+    assets = build_asset_targets(frame)
+    components = calculate_macro_strength_components(assets)
+
+    assert {
+        "gold_proxy",
+        "gold_proxy_source",
+        "bond_proxy",
+        "bond_proxy_source",
+        "dxy_proxy",
+        "dxy_proxy_source",
+    }.issubset(assets.columns)
+    assert assets["gold_proxy"].iloc[-1] == pytest.approx(2000.0)
+    assert assets["bond_proxy"].iloc[-1] > 0.0
+    assert assets["bond_proxy_source"].iloc[-1] == "UST10Y_TOTAL_RETURN_PROXY"
+    assert {
+        "gold_volatility_1y",
+        "gold_drawdown_1y",
+        "gold_1y_volatility_percentile",
+        "bond_volatility_1y",
+        "bond_drawdown_1y",
+        "bond_1y_volatility_percentile",
+        "dxy_volatility_1y",
+        "dxy_drawdown_1y",
+        "dxy_1y_volatility_percentile",
+    }.issubset(components.columns)
+    assert components["bond_volatility_1y"].notna().any()
 
 
 def test_sp500_proxy_respects_raw_source_boundaries():

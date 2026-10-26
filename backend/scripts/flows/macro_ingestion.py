@@ -30,6 +30,7 @@ import io
 import json
 import os
 import random
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -62,7 +63,15 @@ DEFAULT_OUTPUT_DIR = BACKEND_DIR / "data" / "processed"
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 USER_AGENT = "strikehike-regime-intelligence/phase1 (+https://strikehike.com)"
-PIPELINE_VERSION = "phase1-v2"
+PIPELINE_VERSION = "phase8-v1"
+WORLD_BANK_COMMODITY_PAGE = "https://www.worldbank.org/en/research/commodity-markets"
+WORLD_BANK_CMO_FALLBACK = (
+    "https://thedocs.worldbank.org/en/doc/"
+    "74e8be41ceb20fa0da750cda2f6b9e4e-0050012026/related/"
+    "CMO-Historical-Data-Monthly.xlsx"
+)
+GOLD_SERIES_ID = "GOLD_LBMA"
+GOLD_SOURCE = "WORLD_BANK_LBMA_GOLD"
 
 
 # ---------------------------------------------------------------------------
@@ -665,6 +674,140 @@ def fetch_universe(
 
 
 # ---------------------------------------------------------------------------
+# Supplemental London Bullion gold target
+# ---------------------------------------------------------------------------
+
+
+def _world_bank_monthly_url() -> str:
+    """Resolve the current World Bank Pink Sheet historical XLSX URL."""
+    try:
+        response = requests.get(
+            WORLD_BANK_COMMODITY_PAGE,
+            headers={"User-Agent": USER_AGENT},
+            timeout=60,
+        )
+        response.raise_for_status()
+        urls = re.findall(
+            r"https://thedocs\.worldbank\.org/[^\"' ]+"
+            r"CMO-Historical-Data-Monthly\.xlsx",
+            response.text,
+        )
+        if urls:
+            return urls[0]
+    except requests.RequestException as exc:
+        logger.warning("World Bank page unavailable ({}); using fallback URL", exc)
+    return WORLD_BANK_CMO_FALLBACK
+
+
+def _parse_world_bank_gold(content: bytes) -> pd.Series:
+    """Extract the London gold benchmark from the World Bank Pink Sheet."""
+    workbook = pd.ExcelFile(io.BytesIO(content))
+    if "Monthly Prices" not in workbook.sheet_names:
+        raise ValueError("World Bank file has no 'Monthly Prices' sheet")
+    sheet = workbook.parse("Monthly Prices", header=None)
+    if sheet.shape[0] < 7 or sheet.shape[1] < 2:
+        raise ValueError("World Bank gold sheet is unexpectedly short")
+
+    headers = sheet.iloc[4]
+    gold_columns = [
+        column
+        for column, label in headers.items()
+        if str(label).strip().lower() == "gold"
+    ]
+    if not gold_columns:
+        raise ValueError("World Bank file has no Gold column")
+
+    gold_column = gold_columns[0]
+    raw = sheet.iloc[6:, [0, gold_column]].copy()
+    raw.columns = ["month", "value"]
+    months = pd.to_datetime(
+        raw["month"].astype(str).str.replace("M", "-", regex=False),
+        format="%Y-%m",
+        utc=True,
+        errors="coerce",
+    )
+    values = pd.to_numeric(raw["value"], errors="coerce")
+    series = pd.Series(
+        values.to_numpy(), index=months, name=GOLD_SERIES_ID, dtype="float64"
+    )
+    series = series[series.index.notna() & series.notna()].sort_index()
+    series = series[~series.index.duplicated(keep="last")]
+    if series.empty:
+        raise ValueError("World Bank file has no numeric gold observations")
+    return series
+
+
+def fetch_gold_series(
+    cache_dir: Path,
+    *,
+    refresh: bool,
+    offline: bool,
+    max_age_hours: float = 24.0 * 7.0,
+    timeout: float = 90.0,
+) -> pd.Series | None:
+    """Fetch/cache the World Bank London gold benchmark as a monthly series."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"{GOLD_SERIES_ID}.csv"
+    cached = _load_cached_series(cache_path, GOLD_SERIES_ID)
+
+    cache_age = None
+    if cache_path.exists():
+        cache_age = (
+            pd.Timestamp.now(tz="UTC").timestamp() - cache_path.stat().st_mtime
+        ) / 3600.0
+    if cached is not None and not refresh and (
+        offline or (cache_age is not None and cache_age <= max_age_hours)
+    ):
+        logger.info(
+            "Using cached {} {} -> {} ({} obs)",
+            GOLD_SERIES_ID,
+            cached.index.min().date(),
+            cached.index.max().date(),
+            len(cached),
+        )
+        return cached
+
+    if offline:
+        if cached is not None:
+            return cached
+        raise MacroConfigError(
+            f"Offline mode: no cached {GOLD_SERIES_ID} in {cache_dir}"
+        )
+
+    url = _world_bank_monthly_url()
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": USER_AGENT},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        series = _parse_world_bank_gold(response.content)
+        _save_cached_series(cache_path, series)
+        logger.info(
+            "Fetched {} from World Bank {} -> {} ({} obs)",
+            GOLD_SERIES_ID,
+            series.index.min().date(),
+            series.index.max().date(),
+            len(series),
+        )
+        return series
+    except (requests.RequestException, ValueError, OSError) as exc:
+        if cached is not None:
+            logger.warning(
+                "{} fetch failed ({}); using stale cache {} -> {}",
+                GOLD_SERIES_ID,
+                exc,
+                cached.index.min().date(),
+                cached.index.max().date(),
+            )
+            return cached
+        raise FredAPIError(
+            f"{GOLD_SERIES_ID}: World Bank fetch failed ({exc})"
+        ) from exc
+
+
+# ---------------------------------------------------------------------------
 # Frame assembly
 # ---------------------------------------------------------------------------
 
@@ -721,6 +864,74 @@ def build_raw_daily_frame(
     merged = pd.concat(series_map, axis=1, sort=True).sort_index()
     merged = merged[~merged.index.duplicated(keep="last")]
     return merged.reindex(index)
+
+
+def build_asset_targets(frame: pd.DataFrame) -> pd.DataFrame:
+    """Serialize the S&P, gold, bond and dollar target variables.
+
+    Gold is the World Bank Pink Sheet London bullion benchmark, monthly and
+    forward-filled onto the daily calendar. Bonds are represented by a
+    constant-duration 10-year Treasury total-return proxy derived from DGS10:
+    carry plus duration price change, rebased to 100. The dollar target is the
+    broad trade-weighted index already present in the FRED universe.
+    """
+    out = frame.copy()
+
+    if "GOLD_LBMA" in out.columns:
+        out["gold_proxy"] = pd.to_numeric(
+            out["GOLD_LBMA"], errors="coerce"
+        )
+        out["gold_proxy_source"] = pd.Series(
+            GOLD_SOURCE, index=out.index, dtype="string"
+        ).where(out["gold_proxy"].notna())
+    else:
+        out["gold_proxy"] = np.nan
+        out["gold_proxy_source"] = pd.Series(pd.NA, index=out.index, dtype="string")
+
+    if "DTWEXBGS" in out.columns:
+        out["dxy_proxy"] = pd.to_numeric(
+            out["DTWEXBGS"], errors="coerce"
+        )
+        out["dxy_proxy_source"] = pd.Series(
+            "DTWEXBGS", index=out.index, dtype="string"
+        ).where(out["dxy_proxy"].notna())
+    else:
+        out["dxy_proxy"] = np.nan
+        out["dxy_proxy_source"] = pd.Series(pd.NA, index=out.index, dtype="string")
+
+    if "DGS10" in out.columns:
+        yield_series = (
+            pd.to_numeric(out["DGS10"], errors="coerce") / 100.0
+        )
+        first_valid = yield_series.first_valid_index()
+        if first_valid is not None:
+            previous = yield_series.shift(1)
+            # 7.5-year duration proxy: coupon carry minus duration * dy.
+            daily_return = (
+                previous / 252.0 - 7.5 * (yield_series - previous)
+            )
+            daily_return = daily_return.where(yield_series.notna(), np.nan)
+            bond_index = (1.0 + daily_return.fillna(0.0)).cumprod()
+            base = bond_index.loc[first_valid]
+            if base and np.isfinite(base):
+                bond_index = bond_index / base * 100.0
+            bond_index = bond_index.where(bond_index.index >= first_valid)
+            out["bond_proxy"] = bond_index
+            out["bond_proxy_source"] = pd.Series(
+                "UST10Y_TOTAL_RETURN_PROXY",
+                index=out.index,
+                dtype="string",
+            ).where(out["bond_proxy"].notna())
+        else:
+            out["bond_proxy"] = np.nan
+            out["bond_proxy_source"] = pd.Series(
+                pd.NA, index=out.index, dtype="string"
+            )
+    else:
+        out["bond_proxy"] = np.nan
+        out["bond_proxy_source"] = pd.Series(pd.NA, index=out.index, dtype="string")
+
+    return out
 
 
 def _write_parquet(frame: pd.DataFrame, path: Path) -> None:
@@ -784,6 +995,70 @@ def _proxy_metadata(frame: pd.DataFrame) -> list[dict[str, Any]]:
         )
     sources.sort(key=lambda item: item["start"])
     return sources
+
+
+def _asset_metadata(frame: pd.DataFrame) -> dict[str, dict[str, Any]]:
+    """Describe the selectable target series serialized in the artifact."""
+    definitions = (
+        (
+            "sp500",
+            "S&P 500 proxy",
+            "sp500_proxy",
+            "sp500_proxy_source",
+            "",
+            "Index (spliced, rebased by consumer)",
+        ),
+        (
+            "gold",
+            "Gold — London bullion",
+            "gold_proxy",
+            "gold_proxy_source",
+            "gold_",
+            "$/troy oz",
+        ),
+        (
+            "bonds",
+            "US Treasury bonds",
+            "bond_proxy",
+            "bond_proxy_source",
+            "bond_",
+            "Index (10y UST total-return proxy)",
+        ),
+        (
+            "dxy",
+            "US Dollar — broad trade-weighted",
+            "dxy_proxy",
+            "dxy_proxy_source",
+            "dxy_",
+            "Index (Jan 2006=100)",
+        ),
+    )
+    assets: dict[str, dict[str, Any]] = {}
+    for key, label, value_field, source_field, prefix, units in definitions:
+        if value_field not in frame.columns:
+            continue
+        values = frame[value_field].dropna()
+        if values.empty:
+            continue
+        sources = (
+            frame[source_field].dropna().astype(str)
+            if source_field in frame.columns
+            else pd.Series(dtype="string")
+        )
+        assets[key] = {
+            "label": label,
+            "value_field": value_field,
+            "source_field": source_field,
+            "volatility_field": f"{prefix}volatility_1y",
+            "drawdown_field": f"{prefix}drawdown_1y",
+            "percentile_field": f"{prefix}1y_volatility_percentile",
+            "units": units,
+            "source": str(sources.iloc[0]) if len(sources) else None,
+            "first_observation": values.index.min().date().isoformat(),
+            "last_observation": values.index.max().date().isoformat(),
+            "observations": int(values.size),
+        }
+    return assets
 
 
 def build_metadata(
@@ -854,6 +1129,7 @@ def build_metadata(
         "Macro strength is a V2 coincident heuristic (Fed Funds 21d/126d panic-cut; 10y-2y level and 21d/126d un-inversion; UNRATE Sahm proxy), not a probability or forecast.",
         "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
         "USREC is excluded from the strength inputs to avoid target leakage.",
+        "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index.",
     ]
 
     return {
@@ -909,6 +1185,7 @@ def build_metadata(
             "sources": _proxy_metadata(frame),
             "notes": notes[3:4],
         },
+        "assets": _asset_metadata(frame),
         "alignment": {
             "method": "daily calendar reindex + forward fill",
             "backfill": False,
@@ -958,12 +1235,24 @@ def run_pipeline(
         if client is not None:
             client.close()
 
+    try:
+        gold = fetch_gold_series(
+            cache_dir,
+            refresh=refresh,
+            offline=offline,
+        )
+        if gold is not None:
+            series_map[GOLD_SERIES_ID] = gold
+    except Exception as exc:  # noqa: BLE001 - supplemental target must not kill the artifact
+        warnings.append(f"{GOLD_SERIES_ID}: {type(exc).__name__}: {exc}")
+
     frame = build_macro_frame(series_map, start=start, end=end)
     frame = annotate_nber(frame)
 
     raw_frame = build_raw_daily_frame(series_map, frame.index)
     proxy = build_sp500_proxy(frame, raw_frame=raw_frame)
     frame = frame.join(proxy)
+    frame = build_asset_targets(frame)
 
     strength = calculate_macro_strength_components(frame)
     frame = frame.join(strength)

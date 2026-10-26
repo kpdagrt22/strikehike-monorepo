@@ -10,6 +10,10 @@ import {
   parseIsoDay,
 } from "@/components/regime/regimeUtils";
 import {
+  assetChartColor,
+  getAssetTarget,
+} from "@/components/regime/assetTargets";
+import {
   getRegimeToneColor,
   getRegimeToneLabel,
 } from "@/lib/regimeTone";
@@ -33,8 +37,10 @@ function pathFromPoints(points, x, y) {
     .join(" ");
 }
 
-export function PhasePlane({ asOf, contextLabel, isDark }) {
+export function PhasePlane({ asOf, contextLabel, isDark, assetKey = "sp500" }) {
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
+  const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
+  const assetColor = assetChartColor(asset, isDark);
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({
     status: "loading",
@@ -95,13 +101,13 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
       .map((point) => {
         const ms = parseIsoDay(point.date);
         const vol =
-          point["1y_volatility_percentile"] == null
+          point[asset.percentileField] == null
             ? Number.NaN
-            : Number(point["1y_volatility_percentile"]);
+            : Number(point[asset.percentileField]);
         const drawdown =
-          point.drawdown_1y == null
+          point[asset.drawdownField] == null
             ? Number.NaN
-            : Number(point.drawdown_1y);
+            : Number(point[asset.drawdownField]);
         return {
           ...point,
           ms,
@@ -134,7 +140,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
     }
 
     return { path, current, yMin, yTicks };
-  }, [state]);
+  }, [state, asset]);
 
   const handleRetry = () => {
     setState({ status: "loading", timeline: null, error: null });
@@ -148,7 +154,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
     >
       <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
-          Phase plane
+          Phase plane · {asset.label}
         </p>
         <h2
           id="phase-plane-title"
@@ -193,8 +199,8 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
       {state.status === "ready" && !analytics ? (
         <div className="p-5 sm:p-6">
           <p className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 text-micro text-black/45 dark:border-white/5 dark:bg-white/[0.03] dark:text-white/45">
-            No phase-plane observations for this date. The equity proxy begins
-            in 1871; earlier selections have no volatility percentile.
+            No phase-plane observations for this date. Select another asset or
+            a later date with serialized volatility and drawdown coverage.
           </p>
         </div>
       ) : null}
@@ -206,7 +212,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               className="h-auto w-full min-w-[560px]"
               role="img"
-              aria-label={`Phase plane of one-year volatility percentile versus one-year drawdown as of ${formatDate(asOf)}`}
+              aria-label={`Phase plane of ${asset.label} one-year volatility percentile versus one-year drawdown as of ${formatDate(asOf)}`}
             >
               <defs>
                 <linearGradient
@@ -218,12 +224,12 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
                 >
                   <stop
                     offset="0%"
-                    stopColor={tone.equity}
+                    stopColor={assetColor}
                     stopOpacity="0.2"
                   />
                   <stop
                     offset="100%"
-                    stopColor={tone.equity}
+                    stopColor={assetColor}
                     stopOpacity="1"
                   />
                 </linearGradient>
@@ -246,7 +252,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
                 height={
                   PLOT_H * (DRAWDOWN_THRESHOLD / analytics.yMin)
                 }
-                fill={tone.equity}
+                fill={assetColor}
                 fillOpacity="0.055"
               />
               <rect
@@ -260,7 +266,7 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
                   PLOT_H -
                   PLOT_H * (DRAWDOWN_THRESHOLD / analytics.yMin)
                 }
-                fill={tone.equity}
+                fill={assetColor}
                 fillOpacity="0.035"
               />
               <rect
@@ -530,9 +536,9 @@ export function PhasePlane({ asOf, contextLabel, isDark }) {
 
           <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
             1y volatility percentile and drawdown are read directly from the
-            serialized FRED artifact. The browser only maps the last 90 daily
-            observations into SVG coordinates. Pre-1971 proxy history is
-            monthly and forward-filled, so old phase planes are coarse.
+            serialized macro artifact. The browser only maps the last 90 daily
+            observations into SVG coordinates. Monthly targets are
+            forward-filled to daily, so older phase planes are coarse.
           </p>
         </>
       ) : null}

@@ -7,6 +7,11 @@ import {
   formatScore,
 } from "@/components/regime/regimeUtils";
 import {
+  ASSET_ORDER,
+  ASSET_TARGETS,
+  assetChartColor,
+} from "@/components/regime/assetTargets";
+import {
   getRegimeToneColor,
   getRegimeToneLabel,
 } from "@/lib/regimeTone";
@@ -34,7 +39,16 @@ function Metric({ label, value, accent }) {
   );
 }
 
-export function MacroHUD({ point, isDark, resolution, activeCrash }) {
+export function MacroHUD({
+  point,
+  isDark,
+  resolution,
+  activeCrash,
+  asset = ASSET_TARGETS.sp500,
+  assetKey = "sp500",
+  onAssetChange,
+  forecast,
+}) {
   const toneColor =
     getRegimeToneColor(point?.regime_state, isDark) ??
     (isDark ? "#f2ede4" : "#14121a");
@@ -51,8 +65,9 @@ export function MacroHUD({ point, isDark, resolution, activeCrash }) {
         : isDark
           ? "#34d399"
           : "#0f766e";
-  const volPercentile = point?.["1y_volatility_percentile"];
-  const drawdown = point?.drawdown_1y;
+  const volPercentile = point?.[asset.percentileField];
+  const drawdown = point?.[asset.drawdownField];
+  const assetValue = point?.[asset.valueField];
   const drawdownAccent =
     drawdown == null
       ? null
@@ -76,6 +91,23 @@ export function MacroHUD({ point, isDark, resolution, activeCrash }) {
           ? "#5eead4"
           : "#0f766e"
         : null;
+  const risk = forecast?.risk_pct;
+  const riskColor =
+    risk == null
+      ? isDark
+        ? "#9ca3af"
+        : "#6b7280"
+      : risk < 10
+        ? isDark
+          ? "#5eead4"
+          : "#0f766e"
+        : risk < 33
+          ? isDark
+            ? "#fbbf24"
+            : "#b45309"
+          : isDark
+            ? "#fb7185"
+            : "#c0442f";
 
   return (
     <div className="mx-auto w-full max-w-[1600px] px-3 pb-2.5 pt-3 sm:px-5 sm:pb-4 sm:pt-5 lg:px-8">
@@ -118,21 +150,86 @@ export function MacroHUD({ point, isDark, resolution, activeCrash }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 xl:flex-col xl:items-end">
-          <span className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-black/35 dark:text-white/35">
+        <div className="flex flex-col items-start gap-2 xl:items-end">
+          <div
+            role="group"
+            aria-label="Primary asset"
+            className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 backdrop-blur-2xl dark:border-white/5 dark:bg-white/[0.035]"
+          >
+            {ASSET_ORDER.map((key) => {
+              const target = ASSET_TARGETS[key];
+              const selected = key === assetKey;
+              const color = assetChartColor(target, isDark);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onAssetChange?.(key)}
+                  aria-pressed={selected}
+                  className={`rounded-full px-2.5 py-1 text-micro font-medium transition-[background-color,color,box-shadow] duration-200 ${
+                    selected
+                      ? ""
+                      : "text-black/45 hover:text-black/75 dark:text-white/45 dark:hover:text-white/75"
+                  }`}
+                  style={
+                    selected
+                      ? {
+                          color,
+                          backgroundColor: `${color}1f`,
+                          boxShadow: `0 0 18px ${color}22`,
+                        }
+                      : undefined
+                  }
+                >
+                  {target.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 xl:justify-end">
+            <span className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-black/35 dark:text-white/35">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: toneColor, boxShadow: glow }}
+                aria-hidden="true"
+              />
+              Snapshot
+            </span>
+            <p className="font-mono text-lg font-medium tracking-[-0.03em] text-black/75 dark:text-white/80">
+              {formatDate(point?.date)}
+            </p>
+            <p className="text-micro text-black/35 dark:text-white/35">
+              {resolution ? `${resolution} tape` : "Macro tape"} · hover to scrub
+            </p>
+          </div>
+
+          <div
+            className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-black/[0.025] px-3 py-1.5 backdrop-blur-2xl dark:border-white/5 dark:bg-white/[0.035]"
+            title={
+              forecast
+                ? `${forecast.model} · ${forecast.as_of} · ${forecast.training?.observations ?? "—"} training obs`
+                : "30-day regime forecast is loading"
+            }
+          >
             <span
               className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: toneColor, boxShadow: glow }}
+              style={{
+                backgroundColor: riskColor,
+                boxShadow: `0 0 18px ${riskColor}55`,
+              }}
               aria-hidden="true"
             />
-            Snapshot
-          </span>
-          <p className="font-mono text-lg font-medium tracking-[-0.03em] text-black/75 dark:text-white/80">
-            {formatDate(point?.date)}
-          </p>
-          <p className="text-micro text-black/35 dark:text-white/35">
-            {resolution ? `${resolution} tape` : "Macro tape"} · hover to scrub
-          </p>
+            <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+              30-Day Disruptive Risk
+            </span>
+            <span
+              className="font-mono text-body font-medium tracking-[-0.02em]"
+              style={{ color: riskColor }}
+            >
+              {risk == null ? "—" : `${formatNumber(risk, 1)}%`}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -152,8 +249,8 @@ export function MacroHUD({ point, isDark, resolution, activeCrash }) {
           accent={drawdownAccent}
         />
         <Metric
-          label="Equity proxy"
-          value={formatNumber(point?.sp500_proxy, 0)}
+          label={asset.metricLabel}
+          value={formatNumber(assetValue, asset.precision)}
         />
         <Metric label="NBER phase" value={phase} accent={phaseAccent} />
       </div>

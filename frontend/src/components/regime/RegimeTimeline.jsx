@@ -13,6 +13,11 @@ import {
 import { CrashTape } from "@/components/regime/CrashTape";
 import { MacroHUD } from "@/components/regime/MacroHUD";
 import {
+  assetChartColor,
+  assetChartSoft,
+  getAssetTarget,
+} from "@/components/regime/assetTargets";
+import {
   addMonthsIso,
   formatDate,
   getChartTone,
@@ -144,6 +149,9 @@ export function RegimeTimeline({
   isDark,
   coverage,
   resolution,
+  assetKey = "sp500",
+  onAssetChange,
+  forecast,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -157,13 +165,17 @@ export function RegimeTimeline({
   }, [selectedId]);
 
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
+  const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
+  const primaryColor = assetChartColor(asset, isDark);
+  const primarySoft = assetChartSoft(asset, isDark);
   const firstProxy = useMemo(
     () =>
       timeline.find(
         (point) =>
-          Number.isFinite(point.sp500_proxy) && point.sp500_proxy > 0,
-      )?.sp500_proxy ?? null,
-    [timeline],
+          Number.isFinite(point[asset.valueField]) &&
+          point[asset.valueField] > 0,
+      )?.[asset.valueField] ?? null,
+    [timeline, asset],
   );
   const latestPoint = timeline.at(-1) ?? null;
   const selectedCrash = useMemo(
@@ -192,15 +204,16 @@ export function RegimeTimeline({
 
   const primaryData = useMemo(() => {
     if (!firstProxy) return [];
-    return timeline.map((point) =>
-      Number.isFinite(point.sp500_proxy) && point.sp500_proxy > 0
+    return timeline.map((point) => {
+      const value = point[asset.valueField];
+      return Number.isFinite(value) && value > 0
         ? {
             time: point.date,
-            value: (point.sp500_proxy / firstProxy) * 100,
+            value: (value / firstProxy) * 100,
           }
-        : { time: point.date },
-    );
-  }, [timeline, firstProxy]);
+        : { time: point.date };
+    });
+  }, [timeline, firstProxy, asset]);
 
   const fedData = useMemo(
     () =>
@@ -318,10 +331,14 @@ export function RegimeTimeline({
     const primaryGlow = chart.addSeries(
       LineSeries,
       {
-        color: tone.equitySoft,
+        color: primarySoft,
         lineWidth: 4,
         priceScaleId: "right",
-        priceFormat: { type: "price", precision: 0, minMove: 1 },
+        priceFormat: {
+          type: "price",
+          precision: asset.precision,
+          minMove: asset.precision ? 0.1 : 1,
+        },
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
@@ -331,16 +348,20 @@ export function RegimeTimeline({
     const equitySeries = chart.addSeries(
       LineSeries,
       {
-        color: tone.equity,
+        color: primaryColor,
         lineWidth: 2,
         priceScaleId: "right",
-        priceFormat: { type: "price", precision: 0, minMove: 1 },
+        priceFormat: {
+          type: "price",
+          precision: asset.precision,
+          minMove: asset.precision ? 0.1 : 1,
+        },
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: true,
         crosshairMarkerRadius: 3.5,
         crosshairMarkerBorderColor: isDark ? "#08080c" : "#f6f1e9",
-        crosshairMarkerBackgroundColor: tone.equity,
+        crosshairMarkerBackgroundColor: primaryColor,
       },
       0,
     );
@@ -512,12 +533,15 @@ export function RegimeTimeline({
       chart.remove();
     };
   }, [
+    asset,
     bands,
     crashes,
     curveData,
     fedData,
     isDark,
+    primaryColor,
     primaryData,
+    primarySoft,
     strengthData,
     timeline,
     tone,
@@ -546,10 +570,12 @@ export function RegimeTimeline({
         Immersive 120-year macro regime terminal
       </h2>
       <p className="sr-only">
-        Three synchronized lightweight-charts panes: a log-scale equity proxy
-        with NBER recession shading, Fed Funds and 10Y–2Y yield curve, and the
-        0–100 macro strength oscillator. Hover the chart to update the macro
-        HUD. Use the NBER dossier rail to zoom to a recession window.
+        Three synchronized lightweight-charts panes: a log-scale target asset
+        (S&amp;P 500, London gold, or Treasury bonds) with NBER recession
+        shading, Fed Funds and 10Y–2Y yield curve, and the 0–100 macro strength
+        oscillator. Hover the chart to update the macro HUD. Use the asset
+        toggle to change the primary pane and the NBER dossier rail to zoom to a
+        recession window.
       </p>
 
       <div className="sticky top-0 z-30 border-b border-black/5 bg-[#f5f0e8]/80 backdrop-blur-2xl dark:border-white/5 dark:bg-[#06060a]/75">
@@ -558,6 +584,10 @@ export function RegimeTimeline({
           isDark={isDark}
           resolution={resolution}
           activeCrash={selectedCrash}
+          asset={asset}
+          assetKey={asset.key}
+          onAssetChange={onAssetChange}
+          forecast={forecast}
         />
         <CrashTape
           crashes={crashes}
@@ -574,7 +604,10 @@ export function RegimeTimeline({
         />
 
         <div className="pointer-events-none absolute left-4 top-2 z-20 text-[10px] font-medium uppercase tracking-[0.18em] text-black/30 dark:text-white/30 sm:left-7">
-          01 · Equity proxy <span className="normal-case tracking-normal">· rebased 100 · log</span>
+          01 · {asset.fullLabel}{" "}
+          <span className="normal-case tracking-normal">
+            · rebased 100 · log
+          </span>
         </div>
         <div className="pointer-events-none absolute left-4 top-[calc(50%+0.75rem)] z-20 text-[10px] font-medium uppercase tracking-[0.18em] text-black/30 dark:text-white/30 sm:left-7">
           02 · Rates &amp; yield <span className="normal-case tracking-normal">· Fed funds / 10Y–2Y</span>
@@ -599,8 +632,8 @@ export function RegimeTimeline({
           </span>
           <span>
             {firstProxy != null
-              ? "Equity proxy rebased to 100 at first observation; log scale."
-              : "No equity proxy in this window."}{" "}
+              ? "Selected asset rebased to 100 at first observation; log scale."
+              : "No asset history in this window."}{" "}
             {fullStrengthFrom
               ? `Full composite coverage from ${formatDate(fullStrengthFrom)}.`
               : "Strength coverage is partial."}

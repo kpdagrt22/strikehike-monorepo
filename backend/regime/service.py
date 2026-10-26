@@ -98,11 +98,26 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "macro_strength",
             "macro_strength_coverage",
             "regime_state",
+            "sp500_proxy",
+            "sp500_proxy_source",
             "volatility_1y",
             "drawdown_1y",
             "1y_volatility_percentile",
-            "sp500_proxy",
-            "sp500_proxy_source",
+            "gold_proxy",
+            "gold_proxy_source",
+            "gold_volatility_1y",
+            "gold_drawdown_1y",
+            "gold_1y_volatility_percentile",
+            "bond_proxy",
+            "bond_proxy_source",
+            "bond_volatility_1y",
+            "bond_drawdown_1y",
+            "bond_1y_volatility_percentile",
+            "dxy_proxy",
+            "dxy_proxy_source",
+            "dxy_volatility_1y",
+            "dxy_drawdown_1y",
+            "dxy_1y_volatility_percentile",
             "nber_recession",
             "nber_episode",
             "FEDFUNDS",
@@ -150,6 +165,45 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 ),
                 "sp500_proxy": sp500,
                 "proxy_source": _as_str(row.get("sp500_proxy_source")),
+                "gold_proxy": _as_float(row.get("gold_proxy"), 2),
+                "gold_proxy_source": _as_str(
+                    row.get("gold_proxy_source")
+                ),
+                "gold_volatility_1y": _as_float(
+                    row.get("gold_volatility_1y"), 2
+                ),
+                "gold_drawdown_1y": _as_float(
+                    row.get("gold_drawdown_1y"), 2
+                ),
+                "gold_1y_volatility_percentile": _as_float(
+                    row.get("gold_1y_volatility_percentile"), 1
+                ),
+                "bond_proxy": _as_float(row.get("bond_proxy"), 2),
+                "bond_proxy_source": _as_str(
+                    row.get("bond_proxy_source")
+                ),
+                "bond_volatility_1y": _as_float(
+                    row.get("bond_volatility_1y"), 2
+                ),
+                "bond_drawdown_1y": _as_float(
+                    row.get("bond_drawdown_1y"), 2
+                ),
+                "bond_1y_volatility_percentile": _as_float(
+                    row.get("bond_1y_volatility_percentile"), 1
+                ),
+                "dxy_proxy": _as_float(row.get("dxy_proxy"), 2),
+                "dxy_proxy_source": _as_str(
+                    row.get("dxy_proxy_source")
+                ),
+                "dxy_volatility_1y": _as_float(
+                    row.get("dxy_volatility_1y"), 2
+                ),
+                "dxy_drawdown_1y": _as_float(
+                    row.get("dxy_drawdown_1y"), 2
+                ),
+                "dxy_1y_volatility_percentile": _as_float(
+                    row.get("dxy_1y_volatility_percentile"), 1
+                ),
                 "usrec": usrec,
                 "phase": phase,
                 "nber_episode": _as_int(row.get("nber_episode")),
@@ -202,6 +256,7 @@ class MacroRegimeService:
         self._mtime: float | None = None
         self._meta_mtime: float | None = None
         self._cache: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._forecast_cache: dict[str, Any] | None = None
         self._lock = threading.RLock()
 
     def _load(self) -> pd.DataFrame:
@@ -231,6 +286,7 @@ class MacroRegimeService:
                 self._meta = _read_json(self.meta_path)
                 self._crashes = build_crashes(frame)
                 self._cache.clear()
+                self._forecast_cache = None
             return self._frame
 
     def _meta_payload(self, frame: pd.DataFrame) -> dict[str, Any]:
@@ -253,6 +309,7 @@ class MacroRegimeService:
             "proxy_sources": proxy_sources,
             "nber_source": self._meta.get("nber", {}).get("source", "USREC"),
             "transport": source.get("transport"),
+            "assets": self._meta.get("assets"),
             "notes": notes,
         }
 
@@ -481,3 +538,106 @@ class MacroRegimeService:
             },
             "meta": self._meta_payload(frame),
         }
+
+    def forecast(self) -> dict[str, Any]:
+        """30-day forward probability of a Disruptive macro regime.
+
+        A lightweight logistic regression is fitted on the serialized V2
+        features only. The target is ``regime_state == "disruptive"`` thirty
+        calendar days after each observation. The model is cached until the
+        parquet artifact changes.
+        """
+        frame = self._load()
+        if self._forecast_cache is not None:
+            return self._forecast_cache
+
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import StandardScaler
+
+        feature_columns = ["fed_cross", "curve_cross", "sahm_alert"]
+        missing = [
+            column for column in feature_columns if column not in frame.columns
+        ]
+        if missing:
+            raise ValueError(
+                "Forecast features are missing from the artifact: "
+                + ", ".join(missing)
+            )
+
+        data = frame[feature_columns + ["regime_state", "macro_strength"]].copy()
+        data["sahm_alert"] = (
+            data["sahm_alert"].astype("boolean").fillna(False).astype(float)
+        )
+        future_state = data["regime_state"].shift(-30)
+        target = pd.Series(pd.NA, index=data.index, dtype="boolean")
+        valid_future = future_state.notna()
+        target.loc[valid_future] = future_state.loc[valid_future].eq(
+            "disruptive"
+        )
+        data["disruptive_30d"] = target
+
+        current_rows = data.dropna(subset=feature_columns)
+        train = data.dropna(subset=feature_columns + ["disruptive_30d"])
+        if current_rows.empty or len(train) < 250:
+            raise ValueError("Not enough observations to fit the forecast model")
+
+        current = current_rows.iloc[-1]
+        X_train = train[feature_columns].astype(float)
+        y_train = train["disruptive_30d"].astype(int)
+        model = make_pipeline(
+            StandardScaler(),
+            LogisticRegression(
+                max_iter=2000,
+                solver="lbfgs",
+                class_weight=None,
+            ),
+        )
+        model.fit(X_train, y_train)
+        probability = float(
+            model.predict_proba(
+                current[feature_columns].astype(float).to_frame().T
+            )[0, 1]
+        )
+        probability = max(0.0, min(1.0, probability))
+        classifier = model[-1]
+        coefficients = {
+            column: round(float(value), 6)
+            for column, value in zip(feature_columns, classifier.coef_[0])
+        }
+
+        payload = {
+            "as_of": current.name.date().isoformat(),
+            "horizon_days": 30,
+            "model": "logistic_regression_v2",
+            "features": feature_columns,
+            "training": {
+                "start": train.index.min().date().isoformat(),
+                "end": train.index.max().date().isoformat(),
+                "observations": int(len(train)),
+                "disruptive_base_rate": round(float(y_train.mean()), 4),
+            },
+            "current": {
+                "as_of": current.name.date().isoformat(),
+                "regime_state": _as_str(current.get("regime_state")),
+                "macro_strength": _as_float(
+                    current.get("macro_strength"), 2
+                ),
+                "features": {
+                    "fed_cross": round(float(current["fed_cross"]), 6),
+                    "curve_cross": round(float(current["curve_cross"]), 6),
+                    "sahm_alert": bool(current["sahm_alert"]),
+                },
+            },
+            "disruptive_probability": round(probability, 4),
+            "risk_pct": round(probability * 100.0, 1),
+            "coefficients": coefficients,
+            "intercept": round(float(classifier.intercept_[0]), 6),
+            "notes": [
+                "Target is regime_state == disruptive 30 calendar days after each observation.",
+                "Logistic regression uses standardized V2 features and is cached until the artifact changes.",
+                "Macro-regime risk only; not a security-specific return forecast or investment advice.",
+            ],
+        }
+        self._forecast_cache = payload
+        return payload

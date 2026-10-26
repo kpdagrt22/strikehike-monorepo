@@ -130,36 +130,35 @@ def _nan_series(index: pd.Index, name: str) -> pd.Series:
 # ---------------------------------------------------------------------------
 
 
-def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
-    """Realised volatility, drawdown and volatility percentile of the equity proxy.
-
-    Returns are masked at proxy-source boundaries so a splice between the NBER
-    monthly series and the modern daily series cannot create a fake return.
-    Volatility is annualised from daily returns; the percentile is the
-    one-year volatility rank within the prior five years of the same source
-    segment. Drawdown is measured from the trailing one-year high.
-
-    The pre-1971 proxy is monthly and forward-filled, so its realised
-    volatility is deliberately coarse. The modern Nasdaq/S&P segments are the
-    meaningful phase-plane inputs.
-    """
+def _phase_features_for_asset(
+    frame: pd.DataFrame,
+    value_column: str,
+    source_column: str,
+    prefix: str,
+) -> pd.DataFrame:
+    """Realised volatility, drawdown and percentile for one target series."""
     index = frame.index
+    names = {
+        "volatility": f"{prefix}volatility_1y",
+        "drawdown": f"{prefix}drawdown_1y",
+        "percentile": f"{prefix}1y_volatility_percentile",
+    }
     empty = pd.DataFrame(
         {
-            "volatility_1y": np.nan,
-            "drawdown_1y": np.nan,
-            "1y_volatility_percentile": np.nan,
+            names["volatility"]: np.nan,
+            names["drawdown"]: np.nan,
+            names["percentile"]: np.nan,
         },
         index=index,
     )
-    if "sp500_proxy" not in frame.columns:
+    if value_column not in frame.columns:
         return empty
 
-    proxy = pd.to_numeric(frame["sp500_proxy"], errors="coerce")
+    proxy = pd.to_numeric(frame[value_column], errors="coerce")
     if not proxy.notna().any():
         return empty
 
-    source = frame.get("sp500_proxy_source")
+    source = frame.get(source_column)
     if source is not None:
         source = source.astype("string")
         groups = (
@@ -199,12 +198,43 @@ def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame(
         {
-            "volatility_1y": volatility,
-            "drawdown_1y": drawdown,
-            "1y_volatility_percentile": percentile,
+            names["volatility"]: volatility,
+            names["drawdown"]: drawdown,
+            names["percentile"]: percentile,
         },
         index=index,
     )
+
+
+def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
+    """Realised volatility, drawdown and percentile for every asset target.
+
+    The S&P columns keep their historical names used by the Phase Plane and the
+    V2 timeline. Gold, bond and dollar targets are prefixed so the UI can switch
+    the primary pane without changing the regime score. Returns are masked at
+    source boundaries so a splice cannot create a fake return.
+    """
+    out = _phase_features_for_asset(
+        frame,
+        "sp500_proxy",
+        "sp500_proxy_source",
+        "",
+    )
+    for value_column, source_column, prefix in (
+        ("gold_proxy", "gold_proxy_source", "gold_"),
+        ("bond_proxy", "bond_proxy_source", "bond_"),
+        ("dxy_proxy", "dxy_proxy_source", "dxy_"),
+    ):
+        if value_column in frame.columns:
+            out = out.join(
+                _phase_features_for_asset(
+                    frame,
+                    value_column,
+                    source_column,
+                    prefix,
+                )
+            )
+    return out
 
 
 def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:

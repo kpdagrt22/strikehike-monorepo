@@ -7,7 +7,11 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
-from regime.schemas import MacroHistoryResponse, RegimeRunsResponse
+from regime.schemas import (
+    ForecastResponse,
+    MacroHistoryResponse,
+    RegimeRunsResponse,
+)
 from regime.service import MacroRegimeService
 
 router = APIRouter(prefix="/regime", tags=["regime"])
@@ -76,6 +80,32 @@ def get_regime_runs(
             status_code=503,
             detail=(
                 "Macro regime artifact is not available. Run the Phase 1.5 "
+                "ingestion pipeline and redeploy the backend."
+            ),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/forecast",
+    response_model=ForecastResponse,
+    summary="30-day forward probability of a Disruptive macro regime",
+    description=(
+        "Trains/caches a lightweight logistic regression on the V2 Parquet "
+        "features fed_cross, curve_cross and sahm_alert. The target is a "
+        "Disruptive regime 30 calendar days after each observation. Returns "
+        "the current probability and risk percentage for the top HUD."
+    ),
+)
+def get_regime_forecast() -> dict:
+    try:
+        return _service.forecast()
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Macro regime artifact is not available. Run the Phase 1 "
                 "ingestion pipeline and redeploy the backend."
             ),
         ) from exc
