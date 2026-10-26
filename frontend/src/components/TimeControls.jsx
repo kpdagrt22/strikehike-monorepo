@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import crashMarkers from "@/data/astro/crash_markers.json";
+import { DateTimePicker } from "@/components/DateTimePicker";
 import { categoryTone } from "@/lib/categoryTone";
 import {
   TIMELINE_MAX,
@@ -189,7 +190,17 @@ export function TimeControls() {
 
   const [expanded, setExpanded] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const selectedDateTime = `${focusedDate}T${focusedTime}`;
+
+  const closePicker = useCallback(() => setPickerOpen(false), []);
+  const applyPicker = useCallback(
+    (date, time) => {
+      setFocusedDateTime(date, time);
+      setPickerOpen(false);
+    },
+    [setFocusedDateTime],
+  );
   const today = currentUtcDate();
   const isToday = focusedDate === today && focusedTime === "00:00";
 
@@ -253,15 +264,19 @@ export function TimeControls() {
           : "Initialising";
 
   return (
-    <motion.div
-      layout
-      onMouseEnter={() => setExpanded(true)}
+    <>
+      <motion.div
+        layout
+        onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => {
-        if (!scrubbing) setExpanded(false);
+        if (!scrubbing && !pickerOpen) setExpanded(false);
       }}
       onFocusCapture={() => setExpanded(true)}
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
+        if (
+          !event.currentTarget.contains(event.relatedTarget) &&
+          !pickerOpen
+        ) {
           setExpanded(false);
         }
       }}
@@ -389,44 +404,42 @@ export function TimeControls() {
               </div>
 
               <div className="mt-2 flex items-center gap-2.5">
-                <label
-                  htmlFor="chrono-precise-datetime"
-                  className="whitespace-nowrap text-micro font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/45"
-                >
+                <span className="whitespace-nowrap text-micro font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/45">
                   Precise UTC
-                </label>
-                <div className="relative min-w-0 flex-1">
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpanded(true);
+                    setPickerOpen(true);
+                  }}
+                  aria-haspopup="dialog"
+                  aria-expanded={pickerOpen}
+                  aria-label={`Open precise UTC date and time picker. Current value ${formatDateTime(focusedDate, focusedTime)}`}
+                  className="group flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-black/10 bg-black/[0.025] py-1 pl-3 pr-2 text-left text-meta tabular-nums tracking-[-0.01em] text-black/70 outline-none transition-colors hover:bg-black/[0.04] focus-visible:border-black/20 focus-visible:ring-1 focus-visible:ring-[#f05d49]/40 sm:h-9 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:bg-white/[0.06]"
+                >
                   <svg
                     viewBox="0 0 16 16"
-                    className="pointer-events-none absolute left-3 top-1/2 z-10 h-3 w-3 -translate-y-1/2 text-black/30 dark:text-white/30"
+                    className="h-3.5 w-3.5 shrink-0 text-[#f05d49]"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="1.1"
+                    strokeWidth="1.15"
                     strokeLinecap="round"
                     aria-hidden="true"
                   >
-                    <circle cx="8" cy="8" r="5.4" />
-                    <path d="M8 4.8V8l2.2 1.4" />
+                    <rect x="2.5" y="3.5" width="11" height="10" rx="2" />
+                    <path d="M5 2.5v2M11 2.5v2M2.5 6.5h11" />
+                    <circle cx="5.2" cy="9.2" r="0.65" fill="currentColor" stroke="none" />
+                    <circle cx="8" cy="9.2" r="0.65" fill="currentColor" stroke="none" />
+                    <circle cx="10.8" cy="9.2" r="0.65" fill="currentColor" stroke="none" />
                   </svg>
-                  <input
-                    id="chrono-precise-datetime"
-                    type="datetime-local"
-                    min={`${TIMELINE_MIN}T00:00`}
-                    max={`${TIMELINE_MAX}T23:59`}
-                    step="60"
-                    value={selectedDateTime}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      if (!next) return;
-                      const [nextDate, nextTime] = next.split("T");
-                      if (nextDate && nextTime) {
-                        setFocusedDateTime(nextDate, nextTime.slice(0, 5));
-                      }
-                    }}
-                    aria-label="Precise UTC date and time"
-                    className="h-11 w-full min-w-0 appearance-none rounded-full border border-black/10 bg-black/[0.025] py-1 pl-8 pr-2.5 text-meta tabular-nums tracking-[-0.01em] text-black/70 outline-none transition-colors sm:h-9 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 focus:border-black/20 focus:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:[color-scheme:dark] dark:focus:border-white/20 dark:focus:bg-white/[0.06]"
-                  />
-                </div>
+                  <span className="truncate">
+                    {formatDateTime(focusedDate, focusedTime)}
+                  </span>
+                  <span className="ml-auto shrink-0 text-[7px] font-medium uppercase tracking-[0.16em] text-black/30 transition-colors group-hover:text-[#c0442f] dark:text-white/25 dark:group-hover:text-[#ff8b77]">
+                    Edit
+                  </span>
+                </button>
               </div>
 
               <div className="mt-2.5 flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.1em] text-black/45 dark:text-white/40">
@@ -453,6 +466,17 @@ export function TimeControls() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </motion.div>
+      </motion.div>
+
+      <DateTimePicker
+        open={pickerOpen}
+        initialDate={focusedDate}
+        initialTime={focusedTime}
+        minDate={TIMELINE_MIN}
+        maxDate={TIMELINE_MAX}
+        onApply={applyPicker}
+        onClose={closePicker}
+      />
+    </>
   );
 }
