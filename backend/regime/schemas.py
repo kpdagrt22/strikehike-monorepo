@@ -6,12 +6,22 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TimelinePoint(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     date: str
     strength: float | None = None
+    regime_state: str | None = None
+    volatility_1y: float | None = None
+    drawdown_1y: float | None = None
+    volatility_percentile_1y: float | None = Field(
+        default=None,
+        alias="1y_volatility_percentile",
+    )
     sp500_proxy: float | None = None
     proxy_source: str | None = None
     usrec: int | None = None
     phase: str | None = None
+    nber_episode: int | None = None
     fed_funds: float | None = None
     t10y2y: float | None = None
     strength_coverage: float | None = None
@@ -80,6 +90,7 @@ class LatestStrength(BaseModel):
     date: str
     score: float | None = None
     label: str | None = None
+    regime_state: str | None = None
     coverage: float | None = None
 
 
@@ -87,7 +98,9 @@ class ResponseMeta(BaseModel):
     generated_at: str | None = None
     data_version: str | None = None
     strength_version: str
+    feature_version: str | None = None
     strength_weights: dict[str, float]
+    regime_thresholds: dict[str, float] | None = None
     latest_strength: LatestStrength | None = None
     proxy_sources: list[ProxySource]
     nber_source: str
@@ -103,4 +116,43 @@ class MacroHistoryResponse(BaseModel):
     point_count: int
     timeline: list[TimelinePoint]
     crashes: list[Crash]
+    meta: ResponseMeta
+
+
+class RegimeRun(BaseModel):
+    state: str
+    start: str
+    end: str
+    duration_days: int
+    duration_months: int
+    start_volatility_percentile: float | None = None
+    end_volatility_percentile: float | None = None
+    median_volatility_percentile: float | None = None
+
+
+class RegimeSample(BaseModel):
+    start: str
+    end: str
+    observations: int
+
+
+class RegimeTransitions(BaseModel):
+    states: list[str]
+    counts: dict[str, dict[str, int]]
+    probabilities: dict[str, dict[str, float | None]]
+    median_duration_months: dict[str, float | None]
+    run_counts: dict[str, int]
+    sample_start: str
+    sample_end: str
+    sample_observations: int
+
+
+class RegimeRunsResponse(BaseModel):
+    as_of: str
+    coverage: Coverage
+    resolution: str
+    states: list[str]
+    sample: RegimeSample
+    runs: list[RegimeRun]
+    transitions: RegimeTransitions
     meta: ResponseMeta

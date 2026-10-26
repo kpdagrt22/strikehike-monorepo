@@ -817,6 +817,10 @@ def build_metadata(
             if "macro_strength_label" in frame.columns
             and not pd.isna(frame.loc[latest_index, "macro_strength_label"])
             else None,
+            "regime_state": str(frame.loc[latest_index, "regime_state"])
+            if "regime_state" in frame.columns
+            and not pd.isna(frame.loc[latest_index, "regime_state"])
+            else None,
             "coverage": round(
                 float(frame.loc[latest_index, "macro_strength_coverage"]), 3
             )
@@ -880,7 +884,19 @@ def build_metadata(
         },
         "strength": {
             "version": STRENGTH_VERSION,
+            "feature_version": "regime-v1",
             "weights": dict(STRENGTH_WEIGHTS),
+            "regime_thresholds": {
+                "favorable_min": 60.0,
+                "disruptive_max": 40.0,
+            },
+            "features": [
+                "fed_cross",
+                "curve_cross",
+                "volatility_1y",
+                "drawdown_1y",
+                "1y_volatility_percentile",
+            ],
             "first_scored": coverage_start,
             "full_coverage_from": full_coverage_start,
             "latest": latest_strength,

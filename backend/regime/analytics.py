@@ -128,8 +128,85 @@ def _nan_series(index: pd.Index, name: str) -> pd.Series:
 # ---------------------------------------------------------------------------
 
 
+def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
+    """Realised volatility, drawdown and volatility percentile of the equity proxy.
+
+    Returns are masked at proxy-source boundaries so a splice between the NBER
+    monthly series and the modern daily series cannot create a fake return.
+    Volatility is annualised from daily returns; the percentile is the
+    one-year volatility rank within the prior five years of the same source
+    segment. Drawdown is measured from the trailing one-year high.
+
+    The pre-1971 proxy is monthly and forward-filled, so its realised
+    volatility is deliberately coarse. The modern Nasdaq/S&P segments are the
+    meaningful phase-plane inputs.
+    """
+    index = frame.index
+    empty = pd.DataFrame(
+        {
+            "volatility_1y": np.nan,
+            "drawdown_1y": np.nan,
+            "1y_volatility_percentile": np.nan,
+        },
+        index=index,
+    )
+    if "sp500_proxy" not in frame.columns:
+        return empty
+
+    proxy = pd.to_numeric(frame["sp500_proxy"], errors="coerce")
+    if not proxy.notna().any():
+        return empty
+
+    source = frame.get("sp500_proxy_source")
+    if source is not None:
+        source = source.astype("string")
+        groups = (
+            source.ne(source.shift())
+            .fillna(True)
+            .astype("int64")
+            .cumsum()
+        )
+    else:
+        groups = pd.Series(1, index=index, dtype="int64")
+
+    returns = proxy.pct_change()
+    if source is not None:
+        returns = returns.where(source.eq(source.shift()))
+    # Drop impossible daily moves rather than letting a bad splice dominate.
+    returns = returns.where(returns.abs() < 1.0)
+
+    volatility = (
+        returns.groupby(groups).transform(
+            lambda series: series.rolling(252, min_periods=126).std()
+        )
+        * np.sqrt(252)
+        * 100.0
+    )
+    one_year_high = proxy.groupby(groups).transform(
+        lambda series: series.rolling(252, min_periods=126).max()
+    )
+    drawdown = (proxy / one_year_high - 1.0) * 100.0
+    percentile = (
+        volatility.groupby(groups).transform(
+            lambda series: series.rolling(1260, min_periods=252).rank(
+                pct=True
+            )
+        )
+        * 100.0
+    )
+
+    return pd.DataFrame(
+        {
+            "volatility_1y": volatility,
+            "drawdown_1y": drawdown,
+            "1y_volatility_percentile": percentile,
+        },
+        index=index,
+    )
+
+
 def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return the strength score plus its auditable components.
+    """Return the strength score plus its auditable and persisted components.
 
     Fed component: 1-year vs 3-year moving average of the effective Fed Funds
     rate. Fast below slow (policy easing) scores high; fast above slow scores low.
@@ -140,6 +217,12 @@ def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
 
     The composite is a weighted average of whichever components are available;
     ``macro_strength_coverage`` reports how much of the weight is populated.
+
+    Persisted outputs include the categorical ``regime_state`` and the market
+    phase features ``volatility_1y``, ``drawdown_1y`` and
+    ``1y_volatility_percentile`` used by the Phase Plane. ``fed_cross`` and
+    ``curve_cross`` are the core ML features. NBER identifiers come from
+    ``annotate_nber`` on the surrounding frame.
     """
     out = pd.DataFrame(index=frame.index)
 
@@ -193,6 +276,15 @@ def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
     label.loc[score.gt(40.0) & score.lt(60.0)] = "neutral"
     out["macro_strength_label"] = label
 
+    # Canonical persisted state vocabulary. The API and the 3x3 transition
+    # matrix consume these lowercase values directly.
+    regime_state = pd.Series(pd.NA, index=frame.index, dtype="string")
+    regime_state.loc[score.ge(60.0)] = "favorable"
+    regime_state.loc[score.le(40.0)] = "disruptive"
+    regime_state.loc[score.gt(40.0) & score.lt(60.0)] = "neutral"
+    out["regime_state"] = regime_state
+
+    out = out.join(_market_phase_features(frame))
     return out
 
 
@@ -227,6 +319,13 @@ def annotate_nber(frame: pd.DataFrame) -> pd.DataFrame:
     out["nber_phase"] = phase
 
     change = recession.diff()
+    # A frame that begins inside a recession has no prior observation to diff
+    # against. Treat the first valid recession row as an episode start so the
+    # first NBER run is identified as 1 rather than 0 (which means expansion).
+    first_valid = recession.first_valid_index()
+    if first_valid is not None and recession.loc[first_valid] == 1:
+        change.loc[first_valid] = 1
+
     start = change.eq(1).fillna(False)
     end = change.eq(-1).fillna(False)
     out["nber_recession_start"] = start.astype(bool)

@@ -92,6 +92,16 @@ def _nber_frame() -> pd.DataFrame:
     return frame
 
 
+def test_nber_frame_starting_inside_recession_is_episode_one():
+    index = pd.date_range("2020-03-01", "2020-04-30", freq="D", tz="UTC")
+    usrec = pd.Series(1.0, index=index, name="USREC")
+    frame = annotate_nber(pd.DataFrame({"USREC": usrec}))
+
+    assert frame.iloc[0]["nber_episode"] == 1
+    assert bool(frame.iloc[0]["nber_recession_start"])
+    assert frame["nber_phase"].iloc[0] == "recession"
+
+
 def test_nber_alignment_and_episode_boundaries():
     frame = _nber_frame()
 
@@ -171,6 +181,54 @@ def test_strength_partial_coverage_when_only_fed_is_available():
     components = calculate_macro_strength_components(frame)
     assert components["macro_strength_coverage"].max() == pytest.approx(0.55)
     assert components["macro_strength"].notna().any()
+
+
+def test_strength_components_include_regime_state_and_phase_features():
+    index = pd.date_range("2010-01-01", periods=1600, freq="D", tz="UTC")
+    frame = pd.DataFrame(
+        {
+            "FEDFUNDS": np.linspace(5.0, 0.0, len(index)),
+            "T10Y2Y": np.linspace(-1.0, 2.0, len(index)),
+            "sp500_proxy": np.linspace(1000.0, 2000.0, len(index))
+            * (1.0 + np.sin(np.arange(len(index)) / 20.0) * 0.02),
+            "sp500_proxy_source": "SP500",
+        },
+        index=index,
+    )
+
+    components = calculate_macro_strength_components(frame)
+
+    assert {
+        "macro_strength",
+        "regime_state",
+        "fed_cross",
+        "curve_cross",
+        "volatility_1y",
+        "drawdown_1y",
+        "1y_volatility_percentile",
+    }.issubset(components.columns)
+
+    states = components["regime_state"].dropna().unique().tolist()
+    assert set(states).issubset({"favorable", "neutral", "disruptive"})
+
+    percentiles = components["1y_volatility_percentile"].dropna()
+    assert not percentiles.empty
+    assert percentiles.between(0.0, 100.0).all()
+
+    drawdowns = components["drawdown_1y"].dropna()
+    assert not drawdowns.empty
+    assert (drawdowns <= 0.0).all()
+
+
+def test_timeline_point_exposes_volatility_percentile_alias():
+    from regime.schemas import TimelinePoint
+
+    point = TimelinePoint(
+        date="2020-01-01",
+        **{"1y_volatility_percentile": 63.4},
+    )
+    assert point.volatility_percentile_1y == 63.4
+    assert point.model_dump(by_alias=True)["1y_volatility_percentile"] == 63.4
 
 
 def test_sp500_proxy_priority_and_source_labels():

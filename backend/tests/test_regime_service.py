@@ -23,8 +23,22 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
     frame["T10Y2Y"] = 0.5
     frame["nber_recession"] = 0
     frame["nber_phase"] = "expansion"
+    frame["nber_episode"] = 0
     frame.loc["2020-03-01":"2020-04-30", "nber_recession"] = 1
     frame.loc[frame["nber_recession"] == 1, "nber_phase"] = "recession"
+    frame.loc[frame["nber_recession"] == 1, "nber_episode"] = 1
+
+    # A deliberately simple regime cycle for the runs/transition tests.
+    frame["regime_state"] = "neutral"
+    frame.loc["2019-01-01":"2019-06-30", "regime_state"] = "favorable"
+    frame.loc["2019-07-01":"2019-09-30", "regime_state"] = "neutral"
+    frame.loc["2019-10-01":"2019-12-31", "regime_state"] = "disruptive"
+    frame.loc["2020-01-01":"2020-06-30", "regime_state"] = "favorable"
+    frame.loc["2020-07-01":"2020-09-30", "regime_state"] = "neutral"
+    frame.loc["2020-10-01":"2020-12-31", "regime_state"] = "disruptive"
+    frame["1y_volatility_percentile"] = 50.0
+    frame["volatility_1y"] = 12.0
+    frame["drawdown_1y"] = -5.0
 
     artifact = tmp_path / "macro_regime_history.parquet"
     frame.to_parquet(artifact, engine="pyarrow", compression="snappy")
@@ -75,6 +89,8 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert payload["meta"]["data_version"] == "test-version"
     assert payload["meta"]["latest_strength"]["score"] == 55.0
     assert payload["timeline"][0]["proxy_source"] == "TEST"
+    assert payload["timeline"][0]["regime_state"] == "favorable"
+    assert payload["timeline"][0]["1y_volatility_percentile"] == 50.0
 
     monthly = service.macro_history(resolution="monthly")
     assert monthly["resolution"] == "monthly"
@@ -89,6 +105,41 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert crash["pre_crash_indicators"]["3m"]["as_of"] == "2019-11-01"
     assert crash["pre_crash_indicators"]["6m"]["as_of"] == "2019-08-01"
     assert crash["pre_crash_indicators"]["3m"]["fed_funds"] == 2.0
+
+
+def test_regime_runs_returns_transition_matrix_and_durations(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+
+    payload = service.regime_runs()
+
+    assert payload["resolution"] == "monthly"
+    assert payload["states"] == ["favorable", "neutral", "disruptive"]
+    assert payload["sample"]["observations"] == 24
+    assert len(payload["runs"]) == 6
+
+    first = payload["runs"][0]
+    assert first["state"] == "favorable"
+    assert first["start"] == "2019-01-31"
+    assert first["end"] == "2019-06-30"
+    assert first["duration_months"] == 6
+    assert first["start_volatility_percentile"] == 50.0
+    assert first["end_volatility_percentile"] == 50.0
+    assert first["median_volatility_percentile"] == 50.0
+
+    transitions = payload["transitions"]
+    assert transitions["counts"]["favorable"]["neutral"] == 2
+    assert transitions["probabilities"]["favorable"]["neutral"] == pytest.approx(
+        2 / 12, abs=1e-4
+    )
+    assert transitions["median_duration_months"]["favorable"] == 6.0
+    assert transitions["median_duration_months"]["neutral"] == 3.0
+    assert transitions["median_duration_months"]["disruptive"] == 3.0
+    assert transitions["run_counts"] == {
+        "favorable": 2,
+        "neutral": 2,
+        "disruptive": 2,
+    }
 
 
 def test_daily_resolution_for_short_window(tmp_path):
@@ -114,3 +165,5 @@ def test_invalid_ranges_raise_value_error(tmp_path):
         service.macro_history(start="2021-01-01", end="2020-01-01")
     with pytest.raises(ValueError):
         service.macro_history(start="2030-01-01", end="2030-12-31")
+    with pytest.raises(ValueError):
+        service.regime_runs(start="2030-01-01", end="2030-12-31")

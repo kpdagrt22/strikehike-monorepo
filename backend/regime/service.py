@@ -8,6 +8,7 @@ does not call FRED; ingestion is a separate offline pipeline.
 from __future__ import annotations
 
 import json
+import statistics
 import threading
 from datetime import date
 from pathlib import Path
@@ -27,6 +28,7 @@ DEFAULT_ARTIFACT = BACKEND_DIR / "data" / "processed" / "macro_regime_history.pa
 DEFAULT_META = BACKEND_DIR / "data" / "processed" / "macro_regime_history.meta.json"
 
 Resolution = Literal["auto", "daily", "weekly", "monthly"]
+REGIME_STATES = ("favorable", "neutral", "disruptive")
 
 
 def _to_timestamp(value: Any) -> pd.Timestamp:
@@ -95,9 +97,14 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
         for column in (
             "macro_strength",
             "macro_strength_coverage",
+            "regime_state",
+            "volatility_1y",
+            "drawdown_1y",
+            "1y_volatility_percentile",
             "sp500_proxy",
             "sp500_proxy_source",
             "nber_recession",
+            "nber_episode",
             "FEDFUNDS",
             "T10Y2Y",
         )
@@ -135,10 +142,17 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
             {
                 "date": timestamp.date().isoformat(),
                 "strength": strength,
+                "regime_state": _as_str(row.get("regime_state")),
+                "volatility_1y": _as_float(row.get("volatility_1y"), 2),
+                "drawdown_1y": _as_float(row.get("drawdown_1y"), 2),
+                "1y_volatility_percentile": _as_float(
+                    row.get("1y_volatility_percentile"), 1
+                ),
                 "sp500_proxy": sp500,
                 "proxy_source": _as_str(row.get("sp500_proxy_source")),
                 "usrec": usrec,
                 "phase": phase,
+                "nber_episode": _as_int(row.get("nber_episode")),
                 "fed_funds": _as_float(row.get("FEDFUNDS"), 4),
                 "t10y2y": _as_float(row.get("T10Y2Y"), 4),
                 "strength_coverage": _as_float(
@@ -232,7 +246,9 @@ class MacroRegimeService:
             "generated_at": self._meta.get("generated_at"),
             "data_version": self._meta.get("data_version"),
             "strength_version": strength.get("version", STRENGTH_VERSION),
+            "feature_version": strength.get("feature_version"),
             "strength_weights": strength.get("weights", dict(STRENGTH_WEIGHTS)),
+            "regime_thresholds": strength.get("regime_thresholds"),
             "latest_strength": strength.get("latest"),
             "proxy_sources": proxy_sources,
             "nber_source": self._meta.get("nber", {}).get("source", "USREC"),
@@ -312,3 +328,156 @@ class MacroRegimeService:
             if len(self._cache) > 8:
                 self._cache.clear()
         return payload
+
+    def regime_runs(
+        self,
+        start: date | str | None = None,
+        end: date | str | None = None,
+    ) -> dict[str, Any]:
+        """Monthly regime runs, transition probabilities and median durations."""
+        frame = self._load()
+
+        start_timestamp = (
+            _to_timestamp(start) if start is not None else frame.index.min()
+        )
+        end_timestamp = (
+            _to_timestamp(end) if end is not None else frame.index.max()
+        )
+        if start_timestamp > end_timestamp:
+            raise ValueError("start must be earlier than or equal to end")
+
+        subset = frame.loc[start_timestamp:end_timestamp]
+        if subset.empty:
+            raise ValueError(
+                "No macro observations in the requested range. "
+                f"Artifact coverage is {frame.index.min().date()} to {frame.index.max().date()}."
+            )
+
+        monthly = _downsample(subset, "monthly")
+        required = {"regime_state", "macro_strength_coverage"}
+        if not required.issubset(monthly.columns):
+            raise ValueError(
+                "The macro artifact does not contain regime_state. "
+                "Rebuild it with the Phase 1.5 pipeline."
+            )
+
+        sample = monthly.loc[
+            monthly["macro_strength_coverage"] >= 0.99
+        ].dropna(subset=["regime_state"])
+        sample = sample[sample["regime_state"].isin(REGIME_STATES)]
+        if len(sample) < 2:
+            raise ValueError(
+                "Not enough full-coverage regime observations for a transition matrix."
+            )
+
+        states = sample["regime_state"].astype(str).tolist()
+        runs: list[dict[str, Any]] = []
+        run_start = 0
+
+        for index in range(1, len(states) + 1):
+            if index < len(states) and states[index] == states[run_start]:
+                continue
+
+            run = sample.iloc[run_start:index]
+            run_start_date = run.index[0]
+            run_end_date = run.index[-1]
+            vol_values = (
+                pd.to_numeric(
+                    run["1y_volatility_percentile"], errors="coerce"
+                ).dropna()
+                if "1y_volatility_percentile" in run.columns
+                else pd.Series(dtype="float64")
+            )
+            runs.append(
+                {
+                    "state": states[run_start],
+                    "start": run_start_date.date().isoformat(),
+                    "end": run_end_date.date().isoformat(),
+                    "duration_days": int(
+                        (run_end_date - run_start_date).days
+                    )
+                    + 1,
+                    "duration_months": int(index - run_start),
+                    "start_volatility_percentile": _as_float(
+                        vol_values.iloc[0], 1
+                    )
+                    if not vol_values.empty
+                    else None,
+                    "end_volatility_percentile": _as_float(
+                        vol_values.iloc[-1], 1
+                    )
+                    if not vol_values.empty
+                    else None,
+                    "median_volatility_percentile": _as_float(
+                        vol_values.median(), 1
+                    )
+                    if not vol_values.empty
+                    else None,
+                }
+            )
+            run_start = index
+
+        counts = {
+            state: {next_state: 0 for next_state in REGIME_STATES}
+            for state in REGIME_STATES
+        }
+        for previous, next_state in zip(states, states[1:]):
+            counts[previous][next_state] += 1
+
+        probabilities: dict[str, dict[str, float | None]] = {}
+        for state in REGIME_STATES:
+            total = sum(counts[state].values())
+            probabilities[state] = {
+                next_state: (
+                    round(counts[state][next_state] / total, 4)
+                    if total
+                    else None
+                )
+                for next_state in REGIME_STATES
+            }
+
+        durations = {state: [] for state in REGIME_STATES}
+        for run in runs:
+            durations[run["state"]].append(run["duration_months"])
+
+        median_duration = {
+            state: (
+                float(statistics.median(durations[state]))
+                if durations[state]
+                else None
+            )
+            for state in REGIME_STATES
+        }
+
+        return {
+            "as_of": frame.index.max().date().isoformat(),
+            "coverage": {
+                "start": frame.index.min().date().isoformat(),
+                "end": frame.index.max().date().isoformat(),
+                "years": round(
+                    (frame.index.max() - frame.index.min()).days / 365.25,
+                    1,
+                ),
+            },
+            "resolution": "monthly",
+            "states": list(REGIME_STATES),
+            "sample": {
+                "start": sample.index[0].date().isoformat(),
+                "end": sample.index[-1].date().isoformat(),
+                "observations": int(len(sample)),
+            },
+            "runs": runs,
+            "transitions": {
+                "states": list(REGIME_STATES),
+                "counts": counts,
+                "probabilities": probabilities,
+                "median_duration_months": median_duration,
+                "run_counts": {
+                    state: len(durations[state]) for state in REGIME_STATES
+                },
+                "sample_start": sample.index[0].date().isoformat(),
+                "sample_end": sample.index[-1].date().isoformat(),
+                "sample_observations": int(len(sample)),
+            },
+            "meta": self._meta_payload(frame),
+        }
