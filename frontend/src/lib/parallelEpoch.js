@@ -18,3 +18,12 @@ export function splitParallels(parallels = []) {
   }
   return groups;
 }
+
+export function bestParallel(parallels = []) {
+  return parallels.reduce((best, parallel) => {
+    if (!best) return parallel;
+    const score = Number(parallel?.similarity_percent ?? 0);
+    const bestScore = Number(best?.similarity_percent ?? 0);
+    return score > bestScore ? parallel : best;
+  }, null);
+}

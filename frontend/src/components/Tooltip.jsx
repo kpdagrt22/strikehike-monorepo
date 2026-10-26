@@ -4,64 +4,41 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
-import { splitParallels } from "@/lib/parallelEpoch";
+import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
 
-function ParallelSection({ epoch, parallels }) {
-  if (!parallels.length) return null;
+function SimilarDaySection({ parallel }) {
+  if (!parallel) return null;
 
-  const recent = epoch === "recent";
+  const tone = categoryTone(parallel.category);
 
   return (
     <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
-      <p
-        className={`text-micro font-medium uppercase tracking-[0.14em] ${
-          recent
-            ? "text-[#c0442f] dark:text-[#ff8b77]"
-            : "text-black/50 dark:text-white/45"
-        }`}
-      >
-        {recent ? "Recent Manifestations" : "Historical Parallels"}
+      <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/50 dark:text-white/45">
+        Most Similar Day
       </p>
 
-      <div
-        className={
-          recent
-            ? "recent-glow mt-2 space-y-2 rounded-xl border border-[#f05d49]/25 bg-white/20 p-2.5 backdrop-blur-md dark:bg-white/[0.04]"
-            : "mt-2 space-y-2"
-        }
-      >
-        {parallels.map((parallel) => {
-          const tone = categoryTone(parallel.category);
-
-          return (
-            <div
-              key={`${parallel.date}-${parallel.name}`}
-              className="flex items-start gap-2"
-            >
-              <span
-                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{
-                  backgroundColor: tone.color,
-                  boxShadow: `0 0 8px ${tone.glow}`,
-                }}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="whitespace-normal text-meta font-medium leading-snug text-black/75 dark:text-white/75">
-                  {parallel.name}
-                </p>
-                <p
-                  className="text-micro tabular-nums"
-                  style={{ color: tone.color }}
-                >
-                  {parallel.category} · {parallel.date.slice(0, 4)} ·{" "}
-                  {Math.round(parallel.similarity_percent)}%
-                </p>
-              </div>
-            </div>
-          );
-        })}
+      <div className="mt-2 flex items-start gap-2">
+        <span
+          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{
+            backgroundColor: tone.color,
+            boxShadow: `0 0 8px ${tone.glow}`,
+          }}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="whitespace-normal text-meta font-medium leading-snug text-black/75 dark:text-white/75">
+            {parallel.name}
+          </p>
+          <p
+            className="text-micro tabular-nums"
+            style={{ color: tone.color }}
+          >
+            {parallel.category} · {parallel.date.slice(0, 4)} ·{" "}
+            {Math.round(parallel.similarity_percent)}%
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -75,7 +52,7 @@ export function Tooltip() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== "light";
   const tone = getEnergyTone(energy?.polarity, isDark);
-  const { historical, recent } = splitParallels(parallels);
+  const parallel = bestParallel(parallels);
 
   return (
     <AnimatePresence>
@@ -161,8 +138,7 @@ export function Tooltip() {
             </div>
           </div>
 
-          <ParallelSection epoch="historical" parallels={historical} />
-          <ParallelSection epoch="recent" parallels={recent} />
+          <SimilarDaySection parallel={parallel} />
 
           {entity.ml_insight ? (
             <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">

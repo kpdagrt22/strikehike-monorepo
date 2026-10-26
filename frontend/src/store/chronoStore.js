@@ -30,12 +30,20 @@ export const useChronoStore = create((set) => ({
   ladderStatus: "idle",
 
   setFocusedDate: (focusedDate) =>
-    set({ focusedDate, focusedTime: "00:00" }),
-  setFocusedTime: (focusedTime) => set({ focusedTime }),
+    set({
+      focusedDate,
+      focusedTime: "00:00",
+      parallels: [],
+      status: "loading",
+    }),
+  setFocusedTime: (focusedTime) =>
+    set({ focusedTime, parallels: [], status: "loading" }),
   setFocusedDateTime: (focusedDate, focusedTime) =>
     set({
       focusedDate,
       focusedTime: focusedTime || "00:00",
+      parallels: [],
+      status: "loading",
     }),
   setCameraView: (cameraView) =>
     set((state) => ({

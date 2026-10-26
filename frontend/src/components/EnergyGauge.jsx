@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
-import { splitParallels } from "@/lib/parallelEpoch";
+import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 
 const SIZE = 116;
@@ -17,94 +16,39 @@ function formatYear(iso) {
   return Number.isFinite(year) ? year : "";
 }
 
-function EpochRow({ epoch, parallel }) {
-  const recent = epoch === "recent";
+function SelectedDayParallel({ parallels }) {
+  const parallel = bestParallel(parallels);
+  if (!parallel) return null;
+
   const tone = categoryTone(parallel.category);
-
-  return (
-    <div
-      className={`flex min-w-0 max-w-full flex-col items-center rounded-2xl px-3.5 py-1.5 ${
-        recent
-          ? "recent-glow border border-[#f05d49]/25 bg-white/30 dark:bg-white/[0.05]"
-          : ""
-      }`}
-    >
-      <span className="flex items-center gap-1.5">
-        <span
-          className="h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{
-            backgroundColor: tone.color,
-            boxShadow: `0 0 8px ${tone.glow}`,
-          }}
-        />
-        <span
-          className={`text-micro font-medium uppercase tracking-[0.1em] ${
-            recent
-              ? "text-[#c0442f] dark:text-[#ff8b77]"
-              : "text-black/50 dark:text-white/45"
-          }`}
-        >
-          {recent ? "Recent Manifestations" : "Historical Parallels"}
-        </span>
-      </span>
-      <span className="mt-0.5 max-w-full whitespace-normal text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
-        {formatYear(parallel.date)} {parallel.name}
-      </span>
-    </div>
-  );
-}
-
-function DualEpochCarousel({ parallels, status }) {
-  const [tick, setTick] = useState(0);
-  const { historical, recent } = splitParallels(parallels);
-  const longest = Math.max(historical.length, recent.length);
-
-  useEffect(() => {
-    if (longest <= 1) return undefined;
-
-    const timer = setInterval(() => setTick((value) => value + 1), 5000);
-    return () => clearInterval(timer);
-  }, [longest]);
-
-  const historicalPick = historical.length
-    ? historical[tick % historical.length]
-    : null;
-  const recentPick = recent.length ? recent[tick % recent.length] : null;
-  const parallelKey = `${historicalPick?.date}-${historicalPick?.name}|${recentPick?.date}-${recentPick?.name}`;
 
   return (
     <div className="mt-3 w-full text-center">
       <AnimatePresence mode="wait" initial={false}>
-        {historicalPick || recentPick ? (
-          <motion.div
-            key={parallelKey}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="flex w-full flex-col items-center gap-1.5"
-          >
-            {historicalPick ? (
-              <EpochRow epoch="historical" parallel={historicalPick} />
-            ) : null}
-            {recentPick ? (
-              <EpochRow epoch="recent" parallel={recentPick} />
-            ) : null}
-          </motion.div>
-        ) : (
-          <motion.p
-            key="empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="text-meta font-medium tracking-[-0.01em] text-black/45 dark:text-white/45"
-          >
-            {status === "loading"
-              ? "Reading historical parallels…"
-              : "Historical parallels unavailable"}
-          </motion.p>
-        )}
+        <motion.div
+          key={`${parallel.date}-${parallel.name}-${parallel.similarity_percent}`}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className="flex min-w-0 max-w-full flex-col items-center rounded-2xl px-3.5 py-1.5"
+        >
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{
+                backgroundColor: tone.color,
+                boxShadow: `0 0 8px ${tone.glow}`,
+              }}
+            />
+            <span className="text-micro font-medium uppercase tracking-[0.1em] text-black/50 dark:text-white/45">
+              Most Similar Day
+            </span>
+          </span>
+          <span className="mt-0.5 max-w-full whitespace-normal text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
+            {formatYear(parallel.date)} {parallel.name}
+          </span>
+        </motion.div>
       </AnimatePresence>
     </div>
   );
@@ -208,14 +152,7 @@ export function EnergyGauge({ isDark = true }) {
         {label}
       </div>
 
-      <DualEpochCarousel
-        key={
-          parallels.map((parallel) => `${parallel.date}-${parallel.name}`).join("|") ||
-          "empty"
-        }
-        parallels={parallels}
-        status={status}
-      />
+      <SelectedDayParallel parallels={parallels} />
     </div>
   );
 }
