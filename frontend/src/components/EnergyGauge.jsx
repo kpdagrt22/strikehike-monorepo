@@ -45,8 +45,15 @@ function SelectedDayParallel({ parallels }) {
               Most Similar Day
             </span>
           </span>
-          <span className="mt-0.5 max-w-full whitespace-normal text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
-            {formatYear(parallel.date)} {parallel.name}
+          <span className="mt-0.5 flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
+            <span className="whitespace-normal">
+              {formatYear(parallel.date)} {parallel.name}
+            </span>
+            {Number.isFinite(Number(parallel.similarity_percent)) ? (
+              <span className="whitespace-nowrap font-mono text-[10px] font-normal tracking-[0.08em] text-black/40 dark:text-white/60">
+                · {Number(parallel.similarity_percent).toFixed(1)}% Match
+              </span>
+            ) : null}
           </span>
         </motion.div>
       </AnimatePresence>
