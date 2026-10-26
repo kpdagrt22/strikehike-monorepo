@@ -692,10 +692,76 @@
       "description": "Global equity markets began a rapid sell-off as the COVID-19 pandemic spread."
     },
     {
+      "date": "2020-03-11",
+      "name": "WHO declares COVID-19 a pandemic",
+      "category": "Science",
+      "description": "The World Health Organization declared COVID-19 a global pandemic as cases spread across more than 100 countries."
+    },
+    {
+      "date": "2020-04-20",
+      "name": "WTI crude oil futures turn negative",
+      "category": "Finance",
+      "description": "The expiring May WTI contract settled at negative $37.63 a barrel as storage filled during the pandemic demand collapse."
+    },
+    {
+      "date": "2020-05-25",
+      "name": "Murder of George Floyd",
+      "category": "Politics",
+      "description": "The police killing of George Floyd in Minneapolis sparked global protests against racial injustice."
+    },
+    {
+      "date": "2020-08-04",
+      "name": "Beirut port explosion",
+      "category": "Natural Disasters",
+      "description": "A massive ammonium nitrate explosion at Beirut's port killed more than 200 people and devastated the city."
+    },
+    {
+      "date": "2020-09-18",
+      "name": "Ruth Bader Ginsburg dies",
+      "category": "Politics",
+      "description": "Supreme Court Justice Ruth Bader Ginsburg died at 87, setting up a contentious confirmation battle before the 2020 election."
+    },
+    {
       "date": "2020-11-03",
       "name": "US presidential election",
       "category": "Politics",
       "description": "Joe Biden defeated incumbent Donald Trump in the US presidential election."
+    },
+    {
+      "date": "2020-12-08",
+      "name": "First COVID-19 vaccine administered",
+      "category": "Science",
+      "description": "Margaret Keenan received the first clinically approved COVID-19 vaccine outside a trial, in Coventry, England."
+    },
+    {
+      "date": "2021-01-06",
+      "name": "US Capitol attack",
+      "category": "Politics",
+      "description": "Supporters of President Donald Trump stormed the US Capitol as Congress certified the 2020 election results."
+    },
+    {
+      "date": "2021-01-27",
+      "name": "GameStop short squeeze",
+      "category": "Finance",
+      "description": "Coordinated retail buying drove a historic short squeeze in GameStop shares and disrupted hedge fund positioning."
+    },
+    {
+      "date": "2021-02-18",
+      "name": "Perseverance lands on Mars",
+      "category": "Science",
+      "description": "NASA's Perseverance rover landed in Jezero Crater to search for signs of ancient microbial life."
+    },
+    {
+      "date": "2021-07-20",
+      "name": "Bezos flies to space on Blue Origin",
+      "category": "Science",
+      "description": "Jeff Bezos flew on Blue Origin's New Shepard on the company's first crewed suborbital flight."
+    },
+    {
+      "date": "2021-08-15",
+      "name": "Taliban capture Kabul",
+      "category": "Politics",
+      "description": "Taliban forces entered Kabul as the US-backed Afghan government collapsed, prompting a chaotic evacuation."
     },
     {
       "date": "2021-12-25",
@@ -716,6 +782,12 @@
       "description": "Russia launched a full-scale invasion of Ukraine."
     },
     {
+      "date": "2022-06-13",
+      "name": "Crypto credit crash",
+      "category": "Finance",
+      "description": "Celsius froze withdrawals and crypto lenders buckled, accelerating a violent deleveraging across digital assets."
+    },
+    {
       "date": "2022-07-12",
       "name": "JWST first science images",
       "category": "Science",
@@ -728,10 +800,34 @@
       "description": "Queen Elizabeth II died at Balmoral Castle after a 70-year reign."
     },
     {
+      "date": "2022-10-27",
+      "name": "Musk completes Twitter takeover",
+      "category": "Science",
+      "description": "Elon Musk closed his $44 billion acquisition of Twitter and immediately began restructuring the company."
+    },
+    {
+      "date": "2022-11-30",
+      "name": "ChatGPT released",
+      "category": "Science",
+      "description": "OpenAI released ChatGPT, bringing large language models to a mainstream audience within days."
+    },
+    {
       "date": "2022-12-05",
       "name": "Fusion ignition achieved",
       "category": "Science",
       "description": "The National Ignition Facility achieved the first controlled fusion reaction that produced more energy than the laser energy delivered to the target."
+    },
+    {
+      "date": "2022-12-18",
+      "name": "Argentina wins FIFA World Cup",
+      "category": "Culture/Religion",
+      "description": "Argentina beat France on penalties in one of the most dramatic World Cup finals ever played."
+    },
+    {
+      "date": "2023-02-06",
+      "name": "Turkey-Syria earthquakes",
+      "category": "Natural Disasters",
+      "description": "Two massive earthquakes struck southern Turkey and northern Syria, killing more than 50,000 people."
     },
     {
       "date": "2023-03-10",
@@ -746,16 +842,46 @@
       "description": "Finland formally joined NATO, ending decades of military non-alignment."
     },
     {
+      "date": "2023-06-18",
+      "name": "Titan submersible implosion",
+      "category": "Science",
+      "description": "The Titan submersible imploded during a dive to the Titanic wreck, killing all five people aboard."
+    },
+    {
       "date": "2023-07-01",
       "name": "Euclid space telescope launched",
       "category": "Science",
       "description": "The European Space Agency launched the Euclid space telescope to map dark matter and dark energy."
     },
     {
+      "date": "2023-10-07",
+      "name": "Hamas attacks Israel",
+      "category": "Politics",
+      "description": "A surprise Hamas attack on southern Israel killed about 1,200 people and triggered the Gaza war."
+    },
+    {
+      "date": "2024-01-01",
+      "name": "Noto Peninsula earthquake",
+      "category": "Natural Disasters",
+      "description": "A magnitude 7.6 earthquake struck Japan's Noto Peninsula, causing tsunamis, fires and widespread damage."
+    },
+    {
       "date": "2024-06-25",
       "name": "Chang'e 6 returns lunar far-side samples",
       "category": "Science",
       "description": "China's Chang'e 6 mission returned the first samples from the Moon's far side."
+    },
+    {
+      "date": "2024-07-13",
+      "name": "Trump assassination attempt",
+      "category": "Politics",
+      "description": "A gunman wounded Donald Trump at a campaign rally in Butler, Pennsylvania, killing one attendee."
+    },
+    {
+      "date": "2024-07-19",
+      "name": "CrowdStrike global IT outage",
+      "category": "Science",
+      "description": "A faulty CrowdStrike update crashed millions of Windows systems, grounding flights and disrupting hospitals."
     },
     {
       "date": "2024-07-26",
@@ -774,6 +900,60 @@
       "name": "Starship booster caught at launch tower",
       "category": "Science",
       "description": "SpaceX's Starship Super Heavy booster returned to its launch tower and was caught by mechanical arms."
+    },
+    {
+      "date": "2024-11-05",
+      "name": "Trump wins US election",
+      "category": "Politics",
+      "description": "Donald Trump won the 2024 US presidential election, securing a second term and Republican control of Congress."
+    },
+    {
+      "date": "2024-12-08",
+      "name": "Assad regime falls in Syria",
+      "category": "Politics",
+      "description": "Rebel forces captured Damascus and ended the Assad family's five-decade rule in Syria."
+    },
+    {
+      "date": "2025-01-07",
+      "name": "Southern California wildfires",
+      "category": "Natural Disasters",
+      "description": "The Palisades and Eaton fires exploded across Los Angeles County, destroying thousands of structures."
+    },
+    {
+      "date": "2025-01-20",
+      "name": "Trump second inauguration",
+      "category": "Politics",
+      "description": "Donald Trump was inaugurated for a second non-consecutive term as the 47th US president."
+    },
+    {
+      "date": "2025-02-28",
+      "name": "Trump-Zelensky Oval Office clash",
+      "category": "Politics",
+      "description": "A televised Oval Office meeting between Donald Trump, JD Vance and Volodymyr Zelensky ended in a public confrontation."
+    },
+    {
+      "date": "2025-03-28",
+      "name": "Myanmar earthquake",
+      "category": "Natural Disasters",
+      "description": "A magnitude 7.7 earthquake struck central Myanmar, killing thousands and damaging infrastructure across the region."
+    },
+    {
+      "date": "2025-04-02",
+      "name": "Liberation Day tariffs announced",
+      "category": "Finance",
+      "description": "The United States announced sweeping reciprocal tariffs, triggering a global market selloff and trade escalation."
+    },
+    {
+      "date": "2025-05-07",
+      "name": "India-Pakistan military strikes",
+      "category": "Politics",
+      "description": "India launched Operation Sindoor against targets in Pakistan and Pakistan-administered Kashmir, escalating a nuclear-armed rivalry."
+    },
+    {
+      "date": "2026-02-06",
+      "name": "Milan-Cortina Winter Olympics open",
+      "category": "Culture/Religion",
+      "description": "The 2026 Winter Olympics opened in Milan and Cortina d'Ampezzo, Italy, with events spread across the Alps."
     }
   ]
 }
