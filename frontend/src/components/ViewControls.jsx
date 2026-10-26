@@ -33,7 +33,7 @@ export function ViewControls() {
   const setCameraView = useChronoStore((state) => state.setCameraView);
 
   return (
-    <div className="pointer-events-auto fixed bottom-20 right-3 z-30 hidden sm:bottom-24 sm:right-5 lg:block">
+    <div className="pointer-events-auto fixed bottom-24 right-5 z-30 hidden lg:block">
       <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/45 p-1 shadow-[0_16px_50px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/30 dark:shadow-[0_16px_50px_rgba(0,0,0,0.45)]">
         {VIEWS.map((view) => {
           const active = cameraView === view.id;
@@ -48,7 +48,7 @@ export function ViewControls() {
               title={view.label}
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.94 }}
-              className={`grid h-9 w-9 place-items-center rounded-full border transition-colors duration-200 ${
+              className={`grid h-11 w-11 place-items-center rounded-full border transition-colors duration-200 ${
                 active
                   ? "border-black/10 bg-[#14121a] text-[#f2ede4] dark:border-white/15 dark:bg-[#f2ede4] dark:text-[#14121a]"
                   : "border-transparent text-black/45 hover:bg-black/[0.05] dark:text-white/45 dark:hover:bg-white/[0.07]"

@@ -250,12 +250,12 @@ class HistoricalParallelsRequest(BaseModel):
     date: str
     datetime: str | None = None
     geometry: dict[str, Any] | None = None
-    limit: int = 3
+    limit: int = 2
 
 
 @app.post("/api/v1/historical-parallels")
 def historical_parallels(payload: HistoricalParallelsRequest):
-    """Return 2-3 historical events with similar geometry or energy score."""
+    """Return two historical and two recent parallels for the target moment."""
     try:
         return find_historical_parallels(
             payload.date,
@@ -282,9 +282,9 @@ def historical_parallels_get(
         str | None,
         Query(alias="datetime", description="Optional exact UTC minute YYYY-MM-DDTHH:MM."),
     ] = None,
-    limit: Annotated[int, Query(ge=2, le=3)] = 3,
+    limit: Annotated[int, Query(ge=1, le=2)] = 2,
 ):
-    """Convenience GET; geometry is computed from the target date/minute."""
+    """Convenience GET; returns dual-epoch historical and recent parallels."""
     try:
         return find_historical_parallels(
             date,

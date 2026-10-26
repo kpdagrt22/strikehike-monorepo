@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import gsap from "gsap";
@@ -10,24 +10,42 @@ import { useChronoStore } from "@/store/chronoStore";
 
 // Camera keys are calibrated to the compact orrery radius (not literal AU scale).
 const ORBITAL_VIEW = { x: 0, y: 8, z: 14 };
-const PORTRAIT_ORBITAL_VIEW = { x: 0, y: 12, z: 22 };
+// Portrait phones: a closer, more top-down framing. The orbit is a flat disc,
+// so tilting down makes the ring use the tall viewport instead of leaving a
+// vertical dead zone above and below it.
+const PORTRAIT_ORBITAL_VIEW = { x: 0, y: 16, z: 12 };
+// Large desktops: pull in so the orrery commands the center of the canvas.
+const WIDE_ORBITAL_VIEW = { x: 0, y: 5, z: 10 };
 const ZENITH_VIEW = { x: 0, y: 22, z: 0 };
+const PORTRAIT_ZENITH_VIEW = { x: 0, y: 28, z: 0 };
 const INTRO_START = { x: 0, y: 55, z: 95 };
 const INTRO_DURATION = 3;
 const AUTO_ROTATE_SPEED = 0.16;
 const IDLE_RESUME_MS = 4200;
 
+const CAMERA_FRAMING = {
+  portrait: { orbital: PORTRAIT_ORBITAL_VIEW, zenith: PORTRAIT_ZENITH_VIEW },
+  standard: { orbital: ORBITAL_VIEW, zenith: ZENITH_VIEW },
+  wide: { orbital: WIDE_ORBITAL_VIEW, zenith: ZENITH_VIEW },
+};
+
+function getFramingKey(width, height) {
+  const aspect = width / Math.max(height, 1);
+  if (aspect < 0.8) return "portrait";
+  if (width >= 1200) return "wide";
+  return "standard";
+}
+
 function CameraRig({ onIntroComplete }) {
   const { camera, size } = useThree();
-  const isPortrait = size.width / Math.max(size.height, 1) < 0.8;
-  const orbitalTarget = useMemo(
-    () => (isPortrait ? PORTRAIT_ORBITAL_VIEW : ORBITAL_VIEW),
-    [isPortrait],
-  );
+  const framing = CAMERA_FRAMING[getFramingKey(size.width, size.height)];
   const controlsRef = useRef(null);
   const idleTimerRef = useRef(null);
   const appliedViewRef = useRef(false);
+  const introStartedRef = useRef(false);
   const introCallbackRef = useRef(onIntroComplete);
+  const framingRef = useRef(framing);
+  const introTargetRef = useRef(framing.orbital);
 
   const [introComplete, setIntroComplete] = useState(false);
   const [interacting, setInteracting] = useState(false);
@@ -39,6 +57,11 @@ function CameraRig({ onIntroComplete }) {
   useEffect(() => {
     introCallbackRef.current = onIntroComplete;
   }, [onIntroComplete]);
+
+  useEffect(() => {
+    framingRef.current = framing;
+    introTargetRef.current = framing.orbital;
+  }, [framing]);
 
   const emitCameraState = useCallback(
     (phase, view) => {
@@ -61,6 +84,9 @@ function CameraRig({ onIntroComplete }) {
   );
 
   useEffect(() => {
+    if (introStartedRef.current) return undefined;
+    introStartedRef.current = true;
+
     camera.position.set(INTRO_START.x, INTRO_START.y, INTRO_START.z);
     camera.lookAt(0, 0, 0);
     if (controlsRef.current) {
@@ -69,11 +95,19 @@ function CameraRig({ onIntroComplete }) {
     }
 
     const tween = gsap.to(camera.position, {
-      ...orbitalTarget,
+      ...introTargetRef.current,
       duration: INTRO_DURATION,
       ease: "power3.inOut",
       onUpdate: () => controlsRef.current?.update(),
       onComplete: () => {
+        // Orientation may have changed mid-intro: land on the live framing.
+        const liveFraming = framingRef.current;
+        camera.position.set(
+          liveFraming.orbital.x,
+          liveFraming.orbital.y,
+          liveFraming.orbital.z,
+        );
+        controlsRef.current?.update();
         setIntroComplete(true);
         emitCameraState("intro-complete", "orbital");
         introCallbackRef.current?.();
@@ -84,7 +118,7 @@ function CameraRig({ onIntroComplete }) {
       tween.kill();
       clearTimeout(idleTimerRef.current);
     };
-  }, [camera, emitCameraState, orbitalTarget]);
+  }, [camera, emitCameraState]);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -114,17 +148,15 @@ function CameraRig({ onIntroComplete }) {
 
   useEffect(() => {
     if (!introComplete) return undefined;
+
     if (!appliedViewRef.current) {
       appliedViewRef.current = true;
       return undefined;
     }
 
     const target =
-      cameraView === "zenith"
-        ? isPortrait
-          ? { x: 0, y: 28, z: 0 }
-          : ZENITH_VIEW
-        : orbitalTarget;
+      cameraView === "zenith" ? framing.zenith : framing.orbital;
+
     setViewTweening(true);
     const tween = gsap.to(camera.position, {
       ...target,
@@ -146,9 +178,8 @@ function CameraRig({ onIntroComplete }) {
     cameraView,
     cameraRevision,
     emitCameraState,
+    framing,
     introComplete,
-    isPortrait,
-    orbitalTarget,
   ]);
 
   const shouldAutoRotate =

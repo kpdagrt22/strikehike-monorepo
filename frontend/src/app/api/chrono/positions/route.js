@@ -93,8 +93,8 @@ export async function GET(request) {
   const [historical, market] = await Promise.all([
     fetchBackend(
       requestedDateTime
-        ? `/api/v1/historical-parallels?datetime=${encodeURIComponent(datetime)}&date=${date}&limit=3`
-        : `/api/v1/historical-parallels?date=${date}&limit=3`,
+        ? `/api/v1/historical-parallels?datetime=${encodeURIComponent(datetime)}&date=${date}&limit=2`
+        : `/api/v1/historical-parallels?date=${date}&limit=2`,
     ),
     fetchBackend(`/api/v1/astro-positions?date=${date}`),
   ]);

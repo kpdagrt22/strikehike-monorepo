@@ -70,7 +70,7 @@ export function OnboardingOverlay({ introComplete = false }) {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/20 bg-white/65 p-7 text-[#14121a] shadow-[0_30px_100px_rgba(20,18,26,0.22)] backdrop-blur-2xl dark:border-white/15 dark:bg-black/45 dark:text-[#f2ede4] dark:shadow-[0_30px_100px_rgba(0,0,0,0.6)]"
           >
-            <p className="text-[9px] font-medium uppercase tracking-[0.3em] text-black/45 dark:text-white/40">
+            <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/55 dark:text-white/50">
               StrikeHike · First Contact
             </p>
             <h2
@@ -97,7 +97,7 @@ export function OnboardingOverlay({ introComplete = false }) {
                       {item.icon}
                     </svg>
                   </span>
-                  <p className="text-[12px] leading-relaxed text-black/65 dark:text-white/65">
+                  <p className="text-[14px] leading-relaxed text-black/70 dark:text-white/70 lg:text-[15px]">
                     {item.label}
                   </p>
                 </div>
@@ -108,7 +108,7 @@ export function OnboardingOverlay({ introComplete = false }) {
               type="button"
               autoFocus
               onClick={enter}
-              className="mt-8 w-full rounded-full border border-black/10 bg-[#14121a] px-5 py-3 text-[10px] font-medium uppercase tracking-[0.26em] text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f05d49]/60 dark:border-white/10 dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-white"
+              className="mt-8 min-h-11 w-full rounded-full border border-black/10 bg-[#14121a] px-5 py-3 text-meta font-medium uppercase tracking-[0.18em] text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f05d49]/60 dark:border-white/10 dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-white"
             >
               Enter
             </button>

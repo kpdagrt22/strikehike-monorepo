@@ -8,6 +8,7 @@ seed/geometry pipeline with ``force=True``, which drops the existing
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -47,6 +48,9 @@ def main() -> int:
 
     counts = {category: int(total) for category, total in rows}
     total = sum(counts.values())
+    expected = len(
+        json.loads(SEED_PATH.read_text(encoding="utf-8")).get("events", [])
+    )
 
     print(f"Force-reseeded {count} events into {DB_PATH}")
     print(f"Seed source: {SEED_PATH}")
@@ -55,9 +59,10 @@ def main() -> int:
         print(f"  {category}: {counts.get(category, 0)}")
     print(f"Total: {total}")
 
-    if count != total or total != 129:
+    if count != total or total != expected:
         print(
-            f"ERROR: expected 129 seeded events, got count={count}, total={total}",
+            f"ERROR: expected {expected} seeded events, "
+            f"got count={count}, total={total}",
             file=sys.stderr,
         )
         return 1

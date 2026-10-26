@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
+import { splitParallels } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 
 const SIZE = 116;
@@ -16,43 +17,78 @@ function formatYear(iso) {
   return Number.isFinite(year) ? year : "";
 }
 
-function ParallelCarousel({ parallels, status }) {
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    if (parallels.length <= 1) return undefined;
-
-    const timer = setInterval(() => setTick((value) => value + 1), 4000);
-    return () => clearInterval(timer);
-  }, [parallels.length]);
-
-  const parallel = parallels.length ? parallels[tick % parallels.length] : null;
-  const parallelKey = parallel ? `${parallel.date}-${parallel.name}` : "empty";
-  const tone = categoryTone(parallel?.category);
+function EpochRow({ epoch, parallel }) {
+  const recent = epoch === "recent";
+  const tone = categoryTone(parallel.category);
 
   return (
-    <div className="mt-3 h-4 w-full text-center">
+    <div
+      className={`flex min-w-0 max-w-full items-center justify-center gap-2 rounded-full px-3 py-1 ${
+        recent
+          ? "recent-glow border border-[#f05d49]/25 bg-white/30 dark:bg-white/[0.05]"
+          : ""
+      }`}
+    >
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{
+          backgroundColor: tone.color,
+          boxShadow: `0 0 8px ${tone.glow}`,
+        }}
+      />
+      <span
+        className={`shrink-0 text-micro font-medium uppercase tracking-[0.1em] ${
+          recent
+            ? "text-[#c0442f] dark:text-[#ff8b77]"
+            : "text-black/50 dark:text-white/45"
+        }`}
+      >
+        {recent ? "Recent Manifestations" : "Historical Parallels"}
+      </span>
+      <span className="min-w-0 truncate text-meta font-medium tracking-[-0.01em] text-black/70 dark:text-white/70">
+        {formatYear(parallel.date)} {parallel.name}
+      </span>
+    </div>
+  );
+}
+
+function DualEpochCarousel({ parallels, status }) {
+  const [tick, setTick] = useState(0);
+  const { historical, recent } = splitParallels(parallels);
+  const longest = Math.max(historical.length, recent.length);
+
+  useEffect(() => {
+    if (longest <= 1) return undefined;
+
+    const timer = setInterval(() => setTick((value) => value + 1), 5000);
+    return () => clearInterval(timer);
+  }, [longest]);
+
+  const historicalPick = historical.length
+    ? historical[tick % historical.length]
+    : null;
+  const recentPick = recent.length ? recent[tick % recent.length] : null;
+  const parallelKey = `${historicalPick?.date}-${historicalPick?.name}|${recentPick?.date}-${recentPick?.name}`;
+
+  return (
+    <div className="mt-3 w-full text-center">
       <AnimatePresence mode="wait" initial={false}>
-        {parallel ? (
-          <motion.p
+        {historicalPick || recentPick ? (
+          <motion.div
             key={parallelKey}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="flex items-center justify-center gap-1.5 text-[10px] font-medium tracking-[-0.01em] text-black/55 dark:text-white/55"
+            className="flex w-full flex-col items-center gap-1.5"
           >
-            <span
-              className="h-1 w-1 shrink-0 rounded-full"
-              style={{
-                backgroundColor: tone.color,
-                boxShadow: `0 0 8px ${tone.glow}`,
-              }}
-            />
-            <span className="truncate">
-              Similar Energy to: {formatYear(parallel.date)} {parallel.name}
-            </span>
-          </motion.p>
+            {historicalPick ? (
+              <EpochRow epoch="historical" parallel={historicalPick} />
+            ) : null}
+            {recentPick ? (
+              <EpochRow epoch="recent" parallel={recentPick} />
+            ) : null}
+          </motion.div>
         ) : (
           <motion.p
             key="empty"
@@ -60,7 +96,7 @@ function ParallelCarousel({ parallels, status }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="text-[10px] font-medium tracking-[-0.01em] text-black/35 dark:text-white/35"
+            className="text-meta font-medium tracking-[-0.01em] text-black/45 dark:text-white/45"
           >
             {status === "loading"
               ? "Reading historical parallels…"
@@ -150,18 +186,18 @@ export function EnergyGauge({ isDark = true }) {
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[30px] font-light leading-none tabular-nums tracking-[-0.05em] text-[#14121a] drop-shadow-[0_1px_12px_rgba(255,255,255,0.35)] dark:text-[#f2ede4] dark:drop-shadow-[0_1px_14px_rgba(0,0,0,0.45)]">
+          <span className="text-[32px] font-light leading-none tabular-nums tracking-[-0.05em] text-[#14121a] drop-shadow-[0_1px_12px_rgba(255,255,255,0.35)] dark:text-[#f2ede4] dark:drop-shadow-[0_1px_14px_rgba(0,0,0,0.45)]">
             {score === null ? "—" : Math.round(score)}
           </span>
-          <span className="mt-1 text-[8px] font-medium uppercase tracking-[0.26em] text-black/40 dark:text-white/40">
+          <span className="mt-1 text-micro font-medium uppercase tracking-[0.18em] text-black/50 dark:text-white/50">
             Energy
           </span>
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-1.5 text-[8px] font-medium uppercase tracking-[0.24em] text-black/45 dark:text-white/45">
+      <div className="mt-2.5 flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/55 dark:text-white/55">
         <span
-          className="h-1 w-1 rounded-full"
+          className="h-1.5 w-1.5 rounded-full"
           style={{
             backgroundColor: tone.stroke,
             boxShadow: `0 0 10px ${tone.stroke}`,
@@ -170,7 +206,7 @@ export function EnergyGauge({ isDark = true }) {
         {label}
       </div>
 
-      <ParallelCarousel
+      <DualEpochCarousel
         key={
           parallels.map((parallel) => `${parallel.date}-${parallel.name}`).join("|") ||
           "empty"

@@ -3,10 +3,11 @@
 import { motion } from "framer-motion";
 import { useChronoStore } from "@/store/chronoStore";
 
-const SHEET_BUTTONS = [
+const PANEL_BUTTONS = [
   {
     id: "archive",
-    label: "Event archive",
+    label: "Events",
+    controls: "chrono-events-sheet chrono-ladder-sheet",
     icon: (
       <>
         <path d="M4 7.5h16M6.5 12h11M9 16.5h6" />
@@ -14,18 +15,9 @@ const SHEET_BUTTONS = [
     ),
   },
   {
-    id: "future",
-    label: "Future ladder",
-    icon: (
-      <>
-        <path d="M4 16.5 9 11l3.5 3.5L20 6.5" />
-        <path d="M14.5 6.5H20v5.5" />
-      </>
-    ),
-  },
-  {
     id: "alignment",
-    label: "Current alignment",
+    label: "Data",
+    controls: "chrono-alignment-sheet",
     icon: (
       <>
         <rect x="4" y="4" width="16" height="16" rx="3" />
@@ -70,24 +62,71 @@ export function MobileDock() {
 
   if (timeControlsExpanded) return null;
 
+  const isPanelActive = (id) =>
+    id === "archive"
+      ? mobileSheet === "archive" || mobileSheet === "future"
+      : mobileSheet === id;
+
   return (
-    <div className="pointer-events-auto fixed bottom-[4.25rem] left-1/2 z-40 -translate-x-1/2 lg:hidden">
-      <div className="flex items-center gap-0.5 rounded-full border border-black/10 bg-white/55 p-1 shadow-[0_16px_50px_rgba(20,18,26,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-black/45 dark:shadow-[0_16px_50px_rgba(0,0,0,0.55)]">
-        {SHEET_BUTTONS.map((button) => {
-          const active = mobileSheet === button.id;
+    <div className="pointer-events-auto fixed bottom-[4.5rem] left-1/2 z-40 -translate-x-1/2 lg:hidden">
+      <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/60 p-1 shadow-[0_16px_50px_rgba(20,18,26,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-black/55 dark:shadow-[0_16px_50px_rgba(0,0,0,0.55)]">
+        {PANEL_BUTTONS.map((button) => {
+          const active = isPanelActive(button.id);
+
           return (
             <motion.button
               key={button.id}
               type="button"
-              onClick={() => setMobileSheet(active ? null : button.id)}
+              onClick={() =>
+                setMobileSheet(active ? null : button.id)
+              }
+              aria-label={`${button.label} panel`}
+              aria-controls={button.controls}
+              aria-expanded={active}
+              aria-pressed={active}
+              title={`${button.label} panel`}
+              whileTap={{ scale: 0.94 }}
+              className={`flex h-11 items-center gap-1.5 rounded-full px-3 text-meta font-medium transition-colors ${
+                active
+                  ? "bg-[#14121a] text-[#f2ede4] dark:bg-[#f2ede4] dark:text-[#14121a]"
+                  : "text-black/65 hover:bg-black/[0.05] dark:text-white/65 dark:hover:bg-white/[0.07]"
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.35"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {button.icon}
+              </svg>
+              <span>{button.label}</span>
+            </motion.button>
+          );
+        })}
+
+        <span className="mx-0.5 h-6 w-px bg-black/10 dark:bg-white/10" />
+
+        {VIEW_BUTTONS.map((button) => {
+          const active = cameraView === button.id;
+
+          return (
+            <motion.button
+              key={button.id}
+              type="button"
+              onClick={() => setCameraView(button.id)}
               aria-label={button.label}
               aria-pressed={active}
               title={button.label}
               whileTap={{ scale: 0.9 }}
-              className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${
+              className={`grid h-11 w-11 place-items-center rounded-full transition-colors ${
                 active
-                  ? "bg-[#14121a] text-[#f2ede4] dark:bg-[#f2ede4] dark:text-[#14121a]"
-                  : "text-black/45 hover:bg-black/[0.05] dark:text-white/45 dark:hover:bg-white/[0.07]"
+                  ? "text-[#f05d49]"
+                  : "text-black/50 hover:bg-black/[0.05] dark:text-white/50 dark:hover:bg-white/[0.07]"
               }`}
             >
               <svg
@@ -98,40 +137,6 @@ export function MobileDock() {
                 strokeWidth="1.25"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {button.icon}
-              </svg>
-            </motion.button>
-          );
-        })}
-
-        <span className="mx-0.5 h-5 w-px bg-black/10 dark:bg-white/10" />
-
-        {VIEW_BUTTONS.map((button) => {
-          const active = cameraView === button.id;
-          return (
-            <motion.button
-              key={button.id}
-              type="button"
-              onClick={() => setCameraView(button.id)}
-              aria-label={button.label}
-              aria-pressed={active}
-              title={button.label}
-              whileTap={{ scale: 0.9 }}
-              className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${
-                active
-                  ? "text-[#f05d49]"
-                  : "text-black/35 hover:bg-black/[0.05] dark:text-white/35 dark:hover:bg-white/[0.07]"
-              }`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
                 aria-hidden="true"
               >
                 {button.icon}

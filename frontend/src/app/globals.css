@@ -7,6 +7,28 @@
   --font-sans: var(--font-onest), "Onest", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* HUD type scale. Micro labels are never rendered below 11px and all readable
+   content starts at 12px; desktop gets one step of extra breathing room. */
+@theme {
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.35;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.45;
+  --text-body: 0.8125rem;
+  --text-body--line-height: 1.5;
+  --text-strong: 0.875rem;
+  --text-strong--line-height: 1.4;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --text-micro: 0.75rem;
+    --text-meta: 0.8125rem;
+    --text-body: 0.875rem;
+    --text-strong: 0.9375rem;
+  }
+}
+
 :root {
   color-scheme: light;
   --engine-fallback: #e3dbcf;
@@ -39,6 +61,73 @@
 
   .dark body {
     color: #f2ede4;
+  }
+}
+
+/* Info module enquiries: no native chrome, just a lit baseline. */
+.info-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.5rem 0;
+  color: #ffffff;
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.info-input::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.info-input:focus {
+  border-bottom-color: rgba(240, 93, 73, 0.7);
+  box-shadow: 0 8px 18px -14px rgba(240, 93, 73, 0.9);
+}
+
+.info-input:autofill,
+.info-input:-webkit-autofill {
+  -webkit-text-fill-color: #ffffff;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Mobile bottom sheets rise from the controls instead of popping in. */
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .animate-sheet-up {
+    animation: sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+/* Recent-manifestation glass edge: a slow, low-contrast pulse. */
+@keyframes recent-glow {
+  0%,
+  100% {
+    border-color: rgba(240, 93, 73, 0.22);
+    box-shadow: 0 0 0 rgba(240, 93, 73, 0);
+  }
+  50% {
+    border-color: rgba(240, 93, 73, 0.52);
+    box-shadow: 0 0 18px rgba(240, 93, 73, 0.16);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .recent-glow {
+    animation: recent-glow 3.8s ease-in-out infinite;
   }
 }
 

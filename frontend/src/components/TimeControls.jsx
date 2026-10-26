@@ -61,6 +61,7 @@ export function TimeControls() {
   const setTimeControlsExpanded = useChronoStore(
     (state) => state.setTimeControlsExpanded,
   );
+  const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const status = useChronoStore((state) => state.status);
   const source = useChronoStore((state) => state.source);
 
@@ -70,8 +71,11 @@ export function TimeControls() {
 
   useEffect(() => {
     setTimeControlsExpanded(expanded);
+    // The expanded tray owns the bottom of the screen; close any mobile sheet
+    // underneath it so the two surfaces never compete for the same space.
+    if (expanded) setMobileSheet(null);
     return () => setTimeControlsExpanded(false);
-  }, [expanded, setTimeControlsExpanded]);
+  }, [expanded, setMobileSheet, setTimeControlsExpanded]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,7 +154,7 @@ export function TimeControls() {
         aria-expanded={expanded}
         aria-controls={expanded ? "chrono-timeline-controls" : undefined}
         aria-label={`Focused date: ${formatDateTime(focusedDate, focusedTime)}. Open timeline.`}
-        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left"
+        className="flex min-h-11 w-full items-center gap-2.5 px-4 py-2.5 text-left"
       >
         <span
           className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#f05d49] ${
@@ -159,12 +163,12 @@ export function TimeControls() {
         />
 
         {expanded ? (
-          <span className="text-[9px] font-medium uppercase tracking-[0.22em] text-black/45 dark:text-white/45">
+          <span className="text-micro font-medium uppercase tracking-[0.16em] text-black/55 dark:text-white/55">
             Focused date
           </span>
         ) : null}
 
-        <span className="ml-auto whitespace-nowrap text-[12px] font-medium tabular-nums tracking-[-0.01em] text-[#14121a] dark:text-[#f2ede4]">
+        <span className="ml-auto whitespace-nowrap text-strong font-medium tabular-nums tracking-[-0.01em] text-[#14121a] dark:text-[#f2ede4]">
           {formatDateTime(focusedDate, focusedTime)}
         </span>
       </button>
@@ -181,7 +185,7 @@ export function TimeControls() {
             className="overflow-hidden"
           >
             <div className="px-4 pb-3">
-              <div className="relative h-9">
+              <div className="relative h-11">
                 <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-black/15 dark:bg-white/15" />
                 <div
                   className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-[#f05d49] shadow-[0_0_10px_rgba(240,93,73,0.55)]"
@@ -205,7 +209,7 @@ export function TimeControls() {
                       style={{ left: `${left}%` }}
                       title={`${marker.name} · ${formatDate(marker.date)}`}
                       aria-label={`${marker.name}, ${formatDate(marker.date)}`}
-                      className="group absolute top-1/2 z-20 grid h-5 w-4 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center"
+                      className="group absolute top-1/2 z-20 grid h-11 w-4 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center"
                     >
                       <span
                         className={`block rounded-full transition-transform duration-200 group-hover:scale-150 ${
@@ -233,14 +237,14 @@ export function TimeControls() {
                   onBlur={() => setScrubbing(false)}
                   aria-label="Focused date"
                   aria-valuetext={formatDate(focusedDate)}
-                  className="chrono-range absolute inset-0 z-10 h-9 w-full cursor-ew-resize appearance-none bg-transparent"
+                  className="chrono-range absolute inset-0 z-10 h-11 w-full cursor-ew-resize appearance-none bg-transparent"
                 />
               </div>
 
               <div className="mt-2 flex items-center gap-2.5">
                 <label
                   htmlFor="chrono-precise-datetime"
-                  className="whitespace-nowrap text-[8px] font-medium uppercase tracking-[0.18em] text-black/35 dark:text-white/30"
+                  className="whitespace-nowrap text-micro font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/45"
                 >
                   Precise UTC
                 </label>
@@ -273,12 +277,12 @@ export function TimeControls() {
                       }
                     }}
                     aria-label="Precise UTC date and time"
-                    className="h-7 w-full min-w-0 appearance-none rounded-full border border-black/10 bg-black/[0.025] py-1 pl-8 pr-2.5 text-[9px] tabular-nums tracking-[-0.01em] text-black/60 outline-none transition-colors [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 focus:border-black/20 focus:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55 dark:[color-scheme:dark] dark:focus:border-white/20 dark:focus:bg-white/[0.06]"
+                    className="h-11 w-full min-w-0 appearance-none rounded-full border border-black/10 bg-black/[0.025] py-1 pl-8 pr-2.5 text-meta tabular-nums tracking-[-0.01em] text-black/70 outline-none transition-colors sm:h-9 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 focus:border-black/20 focus:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:[color-scheme:dark] dark:focus:border-white/20 dark:focus:bg-white/[0.06]"
                   />
                 </div>
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-3 text-[8px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+              <div className="mt-2.5 flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.1em] text-black/45 dark:text-white/40">
                 <span>1906</span>
                 <span
                   className={

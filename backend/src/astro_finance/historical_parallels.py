@@ -97,6 +97,15 @@ MIN_GEOMETRY_BODIES = 3
 MIN_DATE = date(1900, 1, 1)
 MAX_DATE = date(2035, 12, 31)
 
+# Dual-epoch matching: deep history on one side, fresh-memory events on the
+# other. The cutoff is intentionally a calendar boundary, not a rolling window,
+# so the same query always returns the same two reference eras.
+EPOCH_CUTOFF_YEAR = 2015
+EPOCH_LABELS = {
+    "historical": "Historical Parallels",
+    "recent": "Recent Manifestations",
+}
+
 # Known systemic stress sessions. The market feature frame begins in 1992, so
 # 1929 has no market row; these dates use the calibrated historical-geometry
 # percentile with an explicit stress floor. They are historical calendar data,
@@ -309,7 +318,7 @@ def calibrated_geometry_score(
 ) -> tuple[int, float, str]:
     """Map a raw geometry score onto a uniform historical percentile.
 
-    The 129-event roster provides the reference distribution. Known systemic
+    The curated event roster provides the reference distribution. Known systemic
     stress sessions receive an explicit 90+ floor because their market-era
     volatility is either unavailable (1929) or belongs to the market model.
     """
@@ -620,10 +629,15 @@ def list_events_by_category() -> dict:
 def find_historical_parallels(
     target_date: str,
     geometry: dict | None = None,
-    limit: int = 3,
+    limit: int = 2,
     target_datetime: str | None = None,
 ) -> dict:
-    """Find 2-3 historical events with the closest planetary geometry/energy."""
+    """Find the closest historical and recent parallels for a moment.
+
+    ``limit`` is applied per epoch. The default returns two events from before
+    2015 (``historical``) and two from 2015 onward (``recent``), so the caller
+    can compare a deep historical root with a fresh-memory manifestation.
+    """
     try:
         parsed_date = date.fromisoformat(target_date)
     except (TypeError, ValueError) as exc:
@@ -653,7 +667,7 @@ def find_historical_parallels(
     else:
         target_date = parsed_date.isoformat()
 
-    limit = max(2, min(3, int(limit)))
+    per_epoch_limit = max(1, min(2, int(limit)))
     ensure_event_database()
 
     target_geometry = (
@@ -732,7 +746,25 @@ def find_historical_parallels(
         reverse=True,
     )
 
-    matches = scored[:limit]
+    # Partition the ranked candidates at the epoch boundary. Keeping the two
+    # slices separate means a cluster of recent matches can never crowd out the
+    # deep historical root (and vice versa).
+    epoch_candidates = {"historical": [], "recent": []}
+    for item in scored:
+        event_year = date.fromisoformat(str(item["date"])).year
+        epoch = "historical" if event_year < EPOCH_CUTOFF_YEAR else "recent"
+        epoch_candidates[epoch].append(item)
+
+    epochs = {}
+    matches = []
+    for epoch in ("historical", "recent"):
+        picks = epoch_candidates[epoch][:per_epoch_limit]
+        for item in picks:
+            item["epoch"] = epoch
+            item["epoch_label"] = EPOCH_LABELS[epoch]
+        epochs[epoch] = picks
+        matches.extend(picks)
+
     qualified_count = sum(1 for item in matches if item["_qualified"])
     low_confidence = qualified_count < 2
     for item in matches:
@@ -752,7 +784,10 @@ def find_historical_parallels(
         ),
         "geometry": target_geometry,
         "matches": matches,
+        "epochs": epochs,
+        "epoch_cutoff_year": EPOCH_CUTOFF_YEAR,
         "method": (
+            "dual-epoch partition (historical < 2015, recent >= 2015): "
             "weighted sidereal longitude (85%) + retrograde agreement (15%) + "
             "Nakshatra/Pada resonance bonus (up to 5%), with a calibrated energy bonus"
         ),
@@ -760,12 +795,45 @@ def find_historical_parallels(
     }
 
 
+def _peak_forecast_matches(matches: list[dict], limit: int) -> list[dict]:
+    """Collapse each historical-event cluster to its strongest future day.
+
+    Slow-moving geometry can keep the same event above threshold for many
+    consecutive days. Those days are one echo, not three independent ladder
+    rungs, so the peak day represents the cluster. The remaining unique events
+    are ranked by similarity and then by proximity.
+    """
+    peaks: dict[str, dict] = {}
+    for match in matches:
+        key = str(match["event"]["name"]).strip().casefold()
+        current = peaks.get(key)
+        if current is None or (
+            match["similarity_percent"],
+            -match["days_ahead"],
+        ) > (
+            current["similarity_percent"],
+            -current["days_ahead"],
+        ):
+            peaks[key] = match
+
+    ranked = sorted(
+        peaks.values(),
+        key=lambda item: (-item["similarity_percent"], item["days_ahead"]),
+    )
+    return ranked[: max(1, int(limit))]
+
+
 def forecast_ladder(
     days: int = 180,
     threshold: float = 85.0,
     limit: int = 3,
 ) -> dict:
-    """Find the strongest upcoming geometric echoes in the next N days."""
+    """Find the strongest upcoming geometric echoes in the next N days.
+
+    Every qualifying event/day pair is considered before clustering, so one
+    event repeating across consecutive days cannot hide the next-best unique
+    event from the ladder.
+    """
     ensure_event_database()
     rows = _load_events()
     events = [
@@ -785,44 +853,39 @@ def forecast_ladder(
     for offset in range(1, max(1, int(days)) + 1):
         target_date = (today + timedelta(days=offset)).isoformat()
         target_geometry = geometry_for_date(target_date)
-        best = None
         for event in events:
             (
                 geometry_similarity,
                 longitude_similarity,
                 nakshatra_similarity,
             ) = _similarity_percent(target_geometry, event["geometry"])
-            if best is None or geometry_similarity > best[0]:
-                best = (
-                    geometry_similarity,
-                    longitude_similarity,
-                    nakshatra_similarity,
-                    event,
-                )
-        if best and best[0] >= threshold:
+            if geometry_similarity < threshold:
+                continue
+
             matches.append(
                 {
                     "date": target_date,
                     "days_ahead": offset,
-                    "similarity_percent": round(best[0], 1),
-                    "geometry_similarity_percent": round(best[0], 1),
-                    "longitude_similarity_percent": round(best[1], 1),
-                    "nakshatra_similarity_percent": round(best[2], 1),
+                    "similarity_percent": round(geometry_similarity, 1),
+                    "geometry_similarity_percent": round(geometry_similarity, 1),
+                    "longitude_similarity_percent": round(longitude_similarity, 1),
+                    "nakshatra_similarity_percent": round(nakshatra_similarity, 1),
                     "event": {
-                        "date": best[3]["date"],
-                        "name": best[3]["name"],
-                        "category": best[3]["category"],
-                        "description": best[3]["description"],
+                        "date": event["date"],
+                        "name": event["name"],
+                        "category": event["category"],
+                        "description": event["description"],
                     },
                 }
             )
 
-    matches.sort(key=lambda item: item["similarity_percent"], reverse=True)
+    unique_matches = _peak_forecast_matches(matches, limit)
     return {
         "generated_for": today.isoformat(),
         "window_days": int(days),
         "threshold": float(threshold),
-        "matches": matches[: max(1, int(limit))],
+        "matches": unique_matches,
+        "unique_events": len(unique_matches),
     }
 
 

@@ -57,41 +57,53 @@ export function FilterControls() {
     <div
       className={`${
         mobileSheet === "archive"
-          ? "fixed inset-x-3 bottom-[4.25rem] z-50 block max-h-[70dvh] overflow-y-auto"
+          ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block max-h-[70dvh] overflow-y-auto"
           : "hidden"
       } pointer-events-auto lg:fixed lg:left-5 lg:top-[6.75rem] lg:z-30 lg:block lg:max-h-none lg:overflow-visible`}
     >
       <div className="relative">
-        <div className="rounded-[1.6rem] border border-black/10 bg-white/55 p-2 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/55 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25">
+        <div
+          id="chrono-events-sheet"
+          className="rounded-[1.6rem] border border-black/10 bg-white/70 p-2 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/70 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
+        >
           <div className="flex items-start justify-between gap-2 px-2 pb-1.5 pt-1">
             <div>
-              <p className="text-[8px] font-medium uppercase tracking-[0.24em] text-black/40 dark:text-white/35">
+              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/50 dark:text-white/50">
                 Event archive
               </p>
-              <p className="mt-0.5 text-[9px] tabular-nums text-black/30 dark:text-white/25">
+              <p className="mt-0.5 text-meta tabular-nums text-black/45 dark:text-white/40">
                 {roster?.total
                   ? `${roster.total} curated moments`
-                  : "129 moments"}
+                  : "Curated moments"}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setMobileSheet(null)}
-              aria-label="Close event archive"
-              className="grid h-7 w-7 place-items-center rounded-full border border-black/10 text-black/35 lg:hidden dark:border-white/10 dark:text-white/35"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                className="h-3 w-3"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                aria-hidden="true"
+            <div className="flex items-center gap-1 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileSheet("future")}
+                className="h-11 rounded-full border border-black/10 px-3 text-micro font-medium uppercase tracking-[0.1em] text-black/55 dark:border-white/10 dark:text-white/55"
               >
-                <path d="M4 4l8 8M12 4l-8 8" />
-              </svg>
-            </button>
+                Ladder
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileSheet(null)}
+                aria-label="Close event archive"
+                className="grid h-11 w-11 place-items-center rounded-full border border-black/10 text-black/50 dark:border-white/10 dark:text-white/50"
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -105,7 +117,7 @@ export function FilterControls() {
                   type="button"
                   onClick={() => toggleCategory(category)}
                   aria-expanded={isActive}
-                  className={`flex w-full items-center gap-2 rounded-full border px-3 py-1.5 text-left text-[10px] font-medium tracking-[-0.01em] transition-colors duration-200 ${
+                  className={`flex min-h-11 w-full items-center gap-2 rounded-full border px-3 py-2 text-left text-meta font-medium tracking-[-0.01em] transition-colors duration-200 lg:min-h-0 lg:py-1.5 ${
                     isActive
                       ? "border-black/10 bg-black/[0.07] text-[#14121a] dark:border-white/15 dark:bg-white/10 dark:text-[#f2ede4]"
                       : "border-transparent text-black/55 hover:bg-black/[0.035] dark:text-white/55 dark:hover:bg-white/[0.05]"
@@ -119,7 +131,7 @@ export function FilterControls() {
                     }}
                   />
                   <span className="truncate">{category}</span>
-                  <span className="ml-auto text-[8px] tabular-nums text-black/25 dark:text-white/25">
+                  <span className="ml-auto text-micro tabular-nums text-black/35 dark:text-white/35">
                     {count || ""}
                   </span>
                 </button>
@@ -128,7 +140,7 @@ export function FilterControls() {
           </div>
 
           {error ? (
-            <p className="px-2 pb-1 pt-1 text-[8px] leading-relaxed text-[#c0442f] dark:text-[#ff8b77]">
+            <p className="px-2 pb-1 pt-1 text-meta leading-relaxed text-[#c0442f] dark:text-[#ff8b77]">
               Archive unavailable
             </p>
           ) : null}
@@ -148,14 +160,14 @@ export function FilterControls() {
             >
               <div className="flex items-center justify-between border-b border-black/10 px-4 py-3 dark:border-white/10">
                 <div>
-                  <p className="text-[8px] font-medium uppercase tracking-[0.22em] text-black/40 dark:text-white/35">
+                  <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/50 dark:text-white/50">
                     {activeCategory}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-black/45 dark:text-white/45">
+                  <p className="mt-0.5 text-meta text-black/55 dark:text-white/55">
                     Select a date to travel
                   </p>
                 </div>
-                <span className="text-[9px] tabular-nums text-black/30 dark:text-white/25">
+                <span className="text-micro tabular-nums text-black/40 dark:text-white/35">
                   {activeEvents.length}
                 </span>
               </div>
@@ -183,10 +195,10 @@ export function FilterControls() {
                         }}
                       />
                       <span className="min-w-0">
-                        <span className="block text-[8px] font-medium tabular-nums uppercase tracking-[0.16em] text-black/35 dark:text-white/30">
+                        <span className="block text-micro font-medium tabular-nums uppercase tracking-[0.1em] text-black/45 dark:text-white/40">
                           {event.date}
                         </span>
-                        <span className="mt-0.5 block text-[11px] leading-snug text-black/70 transition-colors group-hover:text-[#14121a] dark:text-white/65 dark:group-hover:text-white">
+                        <span className="mt-0.5 block text-body leading-snug text-black/75 transition-colors group-hover:text-[#14121a] dark:text-white/70 dark:group-hover:text-white">
                           {event.name}
                         </span>
                       </span>
