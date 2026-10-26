@@ -2,11 +2,26 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { animated, useSpring } from "@react-spring/three";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { Sphere } from "@react-three/drei";
 import gsap from "gsap";
 import * as THREE from "three";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
+
+const EARTH_RADIUS = 1.66;
+const EARTH_SIZE = 0.09;
+const SATURN_TILT = Math.PI / 2 + 0.47;
+const TEXTURE_PATHS = [
+  "/textures/sun.webp",
+  "/textures/earth-day.webp",
+  "/textures/earth-clouds.webp",
+  "/textures/earth-normal.webp",
+  "/textures/earth-specular.webp",
+  "/textures/jupiter.webp",
+  "/textures/saturn.webp",
+  "/textures/saturn-ring.webp",
+];
 
 /**
  * Visual orbit radii, inner to outer. The values are deliberately compressed:
@@ -68,9 +83,9 @@ const PLANETS = [
     radius: 2.28,
     size: 0.175,
     color: "#d8b47a",
-    roughness: 0.48,
-    metalness: 0.06,
-    clearcoat: 0.28,
+    roughness: 0.7,
+    metalness: 0.1,
+    clearcoat: 0.12,
     bumpScale: 0.012,
     gas: true,
   },
@@ -275,7 +290,148 @@ function OrbitRing({ radius, isDark }) {
   );
 }
 
-function Planet({ planet, body, isDark }) {
+function SaturnRing({ texture, planetSize }) {
+  const geometry = useMemo(() => {
+    const inner = planetSize * 1.55;
+    const outer = planetSize * 2.55;
+    const ring = new THREE.RingGeometry(inner, outer, 192, 8);
+    const positions = ring.attributes.position;
+    const uvs = ring.attributes.uv;
+
+    // The source ring map is a radial strip. Map its width across the ring's
+    // radius instead of stretching a square texture around the hole.
+    for (let index = 0; index < positions.count; index += 1) {
+      const radius = Math.hypot(
+        positions.getX(index),
+        positions.getY(index),
+      );
+      uvs.setXY(
+        index,
+        THREE.MathUtils.clamp((radius - inner) / (outer - inner), 0, 1),
+        0.5,
+      );
+    }
+    uvs.needsUpdate = true;
+    return ring;
+  }, [planetSize]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  return (
+    <mesh
+      geometry={geometry}
+      rotation={[SATURN_TILT, 0, 0]}
+      renderOrder={2}
+      raycast={() => {}}
+    >
+      <meshStandardMaterial
+        map={texture}
+        alphaMap={texture}
+        transparent
+        opacity={0.92}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        roughness={0.85}
+        metalness={0.05}
+        emissive="#4a3c22"
+        emissiveIntensity={0.3}
+      />
+    </mesh>
+  );
+}
+
+function Earth({
+  isDark,
+  angle,
+  earthMap,
+  earthClouds,
+  earthNormal,
+  earthSpecular,
+}) {
+  const groupRef = useRef(null);
+  const surfaceRef = useRef(null);
+  const cloudRef = useRef(null);
+  const initialPosition = useRef({
+    x: Math.cos(angle) * EARTH_RADIUS,
+    z: Math.sin(angle) * EARTH_RADIUS,
+  });
+
+  useLayoutEffect(() => {
+    groupRef.current?.position.set(
+      initialPosition.current.x,
+      0,
+      initialPosition.current.z,
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!groupRef.current) return undefined;
+
+    const tween = gsap.to(groupRef.current.position, {
+      x: Math.cos(angle) * EARTH_RADIUS,
+      z: Math.sin(angle) * EARTH_RADIUS,
+      duration: 2,
+      ease: "expo.inOut",
+      overwrite: true,
+    });
+
+    return () => tween.kill();
+  }, [angle]);
+
+  useFrame((_, delta) => {
+    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.018;
+    if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.045;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh ref={surfaceRef} raycast={() => {}}>
+        <sphereGeometry args={[EARTH_SIZE, 96, 96]} />
+        <meshPhysicalMaterial
+          map={earthMap}
+          normalMap={earthNormal}
+          normalScale={[0.9, 0.9]}
+          metalnessMap={earthSpecular}
+          metalness={0.18}
+          roughness={0.62}
+          clearcoat={0.32}
+          clearcoatRoughness={0.28}
+          envMapIntensity={0.6}
+        />
+      </mesh>
+
+      <mesh ref={cloudRef} scale={1.02} raycast={() => {}}>
+        <sphereGeometry args={[EARTH_SIZE, 96, 96]} />
+        <meshPhysicalMaterial
+          map={earthClouds}
+          alphaMap={earthClouds}
+          transparent
+          opacity={0.6}
+          depthWrite={false}
+          roughness={1}
+          metalness={0}
+          color="#ffffff"
+          side={THREE.FrontSide}
+        />
+      </mesh>
+
+      <mesh scale={1.055} raycast={() => {}}>
+        <sphereGeometry args={[EARTH_SIZE, 48, 48]} />
+        <meshBasicMaterial
+          color={isDark ? "#4d9fff" : "#8dc8ff"}
+          transparent
+          opacity={0.12}
+          side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function Planet({ planet, body, isDark, texture, ringTexture }) {
   const setHoveredEntity = useEntityStore((state) => state.setHoveredEntity);
   const clearHoveredEntity = useEntityStore(
     (state) => state.clearHoveredEntity,
@@ -284,7 +440,10 @@ function Planet({ planet, body, isDark }) {
     (state) => state.hoveredEntity?.name === planet.name,
   );
 
-  const textures = useMemo(() => createPlanetTextures(planet), [planet]);
+  const textures = useMemo(
+    () => (texture ? null : createPlanetTextures(planet)),
+    [planet, texture],
+  );
 
   useEffect(
     () => () => {
@@ -373,23 +532,42 @@ function Planet({ planet, body, isDark }) {
   return (
     <group ref={positionRef}>
       <animated.group scale={scale}>
+        {isSun ? (
+          <mesh scale={1.24} raycast={() => {}}>
+            <sphereGeometry args={[planet.size, 48, 48]} />
+            <meshBasicMaterial
+              color="#ffb347"
+              transparent
+              opacity={isDark ? 0.12 : 0.08}
+              side={THREE.BackSide}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
+        ) : null}
+
         <Sphere args={[planet.size, 64, 64]} raycast={() => {}}>
           <meshPhysicalMaterial
-            color={textures?.map ? "#ffffff" : planet.color}
-            map={textures?.map}
-            bumpMap={textures?.bumpMap}
-            bumpScale={planet.bumpScale}
+            color={texture || textures?.map ? "#ffffff" : planet.color}
+            map={texture ?? textures?.map}
+            bumpMap={texture ? undefined : textures?.bumpMap}
+            bumpScale={texture ? 0 : planet.bumpScale}
             roughness={planet.roughness}
             metalness={planet.metalness}
             clearcoat={planet.clearcoat}
             clearcoatRoughness={0.18}
             envMapIntensity={0.45}
             emissive={isSun ? planet.color : "#000000"}
-            emissiveMap={isSun ? textures?.map : undefined}
+            emissiveMap={isSun ? texture ?? textures?.map : undefined}
             emissiveIntensity={isSun ? (isDark ? 1.35 : 0.28) : 0}
             toneMapped={!isSun}
           />
         </Sphere>
+
+        {planet.name === "Saturn" && ringTexture ? (
+          <SaturnRing texture={ringTexture} planetSize={planet.size} />
+        ) : null}
 
         {/* Larger invisible hit volume: no click is needed to reveal the readout. */}
         <Sphere
@@ -414,6 +592,45 @@ export function PlanetarySystem({ isDark = true }) {
   const clearHoveredEntity = useEntityStore(
     (state) => state.clearHoveredEntity,
   );
+  const [
+    sunMap,
+    earthMap,
+    earthClouds,
+    earthNormal,
+    earthSpecular,
+    jupiterMap,
+    saturnMap,
+    saturnRing,
+  ] = useLoader(THREE.TextureLoader, TEXTURE_PATHS);
+
+  useEffect(() => {
+    for (const texture of [
+      sunMap,
+      earthMap,
+      earthClouds,
+      jupiterMap,
+      saturnMap,
+      saturnRing,
+    ]) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+    }
+    for (const texture of [earthNormal, earthSpecular]) {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+    }
+  }, [
+    sunMap,
+    earthMap,
+    earthClouds,
+    earthNormal,
+    earthSpecular,
+    jupiterMap,
+    saturnMap,
+    saturnRing,
+  ]);
 
   useEffect(() => () => clearHoveredEntity(), [clearHoveredEntity]);
 
@@ -421,6 +638,9 @@ export function PlanetarySystem({ isDark = true }) {
     positions && PLANETS.every((planet) => positions[planet.name]);
 
   if (!ready) return null;
+
+  const earthAngle =
+    (((Number(positions.Sun.lon) + 180) % 360) * Math.PI) / 180;
 
   return (
     <group>
@@ -431,6 +651,7 @@ export function PlanetarySystem({ isDark = true }) {
           isDark={isDark}
         />
       ))}
+      <OrbitRing radius={EARTH_RADIUS} isDark={isDark} />
 
       {PLANETS.map((planet) => (
         <Planet
@@ -438,8 +659,27 @@ export function PlanetarySystem({ isDark = true }) {
           planet={planet}
           body={positions[planet.name]}
           isDark={isDark}
+          texture={
+            planet.name === "Sun"
+              ? sunMap
+              : planet.name === "Jupiter"
+                ? jupiterMap
+                : planet.name === "Saturn"
+                  ? saturnMap
+                  : null
+          }
+          ringTexture={planet.name === "Saturn" ? saturnRing : null}
         />
       ))}
+
+      <Earth
+        isDark={isDark}
+        angle={earthAngle}
+        earthMap={earthMap}
+        earthClouds={earthClouds}
+        earthNormal={earthNormal}
+        earthSpecular={earthSpecular}
+      />
     </group>
   );
 }

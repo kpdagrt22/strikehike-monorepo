@@ -216,22 +216,26 @@ function NakshatraRing({ isDark }) {
 function ThemeLights({ isDark }) {
   return (
     <>
-      <ambientLight intensity={isDark ? 0.12 : 0.8} />
+      {/* Space has no fill light. Keep ambient at a trace level so the
+          Sun-centred point light produces a readable terminator. */}
+      <ambientLight intensity={isDark ? 0.12 : 0.18} />
       <hemisphereLight
         color={isDark ? "#6d5cff" : "#ffffff"}
         groundColor={isDark ? "#05050a" : "#d9cfc2"}
-        intensity={isDark ? 0.32 : 1.1}
+        intensity={isDark ? 0.18 : 0.35}
       />
       <directionalLight
         position={[5, 7, 8]}
         color={isDark ? "#cfc6ff" : "#fff8ee"}
-        intensity={isDark ? 1.5 : 2.6}
+        intensity={isDark ? 0.3 : 0.55}
       />
+      {/* The Sun is at the origin. This is the only strong source, so every
+          planet gets a true day/night side instead of a flat wash. */}
       <pointLight
-        position={[-5, 4, 5]}
-        color={isDark ? "#7c6cff" : "#e4d6ff"}
-        intensity={isDark ? 24 : 9}
-        distance={22}
+        position={[0, 0, 0]}
+        color="#fff1d6"
+        intensity={isDark ? 48 : 32}
+        distance={28}
         decay={2}
       />
     </>

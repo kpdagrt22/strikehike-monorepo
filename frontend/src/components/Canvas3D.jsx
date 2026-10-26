@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import gsap from "gsap";
@@ -227,7 +227,9 @@ export function Canvas3D({ isDark = true, mounted = false, onIntroComplete }) {
         {mounted ? (
           <>
             <AmbientCosmos isDark={isDark} />
-            <PlanetarySystem isDark={isDark} />
+            <Suspense fallback={null}>
+              <PlanetarySystem isDark={isDark} />
+            </Suspense>
             <CameraRig onIntroComplete={onIntroComplete} />
           </>
         ) : null}
