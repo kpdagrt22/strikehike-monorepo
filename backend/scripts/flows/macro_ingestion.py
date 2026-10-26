@@ -62,7 +62,7 @@ DEFAULT_OUTPUT_DIR = BACKEND_DIR / "data" / "processed"
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 USER_AGENT = "strikehike-regime-intelligence/phase1 (+https://strikehike.com)"
-PIPELINE_VERSION = "phase1-v1"
+PIPELINE_VERSION = "phase1-v2"
 
 
 # ---------------------------------------------------------------------------
@@ -851,7 +851,7 @@ def build_metadata(
     notes = [
         "NBER recession windows come from USREC and are month-precise, not day-precise.",
         "USREC is retrospective: labels reflect later NBER dating, not real-time announcements.",
-        "Macro strength is a V1 heuristic (Fed Funds 1y/3y MA crossover; 10y-2y level and 3m/1y crossover), not a probability or forecast.",
+        "Macro strength is a V2 coincident heuristic (Fed Funds 21d/126d panic-cut; 10y-2y level and 21d/126d un-inversion; UNRATE Sahm proxy), not a probability or forecast.",
         "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
         "USREC is excluded from the strength inputs to avoid target leakage.",
     ]
@@ -884,15 +884,18 @@ def build_metadata(
         },
         "strength": {
             "version": STRENGTH_VERSION,
-            "feature_version": "regime-v1",
+            "feature_version": "regime-v2",
             "weights": dict(STRENGTH_WEIGHTS),
             "regime_thresholds": {
                 "favorable_min": 60.0,
                 "disruptive_max": 40.0,
             },
             "features": [
+                "fed_roc_21d",
                 "fed_cross",
                 "curve_cross",
+                "curve_uninversion_pressure",
+                "labor_gap",
                 "volatility_1y",
                 "drawdown_1y",
                 "1y_volatility_percentile",

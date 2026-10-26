@@ -10,6 +10,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from regime.analytics import (  # noqa: E402
+    STRENGTH_VERSION,
+    STRENGTH_WEIGHTS,
     annotate_nber,
     build_crashes,
     build_sp500_proxy,
@@ -179,8 +181,124 @@ def test_strength_partial_coverage_when_only_fed_is_available():
         {"FEDFUNDS": np.linspace(0.0, 3.0, len(index))}, index=index
     )
     components = calculate_macro_strength_components(frame)
-    assert components["macro_strength_coverage"].max() == pytest.approx(0.55)
+    assert components["macro_strength_coverage"].max() == pytest.approx(0.30)
     assert components["macro_strength"].notna().any()
+
+
+def test_v2_weights_and_coverage_are_component_aware():
+    assert STRENGTH_VERSION == "v2-zero-lag"
+    assert STRENGTH_WEIGHTS == {
+        "fed_score": 0.30,
+        "curve_score": 0.30,
+        "labor_score": 0.40,
+    }
+
+    index = pd.date_range("2010-01-01", periods=900, freq="D", tz="UTC")
+    fed = pd.Series(2.0, index=index)
+    curve = pd.Series(1.0, index=index)
+    unrate = pd.Series(4.0, index=index)
+
+    fed_only = calculate_macro_strength_components(
+        pd.DataFrame({"FEDFUNDS": fed}, index=index)
+    )
+    fed_curve = calculate_macro_strength_components(
+        pd.DataFrame({"FEDFUNDS": fed, "T10Y2Y": curve}, index=index)
+    )
+    labor_only = calculate_macro_strength_components(
+        pd.DataFrame({"UNRATE": unrate}, index=index)
+    )
+    full = calculate_macro_strength_components(
+        pd.DataFrame(
+            {"FEDFUNDS": fed, "T10Y2Y": curve, "UNRATE": unrate},
+            index=index,
+        )
+    )
+
+    assert fed_only["macro_strength_coverage"].max() == pytest.approx(0.30)
+    assert fed_curve["macro_strength_coverage"].max() == pytest.approx(0.60)
+    assert labor_only["macro_strength_coverage"].max() == pytest.approx(0.40)
+    assert full["macro_strength_coverage"].max() == pytest.approx(1.0)
+
+
+def test_rapid_fed_cut_scores_below_slow_easing():
+    index = pd.date_range("2018-01-01", periods=520, freq="D", tz="UTC")
+    slow = pd.Series(5.0, index=index)
+    rapid = pd.Series(5.0, index=index)
+    slow.iloc[-180:] = np.linspace(5.0, 2.0, 180)
+    rapid.iloc[-30:] = np.linspace(5.0, 2.0, 30)
+
+    slow_components = calculate_macro_strength_components(
+        pd.DataFrame(
+            {
+                "FEDFUNDS": slow,
+                "T10Y2Y": pd.Series(1.0, index=index),
+            },
+            index=index,
+        )
+    )
+    rapid_components = calculate_macro_strength_components(
+        pd.DataFrame(
+            {
+                "FEDFUNDS": rapid,
+                "T10Y2Y": pd.Series(1.0, index=index),
+            },
+            index=index,
+        )
+    )
+
+    slow_fed = slow_components["fed_score"].iloc[-1]
+    rapid_fed = rapid_components["fed_score"].iloc[-1]
+    assert slow_fed > 50.0
+    assert rapid_fed < 20.0
+    assert rapid_fed < slow_fed
+    assert (
+        rapid_components["macro_strength"].iloc[-1]
+        < slow_components["macro_strength"].iloc[-1]
+    )
+
+
+def test_rapid_curve_uninversion_is_penalised():
+    index = pd.date_range("2018-01-01", periods=520, freq="D", tz="UTC")
+    curve = pd.Series(-1.0, index=index)
+    curve.iloc[-29:] = np.linspace(0.0, 2.0, 29)
+
+    components = calculate_macro_strength_components(
+        pd.DataFrame(
+            {
+                "FEDFUNDS": pd.Series(4.0, index=index),
+                "T10Y2Y": curve,
+            },
+            index=index,
+        )
+    )
+
+    assert components["curve_uninversion_pressure"].iloc[-1] > 90.0
+    assert components["curve_cross_score"].iloc[-1] < 25.0
+    assert not bool(components["curve_inverted"].iloc[-1])
+
+
+def test_sahm_alert_caps_composite_at_recession_floor():
+    index = pd.date_range("2018-01-01", periods=760, freq="D", tz="UTC")
+    unrate = pd.Series(4.0, index=index)
+    unrate.iloc[400:] = np.linspace(4.0, 4.9, len(index) - 400)
+
+    components = calculate_macro_strength_components(
+        pd.DataFrame(
+            {
+                "FEDFUNDS": pd.Series(5.0, index=index),
+                "T10Y2Y": pd.Series(1.0, index=index),
+                "UNRATE": unrate,
+            },
+            index=index,
+        )
+    )
+
+    latest = components.iloc[-1]
+    assert bool(latest["sahm_alert"])
+    assert latest["labor_gap"] >= 0.5
+    assert latest["labor_score"] == 0.0
+    assert latest["macro_strength"] <= 10.0
+    assert latest["regime_state"] == "disruptive"
 
 
 def test_strength_components_include_regime_state_and_phase_features():

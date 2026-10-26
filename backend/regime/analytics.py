@@ -9,9 +9,10 @@ Method notes
 ------------
 * NBER labels are monthly and retrospective. ``USREC`` is forward-filled onto
   the daily calendar; a crash window is therefore month-precise, not day-precise.
-* The strength meter is a V1 heuristic, not a probability and not a forecast.
-  It uses a 1y/3y moving-average crossover on the Fed Funds rate and a
-  level + 3m/1y crossover on the 10y-2y curve. Weights are fixed and unvalidated.
+* The strength meter is a V2 coincident heuristic, not a probability and not a
+  forecast. It uses a 21d/126d Fed Funds panic-cut signal, a 10y-2y level plus
+  21d/126d un-inversion signal, and a UNRATE Sahm-rule proxy. Weights are fixed
+  and unvalidated.
 * ``USREC`` is deliberately excluded from every strength input. Using the label
   to build the score would leak the target into the feature.
 """
@@ -23,10 +24,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-STRENGTH_VERSION = "v1-ma-crossover"
+STRENGTH_VERSION = "v2-zero-lag"
 STRENGTH_WEIGHTS: dict[str, float] = {
-    "fed_score": 0.55,
-    "curve_score": 0.45,
+    "fed_score": 0.30,
+    "curve_score": 0.30,
+    "labor_score": 0.40,
 }
 
 # Well-known NBER peaks. The key is the first recession month from USREC.
@@ -206,17 +208,27 @@ def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return the strength score plus its auditable and persisted components.
+    """Return the V2 strength score plus auditable, persisted components.
 
-    Fed component: 1-year vs 3-year moving average of the effective Fed Funds
-    rate. Fast below slow (policy easing) scores high; fast above slow scores low.
+    Fed component (30%): a 21-day vs 126-day moving-average crossover. A slow
+    easing cycle scores high, but a violent 21-day collapse in the fast average
+    is treated as a panic cut and scores near zero. The panic signal looks back
+    over a quarter so a single emergency cut is not forgotten immediately.
 
-    Curve component: 60% level score (a -2% curve scores 0, +2% scores 100) and
-    40% 3-month vs 12-month moving-average crossover. Inversion is exposed as a
-    boolean alongside the score.
+    Curve component (30%): 50% level score (a -2% curve scores 0, +2% scores
+    100) and 50% 21-day vs 126-day momentum. Positive steepening is normally
+    constructive, but rapid un-inversion from a negative base is penalised as a
+    classic late-cycle crash signal.
+
+    Labor component (40%): a Sahm-rule proxy. The 63-day average UNRATE is
+    compared with its own 252-day rolling minimum. A 0.5 percentage-point rise
+    is an immediate recession alert. The alert caps the composite at 10 so a
+    labour-confirmed recession cannot print as Favorable.
 
     The composite is a weighted average of whichever components are available;
     ``macro_strength_coverage`` reports how much of the weight is populated.
+    Older history without UNRATE is renormalised over Fed + curve rather than
+    being forced to a false zero. ``sahm_alert`` is serialized for audit.
 
     Persisted outputs include the categorical ``regime_state`` and the market
     phase features ``volatility_1y``, ``drawdown_1y`` and
@@ -238,21 +250,58 @@ def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
     if curve is None:
         curve = _nan_series(frame.index, "T10Y2Y")
 
-    # Fed Funds crossover.
-    out["fed_fast_ma"] = fed.rolling(252, min_periods=252).mean()
-    out["fed_slow_ma"] = fed.rolling(756, min_periods=756).mean()
-    out["fed_cross"] = out["fed_fast_ma"] - out["fed_slow_ma"]
-    # Fast 1pp above slow => 0 (tightening); 1pp below => 100 (easing).
-    out["fed_score"] = 100.0 - _scale(out["fed_cross"], -1.0, 1.0)
+    labor = _first_present(frame, ("UNRATE",))
+    if labor is None:
+        labor = _nan_series(frame.index, "UNRATE")
 
-    # Yield-curve level and crossover.
-    out["curve_fast_ma"] = curve.rolling(63, min_periods=63).mean()
-    out["curve_slow_ma"] = curve.rolling(252, min_periods=252).mean()
+    # Fed Funds: 1-month vs 6-month trend, with a quarter-long panic-cut memory.
+    out["fed_fast_ma"] = fed.rolling(21, min_periods=21).mean()
+    out["fed_slow_ma"] = fed.rolling(126, min_periods=126).mean()
+    out["fed_cross"] = out["fed_fast_ma"] - out["fed_slow_ma"]
+    out["fed_roc_21d"] = out["fed_fast_ma"].diff(21)
+    out["fed_panic_drop"] = (
+        -out["fed_roc_21d"]
+    ).clip(lower=0.0).rolling(63, min_periods=21).max()
+
+    # Slow easing remains constructive: fast below slow scores high.
+    out["fed_easing_score"] = 100.0 - _scale(out["fed_cross"], -1.0, 1.0)
+    # A violent drop is a panic cut, not a bullish easing cycle.
+    out["fed_panic_score"] = 100.0 - _scale(
+        out["fed_panic_drop"], 0.25, 0.75
+    )
+    out["fed_panic_score"] = out["fed_panic_score"].where(
+        out["fed_cross"].lt(0.0), 100.0
+    )
+    out["fed_score"] = np.minimum(
+        out["fed_easing_score"], out["fed_panic_score"]
+    )
+
+    # Yield curve: 15% level + 15% 21d/126d un-inversion momentum.
+    out["curve_fast_ma"] = curve.rolling(21, min_periods=21).mean()
+    out["curve_slow_ma"] = curve.rolling(126, min_periods=126).mean()
     out["curve_cross"] = out["curve_fast_ma"] - out["curve_slow_ma"]
     out["curve_level_score"] = _scale(curve, -2.0, 2.0)
-    out["curve_cross_score"] = _scale(out["curve_cross"], -0.5, 0.5)
+    out["curve_normal_momentum"] = _scale(
+        out["curve_cross"], -0.5, 0.5
+    )
+    # If the curve was inverted in the past year, a rapid positive move is a
+    # late-cycle un-inversion warning rather than a healthy steepener.
+    curve_was_inverted = (
+        curve.rolling(252, min_periods=126).min().lt(0.0)
+    )
+    out["curve_uninversion_pressure"] = _scale(
+        out["curve_cross"].clip(lower=0.0), 0.05, 0.5
+    ).fillna(0.0)
+    out["curve_uninversion_pressure"] = out[
+        "curve_uninversion_pressure"
+    ].where(curve_was_inverted, 0.0)
+    out["curve_cross_score"] = np.minimum(
+        out["curve_normal_momentum"],
+        100.0 - out["curve_uninversion_pressure"],
+    )
     out["curve_score"] = (
-        0.60 * out["curve_level_score"] + 0.40 * out["curve_cross_score"]
+        0.50 * out["curve_level_score"]
+        + 0.50 * out["curve_cross_score"]
     )
 
     inverted = pd.Series(pd.NA, index=frame.index, dtype="boolean")
@@ -260,13 +309,33 @@ def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
     inverted.loc[valid_curve] = curve.loc[valid_curve].lt(0.0)
     out["curve_inverted"] = inverted
 
+    # Labour: 3-month average vs its prior 12-month minimum (Sahm proxy).
+    out["labor_fast_ma"] = labor.rolling(63, min_periods=63).mean()
+    out["labor_min_12m"] = out["labor_fast_ma"].rolling(
+        252, min_periods=252
+    ).min()
+    out["labor_gap"] = out["labor_fast_ma"] - out["labor_min_12m"]
+    out["labor_score"] = 100.0 - _scale(
+        out["labor_gap"], 0.0, 0.5
+    )
+    out["sahm_alert"] = out["labor_gap"].ge(0.5) & out[
+        "labor_gap"
+    ].notna()
+
     score_columns = list(STRENGTH_WEIGHTS)
     weights = pd.Series(STRENGTH_WEIGHTS, dtype="float64")
     available = out[score_columns].notna()
     weighted = out[score_columns].fillna(0.0).mul(weights, axis=1).sum(axis=1)
     coverage = available.mul(weights, axis=1).sum(axis=1)
 
-    out["macro_strength"] = weighted.div(coverage.replace(0.0, np.nan))
+    raw_strength = weighted.div(coverage.replace(0.0, np.nan))
+    # A Sahm alert is an immediate recession flag. Cap the composite so the
+    # 40% labour signal can actually force a Disruptive reading even while the
+    # Fed/curve components are bouncing.
+    out["macro_strength"] = raw_strength.where(
+        ~out["sahm_alert"],
+        np.fmin(raw_strength, 10.0),
+    )
     out["macro_strength_coverage"] = coverage.clip(0.0, 1.0)
 
     label = pd.Series(pd.NA, index=frame.index, dtype="string")
@@ -289,7 +358,7 @@ def calculate_macro_strength_components(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def calculate_macro_strength(frame: pd.DataFrame) -> pd.Series:
-    """Return the 0-100 composite Trend Meter for ``frame``."""
+    """Return the V2 0-100 composite coincident macro-strength meter."""
     return calculate_macro_strength_components(frame)["macro_strength"].rename(
         "macro_strength"
     )

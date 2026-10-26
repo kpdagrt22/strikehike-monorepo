@@ -602,7 +602,7 @@ export function RegimeTimeline({
               ? "Equity proxy rebased to 100 at first observation; log scale."
               : "No equity proxy in this window."}{" "}
             {fullStrengthFrom
-              ? `Strength is Fed-only before ${formatDate(fullStrengthFrom)}.`
+              ? `Full composite coverage from ${formatDate(fullStrengthFrom)}.`
               : "Strength coverage is partial."}
           </span>
         </div>

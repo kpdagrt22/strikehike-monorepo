@@ -375,7 +375,7 @@ export default function RegimePage() {
             <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
               <span>
                 FRED macro archive ·{" "}
-                {data.meta?.strength_version ?? "v1-ma-crossover"}
+                {data.meta?.strength_version ?? "v2-zero-lag"}
               </span>
               <Link
                 href={
