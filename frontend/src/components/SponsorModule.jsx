@@ -60,7 +60,7 @@ export function SponsorModule() {
             <div className="mt-3 flex justify-center rounded-xl border border-black/10 bg-white p-2 dark:border-white/10">
               <img
                 src="/support-qr-cropped.webp"
-                alt="Kotak UPI QR code to support StrikeHike"
+                alt="PhonePe UPI QR code to support StrikeHike"
                 className="w-[min(13.5rem,100%)] rounded-lg object-contain"
               />
             </div>
@@ -74,7 +74,7 @@ export function SponsorModule() {
                 KANTUMUTCHU PRAKASH
               </p>
               <p className="mt-1 break-all font-mono text-[12px] tracking-[0.02em] text-black/45 dark:text-white/45">
-                9330980131@kotakbank
+                UPI ID: thisiskp22@axl
               </p>
             </div>
           </motion.section>
