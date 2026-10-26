@@ -81,6 +81,7 @@ const structuredData = {
         "120-year ML market-regime and volatility index",
         "Dual-epoch historical and recent event parallels",
         "Interactive 3D orrery and historical timeline",
+        "120-year macro regime atlas with NBER recession windows",
       ],
     },
   ],
