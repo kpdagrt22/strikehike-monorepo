@@ -27,7 +27,7 @@ const structuredData = {
       url: SITE_URL,
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/icon.png`,
+        url: `${SITE_URL}/icon.png?v=2`,
         width: 512,
         height: 512,
       },
@@ -97,6 +97,28 @@ export const metadata: Metadata = {
   authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
+  icons: {
+    icon: [
+      {
+        url: "/favicon.ico?v=2",
+        type: "image/x-icon",
+        sizes: "any",
+      },
+      {
+        url: "/icon.png?v=2",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+    apple: [
+      {
+        url: "/apple-icon.png?v=2",
+        type: "image/png",
+        sizes: "180x180",
+      },
+    ],
+    shortcut: "/favicon.ico?v=2",
+  },
   category: "Finance",
   classification: "Finance, Astrology, History",
   keywords: [
