@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      PYTHONPATH: src
+      PYTHONPATH: "src:."
     defaults:
       run:
         working-directory: backend
@@ -41,6 +41,8 @@ jobs:
           python -m pytest \
             tests/test_energy_metric_compiler.py \
             tests/test_historical_parallels.py \
+            tests/test_macro_ingestion.py \
+            tests/test_regime_service.py \
             -q
 
   test-frontend:

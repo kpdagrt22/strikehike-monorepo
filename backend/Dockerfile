@@ -20,10 +20,13 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY api_server.py ./
 COPY src ./src
+COPY regime ./regime
 COPY scripts ./scripts
 COPY websocket_server.py ./
 COPY data/historical_events.json ./data/historical_events.json
 COPY data/processed/final_data_with_regimes.csv ./data/processed/final_data_with_regimes.csv
+COPY data/processed/macro_regime_history.parquet ./data/processed/macro_regime_history.parquet
+COPY data/processed/macro_regime_history.meta.json ./data/processed/macro_regime_history.meta.json
 
 RUN mkdir -p /app/data/runtime
 

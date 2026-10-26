@@ -17,6 +17,10 @@ SRC_DIR = Path(__file__).resolve().parent / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from astro_finance.energy_metric_compiler import (  # noqa: E402
     BODY_NAMES,
     EnergyMetricCompiler,
@@ -29,8 +33,10 @@ from astro_finance.historical_parallels import (  # noqa: E402
     forecast_ladder,
     list_events_by_category,
 )
+from regime.router import router as regime_router  # noqa: E402
 
 app = FastAPI(title="Astro-Finance API")
+app.include_router(regime_router, prefix="/api/v1")
 
 CORS_ORIGINS = [
     origin.strip()

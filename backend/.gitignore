@@ -57,3 +57,6 @@ cols.txt
 
 # Generated historical parallels database (seed JSON is tracked)
 data/historical_events.db
+
+# FRED per-series ingestion cache (generated; the parquet artifact is tracked)
+data/raw/fred/
