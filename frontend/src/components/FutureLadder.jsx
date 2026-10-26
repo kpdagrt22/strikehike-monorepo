@@ -10,6 +10,9 @@ export function FutureLadder() {
   const [error, setError] = useState(false);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
+  const activeEventCategory = useChronoStore(
+    (state) => state.activeEventCategory,
+  );
   const setFocusedDate = useChronoStore((state) => state.setFocusedDate);
 
   useEffect(() => {
@@ -40,7 +43,9 @@ export function FutureLadder() {
         mobileSheet === "future"
           ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block max-h-[70dvh] overflow-y-auto"
           : "hidden"
-      } pointer-events-auto lg:fixed lg:left-5 lg:top-[23.5rem] lg:z-30 lg:block lg:w-[min(18rem,calc(100vw-1.5rem))] lg:max-h-none lg:overflow-visible`}
+      } pointer-events-auto lg:fixed lg:left-5 lg:top-[23.5rem] lg:z-30 ${
+        activeEventCategory ? "lg:hidden" : "lg:block"
+      } lg:w-[min(18rem,calc(100vw-1.5rem))] lg:max-h-none lg:overflow-visible`}
     >
       <div
         id="chrono-ladder-sheet"

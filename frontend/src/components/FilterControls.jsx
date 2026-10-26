@@ -14,6 +14,9 @@ export function FilterControls() {
   const [activeCategory, setActiveCategory] = useState(null);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
+  const setActiveEventCategory = useChronoStore(
+    (state) => state.setActiveEventCategory,
+  );
   const focusedDate = useChronoStore((state) => state.focusedDate);
   const setFocusedDate = useChronoStore((state) => state.setFocusedDate);
 
@@ -36,6 +39,15 @@ export function FilterControls() {
     loadRoster();
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    setActiveEventCategory(activeCategory);
+  }, [activeCategory, setActiveEventCategory]);
+
+  useEffect(
+    () => () => setActiveEventCategory(null),
+    [setActiveEventCategory],
+  );
 
   const categories = roster?.categories ?? {};
   const activeEvents =
@@ -80,14 +92,20 @@ export function FilterControls() {
             <div className="flex items-center gap-1 lg:hidden">
               <button
                 type="button"
-                onClick={() => setMobileSheet("future")}
+                onClick={() => {
+                  setActiveCategory(null);
+                  setMobileSheet("future");
+                }}
                 className="h-11 rounded-full border border-black/10 px-3 text-micro font-medium uppercase tracking-[0.1em] text-black/55 dark:border-white/10 dark:text-white/55"
               >
                 Ladder
               </button>
               <button
                 type="button"
-                onClick={() => setMobileSheet(null)}
+                onClick={() => {
+                  setActiveCategory(null);
+                  setMobileSheet(null);
+                }}
                 aria-label="Close event archive"
                 className="grid h-11 w-11 place-items-center rounded-full border border-black/10 text-black/50 dark:border-white/10 dark:text-white/50"
               >

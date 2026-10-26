@@ -157,6 +157,7 @@ def test_forecast_ladder_returns_qualified_upcoming_matches(seeded_db):
 
     names = [match["event"]["name"] for match in result["matches"]]
     assert len(names) == len(set(names))
+    assert len({match["event"]["category"] for match in result["matches"]}) >= 2
 
 
 def test_peak_forecast_matches_collapses_event_clusters():
@@ -165,37 +166,55 @@ def test_peak_forecast_matches_collapses_event_clusters():
             "date": "2026-11-01",
             "days_ahead": 6,
             "similarity_percent": 91.0,
-            "event": {"name": "MLK Jr. assassination"},
+            "event": {
+                "name": "MLK Jr. assassination",
+                "category": "Politics",
+            },
         },
         {
             "date": "2026-11-02",
             "days_ahead": 7,
             "similarity_percent": 93.4,
-            "event": {"name": "MLK Jr. assassination"},
+            "event": {
+                "name": "MLK Jr. assassination",
+                "category": "Politics",
+            },
         },
         {
             "date": "2026-11-03",
             "days_ahead": 8,
             "similarity_percent": 90.0,
-            "event": {"name": "MLK Jr. assassination"},
+            "event": {
+                "name": "MLK Jr. assassination",
+                "category": "Politics",
+            },
         },
         {
             "date": "2026-12-01",
             "days_ahead": 36,
             "similarity_percent": 89.0,
-            "event": {"name": "First Moon landing"},
+            "event": {
+                "name": "First Moon landing",
+                "category": "Science",
+            },
         },
         {
             "date": "2026-12-02",
             "days_ahead": 37,
             "similarity_percent": 88.0,
-            "event": {"name": "First Moon landing"},
+            "event": {
+                "name": "First Moon landing",
+                "category": "Science",
+            },
         },
         {
             "date": "2026-12-20",
             "days_ahead": 55,
             "similarity_percent": 86.0,
-            "event": {"name": "Fall of the Berlin Wall"},
+            "event": {
+                "name": "Fall of the Berlin Wall",
+                "category": "Politics",
+            },
         },
     ]
 
@@ -212,6 +231,44 @@ def test_peak_forecast_matches_collapses_event_clusters():
         "2026-12-20",
     ]
     assert result[0]["days_ahead"] == 7
+
+
+def test_peak_forecast_matches_diversifies_categories():
+    matches = [
+        {
+            "date": "2026-11-01",
+            "days_ahead": 6,
+            "similarity_percent": 96.0,
+            "event": {"name": "Politics peak", "category": "Politics"},
+        },
+        {
+            "date": "2026-11-02",
+            "days_ahead": 7,
+            "similarity_percent": 95.0,
+            "event": {"name": "Politics runner-up", "category": "Politics"},
+        },
+        {
+            "date": "2026-11-03",
+            "days_ahead": 8,
+            "similarity_percent": 90.0,
+            "event": {"name": "Finance peak", "category": "Finance"},
+        },
+        {
+            "date": "2026-11-04",
+            "days_ahead": 9,
+            "similarity_percent": 88.0,
+            "event": {"name": "Science peak", "category": "Science"},
+        },
+    ]
+
+    result = hp._peak_forecast_matches(matches, 3)
+
+    assert [match["event"]["name"] for match in result] == [
+        "Politics peak",
+        "Finance peak",
+        "Science peak",
+    ]
+    assert len({match["event"]["category"] for match in result}) == 3
 
 
 def test_provided_geometry_matches_date_geometry(seeded_db):

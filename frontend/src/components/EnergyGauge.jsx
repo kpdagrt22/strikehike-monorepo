@@ -23,29 +23,31 @@ function EpochRow({ epoch, parallel }) {
 
   return (
     <div
-      className={`flex min-w-0 max-w-full items-center justify-center gap-2 rounded-full px-3 py-1 ${
+      className={`flex min-w-0 max-w-full flex-col items-center rounded-2xl px-3.5 py-1.5 ${
         recent
           ? "recent-glow border border-[#f05d49]/25 bg-white/30 dark:bg-white/[0.05]"
           : ""
       }`}
     >
-      <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{
-          backgroundColor: tone.color,
-          boxShadow: `0 0 8px ${tone.glow}`,
-        }}
-      />
-      <span
-        className={`shrink-0 text-micro font-medium uppercase tracking-[0.1em] ${
-          recent
-            ? "text-[#c0442f] dark:text-[#ff8b77]"
-            : "text-black/50 dark:text-white/45"
-        }`}
-      >
-        {recent ? "Recent Manifestations" : "Historical Parallels"}
+      <span className="flex items-center gap-1.5">
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{
+            backgroundColor: tone.color,
+            boxShadow: `0 0 8px ${tone.glow}`,
+          }}
+        />
+        <span
+          className={`text-micro font-medium uppercase tracking-[0.1em] ${
+            recent
+              ? "text-[#c0442f] dark:text-[#ff8b77]"
+              : "text-black/50 dark:text-white/45"
+          }`}
+        >
+          {recent ? "Recent Manifestations" : "Historical Parallels"}
+        </span>
       </span>
-      <span className="min-w-0 truncate text-meta font-medium tracking-[-0.01em] text-black/70 dark:text-white/70">
+      <span className="mt-0.5 max-w-full whitespace-normal text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
         {formatYear(parallel.date)} {parallel.name}
       </span>
     </div>

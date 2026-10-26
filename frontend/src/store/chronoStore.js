@@ -25,6 +25,7 @@ export const useChronoStore = create((set) => ({
   cameraRevision: 0,
   mobileSheet: null,
   timeControlsExpanded: false,
+  activeEventCategory: null,
 
   setFocusedDate: (focusedDate) =>
     set({ focusedDate, focusedTime: "00:00" }),
@@ -42,6 +43,8 @@ export const useChronoStore = create((set) => ({
   setMobileSheet: (mobileSheet) => set({ mobileSheet }),
   setTimeControlsExpanded: (timeControlsExpanded) =>
     set({ timeControlsExpanded }),
+  setActiveEventCategory: (activeEventCategory) =>
+    set({ activeEventCategory }),
 
   setPositions: (payload) =>
     set((state) => {

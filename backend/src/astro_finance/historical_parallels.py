@@ -820,7 +820,39 @@ def _peak_forecast_matches(matches: list[dict], limit: int) -> list[dict]:
         peaks.values(),
         key=lambda item: (-item["similarity_percent"], item["days_ahead"]),
     )
-    return ranked[: max(1, int(limit))]
+
+    limit = max(1, int(limit))
+    selected = []
+    selected_categories = set()
+    selected_names = set()
+
+    # First pass: one rung per category, so the ladder shows the breadth of the
+    # engine rather than three near-identical political echoes.
+    for match in ranked:
+        category = str(match["event"].get("category", "Uncategorised"))
+        if category in selected_categories:
+            continue
+        selected.append(match)
+        selected_categories.add(category)
+        selected_names.add(str(match["event"]["name"]).strip().casefold())
+        if len(selected) >= limit:
+            break
+
+    # If there are fewer categories than slots, fill the rest by raw rank.
+    if len(selected) < limit:
+        for match in ranked:
+            key = str(match["event"]["name"]).strip().casefold()
+            if key in selected_names:
+                continue
+            selected.append(match)
+            selected_names.add(key)
+            if len(selected) >= limit:
+                break
+
+    selected.sort(
+        key=lambda item: (-item["similarity_percent"], item["days_ahead"])
+    )
+    return selected[:limit]
 
 
 def forecast_ladder(

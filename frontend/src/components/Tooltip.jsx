@@ -48,7 +48,7 @@ function ParallelSection({ epoch, parallels }) {
                 }}
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-meta font-medium text-black/75 dark:text-white/75">
+                <p className="whitespace-normal text-meta font-medium leading-snug text-black/75 dark:text-white/75">
                   {parallel.name}
                 </p>
                 <p
