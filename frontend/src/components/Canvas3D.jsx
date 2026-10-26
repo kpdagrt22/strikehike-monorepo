@@ -206,7 +206,12 @@ function CameraRig({ onIntroComplete }) {
   );
 }
 
-export function Canvas3D({ isDark = true, mounted = false, onIntroComplete }) {
+export function Canvas3D({
+  isDark = true,
+  mounted = false,
+  onIntroComplete,
+  regimeTone = null,
+}) {
   return (
     <div className="absolute inset-0" aria-hidden="true">
       <Canvas
@@ -228,7 +233,7 @@ export function Canvas3D({ isDark = true, mounted = false, onIntroComplete }) {
           <>
             <AmbientCosmos isDark={isDark} />
             <Suspense fallback={null}>
-              <PlanetarySystem isDark={isDark} />
+              <PlanetarySystem isDark={isDark} regimeTone={regimeTone} />
             </Suspense>
             <CameraRig onIntroComplete={onIntroComplete} />
           </>

@@ -6,6 +6,7 @@ import { AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
 import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
+import { SkyStrip } from "@/components/regime/SkyStrip";
 import {
   formatDate,
   formatNumber,
@@ -242,6 +243,12 @@ export default function RegimePage() {
     [data, selectedId],
   );
   const orreryDate = selectedCrash?.start ?? latest?.date ?? null;
+  const skyDate = selectedCrash?.within_coverage
+    ? selectedCrash.start
+    : latest?.date ?? data?.coverage?.end ?? null;
+  const skyContext = selectedCrash?.within_coverage
+    ? `${selectedCrash.name} peak`
+    : "Latest observation";
 
   const handleSelect = useCallback((crash) => {
     setSelectedId(crash.id);
@@ -319,6 +326,14 @@ export default function RegimePage() {
                 detail="Click a band to inspect"
               />
             </div>
+
+            {skyDate ? (
+              <SkyStrip
+                key={skyDate}
+                asOf={skyDate}
+                contextLabel={skyContext}
+              />
+            ) : null}
 
             <RegimeTimeline
               timeline={data.timeline}

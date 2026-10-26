@@ -6,6 +6,7 @@ import { useFrame, useLoader } from "@react-three/fiber";
 import { Sphere } from "@react-three/drei";
 import gsap from "gsap";
 import * as THREE from "three";
+import { getRegimeToneColor } from "@/lib/regimeTone";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
 
@@ -278,14 +279,30 @@ function createPlanetTextures(planet) {
   return { map, bumpMap };
 }
 
-function OrbitRing({ radius, isDark }) {
+function OrbitRing({ radius, isDark, regimeColor = null }) {
+  const materialRef = useRef(null);
+  const baseColor = isDark ? "#8b7cff" : "#6f627d";
+  const baseOpacity = isDark ? 0.075 : 0.1;
+
+  // The regime overlay is a colour/opacity uniform update on the existing ring
+  // material. It does not add geometry or draw calls, and it is only applied
+  // when the opt-in overlay is active.
+  useLayoutEffect(() => {
+    const material = materialRef.current;
+    if (!material) return;
+    material.color.set(regimeColor ?? baseColor);
+    material.opacity = regimeColor ? (isDark ? 0.28 : 0.3) : baseOpacity;
+    material.needsUpdate = true;
+  }, [regimeColor, baseColor, baseOpacity, isDark]);
+
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[radius - 0.0035, radius + 0.0035, 180]} />
       <meshBasicMaterial
-        color={isDark ? "#8b7cff" : "#6f627d"}
+        ref={materialRef}
+        color={baseColor}
         transparent
-        opacity={isDark ? 0.075 : 0.1}
+        opacity={baseOpacity}
         side={THREE.DoubleSide}
         depthWrite={false}
       />
@@ -629,8 +646,11 @@ function Planet({ planet, body, isDark, texture, ringTexture }) {
   );
 }
 
-export function PlanetarySystem({ isDark = true }) {
+export function PlanetarySystem({ isDark = true, regimeTone = null }) {
   const positions = useChronoStore((state) => state.positions);
+  const regimeColor = regimeTone
+    ? getRegimeToneColor(regimeTone, isDark)
+    : null;
   const clearHoveredEntity = useEntityStore(
     (state) => state.clearHoveredEntity,
   );
@@ -694,9 +714,14 @@ export function PlanetarySystem({ isDark = true }) {
           key={`orbit-${planet.name}`}
           radius={planet.radius}
           isDark={isDark}
+          regimeColor={regimeColor}
         />
       ))}
-      <OrbitRing radius={EARTH_RADIUS} isDark={isDark} />
+      <OrbitRing
+        radius={EARTH_RADIUS}
+        isDark={isDark}
+        regimeColor={regimeColor}
+      />
 
       {PLANETS.map((planet) => (
         <Planet

@@ -28,6 +28,9 @@ export const useChronoStore = create((set) => ({
   activeEventCategory: null,
   ladderMatches: [],
   ladderStatus: "idle",
+  regimeOverlay: false,
+  regimeTone: null,
+  regimeOverlayStatus: "idle",
 
   setFocusedDate: (focusedDate) =>
     set({
@@ -57,6 +60,10 @@ export const useChronoStore = create((set) => ({
     set({ activeEventCategory }),
   setLadder: ({ matches, status }) =>
     set({ ladderMatches: matches, ladderStatus: status }),
+  setRegimeOverlay: (regimeOverlay) => set({ regimeOverlay }),
+  setRegimeTone: (regimeTone) => set({ regimeTone }),
+  setRegimeOverlayStatus: (regimeOverlayStatus) =>
+    set({ regimeOverlayStatus }),
 
   setPositions: (payload) =>
     set((state) => {

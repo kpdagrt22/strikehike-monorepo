@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { getRegimeToneLabel } from "@/lib/regimeTone";
 import { useChronoStore } from "@/store/chronoStore";
 
 const VIEWS = [
@@ -31,6 +32,39 @@ const VIEWS = [
 export function ViewControls() {
   const cameraView = useChronoStore((state) => state.cameraView);
   const setCameraView = useChronoStore((state) => state.setCameraView);
+  const regimeOverlay = useChronoStore((state) => state.regimeOverlay);
+  const regimeTone = useChronoStore((state) => state.regimeTone);
+  const regimeOverlayStatus = useChronoStore(
+    (state) => state.regimeOverlayStatus,
+  );
+  const setRegimeOverlay = useChronoStore(
+    (state) => state.setRegimeOverlay,
+  );
+
+  const dotClass = !regimeOverlay
+    ? "bg-black/20 dark:bg-white/20"
+    : regimeOverlayStatus === "loading"
+      ? "bg-[#d8b47a] animate-pulse"
+      : regimeTone === "favorable"
+        ? "bg-[#0f766e] dark:bg-[#5eead4]"
+        : regimeTone === "neutral"
+          ? "bg-[#6b7280] dark:bg-[#9ca3af]"
+          : regimeTone === "disruptive"
+            ? "bg-[#c2410c] dark:bg-[#fb923c]"
+            : "bg-black/20 dark:bg-white/20";
+
+  const toneLabel = getRegimeToneLabel(regimeTone);
+  const overlayTitle = !regimeOverlay
+    ? "Regime overlay: tint orbit trails by the current macro regime"
+    : regimeOverlayStatus === "loading"
+      ? "Regime overlay: reading the macro archive"
+      : regimeOverlayStatus === "unavailable"
+        ? "Regime overlay: no full macro regime data for this date"
+        : regimeOverlayStatus === "error"
+          ? "Regime overlay: macro regime service unavailable"
+          : toneLabel
+            ? `Regime overlay: ${toneLabel}`
+            : "Regime overlay";
 
   return (
     <div className="pointer-events-auto fixed bottom-24 right-5 z-30 hidden lg:block">
@@ -68,6 +102,30 @@ export function ViewControls() {
             </motion.button>
           );
         })}
+
+        <span
+          className="mx-0.5 h-6 w-px bg-black/10 dark:bg-white/10"
+          aria-hidden="true"
+        />
+
+        <button
+          type="button"
+          onClick={() => setRegimeOverlay(!regimeOverlay)}
+          aria-pressed={regimeOverlay}
+          aria-label="Toggle regime overlay"
+          title={overlayTitle}
+          className={`flex h-11 items-center gap-2 rounded-full border border-transparent px-2.5 text-[10px] font-medium uppercase tracking-[0.12em] transition-colors duration-200 ${
+            regimeOverlay
+              ? "bg-black/[0.05] text-black/70 dark:bg-white/[0.08] dark:text-white/70"
+              : "text-black/45 hover:bg-black/[0.05] dark:text-white/45 dark:hover:bg-white/[0.07]"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`}
+            aria-hidden="true"
+          />
+          Regime
+        </button>
       </div>
     </div>
   );

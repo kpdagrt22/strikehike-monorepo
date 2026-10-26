@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
+import { useRegimeOverlay } from "@/hooks/useRegimeOverlay";
 import { useChronoStore } from "@/store/chronoStore";
 import { Canvas3D } from "@/components/Canvas3D";
 import { EnergyGauge } from "@/components/EnergyGauge";
@@ -54,6 +55,8 @@ export default function Home() {
     getServerSnapshot,
   );
   const isDark = resolvedTheme !== "light";
+  const regimeTone = useChronoStore((state) => state.regimeTone);
+  useRegimeOverlay();
 
   return (
     <main className="relative h-full w-full overflow-hidden border-0 p-0">
@@ -63,6 +66,7 @@ export default function Home() {
         isDark={isDark}
         mounted={mounted}
         onIntroComplete={handleIntroComplete}
+        regimeTone={regimeTone}
       />
 
       <EnergyGauge isDark={isDark} />
