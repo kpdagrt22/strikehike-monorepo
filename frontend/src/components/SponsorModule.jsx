@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useChronoStore } from "@/store/chronoStore";
 
 export function SponsorModule() {
   const [open, setOpen] = useState(false);
+  const [showRupee, setShowRupee] = useState(true);
   const timeControlsExpanded = useChronoStore(
     (state) => state.timeControlsExpanded,
   );
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setShowRupee((value) => !value);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div
@@ -81,33 +89,50 @@ export function SponsorModule() {
         ) : null}
       </AnimatePresence>
 
-      <motion.div
+      <motion.button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Open sponsorship and support"
+        aria-expanded={open}
+        aria-controls="strikehike-sponsor-panel"
         animate={{ y: [0, -8, 0] }}
         transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+        className="grid h-11 w-11 place-items-center rounded-full border border-[#f05d49]/25 bg-white/45 text-[#c0442f] shadow-[0_0_24px_rgba(240,93,73,0.22)] backdrop-blur-xl transition-colors hover:border-[#f05d49]/50 hover:bg-white/60 dark:border-[#ff8b77]/25 dark:bg-black/30 dark:text-[#ff8b77] dark:hover:border-[#ff8b77]/50 dark:hover:bg-black/40"
       >
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-label="Open sponsorship and support"
-          aria-expanded={open}
-          aria-controls="strikehike-sponsor-panel"
-          className="grid h-11 w-11 place-items-center rounded-full border border-[#f05d49]/25 bg-white/45 text-[#c0442f] shadow-[0_0_24px_rgba(240,93,73,0.22)] backdrop-blur-xl transition-colors hover:border-[#f05d49]/50 hover:bg-white/60 dark:border-[#ff8b77]/25 dark:bg-black/30 dark:text-[#ff8b77] dark:hover:border-[#ff8b77]/50 dark:hover:bg-black/40"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m12 3 2.1 6.1L20 11l-5.9 1.9L12 19l-2.1-6.1L4 11l5.9-1.9z" />
-            <path d="M18 17.5v3M16.5 19h3" />
-          </svg>
-        </button>
-      </motion.div>
+        <AnimatePresence mode="wait" initial={false}>
+          {showRupee ? (
+            <motion.span
+              key="rupee"
+              initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.5, rotate: 45 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="text-[17px] font-medium leading-none"
+              aria-hidden="true"
+            >
+              ₹
+            </motion.span>
+          ) : (
+            <motion.svg
+              key="heart"
+              viewBox="0 0 24 24"
+              initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.5, rotate: 45 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.35"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z" />
+            </motion.svg>
+          )}
+        </AnimatePresence>
+      </motion.button>
     </div>
   );
 }
