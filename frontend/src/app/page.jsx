@@ -10,6 +10,7 @@ import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { RightPanel } from "@/components/RightPanel";
+import { SiteHeader } from "@/components/SiteHeader";
 import { TimeControls } from "@/components/TimeControls";
 import { Tooltip } from "@/components/Tooltip";
 import { ViewControls } from "@/components/ViewControls";
@@ -43,6 +44,8 @@ export default function Home() {
         mounted={mounted}
         onIntroComplete={handleIntroComplete}
       />
+
+      <SiteHeader />
 
       <EnergyGauge isDark={isDark} />
       <Tooltip />
