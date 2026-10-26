@@ -42,6 +42,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION:-}
     environment:
       CHRONO_API_URL: http://backend:8010
       NEXT_TELEMETRY_DISABLED: "1"

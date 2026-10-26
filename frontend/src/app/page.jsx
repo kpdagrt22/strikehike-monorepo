@@ -6,6 +6,7 @@ import { Canvas3D } from "@/components/Canvas3D";
 import { EnergyGauge } from "@/components/EnergyGauge";
 import { FilterControls } from "@/components/FilterControls";
 import { FutureLadder } from "@/components/FutureLadder";
+import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { RightPanel } from "@/components/RightPanel";
@@ -51,6 +52,7 @@ export default function Home() {
       <RightPanel />
       <ViewControls />
       <MobileDock />
+      <InfoModule />
       <OnboardingOverlay introComplete={introComplete} />
     </main>
   );
