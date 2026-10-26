@@ -4,6 +4,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Canvas3D } from "@/components/Canvas3D";
 import { EnergyGauge } from "@/components/EnergyGauge";
+import { FeedbackModule } from "@/components/FeedbackModule";
 import { FilterControls } from "@/components/FilterControls";
 import { FutureLadder } from "@/components/FutureLadder";
 import { InfoModule } from "@/components/InfoModule";
@@ -11,6 +12,7 @@ import { MobileDock } from "@/components/MobileDock";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { RightPanel } from "@/components/RightPanel";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SponsorModule } from "@/components/SponsorModule";
 import { TimeControls } from "@/components/TimeControls";
 import { Tooltip } from "@/components/Tooltip";
 import { ViewControls } from "@/components/ViewControls";
@@ -56,6 +58,8 @@ export default function Home() {
       <ViewControls />
       <MobileDock />
       <InfoModule />
+      <FeedbackModule />
+      <SponsorModule />
       <OnboardingOverlay introComplete={introComplete} />
     </main>
   );
