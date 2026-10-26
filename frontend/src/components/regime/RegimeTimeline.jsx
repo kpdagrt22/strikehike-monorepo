@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AreaSeries,
   ColorType,
   CrosshairMode,
   HistogramSeries,
@@ -10,6 +11,7 @@ import {
   PriceScaleMode,
   createChart,
 } from "lightweight-charts";
+import { ChartCrosshairLegend } from "@/components/regime/ChartCrosshairLegend";
 import { CrashTape } from "@/components/regime/CrashTape";
 import { MacroHUD } from "@/components/regime/MacroHUD";
 import {
@@ -159,6 +161,8 @@ export function RegimeTimeline({
   const selectedIdRef = useRef(selectedId);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [equityScaleWidth, setEquityScaleWidth] = useState(0);
+  const [crosshairX, setCrosshairX] = useState(null);
+  const [timeScaleHeight, setTimeScaleHeight] = useState(26);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -263,33 +267,19 @@ export function RegimeTimeline({
         fontSize: 10,
         panes: {
           enableResize: false,
-          separatorColor: isDark
-            ? "rgba(255, 255, 255, 0.045)"
-            : "rgba(20, 18, 26, 0.05)",
+          separatorColor: "transparent",
           separatorHoverColor: "transparent",
         },
       },
       grid: {
-        vertLines: {
-          color: isDark
-            ? "rgba(255, 255, 255, 0.028)"
-            : "rgba(20, 18, 26, 0.035)",
-        },
-        horzLines: {
-          color: isDark
-            ? "rgba(255, 255, 255, 0.04)"
-            : "rgba(20, 18, 26, 0.045)",
-        },
+        vertLines: { visible: false },
+        horzLines: { visible: false },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: isDark
-            ? "rgba(255, 139, 119, 0.62)"
-            : "rgba(192, 68, 47, 0.52)",
-          width: 1,
-          style: LineStyle.Dashed,
-          labelBackgroundColor: isDark ? "#f05d49" : "#c0442f",
+          visible: false,
+          labelVisible: false,
         },
         horzLine: {
           color: isDark
@@ -390,22 +380,16 @@ export function RegimeTimeline({
       1,
     );
 
-    const strengthGlow = chart.addSeries(
-      LineSeries,
-      {
-        color: tone.strengthSoft,
-        lineWidth: 4,
-        priceScaleId: "strength",
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      },
-      2,
-    );
     const strengthSeries = chart.addSeries(
-      LineSeries,
+      AreaSeries,
       {
-        color: tone.strength,
+        lineColor: tone.strength,
+        topColor: isDark
+          ? "rgba(94, 234, 212, 0.18)"
+          : "rgba(15, 118, 110, 0.12)",
+        bottomColor: isDark
+          ? "rgba(94, 234, 212, 0.005)"
+          : "rgba(15, 118, 110, 0.005)",
         lineWidth: 2,
         priceScaleId: "strength",
         priceFormat: { type: "price", precision: 1, minMove: 0.1 },
@@ -459,7 +443,6 @@ export function RegimeTimeline({
     equitySeries.setData(primaryData);
     fedSeries.setData(fedData);
     curveSeries.setData(curveData);
-    strengthGlow.setData(strengthData);
     strengthSeries.setData(strengthData);
 
     curveSeries.createPriceLine({
@@ -475,12 +458,12 @@ export function RegimeTimeline({
     strengthSeries.createPriceLine({
       price: 50,
       color: isDark
-        ? "rgba(242, 237, 228, 0.22)"
-        : "rgba(20, 18, 26, 0.2)",
+        ? "rgba(242, 237, 228, 0.26)"
+        : "rgba(20, 18, 26, 0.22)",
       lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
+      lineStyle: LineStyle.Dotted,
       axisLabelVisible: false,
-      title: "",
+      title: "50",
     });
 
     chart.timeScale().fitContent();
@@ -488,6 +471,7 @@ export function RegimeTimeline({
     const syncScaleWidth = () => {
       const width = panes[0]?.priceScale("right").width() ?? 0;
       setEquityScaleWidth(width);
+      setTimeScaleHeight(chart.timeScale().height() ?? 26);
     };
     const scaleFrame = requestAnimationFrame(syncScaleWidth);
     const scaleObserver = new ResizeObserver(syncScaleWidth);
@@ -503,16 +487,25 @@ export function RegimeTimeline({
     const pointsByTime = new Map(
       timeline.map((point) => [point.date, point]),
     );
-    const handleCrosshairMove = (param) => {
+    /**
+     * Unified crosshair sync. The chart has one time scale and three panes,
+     * so the hovered media x-coordinate is projected once and rendered as a
+     * single DOM line across the entire pane stack. This keeps the vertical
+     * cursor perfectly straight through panes 2 and 3, and drives the floating
+     * legend from the same event.
+     */
+    const syncUnifiedCrosshair = (param) => {
       if (!param?.time || !param.point) {
         setHoveredPoint(null);
+        setCrosshairX(null);
         return;
       }
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
+      setCrosshairX(param.point.x);
       setHoveredPoint(pointsByTime.get(key) ?? null);
     };
-    chart.subscribeCrosshairMove(handleCrosshairMove);
+    chart.subscribeCrosshairMove(syncUnifiedCrosshair);
 
     const activeCrash = (crashes ?? []).find(
       (crash) => crash.id === selectedIdRef.current,
@@ -522,7 +515,7 @@ export function RegimeTimeline({
     return () => {
       cancelAnimationFrame(scaleFrame);
       scaleObserver.disconnect();
-      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.unsubscribeCrosshairMove(syncUnifiedCrosshair);
       if (primitiveRef.current === primitive) primitiveRef.current = null;
       try {
         panes[0]?.detachPrimitive(primitive);
@@ -603,18 +596,19 @@ export function RegimeTimeline({
           className="absolute inset-0"
         />
 
-        <div className="pointer-events-none absolute left-4 top-2 z-20 text-[10px] font-medium uppercase tracking-[0.18em] text-black/30 dark:text-white/30 sm:left-7">
-          01 · {asset.fullLabel}{" "}
-          <span className="normal-case tracking-normal">
-            · rebased 100 · log
-          </span>
-        </div>
-        <div className="pointer-events-none absolute left-4 top-[calc(50%+0.75rem)] z-20 text-[10px] font-medium uppercase tracking-[0.18em] text-black/30 dark:text-white/30 sm:left-7">
-          02 · Rates &amp; yield <span className="normal-case tracking-normal">· Fed funds / 10Y–2Y</span>
-        </div>
-        <div className="pointer-events-none absolute left-4 top-[calc(75%+0.75rem)] z-20 text-[10px] font-medium uppercase tracking-[0.18em] text-black/30 dark:text-white/30 sm:left-7">
-          03 · Macro momentum <span className="normal-case tracking-normal">· baseline 50</span>
-        </div>
+        <ChartCrosshairLegend point={displayPoint} />
+
+        <div
+          aria-hidden="true"
+          data-testid="unified-crosshair"
+          className={`pointer-events-none absolute top-0 z-20 w-px bg-[#ff8b77]/70 shadow-[0_0_12px_rgba(255,139,119,0.45)] ${
+            crosshairX == null ? "opacity-0" : "opacity-100"
+          }`}
+          style={{
+            left: crosshairX == null ? 0 : crosshairX,
+            bottom: timeScaleHeight,
+          }}
+        />
 
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f1ebe2] via-[#f1ebe2]/55 to-transparent dark:from-[#020204] dark:via-[#020204]/55 sm:w-20" />
         <div
