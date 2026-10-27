@@ -129,11 +129,20 @@ function ErrorState({ message, onRetry }) {
 
 function MethodDetails({ meta }) {
   const notes = Array.isArray(meta?.notes) ? meta.notes : [];
-  const sources = Array.isArray(meta?.proxy_sources)
-    ? meta.proxy_sources
-    : [];
+  const sources = [
+    ...(Array.isArray(meta?.proxy_sources) ? meta.proxy_sources : []),
+    ...(meta?.assets?.nifty
+      ? [
+          {
+            source: meta.assets.nifty.source ?? "YAHOO_FINANCE_NSEI",
+            start: meta.assets.nifty.first_observation,
+            end: meta.assets.nifty.last_observation,
+          },
+        ]
+      : []),
+  ];
   const allNotes = [
-    "Core Index is a 40/30/30 descriptive composite: Macro 40% (credit 40%, Fed 30%, curve 30%), Volatility 30% (14d ATR / 20d Bollinger width) and Momentum 30% (MACD 12/26/9 / 14d RSI). The 0-100 composite is mapped to -50..+50; zero is neutral and +25 / -25 begin the strong / extreme bands.",
+    "Core Index is a 40/30/30 descriptive composite: Macro 40% (credit 40%, Fed 30%, curve 30%), Volatility 30% (14d ATR / 20d Bollinger width) and Momentum 30% (MACD 12/26/9 / 14d RSI). The 0-100 composite is mapped to -50..+50. We read it as a contrarian sentiment map: +25 begins the Risk Elevated / trim band; -25 begins the Maximum Fear / accumulation band.",
     ...notes,
   ];
 
@@ -161,7 +170,7 @@ function MethodDetails({ meta }) {
 
         <div>
           <p className="text-micro uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
-            Equity proxy sources
+            Asset proxy sources
           </p>
           <ul className="mt-2 space-y-1.5">
             {sources.map((source) => (
@@ -179,9 +188,9 @@ function MethodDetails({ meta }) {
 
       <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
         Data version {meta?.data_version ?? "—"} ·{" "}
-        {meta?.core_index_version ?? meta?.strength_version ?? "—"} · Source FRED,
-        World Bank, Blockchain.com. Descriptive historical research. Not
-        investment advice.
+        {meta?.core_index_version ?? meta?.strength_version ?? "—"} · Source
+        FRED, World Bank, Blockchain.com, Yahoo Finance. Descriptive historical
+        research. Not investment advice.
       </p>
     </details>
   );
@@ -303,9 +312,9 @@ export default function RegimePage() {
   }, []);
 
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-20 sm:pt-24">
+    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-3 sm:pt-4">
       <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-4 pr-14 sm:pr-16 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Regime Intelligence
@@ -316,8 +325,10 @@ export default function RegimePage() {
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
               One full-bleed market chart. The Core Index composite blends credit,
               volatility and momentum; every NBER window carries its own
-              drawdown and score. Compare the S&amp;P 500, gold and Treasuries
-              on a single percentage scale. Research, not investment advice.
+              drawdown and score. Compare the S&amp;P 500, gold, Treasuries and
+              Nifty 50 on a single percentage scale. The score is read
+              contrarian: trim into euphoria, accumulate into fear. Research,
+              not investment advice.
             </p>
           </div>
 
@@ -404,7 +415,7 @@ export default function RegimePage() {
 
             <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                FRED · World Bank · Blockchain.com ·{" "}
+                FRED · World Bank · Blockchain.com · Yahoo Finance ·{" "}
                 {data.meta?.core_index_version ?? "core-index-v1"}
               </span>
               <div className="flex flex-wrap items-center gap-3">

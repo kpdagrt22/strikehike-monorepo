@@ -15,7 +15,7 @@ const STEPS = [
   {
     number: "2",
     title: "The Score",
-    body: "Our StrikeHike Core Index runs from -50 (Extreme Danger) to +50 (Strong Growth). Watch it predict the drops.",
+    body: "The Core Index maps crowd emotion from -50 (maximum fear) to +50 (euphoria). We read it contrarian: trim into strength, accumulate into panic.",
     accent: "#facc15",
   },
   {

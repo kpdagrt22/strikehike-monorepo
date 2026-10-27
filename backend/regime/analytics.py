@@ -230,6 +230,7 @@ def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
         ("gold_proxy", "gold_proxy_source", "gold_"),
         ("bond_proxy", "bond_proxy_source", "bond_"),
         ("btc_proxy", "btc_proxy_source", "btc_"),
+        ("nifty_proxy", "nifty_proxy_source", "nifty_"),
         ("dxy_proxy", "dxy_proxy_source", "dxy_"),
     ):
         if value_column in frame.columns:

@@ -7,6 +7,7 @@ import { SkyStrip } from "@/components/regime/SkyStrip";
 import {
   addDaysIso,
   addMonthsIso,
+  coreIndexTone,
   formatDate,
   formatNumber,
   formatSigned,
@@ -25,17 +26,12 @@ function Metric({ label, value }) {
   );
 }
 
-function PreCrashCard({ label, data }) {
+function PreCrashCard({ label, data, isDark }) {
   const phase = data?.phase
     ? `${data.phase[0].toUpperCase()}${data.phase.slice(1)}`
     : "—";
   const coreIndex = data?.core_index;
-  const tone =
-    coreIndex == null
-      ? "text-black/45 dark:text-white/45"
-      : coreIndex >= 0
-        ? "text-[#0f766e] dark:text-[#5eead4]"
-        : "text-[#c0442f] dark:text-[#ff8b77]";
+  const tone = coreIndexTone(data?.core_index_bucket, isDark);
 
   return (
     <div className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.03]">
@@ -60,16 +56,8 @@ function PreCrashCard({ label, data }) {
         <span className="text-black/40 dark:text-white/40">
           Market was in {phase.toLowerCase()}
         </span>
-        <span className={`font-mono ${tone}`}>
-          {coreIndex == null
-            ? "No score"
-            : coreIndex >= 25
-              ? "Strong Growth"
-              : coreIndex >= 0
-                ? "Calm Bullish"
-                : coreIndex > -25
-                  ? "Caution"
-                  : "Extreme Danger"}
+        <span className="font-mono" style={{ color: tone.color }}>
+          {tone.label} · {tone.action}
         </span>
       </div>
     </div>
@@ -208,10 +196,12 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
           <PreCrashCard
             label="3 months prior"
             data={crash.pre_crash_indicators?.["3m"]}
+            isDark={isDark}
           />
           <PreCrashCard
             label="6 months prior"
             data={crash.pre_crash_indicators?.["6m"]}
+            isDark={isDark}
           />
         </div>
 

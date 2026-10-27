@@ -23,28 +23,28 @@ const TRACE_DAYS = 90;
 
 const QUADRANTS = {
   calm_bullish: {
-    label: "Calm Bullish",
+    label: "Complacency / Trim Risk",
     detail: "low volatility · shallow",
-    fill: "#0f766e",
-    fillDark: "#5eead4",
-  },
-  volatile_bullish: {
-    label: "Volatile Bullish",
-    detail: "high volatility · shallow",
     fill: "#b45309",
     fillDark: "#fbbf24",
   },
-  calm_bearish: {
-    label: "Calm Bearish",
-    detail: "low volatility · deep",
-    fill: "#2563eb",
-    fillDark: "#60a5fa",
-  },
-  volatile_bearish: {
-    label: "Volatile Bearish",
-    detail: "high volatility · deep",
+  volatile_bullish: {
+    label: "Euphoria / Distribution",
+    detail: "high volatility · shallow",
     fill: "#c0442f",
     fillDark: "#fb7185",
+  },
+  calm_bearish: {
+    label: "Despair / Base Building",
+    detail: "low volatility · deep",
+    fill: "#0f766e",
+    fillDark: "#5eead4",
+  },
+  volatile_bearish: {
+    label: "Panic / Accumulation Zone",
+    detail: "high volatility · deep",
+    fill: "#047857",
+    fillDark: "#34d399",
   },
 };
 
@@ -492,9 +492,19 @@ export function PhasePlane({
         </div>
       </div>
 
+      <div className="border-t border-black/5 px-4 py-3 dark:border-white/5">
+        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+          Contrarian playbook
+        </p>
+        <p className="mt-1 text-meta leading-relaxed" style={{ color: toneForIndex.color }}>
+          {toneForIndex.allocation}
+        </p>
+      </div>
+
       <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
-        Hover the main chart to redraw the glowing 90-day trail. The four
-        quadrants describe the market mood; they are not buy or sell signals.
+        Hover the main chart to redraw the glowing 90-day trail. The quadrants
+        are contrarian risk-posture zones: trim into complacency and euphoria,
+        build into despair and panic. They are not personalised advice.
       </p>
     </section>
   );

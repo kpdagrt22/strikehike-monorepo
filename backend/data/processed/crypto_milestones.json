@@ -1,6 +1,6 @@
 {
   "version": "crypto-milestones-v1",
-  "generated_at": "2026-10-27T07:42:50.794543+00:00",
+  "generated_at": "2026-10-27T08:58:42.555149+00:00",
   "kind": "editorial",
   "notes": [
     "Event windows are hand-curated comparison windows, not detected crash dates.",

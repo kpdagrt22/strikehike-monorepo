@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 const TITLE = "Convergence";
 const DESCRIPTION =
-  "Side-by-side macro and crypto event comparison: Core Index regime, asset drawdowns and the Sun / Moon / Saturn ephemeris at each peak.";
+  "Side-by-side macro and crypto event comparison: contrarian Core Index regime, S&P 500, gold, bond, Bitcoin and Nifty 50 drawdowns, and the Sun / Moon / Saturn ephemeris at each peak.";
 
 export const metadata: Metadata = {
   title: TITLE,

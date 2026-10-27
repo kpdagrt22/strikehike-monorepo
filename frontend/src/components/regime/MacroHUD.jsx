@@ -25,7 +25,7 @@ export function MacroHUD({
   const glow = `0 0 28px ${tone.color}66, 0 0 64px ${tone.color}24`;
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-3 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-5 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] px-3 pb-3 pt-3 pr-20 sm:pb-4 sm:pl-5 sm:pt-5 sm:pr-20 lg:pl-8 lg:pr-20">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex flex-wrap items-end gap-4 sm:gap-8">
           <div className="min-w-0">
@@ -44,13 +44,13 @@ export function MacroHUD({
               </span>
             </div>
             <p className="mt-1 font-mono text-[10px] text-black/30 dark:text-white/30">
-              −50 ↔ +50 · zero is neutral
+              −50 ↔ +50 · contrarian sentiment map
             </p>
           </div>
 
           <div className="min-w-0 border-l border-black/5 pl-4 dark:border-white/5 sm:pl-6">
             <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/35 dark:text-white/35">
-              State
+              State · action
             </p>
             <p
               className="mt-1 text-xl font-semibold leading-none tracking-[-0.05em] sm:text-3xl"
@@ -58,7 +58,13 @@ export function MacroHUD({
             >
               {tone.label}
             </p>
-            <p className="mt-1.5 max-w-[280px] truncate text-micro text-black/40 dark:text-white/40">
+            <p className="mt-1.5 max-w-[360px] text-[10px] leading-relaxed text-black/45 dark:text-white/45">
+              <span className="font-semibold uppercase tracking-[0.1em]" style={{ color: tone.color }}>
+                Smart money
+              </span>{" "}
+              {tone.allocation}
+            </p>
+            <p className="mt-1 max-w-[280px] truncate text-micro text-black/40 dark:text-white/40">
               {activeCrash
                 ? `${activeCrash.name} · NBER window`
                 : point

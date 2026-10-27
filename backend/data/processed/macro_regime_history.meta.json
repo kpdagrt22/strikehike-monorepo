@@ -13,8 +13,8 @@
       "drawdown_field": "btc_drawdown_1y",
       "first_observation": "2010-08-18",
       "label": "Bitcoin",
-      "last_observation": "2026-10-26",
-      "observations": 5914,
+      "last_observation": "2026-10-27",
+      "observations": 5915,
       "percentile_field": "btc_1y_volatility_percentile",
       "source": "BLOCKCHAIN_COM_MARKET_PRICE",
       "source_field": "btc_proxy_source",
@@ -26,8 +26,8 @@
       "drawdown_field": "bond_drawdown_1y",
       "first_observation": "1962-01-02",
       "label": "US Treasury bonds",
-      "last_observation": "2026-10-26",
-      "observations": 23674,
+      "last_observation": "2026-10-27",
+      "observations": 23675,
       "percentile_field": "bond_1y_volatility_percentile",
       "source": "UST10Y_TOTAL_RETURN_PROXY",
       "source_field": "bond_proxy_source",
@@ -39,8 +39,8 @@
       "drawdown_field": "dxy_drawdown_1y",
       "first_observation": "2006-01-02",
       "label": "US Dollar \u2014 broad trade-weighted",
-      "last_observation": "2026-10-26",
-      "observations": 7603,
+      "last_observation": "2026-10-27",
+      "observations": 7604,
       "percentile_field": "dxy_1y_volatility_percentile",
       "source": "DTWEXBGS",
       "source_field": "dxy_proxy_source",
@@ -52,8 +52,8 @@
       "drawdown_field": "gold_drawdown_1y",
       "first_observation": "1960-01-01",
       "label": "Gold \u2014 London bullion",
-      "last_observation": "2026-10-26",
-      "observations": 24406,
+      "last_observation": "2026-10-27",
+      "observations": 24407,
       "percentile_field": "gold_1y_volatility_percentile",
       "source": "WORLD_BANK_LBMA_GOLD",
       "source_field": "gold_proxy_source",
@@ -61,12 +61,25 @@
       "value_field": "gold_proxy",
       "volatility_field": "gold_volatility_1y"
     },
+    "nifty": {
+      "drawdown_field": "nifty_drawdown_1y",
+      "first_observation": "2007-09-17",
+      "label": "Nifty 50 \u2014 India",
+      "last_observation": "2026-10-27",
+      "observations": 6981,
+      "percentile_field": "nifty_1y_volatility_percentile",
+      "source": "YAHOO_FINANCE_NSEI",
+      "source_field": "nifty_proxy_source",
+      "units": "Index",
+      "value_field": "nifty_proxy",
+      "volatility_field": "nifty_volatility_1y"
+    },
     "sp500": {
       "drawdown_field": "drawdown_1y",
       "first_observation": "1871-01-01",
       "label": "S&P 500 proxy",
-      "last_observation": "2026-10-26",
-      "observations": 56117,
+      "last_observation": "2026-10-27",
+      "observations": 56118,
       "percentile_field": "1y_volatility_percentile",
       "source": "M1125AUSM343NNBR",
       "source_field": "sp500_proxy_source",
@@ -91,9 +104,9 @@
     ],
     "latest": {
       "bucket": "calm_bullish",
-      "composite": 60.69,
-      "date": "2026-10-26",
-      "score": 10.69
+      "composite": 60.46,
+      "date": "2026-10-27",
+      "score": 10.46
     },
     "version": "core-index-v1",
     "weights": {
@@ -103,13 +116,13 @@
     }
   },
   "coverage": {
-    "end": "2026-10-26",
+    "end": "2026-10-27",
     "start": "1854-12-01",
     "years": 171.9
   },
-  "data_version": "f8d19ef660bc",
+  "data_version": "a08c2b2db034",
   "frame": {
-    "columns": 153,
+    "columns": 159,
     "columns_list": [
       "USREC",
       "T10Y2Y",
@@ -189,6 +202,7 @@
       "GFDEBTN",
       "GOLD_LBMA",
       "BTCUSD",
+      "NIFTY50",
       "nber_recession",
       "nber_phase",
       "nber_recession_start",
@@ -200,6 +214,8 @@
       "gold_proxy_source",
       "btc_proxy",
       "btc_proxy_source",
+      "nifty_proxy",
+      "nifty_proxy_source",
       "dxy_proxy",
       "dxy_proxy_source",
       "bond_proxy",
@@ -242,6 +258,9 @@
       "btc_volatility_1y",
       "btc_drawdown_1y",
       "btc_1y_volatility_percentile",
+      "nifty_volatility_1y",
+      "nifty_drawdown_1y",
+      "nifty_1y_volatility_percentile",
       "dxy_volatility_1y",
       "dxy_drawdown_1y",
       "dxy_1y_volatility_percentile",
@@ -265,9 +284,9 @@
       "core_index",
       "core_index_bucket"
     ],
-    "rows": 62787
+    "rows": 62788
   },
-  "generated_at": "2026-10-27T07:42:50.757708+00:00",
+  "generated_at": "2026-10-27T08:58:42.492229+00:00",
   "nber": {
     "current_phase": "expansion",
     "episodes": [
@@ -771,6 +790,7 @@
     "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
     "USREC is excluded from the strength inputs to avoid target leakage.",
     "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index; Bitcoin is the Blockchain.com daily market price from 2010-08-18.",
+    "Nifty 50 daily prices come from Yahoo Finance (^NSEI). Yahoo's history begins in 2007, so the Nifty series is intentionally unavailable before then.",
     "Core Index is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
     "FRED's keyless CSV endpoint exposes only a rolling three-year ICE BofA HY OAS window. The pipeline merges FRED's recent observations with a cached public 1996+ mirror; the official FRED API path retains the full provider history.",
     "Crypto milestone dates are editorial comparison windows, not statistically detected events or NBER recession dates."
@@ -800,8 +820,8 @@
         "start": "1971-02-05"
       },
       {
-        "end": "2026-10-26",
-        "observations": 3652,
+        "end": "2026-10-27",
+        "observations": 3653,
         "source": "SP500",
         "start": "2016-10-27"
       }
@@ -1799,7 +1819,8 @@
     "GFDEGDQ188S",
     "GFDEBTN",
     "GOLD_LBMA",
-    "BTCUSD"
+    "BTCUSD",
+    "NIFTY50"
   ],
   "series_requested": [
     "USREC",
@@ -1903,10 +1924,10 @@
     "full_coverage_from": "1976-10-04",
     "latest": {
       "coverage": 1.0,
-      "date": "2026-10-26",
+      "date": "2026-10-27",
       "label": "bullish",
       "regime_state": "favorable",
-      "score": 63.09
+      "score": 62.87
     },
     "notes": [
       "Macro strength is a V2 coincident heuristic (Fed Funds 21d/126d panic-cut; 10y-2y level and 21d/126d un-inversion; UNRATE Sahm proxy), not a probability or forecast."

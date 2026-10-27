@@ -71,6 +71,9 @@ export function ChartCrosshairLegend({
         >
           {tone.label}
         </p>
+        <p className="mt-0.5 truncate text-[9px] text-white/40">
+          Contrarian: {tone.action}
+        </p>
       </div>
     </div>
   );

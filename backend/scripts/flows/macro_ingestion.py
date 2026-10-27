@@ -84,6 +84,9 @@ BITCOIN_URL = (
     "https://api.blockchain.info/charts/market-price"
     "?timespan=all&format=json&sampled=false"
 )
+NIFTY_SERIES_ID = "NIFTY50"
+NIFTY_SOURCE = "YAHOO_FINANCE_NSEI"
+NIFTY_URL = "https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI"
 HY_OAS_ARCHIVE_URL = (
     "https://gist.githubusercontent.com/jcopeland23451/"
     "75cf1a099fffbfb0d400a8af60072ee3/raw"
@@ -929,6 +932,107 @@ def fetch_bitcoin_series(
         ) from exc
 
 
+def _parse_yahoo_nifty(content: bytes) -> pd.Series:
+    """Parse Yahoo Finance's daily chart payload into a Nifty 50 series."""
+    payload = json.loads(content)
+    chart = payload.get("chart") if isinstance(payload, dict) else None
+    results = chart.get("result") if isinstance(chart, dict) else None
+    if not isinstance(results, list) or not results:
+        raise ValueError("Yahoo Finance returned no Nifty 50 result")
+    result = results[0]
+    timestamps = result.get("timestamp")
+    quotes = (result.get("indicators") or {}).get("quote") or []
+    closes = quotes[0].get("close") if quotes else None
+    if not isinstance(timestamps, list) or not isinstance(closes, list):
+        raise ValueError("Yahoo Finance returned no Nifty 50 prices")
+    index = pd.to_datetime(timestamps, unit="s", utc=True, errors="coerce")
+    prices = pd.to_numeric(closes, errors="coerce")
+    series = pd.Series(
+        prices,
+        index=index.normalize(),
+        name=NIFTY_SERIES_ID,
+        dtype="float64",
+    )
+    series = series[series.index.notna() & series.notna() & (series > 0)]
+    series = series.sort_index()
+    series = series[~series.index.duplicated(keep="last")]
+    if series.empty:
+        raise ValueError("Yahoo Finance returned no positive Nifty 50 prices")
+    return series
+
+
+def fetch_nifty_series(
+    cache_dir: Path,
+    *,
+    refresh: bool,
+    offline: bool,
+    max_age_hours: float = 24.0,
+    timeout: float = 60.0,
+) -> pd.Series | None:
+    """Fetch/cache daily Nifty 50 history from Yahoo Finance."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"{NIFTY_SERIES_ID}.csv"
+    cached = _load_cached_series(cache_path, NIFTY_SERIES_ID)
+    cache_age = None
+    if cache_path.exists():
+        cache_age = (
+            pd.Timestamp.now(tz="UTC").timestamp() - cache_path.stat().st_mtime
+        ) / 3600.0
+    if cached is not None and not refresh and (
+        offline or (cache_age is not None and cache_age <= max_age_hours)
+    ):
+        logger.info(
+            "Using cached {} {} -> {} ({} obs)",
+            NIFTY_SERIES_ID,
+            cached.index.min().date(),
+            cached.index.max().date(),
+            len(cached),
+        )
+        return cached
+    if offline:
+        if cached is not None:
+            return cached
+        raise MacroConfigError(
+            f"Offline mode: no cached {NIFTY_SERIES_ID} in {cache_dir}"
+        )
+    try:
+        response = requests.get(
+            NIFTY_URL,
+            params={
+                "period1": 0,
+                "period2": int(pd.Timestamp.now(tz="UTC").timestamp()),
+                "interval": "1d",
+                "events": "div%2Csplits",
+            },
+            headers={"User-Agent": USER_AGENT},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        series = _parse_yahoo_nifty(response.content)
+        _save_cached_series(cache_path, series)
+        logger.info(
+            "Fetched {} from Yahoo Finance {} -> {} ({} obs)",
+            NIFTY_SERIES_ID,
+            series.index.min().date(),
+            series.index.max().date(),
+            len(series),
+        )
+        return series
+    except (requests.RequestException, ValueError, OSError) as exc:
+        if cached is not None:
+            logger.warning(
+                "{} fetch failed ({}); using stale cache {} -> {}",
+                NIFTY_SERIES_ID,
+                exc,
+                cached.index.min().date(),
+                cached.index.max().date(),
+            )
+            return cached
+        raise FredAPIError(
+            f"{NIFTY_SERIES_ID}: Yahoo Finance fetch failed ({exc})"
+        ) from exc
+
+
 def _parse_high_yield_archive(content: bytes) -> pd.Series:
     """Parse a full-history BAMLH0A0HYM2 archive CSV (date,value rows)."""
     text = content.decode("utf-8-sig", errors="replace")
@@ -1095,7 +1199,7 @@ def build_raw_daily_frame(
 
 
 def build_asset_targets(frame: pd.DataFrame) -> pd.DataFrame:
-    """Serialize the S&P, gold, bond, dollar and Bitcoin target variables."""
+    """Serialize the S&P, gold, bond, dollar, Bitcoin and Nifty targets."""
     out = frame.copy()
 
     if "GOLD_LBMA" in out.columns:
@@ -1119,6 +1223,19 @@ def build_asset_targets(frame: pd.DataFrame) -> pd.DataFrame:
     else:
         out["btc_proxy"] = np.nan
         out["btc_proxy_source"] = pd.Series(
+            pd.NA, index=out.index, dtype="string"
+        )
+
+    if "NIFTY50" in out.columns:
+        out["nifty_proxy"] = pd.to_numeric(
+            out["NIFTY50"], errors="coerce"
+        )
+        out["nifty_proxy_source"] = pd.Series(
+            NIFTY_SOURCE, index=out.index, dtype="string"
+        ).where(out["nifty_proxy"].notna())
+    else:
+        out["nifty_proxy"] = np.nan
+        out["nifty_proxy_source"] = pd.Series(
             pd.NA, index=out.index, dtype="string"
         )
 
@@ -1267,6 +1384,14 @@ def _asset_metadata(frame: pd.DataFrame) -> dict[str, dict[str, Any]]:
             "USD",
         ),
         (
+            "nifty",
+            "Nifty 50 — India",
+            "nifty_proxy",
+            "nifty_proxy_source",
+            "nifty_",
+            "Index",
+        ),
+        (
             "dxy",
             "US Dollar — broad trade-weighted",
             "dxy_proxy",
@@ -1395,6 +1520,7 @@ def build_metadata(
         "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
         "USREC is excluded from the strength inputs to avoid target leakage.",
         "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index; Bitcoin is the Blockchain.com daily market price from 2010-08-18.",
+        "Nifty 50 daily prices come from Yahoo Finance (^NSEI). Yahoo's history begins in 2007, so the Nifty series is intentionally unavailable before then.",
         "Core Index is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
         "FRED's keyless CSV endpoint exposes only a rolling three-year ICE BofA HY OAS window. The pipeline merges FRED's recent observations with a cached public 1996+ mirror; the official FRED API path retains the full provider history.",
         "Crypto milestone dates are editorial comparison windows, not statistically detected events or NBER recession dates.",
@@ -1542,6 +1668,17 @@ def run_pipeline(
             series_map[BITCOIN_SERIES_ID] = bitcoin
     except Exception as exc:  # noqa: BLE001 - supplemental target must not kill the artifact
         warnings.append(f"{BITCOIN_SERIES_ID}: {type(exc).__name__}: {exc}")
+
+    try:
+        nifty = fetch_nifty_series(
+            cache_dir,
+            refresh=refresh,
+            offline=offline,
+        )
+        if nifty is not None:
+            series_map[NIFTY_SERIES_ID] = nifty
+    except Exception as exc:  # noqa: BLE001 - supplemental target must not kill the artifact
+        warnings.append(f"{NIFTY_SERIES_ID}: {type(exc).__name__}: {exc}")
 
     try:
         ensure_high_yield_history(

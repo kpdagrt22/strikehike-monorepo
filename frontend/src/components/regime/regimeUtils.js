@@ -69,36 +69,46 @@ export function formatSigned(value, digits = 1) {
 
 export const CORE_INDEX_BUCKETS = {
   strong_bullish: {
-    label: "Strong Growth",
+    label: "Risk Elevated",
     description: "+25 to +50",
-    dark: "#34d399",
-    light: "#0f766e",
-    darkSoft: "rgba(52, 211, 153, 0.16)",
-    lightSoft: "rgba(15, 118, 110, 0.12)",
+    action: "Trim risk",
+    allocation:
+      "Risk Elevated. Trim Equities. 70% Defensive (Gold/Bonds) / 30% Equity.",
+    dark: "#fb7185",
+    light: "#c0442f",
+    darkSoft: "rgba(251, 113, 133, 0.16)",
+    lightSoft: "rgba(192, 68, 47, 0.12)",
   },
   calm_bullish: {
-    label: "Calm Bullish",
+    label: "Balanced Growth",
     description: "0 to +24",
-    dark: "#d8b47a",
-    light: "#8a6a3a",
-    darkSoft: "rgba(216, 180, 122, 0.16)",
-    lightSoft: "rgba(138, 106, 58, 0.12)",
+    action: "Stay balanced",
+    allocation: "Balanced Growth. 60% Equity / 40% Defensive.",
+    dark: "#facc15",
+    light: "#a16207",
+    darkSoft: "rgba(250, 204, 21, 0.16)",
+    lightSoft: "rgba(161, 98, 7, 0.12)",
   },
   bearish_warning: {
-    label: "Caution",
+    label: "Capital Preservation",
     description: "-1 to -24",
+    action: "Wait for the bottom",
+    allocation: "Capital Preservation. Wait for bottom.",
     dark: "#fb923c",
     light: "#b45309",
     darkSoft: "rgba(251, 146, 60, 0.16)",
     lightSoft: "rgba(180, 83, 9, 0.12)",
   },
   extreme_bearish: {
-    label: "Extreme Danger",
+    label: "Maximum Fear",
     description: "-25 to -50",
-    dark: "#fb7185",
-    light: "#c0442f",
-    darkSoft: "rgba(251, 113, 133, 0.16)",
-    lightSoft: "rgba(192, 68, 47, 0.12)",
+    action: "Accumulate",
+    allocation:
+      "Maximum Fear. Aggressive Accumulation. 90% Equity / 10% Defensive.",
+    dark: "#34d399",
+    light: "#047857",
+    darkSoft: "rgba(52, 211, 153, 0.16)",
+    lightSoft: "rgba(4, 120, 87, 0.12)",
   },
 };
 
@@ -115,6 +125,9 @@ export function coreIndexTone(bucket, isDark) {
   if (!meta) {
     return {
       label: "No score",
+      action: "Hold",
+      allocation:
+        "No contrarian allocation while the Core Index is unavailable.",
       color: isDark ? "rgba(242,237,228,0.55)" : "rgba(20,18,26,0.55)",
       soft: isDark
         ? "rgba(242,237,228,0.06)"
@@ -124,6 +137,8 @@ export function coreIndexTone(bucket, isDark) {
   return {
     label: meta.label,
     description: meta.description,
+    action: meta.action,
+    allocation: meta.allocation,
     color: isDark ? meta.dark : meta.light,
     soft: isDark ? meta.darkSoft : meta.lightSoft,
   };

@@ -647,11 +647,11 @@ export function RegimeTimeline({
         Unified Core Index macro and multi-asset regime chart
       </h2>
       <p className="sr-only">
-        One percentage-scaled chart of the S&amp;P 500, London gold and Treasury
-        bonds with NBER recession shading. A colour-coded Core Index histogram from
-        -50 to +50 sits in the lower quarter of the same chart. Hover a red NBER
-        band for the crash name, peak-to-trough drawdown and Core Index score; click
-        it to zoom to the event.
+        One percentage-scaled chart of the S&amp;P 500, London gold, Treasury
+        bonds and Nifty 50 with NBER recession shading. A colour-coded Core Index
+        histogram from -50 to +50 sits in the lower quarter of the same chart.
+        Hover a red NBER band for the crash name, peak-to-trough drawdown and
+        Core Index score; click it to zoom to the event.
       </p>
 
       <div className="sticky top-0 z-30 border-b border-black/5 bg-[#f5f0e8]/85 backdrop-blur-2xl dark:border-white/5 dark:bg-[#06060a]/80">
@@ -745,14 +745,14 @@ export function RegimeTimeline({
               /
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
-              growth
-              <span className="h-1.5 w-1.5 rounded-full bg-[#d8b47a]" />
-              calm
-              <span className="h-1.5 w-1.5 rounded-full bg-[#fb923c]" />
-              caution
               <span className="h-1.5 w-1.5 rounded-full bg-[#fb7185]" />
-              danger
+              trim risk
+              <span className="h-1.5 w-1.5 rounded-full bg-[#facc15]" />
+              balanced
+              <span className="h-1.5 w-1.5 rounded-full bg-[#fb923c]" />
+              preserve
+              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+              accumulate
             </span>
           </div>
 

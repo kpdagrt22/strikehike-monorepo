@@ -356,9 +356,10 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
           </h2>
         </div>
         <p className="max-w-xl text-micro leading-relaxed text-black/45 dark:text-white/45">
-          Core Index is a macro composite; the asset columns show how the same
-          macro state travelled through {asset.label.toLowerCase()}. A high score
-          is calm/constructive, not a directional prediction.
+          Core Index is a contrarian sentiment composite; the asset columns show
+          how the same macro state travelled through {asset.label.toLowerCase()}.
+          A high score means euphoria and elevated risk, a low score means fear
+          and accumulation. It is not a directional prediction.
         </p>
       </div>
 
@@ -568,9 +569,9 @@ export default function ConvergencePage() {
   };
 
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-20 sm:pt-24">
+    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-3 sm:pt-4">
       <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-4 pr-14 sm:pr-16 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Convergence
@@ -749,7 +750,8 @@ export default function ConvergencePage() {
                 <p>
                   Bitcoin prices are Blockchain.com daily market prices. Gold
                   is the World Bank London bullion benchmark; bonds are a
-                  7.5-duration 10-year Treasury total-return proxy. The sky
+                  7.5-duration 10-year Treasury total-return proxy; Nifty 50 is
+                  Yahoo Finance ^NSEI history from September 2007. The sky
                   positions are Lahiri sidereal ephemeris values at the event
                   peak.
                 </p>
