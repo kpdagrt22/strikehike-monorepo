@@ -40,6 +40,19 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
     frame["1y_volatility_percentile"] = 50.0
     frame["volatility_1y"] = 12.0
     frame["drawdown_1y"] = -5.0
+    frame["bravos_score"] = 12.34
+    frame["bravos_composite"] = 62.34
+    frame["bravos_bucket"] = "calm_bullish"
+    frame["macro_score"] = 55.0
+    frame["credit_score"] = 70.0
+    frame["bravos_volatility_score"] = 60.0
+    frame["bravos_momentum_score"] = 50.0
+    frame["hy_oas"] = 3.25
+    frame["btc_proxy"] = np.linspace(7000.0, 29000.0, len(index))
+    frame["btc_proxy_source"] = "TEST_BTC"
+    frame["btc_volatility_1y"] = 55.0
+    frame["btc_drawdown_1y"] = -10.0
+    frame["btc_1y_volatility_percentile"] = 60.0
     frame["fed_cross"] = np.linspace(-0.5, 0.5, len(index))
     frame["curve_cross"] = np.linspace(0.4, -0.4, len(index))
     frame["sahm_alert"] = False
@@ -71,6 +84,16 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
                 }
             ]
         },
+        "bravos": {
+            "version": "bravos-v1",
+            "weights": {"macro": 0.4, "volatility": 0.3, "momentum": 0.3},
+            "latest": {
+                "date": "2020-12-31",
+                "score": 12.34,
+                "bucket": "calm_bullish",
+                "composite": 62.34,
+            },
+        },
         "nber": {"source": "USREC"},
         "source": {"transport": "test"},
         "notes": ["Synthetic fixture."],
@@ -96,6 +119,11 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert payload["timeline"][0]["proxy_source"] == "TEST"
     assert payload["timeline"][0]["regime_state"] == "favorable"
     assert payload["timeline"][0]["1y_volatility_percentile"] == 50.0
+    assert payload["timeline"][0]["bravos_score"] == 12.34
+    assert payload["timeline"][0]["bravos_bucket"] == "calm_bullish"
+    assert payload["timeline"][0]["btc_proxy"] is not None
+    assert payload["meta"]["latest_bravos"]["score"] == 12.34
+    assert payload["meta"]["bravos_version"] == "bravos-v1"
 
     monthly = service.macro_history(resolution="monthly")
     assert monthly["resolution"] == "monthly"
@@ -110,6 +138,7 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert crash["pre_crash_indicators"]["3m"]["as_of"] == "2019-11-01"
     assert crash["pre_crash_indicators"]["6m"]["as_of"] == "2019-08-01"
     assert crash["pre_crash_indicators"]["3m"]["fed_funds"] == 2.0
+    assert crash["pre_crash_indicators"]["3m"]["bravos_score"] == 12.34
 
 
 def test_regime_runs_returns_transition_matrix_and_durations(tmp_path):
@@ -190,3 +219,29 @@ def test_invalid_ranges_raise_value_error(tmp_path):
         service.macro_history(start="2030-01-01", end="2030-12-31")
     with pytest.raises(ValueError):
         service.regime_runs(start="2030-01-01", end="2030-12-31")
+
+
+def test_crypto_milestones_join_market_stats_and_bravos(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(
+        artifact_path=artifact,
+        meta_path=meta_path,
+        crypto_milestones_path=tmp_path / "missing_crypto_milestones.json",
+    )
+
+    payload = service.crypto_milestones()
+
+    assert payload["version"] == "crypto-milestones-v1"
+    assert len(payload["events"]) == 7
+    assert payload["coverage"]["start"] == "2019-01-01"
+    assert payload["coverage"]["years"] > 1
+    covid = next(
+        event for event in payload["events"] if event["id"] == "covid-shock"
+    )
+    assert covid["assets"]["bitcoin"]["available"] is True
+    assert covid["assets"]["bitcoin"]["start_value"] > 0
+    assert covid["assets"]["bitcoin"]["end_value"] > 0
+    assert covid["assets"]["sp500"]["available"] is True
+    assert covid["bravos"]["at_peak"] == 12.34
+    assert covid["bravos"]["at_trough"] == 12.34
+    assert covid["bravos"]["at_peak_bucket"] == "calm_bullish"

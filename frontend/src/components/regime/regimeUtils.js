@@ -60,6 +60,75 @@ export function formatScore(value) {
   return Number(value).toFixed(1);
 }
 
+export function formatSigned(value, digits = 1) {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const number = Number(value);
+  const formatted = number.toFixed(digits);
+  return number >= 0 ? `+${formatted}` : formatted;
+}
+
+export const BRAVOS_BUCKETS = {
+  strong_bullish: {
+    label: "Strong bullish",
+    description: "+25 to +50",
+    dark: "#34d399",
+    light: "#0f766e",
+    darkSoft: "rgba(52, 211, 153, 0.16)",
+    lightSoft: "rgba(15, 118, 110, 0.12)",
+  },
+  calm_bullish: {
+    label: "Calm bullish",
+    description: "0 to +24",
+    dark: "#d8b47a",
+    light: "#8a6a3a",
+    darkSoft: "rgba(216, 180, 122, 0.16)",
+    lightSoft: "rgba(138, 106, 58, 0.12)",
+  },
+  bearish_warning: {
+    label: "Bearish warning",
+    description: "-1 to -24",
+    dark: "#fb923c",
+    light: "#b45309",
+    darkSoft: "rgba(251, 146, 60, 0.16)",
+    lightSoft: "rgba(180, 83, 9, 0.12)",
+  },
+  extreme_bearish: {
+    label: "Extreme bearish",
+    description: "-25 to -50",
+    dark: "#fb7185",
+    light: "#c0442f",
+    darkSoft: "rgba(251, 113, 133, 0.16)",
+    lightSoft: "rgba(192, 68, 47, 0.12)",
+  },
+};
+
+export function bravosMeta(bucket) {
+  return BRAVOS_BUCKETS[bucket] ?? null;
+}
+
+export function bravosLabel(bucket) {
+  return BRAVOS_BUCKETS[bucket]?.label ?? "No composite";
+}
+
+export function bravosTone(bucket, isDark) {
+  const meta = BRAVOS_BUCKETS[bucket];
+  if (!meta) {
+    return {
+      label: "No composite",
+      color: isDark ? "rgba(242,237,228,0.55)" : "rgba(20,18,26,0.55)",
+      soft: isDark
+        ? "rgba(242,237,228,0.06)"
+        : "rgba(20,18,26,0.05)",
+    };
+  }
+  return {
+    label: meta.label,
+    description: meta.description,
+    color: isDark ? meta.dark : meta.light,
+    soft: isDark ? meta.darkSoft : meta.lightSoft,
+  };
+}
+
 export function formatCompact(value) {
   if (value == null || !Number.isFinite(Number(value))) return "—";
   const number = Number(value);

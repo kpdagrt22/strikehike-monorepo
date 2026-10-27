@@ -18,17 +18,31 @@ import numpy as np
 import pandas as pd
 
 from regime.analytics import (
+    BRAVOS_VERSION,
     STRENGTH_VERSION,
     STRENGTH_WEIGHTS,
     build_crashes,
+)
+from regime.crypto_milestones import (
+    CRYPTO_MILESTONES_VERSION,
+    milestone_definitions,
 )
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_ARTIFACT = BACKEND_DIR / "data" / "processed" / "macro_regime_history.parquet"
 DEFAULT_META = BACKEND_DIR / "data" / "processed" / "macro_regime_history.meta.json"
+DEFAULT_CRYPTO_MILESTONES = (
+    BACKEND_DIR / "data" / "processed" / "crypto_milestones.json"
+)
 
 Resolution = Literal["auto", "daily", "weekly", "monthly"]
 REGIME_STATES = ("favorable", "neutral", "disruptive")
+EVENT_ASSETS = {
+    "sp500": ("sp500_proxy", "S&P 500 proxy"),
+    "gold": ("gold_proxy", "Gold — London bullion"),
+    "bonds": ("bond_proxy", "Treasury bonds"),
+    "bitcoin": ("btc_proxy", "Bitcoin"),
+}
 
 
 def _to_timestamp(value: Any) -> pd.Timestamp:
@@ -98,6 +112,19 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "macro_strength",
             "macro_strength_coverage",
             "regime_state",
+            "bravos_score",
+            "bravos_composite",
+            "bravos_bucket",
+            "macro_score",
+            "credit_score",
+            "bravos_volatility_score",
+            "bravos_momentum_score",
+            "hy_oas",
+            "atr_pct",
+            "bollinger_width",
+            "rsi_14",
+            "macd",
+            "macd_hist",
             "sp500_proxy",
             "sp500_proxy_source",
             "volatility_1y",
@@ -113,6 +140,11 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "bond_volatility_1y",
             "bond_drawdown_1y",
             "bond_1y_volatility_percentile",
+            "btc_proxy",
+            "btc_proxy_source",
+            "btc_volatility_1y",
+            "btc_drawdown_1y",
+            "btc_1y_volatility_percentile",
             "dxy_proxy",
             "dxy_proxy_source",
             "dxy_volatility_1y",
@@ -134,17 +166,25 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
     if "nber_recession" in aggregation:
         aggregation["nber_recession"] = "max"
     resampled = subset.resample(rule).agg(aggregation)
+    if resampled.empty:
+        return subset.copy()
     # A right-labelled weekly/monthly bucket can end after the last observation.
-    return resampled.loc[: subset.index.max()]
+    resampled = resampled.loc[: subset.index.max()]
+    # Keep the current partial bucket visible so the HUD and the header stat
+    # agree on the latest daily Bravos reading.
+    if not resampled.empty and subset.index[-1] > resampled.index[-1]:
+        resampled.loc[subset.index[-1]] = subset.iloc[-1]
+    return resampled
 
 
 def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
     points: list[dict[str, Any]] = []
     for timestamp, row in frame.iterrows():
         strength = _as_float(row.get("macro_strength"), 2)
+        bravos = _as_float(row.get("bravos_score"), 2)
         sp500 = _as_float(row.get("sp500_proxy"), 2)
         usrec = _as_int(row.get("nber_recession"))
-        if strength is None and sp500 is None and usrec is None:
+        if strength is None and bravos is None and sp500 is None and usrec is None:
             continue
         phase = (
             "recession"
@@ -158,6 +198,27 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 "date": timestamp.date().isoformat(),
                 "strength": strength,
                 "regime_state": _as_str(row.get("regime_state")),
+                "bravos_score": bravos,
+                "bravos_composite": _as_float(
+                    row.get("bravos_composite"), 2
+                ),
+                "bravos_bucket": _as_str(row.get("bravos_bucket")),
+                "macro_score": _as_float(row.get("macro_score"), 2),
+                "credit_score": _as_float(row.get("credit_score"), 2),
+                "bravos_volatility_score": _as_float(
+                    row.get("bravos_volatility_score"), 2
+                ),
+                "bravos_momentum_score": _as_float(
+                    row.get("bravos_momentum_score"), 2
+                ),
+                "hy_oas": _as_float(row.get("hy_oas"), 3),
+                "atr_pct": _as_float(row.get("atr_pct"), 3),
+                "bollinger_width": _as_float(
+                    row.get("bollinger_width"), 3
+                ),
+                "rsi_14": _as_float(row.get("rsi_14"), 2),
+                "macd": _as_float(row.get("macd"), 4),
+                "macd_hist": _as_float(row.get("macd_hist"), 4),
                 "volatility_1y": _as_float(row.get("volatility_1y"), 2),
                 "drawdown_1y": _as_float(row.get("drawdown_1y"), 2),
                 "1y_volatility_percentile": _as_float(
@@ -190,6 +251,17 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 ),
                 "bond_1y_volatility_percentile": _as_float(
                     row.get("bond_1y_volatility_percentile"), 1
+                ),
+                "btc_proxy": _as_float(row.get("btc_proxy"), 2),
+                "btc_proxy_source": _as_str(row.get("btc_proxy_source")),
+                "btc_volatility_1y": _as_float(
+                    row.get("btc_volatility_1y"), 2
+                ),
+                "btc_drawdown_1y": _as_float(
+                    row.get("btc_drawdown_1y"), 2
+                ),
+                "btc_1y_volatility_percentile": _as_float(
+                    row.get("btc_1y_volatility_percentile"), 1
                 ),
                 "dxy_proxy": _as_float(row.get("dxy_proxy"), 2),
                 "dxy_proxy_source": _as_str(
@@ -242,14 +314,96 @@ def _proxy_sources_from_frame(frame: pd.DataFrame) -> list[dict[str, Any]]:
     return sources
 
 
+def _event_window_stats(
+    frame: pd.DataFrame,
+    start: str,
+    end: str,
+    column: str,
+) -> dict[str, Any] | None:
+    """Peak-to-trough market statistics for one asset inside an event window."""
+    if column not in frame.columns:
+        return None
+    series = pd.to_numeric(frame[column], errors="coerce").loc[start:end].dropna()
+    if series.empty:
+        return None
+    peak = float(series.max())
+    trough = float(series.min())
+    first = float(series.iloc[0])
+    last = float(series.iloc[-1])
+    drawdown = ((trough / peak) - 1.0) * 100.0 if peak > 0 else None
+    total_return = ((last / first) - 1.0) * 100.0 if first > 0 else None
+    return {
+        "start_value": round(first, 4),
+        "peak_value": round(peak, 4),
+        "trough_value": round(trough, 4),
+        "end_value": round(last, 4),
+        "peak_date": series.idxmax().date().isoformat(),
+        "trough_date": series.idxmin().date().isoformat(),
+        "drawdown_pct": round(drawdown, 2) if drawdown is not None else None,
+        "return_pct": round(total_return, 2) if total_return is not None else None,
+        "observations": int(series.size),
+    }
+
+
+def _value_on_or_before(
+    frame: pd.DataFrame,
+    column: str,
+    when: str,
+) -> tuple[float | None, str | None]:
+    if column not in frame.columns:
+        return None, None
+    series = pd.to_numeric(frame[column], errors="coerce").loc[:when].dropna()
+    if series.empty:
+        return None, None
+    return float(series.iloc[-1]), series.index[-1].date().isoformat()
+
+
+def _event_bravos(
+    frame: pd.DataFrame,
+    start: str,
+    end: str,
+    peak: str,
+    trough: str | None,
+) -> dict[str, Any]:
+    if "bravos_score" not in frame.columns:
+        return {}
+    series = pd.to_numeric(frame["bravos_score"], errors="coerce").loc[start:end].dropna()
+    at_peak, peak_asof = _value_on_or_before(frame, "bravos_score", peak)
+    trough_date = trough or end
+    at_trough, trough_asof = _value_on_or_before(
+        frame, "bravos_score", trough_date
+    )
+    bucket_at_peak = None
+    bucket_at_trough = None
+    if peak_asof is not None and "bravos_bucket" in frame.columns:
+        bucket_at_peak = _as_str(frame.loc[peak_asof, "bravos_bucket"])
+    if trough_asof is not None and "bravos_bucket" in frame.columns:
+        bucket_at_trough = _as_str(frame.loc[trough_asof, "bravos_bucket"])
+    return {
+        "at_peak": round(at_peak, 2) if at_peak is not None else None,
+        "at_peak_date": peak_asof,
+        "at_peak_bucket": bucket_at_peak,
+        "at_trough": round(at_trough, 2) if at_trough is not None else None,
+        "at_trough_date": trough_asof,
+        "at_trough_bucket": bucket_at_trough,
+        "min": round(float(series.min()), 2) if not series.empty else None,
+        "min_date": series.idxmin().date().isoformat() if not series.empty else None,
+        "max": round(float(series.max()), 2) if not series.empty else None,
+        "max_date": series.idxmax().date().isoformat() if not series.empty else None,
+        "observations": int(series.size),
+    }
+
+
 class MacroRegimeService:
     def __init__(
         self,
         artifact_path: Path | str = DEFAULT_ARTIFACT,
         meta_path: Path | str = DEFAULT_META,
+        crypto_milestones_path: Path | str = DEFAULT_CRYPTO_MILESTONES,
     ) -> None:
         self.artifact_path = Path(artifact_path)
         self.meta_path = Path(meta_path)
+        self.crypto_milestones_path = Path(crypto_milestones_path)
         self._frame: pd.DataFrame | None = None
         self._meta: dict[str, Any] = {}
         self._crashes: list[dict[str, Any]] = []
@@ -294,6 +448,7 @@ class MacroRegimeService:
         if not proxy_sources:
             proxy_sources = _proxy_sources_from_frame(frame)
         strength = self._meta.get("strength", {})
+        bravos = self._meta.get("bravos", {})
         source = self._meta.get("source", {})
         notes = self._meta.get("notes") or [
             "Descriptive historical classification. Not a forecast or investment advice."
@@ -306,6 +461,10 @@ class MacroRegimeService:
             "strength_weights": strength.get("weights", dict(STRENGTH_WEIGHTS)),
             "regime_thresholds": strength.get("regime_thresholds"),
             "latest_strength": strength.get("latest"),
+            "bravos_version": bravos.get("version", BRAVOS_VERSION),
+            "bravos_weights": bravos.get("weights"),
+            "bravos_buckets": bravos.get("buckets"),
+            "latest_bravos": bravos.get("latest"),
             "proxy_sources": proxy_sources,
             "nber_source": self._meta.get("nber", {}).get("source", "USREC"),
             "transport": source.get("transport"),
@@ -537,6 +696,69 @@ class MacroRegimeService:
                 "sample_observations": int(len(sample)),
             },
             "meta": self._meta_payload(frame),
+        }
+
+    def crypto_milestones(self) -> dict[str, Any]:
+        """Editorial crypto windows enriched with asset and Bravos readings."""
+        frame = self._load()
+        artifact = _read_json(self.crypto_milestones_path)
+        definitions = artifact.get("events")
+        if not isinstance(definitions, list) or not definitions:
+            definitions = milestone_definitions()
+
+        events: list[dict[str, Any]] = []
+        for definition in definitions:
+            if not isinstance(definition, dict):
+                continue
+            item = dict(definition)
+            window = item.get("window") or {}
+            start = str(window.get("start") or "")
+            end = str(window.get("end") or "")
+            peak = str(item.get("peak") or start)
+            trough = item.get("trough")
+            if not start or not end:
+                continue
+
+            assets: dict[str, Any] = {}
+            for key, (column, label) in EVENT_ASSETS.items():
+                stats = _event_window_stats(frame, start, end, column)
+                assets[key] = {
+                    "label": label,
+                    "available": stats is not None,
+                    **(stats or {}),
+                }
+            item["assets"] = assets
+            item["bravos"] = _event_bravos(
+                frame,
+                start,
+                end,
+                peak,
+                str(trough) if trough else None,
+            )
+            events.append(item)
+
+        return {
+            "as_of": frame.index.max().date().isoformat(),
+            "coverage": {
+                "start": frame.index.min().date().isoformat(),
+                "end": frame.index.max().date().isoformat(),
+                "years": round(
+                    (frame.index.max() - frame.index.min()).days / 365.25,
+                    1,
+                ),
+            },
+            "version": artifact.get("version", CRYPTO_MILESTONES_VERSION),
+            "kind": "editorial",
+            "assets": {
+                key: label for key, (_, label) in EVENT_ASSETS.items()
+            },
+            "events": events,
+            "notes": [
+                "Event windows are hand-curated comparison windows, not statistically detected crash dates.",
+                "Bravos is a macro/volatility/momentum composite from the same long-run artifact; it is not a crypto-specific model.",
+                "Bitcoin prices are Blockchain.com daily market prices from 2010-08-18; Genesis predates a market quote.",
+                "Astrology is a historical lens, not a forecast or causal claim.",
+            ],
         }
 
     def forecast(self) -> dict[str, Any]:

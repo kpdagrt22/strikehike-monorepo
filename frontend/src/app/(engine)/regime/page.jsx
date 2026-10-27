@@ -7,12 +7,11 @@ import { useTheme } from "next-themes";
 import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
 import { PhasePlane } from "@/components/regime/PhasePlane";
 import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
-import { SkyStrip } from "@/components/regime/SkyStrip";
-import { TransitionMatrix } from "@/components/regime/TransitionMatrix";
 import {
+  bravosTone,
   formatDate,
   formatNumber,
-  formatScore,
+  formatSigned,
 } from "@/components/regime/regimeUtils";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -49,13 +48,16 @@ function StatusBadge({ status }) {
   );
 }
 
-function Stat({ label, value, suffix, detail }) {
+function Stat({ label, value, suffix, detail, accent }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30">
       <p className="text-micro uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
         {label}
       </p>
-      <p className="mt-1 font-mono text-xl font-medium tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4]">
+      <p
+        className="mt-1 font-mono text-xl font-medium tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4]"
+        style={accent ? { color: accent } : undefined}
+      >
         {value}
         {suffix ? (
           <span className="ml-1 text-micro font-normal tracking-normal text-black/35 dark:text-white/35">
@@ -75,7 +77,7 @@ function LoadingState() {
     <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-micro uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
-          Loading 120 years of macro history
+          Loading 170 years of macro history
         </p>
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d8b47a]" />
       </div>
@@ -100,8 +102,8 @@ function ErrorState({ message, onRetry }) {
             {message || "The API returned an empty response."}
           </p>
           <p className="mt-2 text-micro leading-relaxed text-black/40 dark:text-white/40">
-            A 503 means the Phase 1 parquet artifact has not been published to
-            this environment yet. The rest of the Chrono engine is unaffected.
+            A 503 means the parquet artifact has not been published to this
+            environment yet. The rest of the Chrono engine is unaffected.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -130,6 +132,7 @@ function MethodDetails({ meta }) {
     ? meta.proxy_sources
     : [];
   const allNotes = [
+    "Bravos is a 40/30/30 descriptive composite: Macro 40% (credit 40%, Fed 30%, curve 30%), Volatility 30% (14d ATR / 20d Bollinger width) and Momentum 30% (MACD 12/26/9 / 14d RSI). The 0-100 composite is mapped to -50..+50; zero is neutral and +25 / -25 begin the strong / extreme bands.",
     ...notes,
     "The 30-day disruptive-risk estimate is a lightweight logistic regression on the V2 fed_cross, curve_cross and sahm_alert features; it is macro-regime risk, not a security-specific forecast.",
   ];
@@ -176,8 +179,9 @@ function MethodDetails({ meta }) {
 
       <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
         Data version {meta?.data_version ?? "—"} ·{" "}
-        {meta?.strength_version ?? "—"} · Source FRED. Descriptive historical
-        research. Not investment advice.
+        {meta?.bravos_version ?? meta?.strength_version ?? "—"} · Source FRED,
+        World Bank, Blockchain.com. Descriptive historical research. Not
+        investment advice.
       </p>
     </details>
   );
@@ -189,6 +193,7 @@ export default function RegimePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState("sp500");
+  const [compareAssets, setCompareAssets] = useState(false);
   const [forecast, setForecast] = useState(null);
   const [state, setState] = useState({
     status: "loading",
@@ -269,25 +274,42 @@ export default function RegimePage() {
   }, []);
 
   const data = state.data;
-  const latest = data?.meta?.latest_strength ?? null;
+  const latestBravos = data?.meta?.latest_bravos ?? null;
+  const latestTone = bravosTone(latestBravos?.bucket, isDark);
   const selectedCrash = useMemo(
-    () =>
-      data?.crashes.find((crash) => crash.id === selectedId) ?? null,
+    () => data?.crashes.find((crash) => crash.id === selectedId) ?? null,
     [data, selectedId],
   );
-  const orreryDate = selectedCrash?.start ?? latest?.date ?? null;
-  const skyDate = selectedCrash?.within_coverage
-    ? selectedCrash.start
-    : latest?.date ?? data?.coverage?.end ?? null;
-  const skyContext = selectedCrash?.within_coverage
+  const phaseDate =
+    (selectedCrash?.within_coverage ? selectedCrash.start : null) ??
+    latestBravos?.date ??
+    data?.coverage?.end ??
+    null;
+  const phasePoint = useMemo(() => {
+    if (!data?.timeline || !phaseDate) return null;
+    return (
+      data.timeline.find((point) => point.date >= phaseDate) ??
+      data.timeline.at(-1) ??
+      null
+    );
+  }, [data, phaseDate]);
+  const phaseContext = selectedCrash?.within_coverage
     ? `${selectedCrash.name} peak`
     : "Latest observation";
+  const orreryDate = selectedCrash?.start ?? latestBravos?.date ?? null;
 
   const handleSelect = useCallback((crash) => {
     setSelectedId(crash.id);
     useChronoStore.getState().setFocusedDate(crash.start);
     const url = new URL(window.location.href);
     url.searchParams.set("d", crash.start);
+    window.history.replaceState(null, "", url);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setSelectedId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("d");
     window.history.replaceState(null, "", url);
   }, []);
 
@@ -305,13 +327,13 @@ export default function RegimePage() {
               Regime Intelligence
             </p>
             <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-6xl">
-              The 120-year macro regime atlas.
+              The −50 to +50 macro atlas.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
-              NBER recession windows, a spliced long-run equity proxy, London
-              gold and a Treasury bond target, plus the StrikeHike 0–100 macro
-              strength meter and a lightweight 30-day disruptive-risk estimate.
-              Research, not investment advice.
+              One full-bleed market chart. The Bravos composite blends credit,
+              volatility and momentum; every NBER window carries its own
+              drawdown and score. Compare the S&amp;P 500, gold and Treasuries
+              on a single percentage scale. Research, not investment advice.
             </p>
           </div>
 
@@ -335,18 +357,15 @@ export default function RegimePage() {
           <>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat
-                label="Latest strength"
-                value={latest ? formatScore(latest.score) : "—"}
-                suffix="/ 100"
-                detail={
-                  latest?.label
-                    ? `${latest.label[0].toUpperCase()}${latest.label.slice(1)}`
-                    : "Awaiting archive"
-                }
+                label="Latest Bravos"
+                value={formatSigned(latestBravos?.score)}
+                suffix="/ +50"
+                detail={latestTone.label}
+                accent={latestTone.color}
               />
               <Stat
                 label="As of"
-                value={latest?.date ? formatDate(latest.date) : "—"}
+                value={latestBravos?.date ? formatDate(latestBravos.date) : "—"}
                 detail={`${formatNumber(data.point_count)} timeline points`}
               />
               <Stat
@@ -357,17 +376,9 @@ export default function RegimePage() {
               <Stat
                 label="NBER windows"
                 value={String(data.crashes.length)}
-                detail="Select a dossier in the terminal"
+                detail="Hover a red band · click to zoom"
               />
             </div>
-
-            {skyDate ? (
-              <SkyStrip
-                key={skyDate}
-                asOf={skyDate}
-                contextLabel={skyContext}
-              />
-            ) : null}
 
             <RegimeTimeline
               timeline={data.timeline}
@@ -380,6 +391,8 @@ export default function RegimePage() {
               assetKey={selectedAsset}
               onAssetChange={setSelectedAsset}
               forecast={forecast}
+              compareAssets={compareAssets}
+              onCompareToggle={() => setCompareAssets((value) => !value)}
             />
 
             <AnimatePresence mode="wait" initial={false}>
@@ -388,30 +401,27 @@ export default function RegimePage() {
                   key={selectedCrash.id}
                   crash={selectedCrash}
                   isDark={isDark}
-                  onClose={() => setSelectedId(null)}
+                  onClose={handleClose}
                 />
               ) : null}
             </AnimatePresence>
 
-            <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
-              {skyDate ? (
-                <PhasePlane
-                  key={skyDate}
-                  asOf={skyDate}
-                  contextLabel={skyContext}
-                  isDark={isDark}
-                  assetKey={selectedAsset}
-                />
-              ) : null}
-              <TransitionMatrix isDark={isDark} />
+            <div className="mt-4">
+              <PhasePlane
+                point={phasePoint}
+                asOf={phasePoint?.date ?? phaseDate}
+                contextLabel={phaseContext}
+                isDark={isDark}
+                assetKey={selectedAsset}
+              />
             </div>
 
             <MethodDetails meta={data.meta} />
 
             <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                FRED macro archive ·{" "}
-                {data.meta?.strength_version ?? "v2-zero-lag"}
+                FRED · World Bank · Blockchain.com ·{" "}
+                {data.meta?.bravos_version ?? "bravos-v1"}
               </span>
               <Link
                 href={

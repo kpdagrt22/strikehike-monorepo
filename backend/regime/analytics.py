@@ -30,6 +30,12 @@ STRENGTH_WEIGHTS: dict[str, float] = {
     "curve_score": 0.30,
     "labor_score": 0.40,
 }
+BRAVOS_VERSION = "bravos-v1"
+BRAVOS_WEIGHTS: dict[str, float] = {
+    "macro": 0.40,
+    "volatility": 0.30,
+    "momentum": 0.30,
+}
 
 # Well-known NBER peaks. The key is the first recession month from USREC.
 # Any episode not listed falls back to "Recession of YYYY".
@@ -223,6 +229,7 @@ def _market_phase_features(frame: pd.DataFrame) -> pd.DataFrame:
     for value_column, source_column, prefix in (
         ("gold_proxy", "gold_proxy_source", "gold_"),
         ("bond_proxy", "bond_proxy_source", "bond_"),
+        ("btc_proxy", "btc_proxy_source", "btc_"),
         ("dxy_proxy", "dxy_proxy_source", "dxy_"),
     ):
         if value_column in frame.columns:
@@ -394,6 +401,140 @@ def calculate_macro_strength(frame: pd.DataFrame) -> pd.Series:
     )
 
 
+def _continuous_proxy(frame: pd.DataFrame) -> pd.Series:
+    """Chain S&P source segments into a continuous price index for indicators."""
+    proxy = pd.to_numeric(frame.get("sp500_proxy"), errors="coerce")
+    if proxy is None or not proxy.notna().any():
+        return _nan_series(frame.index, "sp500_proxy")
+    source = frame.get("sp500_proxy_source")
+    returns = proxy.pct_change()
+    if source is not None:
+        source = source.astype("string")
+        returns = returns.where(source.eq(source.shift()))
+    returns = returns.where(returns.abs() < 1.0).fillna(0.0)
+    adjusted = (1.0 + returns).cumprod()
+    adjusted = adjusted.where(proxy.notna())
+    return adjusted.rename("sp500_continuous")
+
+
+def _bravos_bucket(score: pd.Series) -> pd.Series:
+    bucket = pd.Series(pd.NA, index=score.index, dtype="string")
+    bucket.loc[score.ge(25.0)] = "strong_bullish"
+    bucket.loc[score.ge(0.0) & score.lt(25.0)] = "calm_bullish"
+    bucket.loc[score.lt(0.0) & score.gt(-25.0)] = "bearish_warning"
+    bucket.loc[score.le(-25.0)] = "extreme_bearish"
+    return bucket
+
+
+def calculate_bravos_composite(frame: pd.DataFrame) -> pd.DataFrame:
+    """Compute the Bravos-style macro/volatility/momentum composite.
+
+    Macro (40%): high-yield credit spread (40% inside macro), Fed panic/easing
+    component (30%) and curve level/momentum component (30%). Volatility (30%):
+    14d ATR and 20d Bollinger band width, both inverted so calm tape is
+    constructive. Momentum (30%): MACD (12/26/9) and 14d RSI.
+
+    ``bravos_score`` is the final 0-100 composite transformed to -50..+50.
+    Zero is the neutral baseline. The credit series starts in 1997, so the
+    composite intentionally begins there rather than manufacturing a pre-credit
+    score.
+    """
+    out = pd.DataFrame(index=frame.index)
+    proxy = _continuous_proxy(frame)
+    credit = _first_present(frame, ("BAMLH0A0HYM2",))
+    if credit is None:
+        credit = _nan_series(frame.index, "BAMLH0A0HYM2")
+    else:
+        credit = pd.to_numeric(credit, errors="coerce")
+
+    # Price-derived indicators on a source-chained proxy.
+    atr = proxy.diff().abs().rolling(14, min_periods=14).mean()
+    atr_pct = (atr / proxy.replace(0.0, np.nan)) * 100.0
+    middle = proxy.rolling(20, min_periods=20).mean()
+    deviation = proxy.rolling(20, min_periods=20).std()
+    upper = middle + 2.0 * deviation
+    lower = middle - 2.0 * deviation
+    bollinger_width = (
+        (upper - lower) / middle.replace(0.0, np.nan)
+    ) * 100.0
+
+    ema12 = proxy.ewm(span=12, adjust=False, min_periods=12).mean()
+    ema26 = proxy.ewm(span=26, adjust=False, min_periods=26).mean()
+    macd = ema12 - ema26
+    macd_signal = macd.ewm(span=9, adjust=False, min_periods=9).mean()
+    macd_hist = macd - macd_signal
+    macd_pct = (macd / proxy.replace(0.0, np.nan)) * 100.0
+
+    delta = proxy.diff()
+    gains = delta.clip(lower=0.0)
+    losses = (-delta).clip(lower=0.0)
+    avg_gain = gains.rolling(14, min_periods=14).mean()
+    avg_loss = losses.rolling(14, min_periods=14).mean()
+    relative_strength = avg_gain / avg_loss.replace(0.0, np.nan)
+    rsi = 100.0 - (100.0 / (1.0 + relative_strength))
+    rsi = rsi.mask(avg_loss.eq(0.0) & avg_gain.gt(0.0), 100.0)
+    rsi = rsi.mask(avg_loss.eq(0.0) & avg_gain.eq(0.0), 50.0)
+
+    out["hy_oas"] = credit
+    out["credit_score"] = 100.0 - _scale(credit, 3.0, 10.0)
+    out["atr_14"] = atr
+    out["atr_pct"] = atr_pct
+    out["bollinger_width"] = bollinger_width
+    out["macd"] = macd
+    out["macd_signal"] = macd_signal
+    out["macd_hist"] = macd_hist
+    out["rsi_14"] = rsi
+
+    fed_score = frame.get("fed_score")
+    curve_score = frame.get("curve_score")
+    if fed_score is None:
+        fed_score = _nan_series(frame.index, "fed_score")
+    if curve_score is None:
+        curve_score = _nan_series(frame.index, "curve_score")
+
+    credit_component = out["credit_score"]
+    macro_score = (
+        0.40 * credit_component
+        + 0.30 * fed_score
+        + 0.30 * curve_score
+    ).where(
+        credit_component.notna()
+        & fed_score.notna()
+        & curve_score.notna()
+    )
+    out["macro_score"] = macro_score
+
+    atr_score = 100.0 - _scale(out["atr_pct"], 0.5, 4.0)
+    bollinger_score = 100.0 - _scale(out["bollinger_width"], 2.0, 20.0)
+    out["atr_score"] = atr_score
+    out["bollinger_score"] = bollinger_score
+    volatility_score = 0.50 * atr_score + 0.50 * bollinger_score
+    out["bravos_volatility_score"] = volatility_score
+
+    macd_score = _scale(macd_pct, -1.0, 1.0)
+    rsi_score = _scale(rsi, 30.0, 70.0)
+    out["macd_score"] = macd_score
+    out["rsi_score"] = rsi_score
+    momentum_score = 0.50 * macd_score + 0.50 * rsi_score
+    out["bravos_momentum_score"] = momentum_score
+
+    composite = (
+        BRAVOS_WEIGHTS["macro"] * macro_score
+        + BRAVOS_WEIGHTS["volatility"] * volatility_score
+        + BRAVOS_WEIGHTS["momentum"] * momentum_score
+    )
+    composite = composite.where(
+        macro_score.notna()
+        & volatility_score.notna()
+        & momentum_score.notna()
+    )
+    out["bravos_composite"] = composite
+    score = composite - 50.0
+    out["bravos_score"] = score
+    out["bravos_bucket"] = _bravos_bucket(score)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # NBER alignment and crash objects
 # ---------------------------------------------------------------------------
@@ -499,6 +640,8 @@ def pre_crash_snapshot(
         "fed_funds": None,
         "curve_inverted": None,
         "macro_strength": None,
+        "bravos_score": None,
+        "bravos_bucket": None,
         "sp500_proxy": None,
         "phase": None,
     }
@@ -522,6 +665,8 @@ def pre_crash_snapshot(
         "fed_funds": fed_funds,
         "curve_inverted": None if t10y2y is None else bool(t10y2y < 0.0),
         "macro_strength": _as_float(row.get("macro_strength"), 2),
+        "bravos_score": _as_float(row.get("bravos_score"), 2),
+        "bravos_bucket": _as_str(row.get("bravos_bucket")),
         "sp500_proxy": _as_float(row.get("sp500_proxy"), 2),
         "phase": _as_str(row.get("nber_phase")),
     }
@@ -571,7 +716,10 @@ def build_sp500_proxy(
     dates). Passing the already-forward-filled frame would let the oldest
     source fill the entire 170-year timeline, which is why the ingestion
     pipeline passes the raw merge separately. Each source is filled forward
-    only to its own last observation, so source boundaries stay honest.
+    only to its own last observation, so source boundaries stay honest. A
+    modern source whose last print is within a month of the frame end carries
+    that print over the stale tail, preventing a lower-priority series from
+    creating a fake splice in the final days.
 
     Levels are not chained across sources and gaps are preserved. The source
     column tells the frontend which segment it is drawing.
@@ -579,6 +727,7 @@ def build_sp500_proxy(
     proxy = pd.Series(np.nan, index=frame.index, name="sp500_proxy", dtype="float64")
     source = pd.Series(pd.NA, index=frame.index, name="sp500_proxy_source", dtype="string")
     source_frame = raw_frame if raw_frame is not None else frame
+    frame_end = frame.index.max()
 
     for column in (
         "M1125AUSM343NNBR",
@@ -592,7 +741,17 @@ def build_sp500_proxy(
         last_valid = raw.last_valid_index()
         if last_valid is None:
             continue
-        filled = raw.ffill().loc[:last_valid]
+        # A modern source current to within a month should carry its last print
+        # over a stale weekend/holiday tail. Without this, a lower-priority
+        # series can jump in and create a fake splice at the end of the tape.
+        filled = (
+            raw.ffill()
+            if (
+                last_valid >= frame_end - pd.Timedelta(days=30)
+                and int(raw.notna().sum()) >= 5
+            )
+            else raw.ffill().loc[:last_valid]
+        )
         mask = proxy.isna() & filled.notna()
         proxy.loc[mask] = filled.loc[mask]
         source.loc[mask] = column

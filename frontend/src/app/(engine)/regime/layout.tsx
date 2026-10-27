@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 const TITLE = "Regime Intelligence";
 const DESCRIPTION =
-  "A 120-year atlas of US macro regimes: NBER recession windows, a long-run equity proxy and the StrikeHike 0–100 macro strength meter. Descriptive history, not a forecast.";
+  "A 170-year atlas of US macro regimes: NBER recession windows, a long-run equity proxy, the Bravos -50 to +50 composite and multi-asset comparison. Descriptive history, not a forecast.";
 
 export const metadata: Metadata = {
   title: TITLE,

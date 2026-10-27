@@ -1,22 +1,20 @@
 "use client";
 
 import {
+  bravosTone,
   formatDate,
   formatNumber,
   formatPercent,
   formatScore,
+  formatSigned,
 } from "@/components/regime/regimeUtils";
 import {
   ASSET_ORDER,
   ASSET_TARGETS,
   assetChartColor,
 } from "@/components/regime/assetTargets";
-import {
-  getRegimeToneColor,
-  getRegimeToneLabel,
-} from "@/lib/regimeTone";
 
-function Metric({ label, value, accent }) {
+function Metric({ label, value, accent, detail }) {
   return (
     <div className="min-w-0">
       <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
@@ -35,8 +33,20 @@ function Metric({ label, value, accent }) {
       >
         {value}
       </p>
+      {detail ? (
+        <p className="mt-0.5 truncate text-[10px] text-black/30 dark:text-white/30">
+          {detail}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function pillarAccent(value, isDark) {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  if (Number(value) >= 60) return isDark ? "#5eead4" : "#0f766e";
+  if (Number(value) <= 40) return isDark ? "#fb7185" : "#c0442f";
+  return isDark ? "#fbbf24" : "#b45309";
 }
 
 export function MacroHUD({
@@ -48,49 +58,11 @@ export function MacroHUD({
   assetKey = "sp500",
   onAssetChange,
   forecast,
+  compareAssets = false,
+  onCompareToggle,
 }) {
-  const toneColor =
-    getRegimeToneColor(point?.regime_state, isDark) ??
-    (isDark ? "#f2ede4" : "#14121a");
-  const toneLabel = getRegimeToneLabel(point?.regime_state) ?? "No regime";
-  const glow = `0 0 28px ${toneColor}66, 0 0 64px ${toneColor}24`;
-  const curve = point?.t10y2y;
-  const curveAccent =
-    curve == null
-      ? null
-      : Number(curve) < 0
-        ? isDark
-          ? "#fb7185"
-          : "#c0442f"
-        : isDark
-          ? "#34d399"
-          : "#0f766e";
-  const volPercentile = point?.[asset.percentileField];
-  const drawdown = point?.[asset.drawdownField];
-  const assetValue = point?.[asset.valueField];
-  const drawdownAccent =
-    drawdown == null
-      ? null
-      : Number(drawdown) < -10
-        ? isDark
-          ? "#fb7185"
-          : "#c0442f"
-        : isDark
-          ? "#5eead4"
-          : "#0f766e";
-  const phase = point?.phase
-    ? `${point.phase[0].toUpperCase()}${point.phase.slice(1)}`
-    : "—";
-  const phaseAccent =
-    point?.phase === "recession"
-      ? isDark
-        ? "#fb7185"
-        : "#c0442f"
-      : point?.phase === "expansion"
-        ? isDark
-          ? "#5eead4"
-          : "#0f766e"
-        : null;
+  const tone = bravosTone(point?.bravos_bucket, isDark);
+  const glow = `0 0 28px ${tone.color}66, 0 0 64px ${tone.color}24`;
   const risk = forecast?.risk_pct;
   const riskColor =
     risk == null
@@ -108,90 +80,142 @@ export function MacroHUD({
           : isDark
             ? "#fb7185"
             : "#c0442f";
+  const assetValue = point?.[asset.valueField];
+  const macroAccent = pillarAccent(point?.macro_score, isDark);
+  const volAccent = pillarAccent(point?.bravos_volatility_score, isDark);
+  const momentumAccent = pillarAccent(
+    point?.bravos_momentum_score,
+    isDark,
+  );
+  const creditAccent =
+    point?.hy_oas == null
+      ? null
+      : Number(point.hy_oas) >= 8
+        ? isDark
+          ? "#fb7185"
+          : "#c0442f"
+        : Number(point.hy_oas) <= 4
+          ? isDark
+            ? "#5eead4"
+            : "#0f766e"
+          : isDark
+            ? "#fbbf24"
+            : "#b45309";
 
   return (
     <div className="mx-auto w-full max-w-[1600px] px-3 pb-2.5 pt-3 sm:px-5 sm:pb-4 sm:pt-5 lg:px-8">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-x-8 sm:gap-y-4">
+        <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap sm:gap-x-8 sm:gap-y-4">
           <div className="min-w-0">
             <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/35 dark:text-white/35">
-              Macro strength
+              Bravos composite
             </p>
             <div className="mt-1 flex items-end gap-1.5 sm:gap-2">
               <span
                 className="font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] sm:text-[4rem]"
-                style={{ color: toneColor, textShadow: glow }}
+                style={{ color: tone.color, textShadow: glow }}
               >
-                {formatScore(point?.strength)}
+                {formatSigned(point?.bravos_score)}
               </span>
               <span className="pb-1 font-mono text-micro text-black/30 dark:text-white/30">
-                / 100
+                / +50
               </span>
             </div>
+            <p className="mt-1 font-mono text-[10px] text-black/30 dark:text-white/30">
+              −50 ↔ +50 · zero is neutral
+            </p>
           </div>
 
-          <div className="min-w-0 border-l border-black/5 pl-3 dark:border-white/5 sm:min-w-[168px] sm:pl-6">
+          <div className="min-w-0 border-l border-black/5 pl-3 dark:border-white/5 sm:min-w-[190px] sm:pl-6">
             <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/35 dark:text-white/35">
-              Regime state
+              Signal
             </p>
             <p
               className="mt-1 text-xl font-semibold leading-none tracking-[-0.05em] sm:text-3xl"
-              style={{ color: toneColor, textShadow: glow }}
+              style={{ color: tone.color, textShadow: glow }}
             >
-              {toneLabel}
+              {tone.label}
             </p>
-            <p className="mt-1.5 max-w-[260px] truncate text-micro text-black/40 dark:text-white/40">
+            <p className="mt-1.5 max-w-[280px] truncate text-micro text-black/40 dark:text-white/40">
               {activeCrash
-                ? activeCrash.name
+                ? `${activeCrash.name} · NBER window`
                 : point
-                  ? "Crosshair readout"
+                  ? "Crosshair readout · hover the chart"
                   : "Awaiting macro archive"}
             </p>
           </div>
         </div>
 
         <div className="flex flex-col items-start gap-2 xl:items-end">
-          <div
-            role="group"
-            aria-label="Primary asset"
-            className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 backdrop-blur-2xl dark:border-white/5 dark:bg-white/[0.035]"
-          >
-            {ASSET_ORDER.map((key) => {
-              const target = ASSET_TARGETS[key];
-              const selected = key === assetKey;
-              const color = assetChartColor(target, isDark);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onAssetChange?.(key)}
-                  aria-pressed={selected}
-                  className={`rounded-full px-2.5 py-1 text-micro font-medium transition-[background-color,color,box-shadow] duration-200 ${
-                    selected
-                      ? ""
-                      : "text-black/45 hover:text-black/75 dark:text-white/45 dark:hover:text-white/75"
-                  }`}
-                  style={
-                    selected
-                      ? {
-                          color,
-                          backgroundColor: `${color}1f`,
-                          boxShadow: `0 0 18px ${color}22`,
-                        }
-                      : undefined
-                  }
-                >
-                  {target.label}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div
+              role="group"
+              aria-label="Primary asset"
+              className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 backdrop-blur-2xl dark:border-white/5 dark:bg-white/[0.035]"
+            >
+              {ASSET_ORDER.map((key) => {
+                const target = ASSET_TARGETS[key];
+                const selected = key === assetKey;
+                const color = assetChartColor(target, isDark);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onAssetChange?.(key)}
+                    aria-pressed={selected}
+                    className={`rounded-full px-2.5 py-1 text-micro font-medium transition-[background-color,color,box-shadow] duration-200 ${
+                      selected
+                        ? ""
+                        : "text-black/45 hover:text-black/75 dark:text-white/45 dark:hover:text-white/75"
+                    }`}
+                    style={
+                      selected
+                        ? {
+                            color,
+                            backgroundColor: `${color}1f`,
+                            boxShadow: `0 0 18px ${color}22`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {target.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={onCompareToggle}
+              aria-pressed={compareAssets}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-micro font-medium transition-colors ${
+                compareAssets
+                  ? "border-[#c0442f]/25 bg-[#f05d49]/10 text-[#c0442f] dark:border-[#ff8b77]/25 dark:bg-[#f05d49]/15 dark:text-[#ff8b77]"
+                  : "border-black/5 text-black/50 hover:bg-black/[0.04] hover:text-black/75 dark:border-white/5 dark:text-white/50 dark:hover:bg-white/[0.06] dark:hover:text-white/75"
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3 w-3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 17l5-6 4 4 7-9" />
+                <path d="M4 21h16" />
+              </svg>
+              Compare assets
+            </button>
           </div>
 
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 xl:justify-end">
             <span className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-black/35 dark:text-white/35">
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: toneColor, boxShadow: glow }}
+                style={{ backgroundColor: tone.color, boxShadow: glow }}
                 aria-hidden="true"
               />
               Snapshot
@@ -200,7 +224,8 @@ export function MacroHUD({
               {formatDate(point?.date)}
             </p>
             <p className="text-micro text-black/35 dark:text-white/35">
-              {resolution ? `${resolution} tape` : "Macro tape"} · hover to scrub
+              {resolution ? `${resolution} tape` : "Macro tape"} · hover to
+              scrub
             </p>
           </div>
 
@@ -233,26 +258,36 @@ export function MacroHUD({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2.5 border-t border-black/5 pt-3 dark:border-white/5 sm:mt-4 sm:gap-x-4 sm:gap-y-3 lg:grid-cols-6">
+      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-black/5 pt-3 dark:border-white/5 sm:mt-4 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-3 lg:grid-cols-5">
         <Metric
-          label="Fed funds"
-          value={formatPercent(point?.fed_funds, 2)}
-        />
-        <Metric label="10Y–2Y" value={formatPercent(curve, 2)} accent={curveAccent} />
-        <Metric
-          label="1Y vol %ile"
-          value={volPercentile == null ? "—" : formatNumber(volPercentile, 1)}
+          label="Macro pillar"
+          value={`${formatScore(point?.macro_score)} / 100`}
+          accent={macroAccent}
+          detail="Credit · Fed · curve"
         />
         <Metric
-          label="1Y drawdown"
-          value={formatPercent(drawdown, 2)}
-          accent={drawdownAccent}
+          label="Volatility pillar"
+          value={`${formatScore(point?.bravos_volatility_score)} / 100`}
+          accent={volAccent}
+          detail="ATR · Bollinger"
+        />
+        <Metric
+          label="Momentum pillar"
+          value={`${formatScore(point?.bravos_momentum_score)} / 100`}
+          accent={momentumAccent}
+          detail="MACD · RSI"
+        />
+        <Metric
+          label="HY OAS"
+          value={formatPercent(point?.hy_oas, 2)}
+          accent={creditAccent}
+          detail="Credit stress"
         />
         <Metric
           label={asset.metricLabel}
           value={formatNumber(assetValue, asset.precision)}
+          detail={compareAssets ? "Compare mode" : asset.unit}
         />
-        <Metric label="NBER phase" value={phase} accent={phaseAccent} />
       </div>
     </div>
   );

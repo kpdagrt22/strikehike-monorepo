@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 
 from regime.schemas import (
+    CryptoMilestonesResponse,
     ForecastResponse,
     MacroHistoryResponse,
     RegimeRunsResponse,
@@ -80,6 +81,33 @@ def get_regime_runs(
             status_code=503,
             detail=(
                 "Macro regime artifact is not available. Run the Phase 1.5 "
+                "ingestion pipeline and redeploy the backend."
+            ),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/crypto-milestones",
+    response_model=CryptoMilestonesResponse,
+    summary="Editorial crypto event windows enriched with Bravos and asset returns",
+    description=(
+        "Returns the curated Bitcoin/crypto milestone windows (Genesis, Mt. Gox, "
+        "ICO peak, Crypto Winter, COVID, Terra-LUNA and the spot ETF peak), "
+        "each joined to peak-to-trough statistics for the S&P proxy, gold, "
+        "Treasuries and Bitcoin plus the corresponding Bravos readings. The "
+        "Convergence tab uses these windows for side-by-side comparison."
+    ),
+)
+def get_crypto_milestones() -> dict:
+    try:
+        return _service.crypto_milestones()
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Macro regime artifact is not available. Run the Phase 1 "
                 "ingestion pipeline and redeploy the backend."
             ),
         ) from exc

@@ -16,7 +16,7 @@ const HEIGHT = 250;
 const PAD = { top: 28, right: 52, bottom: 34, left: 54 };
 const PLOT_W = WIDTH - PAD.left - PAD.right;
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
-const STRENGTH_TICKS = [0, 50, 100];
+const BRAVOS_TICKS = [-50, 0, 50];
 const EQUITY_TICKS = [100, 1_000, 10_000, 100_000];
 const DAY_MS = 86_400_000;
 
@@ -35,7 +35,7 @@ function Legend({ tone }) {
           className="h-0.5 w-3 rounded-full"
           style={{ backgroundColor: tone.strength }}
         />
-        Strength
+        Bravos
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span
@@ -64,8 +64,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
     const span = Math.max(1, endMs - startMs);
     const x = (ms) =>
       PAD.left + clamp((ms - startMs) / span, 0, 1) * PLOT_W;
-    const yStrength = (value) =>
-      PAD.top + PLOT_H - (clamp(value, 0, 100) / 100) * PLOT_H;
+    const yBravos = (value) =>
+      PAD.top + PLOT_H - ((clamp(value, -50, 50) + 50) / 100) * PLOT_H;
 
     const equityPoints = points.filter(
       (point) =>
@@ -91,11 +91,11 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
       (point) => x(point.ms),
       yEquity,
     );
-    const strengthSegments = buildSegments(
+    const bravosSegments = buildSegments(
       points,
-      (point) => point.strength,
+      (point) => point.bravos_score,
       (point) => x(point.ms),
-      yStrength,
+      yBravos,
     );
 
     const crashStart = parseIsoDay(crash?.start);
@@ -149,10 +149,10 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
       startMs,
       endMs,
       x,
-      yStrength,
+      yBravos,
       yEquity,
       equitySegments,
-      strengthSegments,
+      bravosSegments,
       shadeStart,
       shadeEnd,
       markers,
@@ -172,10 +172,10 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
     startMs,
     endMs,
     x,
-    yStrength,
+    yBravos,
     yEquity,
     equitySegments,
-    strengthSegments,
+    bravosSegments,
     shadeStart,
     shadeEnd,
     markers,
@@ -183,7 +183,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
   } = geometry;
   const baseline = PAD.top + PLOT_H;
   const hasSeries =
-    equitySegments.length > 0 || strengthSegments.length > 0;
+    equitySegments.length > 0 || bravosSegments.length > 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/45 dark:border-white/5 dark:bg-black/25">
@@ -199,11 +199,11 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[620px]"
           role="img"
-          aria-label={`Daily equity proxy and macro strength around ${crash?.name ?? "the selected recession"}`}
+          aria-label={`Daily equity proxy and Bravos score around ${crash?.name ?? "the selected recession"}`}
         >
           <defs>
             <linearGradient
-              id="regime-detail-strength-fill"
+              id="regime-detail-bravos-fill"
               x1="0"
               y1="0"
               x2="0"
@@ -222,17 +222,17 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             </linearGradient>
           </defs>
 
-          {STRENGTH_TICKS.map((tick) => {
-            const y = yStrength(tick);
+          {BRAVOS_TICKS.map((tick) => {
+            const y = yBravos(tick);
             return (
-              <g key={`detail-strength-${tick}`}>
+              <g key={`detail-bravos-${tick}`}>
                 <line
                   x1={PAD.left}
                   x2={WIDTH - PAD.right}
                   y1={y}
                   y2={y}
                   stroke={tone.grid}
-                  strokeDasharray={tick === 50 ? "3 5" : undefined}
+                  strokeDasharray={tick === 0 ? "3 5" : undefined}
                 />
                 <text
                   x={WIDTH - PAD.right + 8}
@@ -285,17 +285,17 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             />
           ))}
 
-          {strengthSegments.map((segment, index) => (
+          {bravosSegments.map((segment, index) => (
             <path
-              key={`detail-strength-area-${index}`}
+              key={`detail-bravos-area-${index}`}
               d={areaFromSegment(segment, baseline)}
-              fill="url(#regime-detail-strength-fill)"
+              fill="url(#regime-detail-bravos-fill)"
             />
           ))}
 
-          {strengthSegments.map((segment, index) => (
+          {bravosSegments.map((segment, index) => (
             <path
-              key={`detail-strength-line-${index}`}
+              key={`detail-bravos-line-${index}`}
               d={pathFromSegment(segment)}
               fill="none"
               stroke={tone.strength}

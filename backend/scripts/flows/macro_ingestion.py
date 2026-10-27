@@ -49,12 +49,18 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from regime.analytics import (  # noqa: E402
+    BRAVOS_WEIGHTS,
+    BRAVOS_VERSION,
     STRENGTH_VERSION,
     STRENGTH_WEIGHTS,
     annotate_nber,
     build_sp500_proxy,
+    calculate_bravos_composite,
     calculate_macro_strength_components,
     nber_episodes,
+)
+from regime.crypto_milestones import (  # noqa: E402
+    write_crypto_milestones_artifact,
 )
 
 REPO_DIR = BACKEND_DIR.parent
@@ -63,7 +69,7 @@ DEFAULT_OUTPUT_DIR = BACKEND_DIR / "data" / "processed"
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 USER_AGENT = "strikehike-regime-intelligence/phase1 (+https://strikehike.com)"
-PIPELINE_VERSION = "phase8-v1"
+PIPELINE_VERSION = "phase12-v1"
 WORLD_BANK_COMMODITY_PAGE = "https://www.worldbank.org/en/research/commodity-markets"
 WORLD_BANK_CMO_FALLBACK = (
     "https://thedocs.worldbank.org/en/doc/"
@@ -72,6 +78,17 @@ WORLD_BANK_CMO_FALLBACK = (
 )
 GOLD_SERIES_ID = "GOLD_LBMA"
 GOLD_SOURCE = "WORLD_BANK_LBMA_GOLD"
+BITCOIN_SERIES_ID = "BTCUSD"
+BITCOIN_SOURCE = "BLOCKCHAIN_COM_MARKET_PRICE"
+BITCOIN_URL = (
+    "https://api.blockchain.info/charts/market-price"
+    "?timespan=all&format=json&sampled=false"
+)
+HY_OAS_ARCHIVE_URL = (
+    "https://gist.githubusercontent.com/jcopeland23451/"
+    "75cf1a099fffbfb0d400a8af60072ee3/raw"
+)
+CRYPTO_MILESTONES_FILENAME = "crypto_milestones.json"
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +180,14 @@ SERIES_REGISTRY: tuple[SeriesSpec, ...] = (
     _spec("T10Y3M", "10-year minus 3-month Treasury spread", "D", "Percent", "rates"),
     _spec("DFF", "Effective federal funds rate (daily)", "D", "Percent", "rates"),
     _spec("BAA10Y", "Moody's Baa minus 10-year Treasury", "D", "Percent", "rates"),
+    _spec(
+        "BAMLH0A0HYM2",
+        "ICE BofA US High Yield Index option-adjusted spread",
+        "D",
+        "Percent",
+        "credit",
+        "target",
+    ),
     _spec("MORTGAGE30US", "30-year fixed mortgage rate", "W", "Percent", "rates"),
     _spec("T10YIE", "10-year breakeven inflation rate", "D", "Percent", "rates"),
     _spec("T5YIE", "5-year breakeven inflation rate", "D", "Percent", "rates"),
@@ -807,6 +832,209 @@ def fetch_gold_series(
         ) from exc
 
 
+def _parse_blockchain_bitcoin(content: bytes) -> pd.Series:
+    """Parse Blockchain.com's market-price JSON into a daily BTC series."""
+    payload = json.loads(content)
+    values = payload.get("values") if isinstance(payload, dict) else None
+    if not isinstance(values, list) or not values:
+        raise ValueError("Blockchain.com returned no Bitcoin price values")
+
+    timestamps = pd.to_datetime(
+        [item.get("x") for item in values],
+        unit="s",
+        utc=True,
+        errors="coerce",
+    )
+    prices = pd.to_numeric(
+        [item.get("y") for item in values], errors="coerce"
+    )
+    series = pd.Series(
+        prices, index=timestamps, name=BITCOIN_SERIES_ID, dtype="float64"
+    )
+    series = series[series.index.notna() & series.notna() & (series > 0)]
+    series = series[series.index >= pd.Timestamp("2010-01-01", tz="UTC")]
+    series = series.sort_index()
+    series = series[~series.index.duplicated(keep="last")]
+    if series.empty:
+        raise ValueError("Blockchain.com returned no positive Bitcoin prices")
+    return series
+
+
+def fetch_bitcoin_series(
+    cache_dir: Path,
+    *,
+    refresh: bool,
+    offline: bool,
+    max_age_hours: float = 24.0,
+    timeout: float = 60.0,
+) -> pd.Series | None:
+    """Fetch/cache daily Bitcoin market price history from Blockchain.com."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"{BITCOIN_SERIES_ID}.csv"
+    cached = _load_cached_series(cache_path, BITCOIN_SERIES_ID)
+
+    cache_age = None
+    if cache_path.exists():
+        cache_age = (
+            pd.Timestamp.now(tz="UTC").timestamp() - cache_path.stat().st_mtime
+        ) / 3600.0
+    if cached is not None and not refresh and (
+        offline or (cache_age is not None and cache_age <= max_age_hours)
+    ):
+        logger.info(
+            "Using cached {} {} -> {} ({} obs)",
+            BITCOIN_SERIES_ID,
+            cached.index.min().date(),
+            cached.index.max().date(),
+            len(cached),
+        )
+        return cached
+
+    if offline:
+        if cached is not None:
+            return cached
+        raise MacroConfigError(
+            f"Offline mode: no cached {BITCOIN_SERIES_ID} in {cache_dir}"
+        )
+
+    try:
+        response = requests.get(
+            BITCOIN_URL,
+            headers={"User-Agent": USER_AGENT},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        series = _parse_blockchain_bitcoin(response.content)
+        _save_cached_series(cache_path, series)
+        logger.info(
+            "Fetched {} from Blockchain.com {} -> {} ({} obs)",
+            BITCOIN_SERIES_ID,
+            series.index.min().date(),
+            series.index.max().date(),
+            len(series),
+        )
+        return series
+    except (requests.RequestException, ValueError, OSError) as exc:
+        if cached is not None:
+            logger.warning(
+                "{} fetch failed ({}); using stale cache {} -> {}",
+                BITCOIN_SERIES_ID,
+                exc,
+                cached.index.min().date(),
+                cached.index.max().date(),
+            )
+            return cached
+        raise FredAPIError(
+            f"{BITCOIN_SERIES_ID}: Blockchain.com fetch failed ({exc})"
+        ) from exc
+
+
+def _parse_high_yield_archive(content: bytes) -> pd.Series:
+    """Parse a full-history BAMLH0A0HYM2 archive CSV (date,value rows)."""
+    text = content.decode("utf-8-sig", errors="replace")
+    frame = pd.read_csv(io.StringIO(text), header=None)
+    if frame.empty or frame.shape[1] < 2:
+        raise ValueError("High-yield archive returned no columns")
+    if not pd.api.types.is_numeric_dtype(frame.iloc[:, 1]):
+        frame = frame.iloc[1:]
+    dates = pd.to_datetime(frame.iloc[:, 0], errors="coerce", utc=True)
+    values = pd.to_numeric(frame.iloc[:, 1], errors="coerce")
+    series = pd.Series(
+        values.to_numpy(),
+        index=dates,
+        name="BAMLH0A0HYM2",
+        dtype="float64",
+    )
+    series = series[series.index.notna() & series.notna()]
+    series = series.sort_index()
+    series = series[~series.index.duplicated(keep="last")]
+    if series.empty:
+        raise ValueError("High-yield archive returned no numeric observations")
+    return series
+
+
+def ensure_high_yield_history(
+    series_map: dict[str, pd.Series],
+    cache_dir: Path,
+    *,
+    refresh: bool,
+    offline: bool,
+) -> pd.Series | None:
+    """Backfill the full 1996+ HY OAS history after FRED's 3-year window.
+
+    FRED's public CSV endpoint currently exposes only a rolling three-year
+    window of ICE BofA series. The official API still serves the full history
+    when FRED_API_KEY is present. When it is not, merge FRED's recent values
+    with a public archive of the same series and persist the merged cache.
+    """
+    existing = series_map.get("BAMLH0A0HYM2")
+    if existing is not None:
+        existing = pd.to_numeric(existing, errors="coerce").dropna()
+    if (
+        existing is not None
+        and not existing.empty
+        and existing.index.min() <= pd.Timestamp("2000-01-01", tz="UTC")
+        and len(existing) >= 4_000
+    ):
+        return existing
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = cache_dir / "BAMLH0A0HYM2.archive.csv"
+    archive = _load_cached_series(archive_path, "BAMLH0A0HYM2")
+
+    if archive is not None and not refresh:
+        logger.info(
+            "Using cached full-history HY OAS archive {} -> {} ({} obs)",
+            archive.index.min().date(),
+            archive.index.max().date(),
+            len(archive),
+        )
+    elif offline:
+        if archive is None:
+            logger.warning(
+                "Offline mode: FRED's HY OAS window is only three years and "
+                "no full-history archive cache exists"
+            )
+            return existing
+    else:
+        try:
+            response = requests.get(
+                HY_OAS_ARCHIVE_URL,
+                headers={"User-Agent": USER_AGENT},
+                timeout=60,
+            )
+            response.raise_for_status()
+            archive = _parse_high_yield_archive(response.content)
+            _save_cached_series(archive_path, archive)
+            logger.info(
+                "Backfilled full-history HY OAS archive {} -> {} ({} obs)",
+                archive.index.min().date(),
+                archive.index.max().date(),
+                len(archive),
+            )
+        except (requests.RequestException, ValueError, OSError) as exc:
+            logger.warning(
+                "Full-history HY OAS archive fetch failed ({}); "
+                "FRED's three-year window will be used",
+                exc,
+            )
+            return existing
+
+    if archive is None or archive.empty:
+        return existing
+
+    pieces = [archive.rename("BAMLH0A0HYM2")]
+    if existing is not None and not existing.empty:
+        pieces.append(existing.rename("BAMLH0A0HYM2"))
+    merged = pd.concat(pieces).sort_index()
+    merged = merged[~merged.index.duplicated(keep="last")]
+    merged = merged[merged.index >= archive.index.min()]
+    merged.name = "BAMLH0A0HYM2"
+    _save_cached_series(cache_dir / "BAMLH0A0HYM2.csv", merged)
+    series_map["BAMLH0A0HYM2"] = merged
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # Frame assembly
 # ---------------------------------------------------------------------------
@@ -867,14 +1095,7 @@ def build_raw_daily_frame(
 
 
 def build_asset_targets(frame: pd.DataFrame) -> pd.DataFrame:
-    """Serialize the S&P, gold, bond and dollar target variables.
-
-    Gold is the World Bank Pink Sheet London bullion benchmark, monthly and
-    forward-filled onto the daily calendar. Bonds are represented by a
-    constant-duration 10-year Treasury total-return proxy derived from DGS10:
-    carry plus duration price change, rebased to 100. The dollar target is the
-    broad trade-weighted index already present in the FRED universe.
-    """
+    """Serialize the S&P, gold, bond, dollar and Bitcoin target variables."""
     out = frame.copy()
 
     if "GOLD_LBMA" in out.columns:
@@ -887,6 +1108,19 @@ def build_asset_targets(frame: pd.DataFrame) -> pd.DataFrame:
     else:
         out["gold_proxy"] = np.nan
         out["gold_proxy_source"] = pd.Series(pd.NA, index=out.index, dtype="string")
+
+    if "BTCUSD" in out.columns:
+        out["btc_proxy"] = pd.to_numeric(
+            out["BTCUSD"], errors="coerce"
+        )
+        out["btc_proxy_source"] = pd.Series(
+            BITCOIN_SOURCE, index=out.index, dtype="string"
+        ).where(out["btc_proxy"].notna())
+    else:
+        out["btc_proxy"] = np.nan
+        out["btc_proxy_source"] = pd.Series(
+            pd.NA, index=out.index, dtype="string"
+        )
 
     if "DTWEXBGS" in out.columns:
         out["dxy_proxy"] = pd.to_numeric(
@@ -1025,6 +1259,14 @@ def _asset_metadata(frame: pd.DataFrame) -> dict[str, dict[str, Any]]:
             "Index (10y UST total-return proxy)",
         ),
         (
+            "bitcoin",
+            "Bitcoin",
+            "btc_proxy",
+            "btc_proxy_source",
+            "btc_",
+            "USD",
+        ),
+        (
             "dxy",
             "US Dollar — broad trade-weighted",
             "dxy_proxy",
@@ -1105,6 +1347,29 @@ def build_metadata(
     else:
         latest_strength = None
 
+    scored_bravos = (
+        frame["bravos_score"].dropna()
+        if "bravos_score" in frame.columns
+        else pd.Series(dtype="float64")
+    )
+    if not scored_bravos.empty:
+        latest_bravos_index = scored_bravos.index.max()
+        latest_bravos = {
+            "date": latest_bravos_index.date().isoformat(),
+            "score": round(float(scored_bravos.loc[latest_bravos_index]), 2),
+            "bucket": str(frame.loc[latest_bravos_index, "bravos_bucket"])
+            if "bravos_bucket" in frame.columns
+            and not pd.isna(frame.loc[latest_bravos_index, "bravos_bucket"])
+            else None,
+            "composite": round(
+                float(frame.loc[latest_bravos_index, "bravos_composite"]), 2
+            )
+            if "bravos_composite" in frame.columns
+            else None,
+        }
+    else:
+        latest_bravos = None
+
     coverage_start = None
     full_coverage_start = None
     if "macro_strength_coverage" in frame.columns:
@@ -1129,7 +1394,10 @@ def build_metadata(
         "Macro strength is a V2 coincident heuristic (Fed Funds 21d/126d panic-cut; 10y-2y level and 21d/126d un-inversion; UNRATE Sahm proxy), not a probability or forecast.",
         "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
         "USREC is excluded from the strength inputs to avoid target leakage.",
-        "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index.",
+        "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index; Bitcoin is the Blockchain.com daily market price from 2010-08-18.",
+        "Bravos is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
+        "FRED's keyless CSV endpoint exposes only a rolling three-year ICE BofA HY OAS window. The pipeline merges FRED's recent observations with a cached public 1996+ mirror; the official FRED API path retains the full provider history.",
+        "Crypto milestone dates are editorial comparison windows, not statistically detected events or NBER recession dates.",
     ]
 
     return {
@@ -1180,6 +1448,24 @@ def build_metadata(
             "full_coverage_from": full_coverage_start,
             "latest": latest_strength,
             "notes": notes[2:3],
+        },
+        "bravos": {
+            "version": BRAVOS_VERSION,
+            "weights": dict(BRAVOS_WEIGHTS),
+            "features": [
+                "hy_oas",
+                "atr_14",
+                "bollinger_width",
+                "macd",
+                "rsi_14",
+            ],
+            "latest": latest_bravos,
+            "buckets": {
+                "strong_bullish": ">= 25",
+                "calm_bullish": "0 to 24",
+                "bearish_warning": "-1 to -24",
+                "extreme_bearish": "<= -25",
+            },
         },
         "proxy": {
             "sources": _proxy_metadata(frame),
@@ -1246,6 +1532,27 @@ def run_pipeline(
     except Exception as exc:  # noqa: BLE001 - supplemental target must not kill the artifact
         warnings.append(f"{GOLD_SERIES_ID}: {type(exc).__name__}: {exc}")
 
+    try:
+        bitcoin = fetch_bitcoin_series(
+            cache_dir,
+            refresh=refresh,
+            offline=offline,
+        )
+        if bitcoin is not None:
+            series_map[BITCOIN_SERIES_ID] = bitcoin
+    except Exception as exc:  # noqa: BLE001 - supplemental target must not kill the artifact
+        warnings.append(f"{BITCOIN_SERIES_ID}: {type(exc).__name__}: {exc}")
+
+    try:
+        ensure_high_yield_history(
+            series_map,
+            cache_dir,
+            refresh=refresh,
+            offline=offline,
+        )
+    except Exception as exc:  # noqa: BLE001 - optional full-history backfill
+        warnings.append(f"BAMLH0A0HYM2 archive: {type(exc).__name__}: {exc}")
+
     frame = build_macro_frame(series_map, start=start, end=end)
     frame = annotate_nber(frame)
 
@@ -1256,6 +1563,8 @@ def run_pipeline(
 
     strength = calculate_macro_strength_components(frame)
     frame = frame.join(strength)
+    bravos = calculate_bravos_composite(frame)
+    frame = frame.join(bravos)
 
     output_dir = Path(output_dir)
     parquet_path = output_dir / "macro_regime_history.parquet"
@@ -1274,6 +1583,9 @@ def run_pipeline(
     )
     metadata["data_version"] = data_version
     _write_json(metadata_path, metadata)
+    crypto_path = write_crypto_milestones_artifact(
+        output_dir / CRYPTO_MILESTONES_FILENAME
+    )
 
     return {
         "rows": int(len(frame)),
@@ -1283,10 +1595,12 @@ def run_pipeline(
         "series_loaded": len(series_map),
         "nber_episodes": len(metadata["nber"]["episodes"]),
         "latest_strength": metadata["strength"]["latest"],
+        "latest_bravos": metadata["bravos"]["latest"],
         "data_version": data_version,
         "transport": transport,
         "parquet": str(parquet_path),
         "metadata": str(metadata_path),
+        "crypto_milestones": str(crypto_path),
     }
 
 

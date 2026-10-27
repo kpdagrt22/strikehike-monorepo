@@ -1,0 +1,200 @@
+"""Static editorial windows for the Bitcoin / crypto convergence tab.
+
+The dates are deliberately hand-curated. They are event windows for visual
+comparison, not NBER-style or statistically detected crash dates. The service
+enriches them with the latest serialized asset and Bravos history at request
+time, while the JSON artifact keeps the editorial definitions stable.
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+CRYPTO_MILESTONES_VERSION = "crypto-milestones-v1"
+
+_CRYPTO_MILESTONES: tuple[dict[str, Any], ...] = (
+    {
+        "id": "genesis-block",
+        "name": "Genesis Block",
+        "short_name": "Genesis",
+        "category": "protocol",
+        "window": {"start": "2009-01-03", "end": "2010-07-17"},
+        "peak": "2009-01-03",
+        "trough": "2010-07-17",
+        "date_precision": "day",
+        "summary": (
+            "The Bitcoin network's first block is mined. Market pricing does "
+            "not begin until July 2010, so the window is an origin marker rather "
+            "than an investable drawdown."
+        ),
+        "context": (
+            "A cypherpunk proof-of-work experiment becomes a live ledger. There "
+            "is no exchange tape, no Bravos equity proxy input and no tradable "
+            "price at the genesis date."
+        ),
+        "tags": ["origin", "protocol"],
+    },
+    {
+        "id": "mt-gox",
+        "name": "Mt. Gox Collapse",
+        "short_name": "Mt. Gox",
+        "category": "exchange failure",
+        "window": {"start": "2013-12-04", "end": "2014-02-28"},
+        "peak": "2013-12-04",
+        "trough": "2014-02-24",
+        "date_precision": "day",
+        "summary": (
+            "The largest early Bitcoin exchange halts withdrawals in February "
+            "2014 and files for bankruptcy, exposing custody and counterparty "
+            "risk at the centre of the market."
+        ),
+        "context": (
+            "The first institutional-scale Bitcoin failure. It followed the "
+            "2013 mania top and pushed the asset into a multi-year repair phase."
+        ),
+        "tags": ["exchange", "custody", "drawdown"],
+    },
+    {
+        "id": "ico-bubble",
+        "name": "ICO Bubble Peak",
+        "short_name": "ICO Peak",
+        "category": "speculative mania",
+        "window": {"start": "2017-12-10", "end": "2017-12-17"},
+        "peak": "2017-12-17",
+        "trough": None,
+        "date_precision": "day",
+        "summary": (
+            "Initial coin offerings and retail speculation drive Bitcoin to its "
+            "then-all-time high. The window is a peak snapshot, not a complete "
+            "crash."
+        ),
+        "context": (
+            "A token-issuance mania that pulled crypto away from its cypherpunk "
+            "roots. The following winter is tracked as a separate event."
+        ),
+        "tags": ["mania", "peak"],
+    },
+    {
+        "id": "crypto-winter",
+        "name": "Crypto Winter",
+        "short_name": "Winter",
+        "category": "bear market",
+        "window": {"start": "2017-12-17", "end": "2018-12-15"},
+        "peak": "2017-12-17",
+        "trough": "2018-12-15",
+        "date_precision": "day",
+        "summary": (
+            "The post-ICO unwind: Bitcoin falls from its 2017 peak through a "
+            "year-long repricing as leverage, token supply and retail demand "
+            "reverse."
+        ),
+        "context": (
+            "A slow, intermarket bear market rather than a single-day liquidity "
+            "shock. It is the cleanest test of whether a macro composite can "
+            "distinguish a grind from a panic."
+        ),
+        "tags": ["bear market", "drawdown"],
+    },
+    {
+        "id": "covid-shock",
+        "name": "COVID-19 Shock",
+        "short_name": "COVID",
+        "category": "liquidity shock",
+        "window": {"start": "2020-02-13", "end": "2020-03-16"},
+        "peak": "2020-02-13",
+        "trough": "2020-03-16",
+        "date_precision": "day",
+        "summary": (
+            "The fastest global risk-off liquidation in the modern record. "
+            "Bitcoin, equities, gold and Treasuries were all caught in the dash "
+            "for cash before policy support stabilized markets."
+        ),
+        "context": (
+            "A cross-asset liquidity event. The comparison is useful because the "
+            "traditional 60/40 and the digital asset traded the same shock with "
+            "different liquidity and duration."
+        ),
+        "tags": ["liquidity", "cross-asset", "drawdown"],
+    },
+    {
+        "id": "terra-luna",
+        "name": "Terra-LUNA Collapse",
+        "short_name": "Terra",
+        "category": "protocol failure",
+        "window": {"start": "2022-05-05", "end": "2022-05-13"},
+        "peak": "2022-05-05",
+        "trough": "2022-05-13",
+        "date_precision": "day",
+        "summary": (
+            "The algorithmic stablecoin UST loses its peg and the LUNA token "
+            "collapses, transmitting a solvency shock through crypto credit and "
+            "lending venues."
+        ),
+        "context": (
+            "A crypto-native bank run. It arrived after the 2021 liquidity cycle "
+            "and preceded the 2022 centralized-lender failures."
+        ),
+        "tags": ["stablecoin", "solvency", "drawdown"],
+    },
+    {
+        "id": "spot-etf-peak",
+        "name": "Spot ETF Peak",
+        "short_name": "ETF Peak",
+        "category": "institutional cycle",
+        "window": {"start": "2025-10-06", "end": "2025-11-21"},
+        "peak": "2025-10-06",
+        "trough": "2025-11-21",
+        "date_precision": "day",
+        "summary": (
+            "The post-approval institutional bid reaches its cycle peak as spot "
+            "Bitcoin ETF flows, basis trades and treasury-company demand mature."
+        ),
+        "context": (
+            "The first fully ETF-mediated Bitcoin cycle. It tests whether the "
+            "macro regime signal still travels through an institutional wrapper."
+        ),
+        "tags": ["etf", "institutional", "peak"],
+    },
+)
+
+
+def milestone_definitions() -> list[dict[str, Any]]:
+    """Return a mutable copy of the curated event definitions."""
+    return copy.deepcopy(list(_CRYPTO_MILESTONES))
+
+
+def build_crypto_milestones_artifact() -> dict[str, Any]:
+    """Build the persisted editorial dataset (without market enrichment)."""
+    return {
+        "version": CRYPTO_MILESTONES_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "kind": "editorial",
+        "notes": [
+            "Event windows are hand-curated comparison windows, not detected crash dates.",
+            "Market statistics and Bravos readings are joined by the live service from the macro artifact.",
+            "Genesis has no market price; the first Blockchain.com observation is 2010-08-18.",
+        ],
+        "events": milestone_definitions(),
+    }
+
+
+def write_crypto_milestones_artifact(path: Path | str) -> Path:
+    """Write the editorial dataset atomically to ``path``."""
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(
+            build_crypto_milestones_artifact(),
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(destination)
+    return destination

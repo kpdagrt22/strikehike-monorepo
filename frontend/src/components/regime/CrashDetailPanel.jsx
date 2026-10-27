@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { RegimeDetailChart } from "@/components/regime/RegimeDetailChart";
+import { SkyStrip } from "@/components/regime/SkyStrip";
 import {
   addDaysIso,
   addMonthsIso,
   formatDate,
   formatNumber,
   formatPercent,
-  formatScore,
+  formatSigned,
 } from "@/components/regime/regimeUtils";
 
 function Metric({ label, value }) {
@@ -64,9 +65,7 @@ function PreCrashCard({ label, data }) {
           {curveLabel}
         </span>
         <span className="font-mono text-micro text-black/45 dark:text-white/45">
-          Strength {data?.macro_strength != null
-            ? `${formatScore(data.macro_strength)}/100`
-            : "—"}
+          Bravos {formatSigned(data?.bravos_score)}
         </span>
       </div>
 
@@ -98,7 +97,7 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
   const reduceMotion = useReducedMotion();
   const detailStart =
     crash.zoom_window?.start ?? addMonthsIso(crash.start, -6);
-  const detailEnd = addDaysIso(addMonthsIso(crash.start, 1), -1);
+  const detailEnd = addDaysIso(addMonthsIso(crash.end, 1), -1);
   const canFetch = Boolean(
     crash.within_coverage && detailStart && detailEnd,
   );
@@ -263,6 +262,11 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
                 {formatDate(detail.range?.start)} →{" "}
                 {formatDate(detail.range?.end)}
               </p>
+              <SkyStrip
+                asOf={crash.start}
+                contextLabel={`${crash.name} peak`}
+                variant="footnote"
+              />
             </>
           ) : null}
         </div>
@@ -270,7 +274,8 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
         <p className="mt-4 text-micro leading-relaxed text-black/40 dark:text-white/40">
           The peak month is the NBER peak; USREC shading begins the following
           month. Pre-crash values are the last observation on or before the
-          3-month and 6-month dates.
+          3-month and 6-month dates. The sky strip is a historical ephemeris
+          footnote, not an economic input.
         </p>
       </div>
     </motion.section>

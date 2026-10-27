@@ -2,26 +2,27 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AreaSeries,
   ColorType,
   CrosshairMode,
-  HistogramSeries,
   LineSeries,
   LineStyle,
   PriceScaleMode,
   createChart,
 } from "lightweight-charts";
 import { ChartCrosshairLegend } from "@/components/regime/ChartCrosshairLegend";
-import { CrashTape } from "@/components/regime/CrashTape";
 import { MacroHUD } from "@/components/regime/MacroHUD";
 import {
+  ASSET_ORDER,
+  ASSET_TARGETS,
   assetChartColor,
   assetChartSoft,
   getAssetTarget,
 } from "@/components/regime/assetTargets";
 import {
-  addMonthsIso,
+  bravosTone,
   formatDate,
+  formatPercent,
+  formatSigned,
   getChartTone,
 } from "@/components/regime/regimeUtils";
 
@@ -49,10 +50,7 @@ function buildBands(timeline, crashes) {
     .map((crash) => {
       const startIndex = lowerBoundByDate(timeline, crash.start);
       let endIndex = lowerBoundByDate(timeline, crash.end);
-      if (
-        endIndex >= timeline.length ||
-        timeline[endIndex].date > crash.end
-      ) {
+      if (endIndex >= timeline.length || timeline[endIndex].date > crash.end) {
         endIndex -= 1;
       }
       if (startIndex >= timeline.length || endIndex < startIndex) return null;
@@ -66,10 +64,38 @@ function buildBands(timeline, crashes) {
     .filter(Boolean);
 }
 
+function buildCrashMetrics(timeline, crashes) {
+  return (crashes ?? []).map((crash) => {
+    const points = timeline.filter(
+      (point) => point.date >= crash.start && point.date <= crash.end,
+    );
+    const equities = points
+      .map((point) => Number(point.sp500_proxy))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const peak = equities.length ? Math.max(...equities) : null;
+    const trough = equities.length ? Math.min(...equities) : null;
+    const drawdown =
+      peak != null && trough != null && peak > 0
+        ? (trough / peak - 1) * 100
+        : null;
+    const scores = points
+      .map((point) => Number(point.bravos_score))
+      .filter((value) => Number.isFinite(value));
+    return {
+      id: crash.id,
+      name: crash.name,
+      start: crash.start,
+      end: crash.end,
+      drawdown,
+      score: scores.length ? Math.min(...scores) : null,
+    };
+  });
+}
+
 function applyCrashZoom(chart, crash) {
   if (!chart || !crash) return;
-  const from = addMonthsIso(crash.indicator_start, -6);
-  const to = addMonthsIso(crash.end, 6);
+  const from = crash.start;
+  const to = crash.end;
   if (!from || !to) return;
 
   try {
@@ -79,10 +105,42 @@ function applyCrashZoom(chart, crash) {
   }
 }
 
-/**
- * NBER recession shading is a pane primitive so it lives behind the price
- * series instead of sitting on top of the line as an HTML overlay would.
- */
+function buildChartSeries(timeline, target) {
+  if (target.key !== "sp500") {
+    return timeline
+      .map((point) => ({
+        time: point.date,
+        value: Number(point[target.valueField]),
+      }))
+      .filter(
+        (point) => Number.isFinite(point.value) && point.value > 0,
+      );
+  }
+
+  const output = [];
+  let level = null;
+  let previous = null;
+  let previousSource = null;
+  for (const point of timeline) {
+    const raw = Number(point[target.valueField]);
+    if (!Number.isFinite(raw) || raw <= 0) {
+      previous = null;
+      previousSource = null;
+      continue;
+    }
+    const source = point[target.sourceField] ?? null;
+    if (level == null) {
+      level = raw;
+    } else if (source === previousSource && previous != null) {
+      level *= raw / previous;
+    }
+    output.push({ time: point.date, value: level });
+    previous = raw;
+    previousSource = source;
+  }
+  return output;
+}
+
 function createRecessionBandsPrimitive(bands, initialSelectedId) {
   const renderer = {
     draw: (target) => {
@@ -100,9 +158,12 @@ function createRecessionBandsPrimitive(bands, initialSelectedId) {
           if (right <= left) continue;
 
           const selected = band.id === primitive.selectedId;
+          const hovered = band.id === primitive.hoveredId;
           context.fillStyle = selected
-            ? "rgba(239, 68, 68, 0.19)"
-            : "rgba(239, 68, 68, 0.085)";
+            ? "rgba(239, 68, 68, 0.22)"
+            : hovered
+              ? "rgba(239, 68, 68, 0.16)"
+              : "rgba(239, 68, 68, 0.075)";
           context.fillRect(left, 0, right - left, mediaSize.height);
         }
       });
@@ -116,6 +177,7 @@ function createRecessionBandsPrimitive(bands, initialSelectedId) {
 
   const primitive = {
     selectedId: initialSelectedId ?? null,
+    hoveredId: null,
     requestUpdate: () => {},
     unsubscribe: null,
     view,
@@ -143,6 +205,95 @@ function createRecessionBandsPrimitive(bands, initialSelectedId) {
   return primitive;
 }
 
+function createBravosHistogramPrimitive(points, isDark) {
+  const renderer = {
+    draw: (target) => {
+      target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+        const timeScale = primitive.chart?.timeScale();
+        if (!timeScale || !Array.isArray(points) || points.length === 0) {
+          return;
+        }
+        const top = mediaSize.height * 0.71;
+        const plotHeight = mediaSize.height * 0.26;
+        const zeroY = top + plotHeight / 2;
+        const half = plotHeight / 2;
+        const barWidth = Math.max(
+          1,
+          Math.min(3, (timeScale.options()?.barSpacing ?? 1) * 0.55),
+        );
+
+        for (const point of points) {
+          if (!Number.isFinite(Number(point.value))) continue;
+          const x = timeScale.timeToCoordinate(point.time);
+          if (x == null) continue;
+          const value = Math.max(-50, Math.min(50, Number(point.value)));
+          const y = zeroY - (value / 50) * half;
+          const height = Math.max(1, Math.abs(zeroY - y));
+          context.fillStyle = point.color;
+          context.fillRect(
+            x - barWidth / 2,
+            Math.min(y, zeroY),
+            barWidth,
+            height,
+          );
+        }
+
+        const line = isDark
+          ? "rgba(242, 237, 228, 0.28)"
+          : "rgba(20, 18, 26, 0.24)";
+        context.strokeStyle = line;
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(0, zeroY);
+        context.lineTo(mediaSize.width, zeroY);
+        context.stroke();
+        context.strokeStyle = isDark
+          ? "rgba(242, 237, 228, 0.10)"
+          : "rgba(20, 18, 26, 0.08)";
+        context.setLineDash([3, 4]);
+        for (const value of [-25, 25]) {
+          const y = zeroY - (value / 50) * half;
+          context.beginPath();
+          context.moveTo(0, y);
+          context.lineTo(mediaSize.width, y);
+          context.stroke();
+        }
+        context.setLineDash([]);
+      });
+    },
+  };
+  const view = {
+    zOrder: () => "top",
+    renderer: () => renderer,
+  };
+  const views = [view];
+  const primitive = {
+    requestUpdate: () => {},
+    unsubscribe: null,
+    view,
+    attached({ chart, requestUpdate }) {
+      primitive.chart = chart;
+      primitive.requestUpdate = requestUpdate;
+      const timeScale = chart.timeScale();
+      const handleRange = () => requestUpdate();
+      timeScale.subscribeVisibleLogicalRangeChange(handleRange);
+      primitive.unsubscribe = () =>
+        timeScale.unsubscribeVisibleLogicalRangeChange(handleRange);
+    },
+    detached() {
+      primitive.unsubscribe?.();
+      primitive.unsubscribe = null;
+      primitive.chart = null;
+      primitive.requestUpdate = () => {};
+    },
+    updateAllViews() {},
+    paneViews() {
+      return views;
+    },
+  };
+  return primitive;
+}
+
 export function RegimeTimeline({
   timeline,
   crashes,
@@ -154,14 +305,16 @@ export function RegimeTimeline({
   assetKey = "sp500",
   onAssetChange,
   forecast,
+  compareAssets = false,
+  onCompareToggle,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const primitiveRef = useRef(null);
   const selectedIdRef = useRef(selectedId);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [hoveredCrashId, setHoveredCrashId] = useState(null);
   const [equityScaleWidth, setEquityScaleWidth] = useState(0);
-  const [crosshairX, setCrosshairX] = useState(null);
   const [timeScaleHeight, setTimeScaleHeight] = useState(26);
 
   useEffect(() => {
@@ -170,17 +323,6 @@ export function RegimeTimeline({
 
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
   const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
-  const primaryColor = assetChartColor(asset, isDark);
-  const primarySoft = assetChartSoft(asset, isDark);
-  const firstProxy = useMemo(
-    () =>
-      timeline.find(
-        (point) =>
-          Number.isFinite(point[asset.valueField]) &&
-          point[asset.valueField] > 0,
-      )?.[asset.valueField] ?? null,
-    [timeline, asset],
-  );
   const latestPoint = timeline.at(-1) ?? null;
   const selectedCrash = useMemo(
     () => (crashes ?? []).find((crash) => crash.id === selectedId) ?? null,
@@ -189,16 +331,15 @@ export function RegimeTimeline({
   const selectedPoint = useMemo(
     () =>
       selectedCrash
-        ? pointAtOrAfter(timeline, selectedCrash.indicator_start)
+        ? pointAtOrAfter(timeline, selectedCrash.start)
         : null,
     [selectedCrash, timeline],
   );
   const displayPoint = hoveredPoint ?? selectedPoint ?? latestPoint;
-  const fullStrengthFrom = useMemo(
-    () =>
-      timeline.find((point) => (point.strength_coverage ?? 0) >= 0.99)
-        ?.date ?? null,
-    [timeline],
+
+  const seriesKeys = useMemo(
+    () => (compareAssets ? ASSET_ORDER : [assetKey]),
+    [compareAssets, assetKey],
   );
 
   const bands = useMemo(
@@ -206,57 +347,66 @@ export function RegimeTimeline({
     [timeline, crashes],
   );
 
-  const primaryData = useMemo(() => {
-    if (!firstProxy) return [];
-    return timeline.map((point) => {
-      const value = point[asset.valueField];
-      return Number.isFinite(value) && value > 0
-        ? {
-            time: point.date,
-            value: (value / firstProxy) * 100,
-          }
-        : { time: point.date };
-    });
-  }, [timeline, firstProxy, asset]);
-
-  const fedData = useMemo(
-    () =>
-      timeline
-        .filter((point) => point.fed_funds != null)
-        .map((point) => ({ time: point.date, value: point.fed_funds })),
-    [timeline],
+  const crashMetrics = useMemo(
+    () => buildCrashMetrics(timeline, crashes),
+    [timeline, crashes],
   );
 
-  const curveData = useMemo(
+  const hoveredMetric = useMemo(
+    () => crashMetrics.find((metric) => metric.id === hoveredCrashId) ?? null,
+    [crashMetrics, hoveredCrashId],
+  );
+
+  const bravosData = useMemo(
     () =>
       timeline
-        .filter((point) => point.t10y2y != null)
+        .filter(
+        (point) =>
+          point.bravos_score != null &&
+          Number.isFinite(Number(point.bravos_score)),
+      )
         .map((point) => ({
           time: point.date,
-          value: point.t10y2y,
-          color:
-            Number(point.t10y2y) < 0
-              ? isDark
-                ? "rgba(251, 113, 133, 0.72)"
-                : "rgba(192, 68, 47, 0.68)"
-              : isDark
-                ? "rgba(52, 211, 153, 0.58)"
-                : "rgba(15, 118, 110, 0.56)",
+          value: Number(point.bravos_score),
+          color: bravosTone(point.bravos_bucket, isDark).color,
         })),
     [timeline, isDark],
   );
 
-  const strengthData = useMemo(
+  const baseDate = useMemo(
     () =>
-      timeline
-        .filter((point) => point.strength != null)
-        .map((point) => ({ time: point.date, value: point.strength })),
+      timeline.find(
+        (point) =>
+          point.bravos_score != null &&
+          Number.isFinite(Number(point.bravos_score)),
+      )?.date ?? timeline[0]?.date,
     [timeline],
   );
+
+  const seriesData = useMemo(() => {
+    const output = {};
+    for (const key of seriesKeys) {
+      const target = ASSET_TARGETS[key] ?? ASSET_TARGETS.sp500;
+      const valid = buildChartSeries(timeline, target);
+      const basePoint =
+        valid.find((point) => point.time >= baseDate) ?? valid[0];
+      const base = basePoint?.value;
+      output[key] = Number.isFinite(base)
+        ? valid.map((point) => ({
+            time: point.time,
+            value: (point.value / base) * 100,
+          }))
+        : [];
+    }
+    return output;
+  }, [timeline, seriesKeys, baseDate]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || timeline.length === 0) return undefined;
+
+    setHoveredPoint(null);
+    setHoveredCrashId(null);
 
     const chart = createChart(container, {
       autoSize: true,
@@ -265,26 +415,29 @@ export function RegimeTimeline({
         textColor: tone.axis,
         fontFamily: '"Onest", ui-sans-serif, system-ui, sans-serif',
         fontSize: 10,
-        panes: {
-          enableResize: false,
-          separatorColor: "transparent",
-          separatorHoverColor: "transparent",
-        },
       },
       grid: {
         vertLines: { visible: false },
         horzLines: { visible: false },
       },
+      localization: {
+        priceFormatter: (price) =>
+          `${(Number(price) - 100).toFixed(0)}%`,
+      },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          visible: false,
-          labelVisible: false,
+          color: isDark
+            ? "rgba(255, 139, 119, 0.55)"
+            : "rgba(192, 68, 47, 0.45)",
+          width: 1,
+          style: LineStyle.Dotted,
+          labelBackgroundColor: isDark ? "#24222b" : "#e8e0d4",
         },
         horzLine: {
           color: isDark
-            ? "rgba(242, 237, 228, 0.2)"
-            : "rgba(20, 18, 26, 0.16)",
+            ? "rgba(242, 237, 228, 0.16)"
+            : "rgba(20, 18, 26, 0.12)",
           width: 1,
           style: LineStyle.Dotted,
           labelBackgroundColor: isDark ? "#24222b" : "#e8e0d4",
@@ -294,7 +447,7 @@ export function RegimeTimeline({
         visible: true,
         borderVisible: false,
         mode: PriceScaleMode.Logarithmic,
-        scaleMargins: { top: 0.14, bottom: 0.05 },
+        scaleMargins: { top: 0.07, bottom: 0.32 },
         entireTextOnly: true,
       },
       timeScale: {
@@ -318,158 +471,56 @@ export function RegimeTimeline({
     });
     chartRef.current = chart;
 
-    const primaryGlow = chart.addSeries(
-      LineSeries,
-      {
-        color: primarySoft,
-        lineWidth: 4,
+    for (const key of seriesKeys) {
+      const target = ASSET_TARGETS[key] ?? ASSET_TARGETS.sp500;
+      const color = assetChartColor(target, isDark);
+      const selected = key === assetKey;
+      const lineWidth = compareAssets ? (selected ? 2.4 : 1.7) : 2.2;
+
+      if (selected) {
+        const glow = chart.addSeries(LineSeries, {
+          color: assetChartSoft(target, isDark),
+          lineWidth: 5,
+          priceScaleId: "right",
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        glow.setData(seriesData[key] ?? []);
+      }
+
+      const line = chart.addSeries(LineSeries, {
+        color,
+        lineWidth,
         priceScaleId: "right",
-        priceFormat: {
-          type: "price",
-          precision: asset.precision,
-          minMove: asset.precision ? 0.1 : 1,
-        },
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      },
-      0,
-    );
-    const equitySeries = chart.addSeries(
-      LineSeries,
-      {
-        color: primaryColor,
-        lineWidth: 2,
-        priceScaleId: "right",
-        priceFormat: {
-          type: "price",
-          precision: asset.precision,
-          minMove: asset.precision ? 0.1 : 1,
-        },
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: true,
         crosshairMarkerRadius: 3.5,
         crosshairMarkerBorderColor: isDark ? "#08080c" : "#f6f1e9",
-        crosshairMarkerBackgroundColor: primaryColor,
-      },
-      0,
-    );
-
-    const fedSeries = chart.addSeries(
-      LineSeries,
-      {
-        color: isDark ? "#60a5fa" : "#2563eb",
-        lineWidth: 2,
-        priceScaleId: "fed",
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      },
-      1,
-    );
-
-    const curveSeries = chart.addSeries(
-      HistogramSeries,
-      {
-        priceScaleId: "curve",
-        base: 0,
-        priceLineVisible: false,
-        lastValueVisible: false,
-      },
-      1,
-    );
-
-    const strengthSeries = chart.addSeries(
-      AreaSeries,
-      {
-        lineColor: tone.strength,
-        topColor: isDark
-          ? "rgba(94, 234, 212, 0.18)"
-          : "rgba(15, 118, 110, 0.12)",
-        bottomColor: isDark
-          ? "rgba(94, 234, 212, 0.005)"
-          : "rgba(15, 118, 110, 0.005)",
-        lineWidth: 2,
-        priceScaleId: "strength",
-        priceFormat: { type: "price", precision: 1, minMove: 0.1 },
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 3.5,
-        crosshairMarkerBorderColor: isDark ? "#08080c" : "#f6f1e9",
-        crosshairMarkerBackgroundColor: tone.strength,
-      },
-      2,
-    );
-
-    const panes = chart.panes();
-    if (panes[0]) {
-      panes[0].setStretchFactor(2);
-      panes[0].priceScale("right").applyOptions({
-        visible: true,
-        borderVisible: false,
-        mode: PriceScaleMode.Logarithmic,
-        scaleMargins: { top: 0.14, bottom: 0.05 },
-        entireTextOnly: true,
+        crosshairMarkerBackgroundColor: color,
       });
-    }
-    if (panes[1]) {
-      panes[1].setStretchFactor(1);
-      panes[1].priceScale("fed").applyOptions({
-        visible: false,
-        borderVisible: false,
-        scaleMargins: { top: 0.08, bottom: 0.53 },
-        entireTextOnly: true,
-      });
-      panes[1].priceScale("curve").applyOptions({
-        visible: false,
-        borderVisible: false,
-        scaleMargins: { top: 0.52, bottom: 0.03 },
-        entireTextOnly: true,
-      });
-    }
-    if (panes[2]) {
-      panes[2].setStretchFactor(1);
-      panes[2].priceScale("strength").applyOptions({
-        visible: false,
-        borderVisible: false,
-        scaleMargins: { top: 0.12, bottom: 0.1 },
-        entireTextOnly: true,
-      });
+      line.setData(seriesData[key] ?? []);
     }
 
-    primaryGlow.setData(primaryData);
-    equitySeries.setData(primaryData);
-    fedSeries.setData(fedData);
-    curveSeries.setData(curveData);
-    strengthSeries.setData(strengthData);
-
-    curveSeries.createPriceLine({
-      price: 0,
-      color: isDark
-        ? "rgba(255, 255, 255, 0.16)"
-        : "rgba(20, 18, 26, 0.14)",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dotted,
-      axisLabelVisible: false,
-      title: "",
-    });
-    strengthSeries.createPriceLine({
-      price: 50,
-      color: isDark
-        ? "rgba(242, 237, 228, 0.26)"
-        : "rgba(20, 18, 26, 0.22)",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dotted,
-      axisLabelVisible: false,
-      title: "50",
+    chart.priceScale("right").applyOptions({
+      visible: true,
+      borderVisible: false,
+      mode: PriceScaleMode.Logarithmic,
+      scaleMargins: { top: 0.07, bottom: 0.32 },
+      entireTextOnly: true,
     });
 
-    chart.timeScale().fitContent();
+    const viewportWidth = container.clientWidth || 1200;
+    const targetYears = viewportWidth < 640 ? 12 : 30;
+    chart.timeScale().applyOptions({
+      barSpacing: Math.max(0.02, viewportWidth / (52 * targetYears)),
+      rightOffset: 1,
+    });
+    chart.timeScale().scrollToRealTime();
 
     const syncScaleWidth = () => {
-      const width = panes[0]?.priceScale("right").width() ?? 0;
+      const width = chart.priceScale("right").width() ?? 0;
       setEquityScaleWidth(width);
       setTimeScaleHeight(chart.timeScale().height() ?? 26);
     };
@@ -477,67 +528,86 @@ export function RegimeTimeline({
     const scaleObserver = new ResizeObserver(syncScaleWidth);
     scaleObserver.observe(container);
 
+    const pane = chart.panes()[0];
     const primitive = createRecessionBandsPrimitive(
       bands,
       selectedIdRef.current,
     );
-    panes[0]?.attachPrimitive(primitive);
+    pane?.attachPrimitive(primitive);
     primitiveRef.current = primitive;
+    const bravosPrimitive = createBravosHistogramPrimitive(
+      bravosData,
+      isDark,
+    );
+    pane?.attachPrimitive(bravosPrimitive);
 
     const pointsByTime = new Map(
       timeline.map((point) => [point.date, point]),
     );
-    /**
-     * Unified crosshair sync. The chart has one time scale and three panes,
-     * so the hovered media x-coordinate is projected once and rendered as a
-     * single DOM line across the entire pane stack. This keeps the vertical
-     * cursor perfectly straight through panes 2 and 3, and drives the floating
-     * legend from the same event.
-     */
-    const syncUnifiedCrosshair = (param) => {
-      if (!param?.time || !param.point) {
+    const crashForTime = (time) => {
+      if (typeof time !== "string") return null;
+      return (
+        (crashes ?? []).find(
+          (crash) => time >= crash.start && time <= crash.end,
+        ) ?? null
+      );
+    };
+
+    const handleCrosshair = (param) => {
+      if (!param?.time) {
         setHoveredPoint(null);
-        setCrosshairX(null);
+        setHoveredCrashId(null);
         return;
       }
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
-      setCrosshairX(param.point.x);
+      const crash = crashForTime(key);
       setHoveredPoint(pointsByTime.get(key) ?? null);
+      setHoveredCrashId(crash?.id ?? null);
     };
-    chart.subscribeCrosshairMove(syncUnifiedCrosshair);
 
-    const activeCrash = (crashes ?? []).find(
-      (crash) => crash.id === selectedIdRef.current,
-    );
-    if (activeCrash) applyCrashZoom(chart, activeCrash);
+    const handleClick = (param) => {
+      const crash = crashForTime(param?.time);
+      if (crash) onSelect?.(crash);
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshair);
+    chart.subscribeClick(handleClick);
+
+    if (selectedIdRef.current) {
+      const activeCrash = (crashes ?? []).find(
+        (crash) => crash.id === selectedIdRef.current,
+      );
+      if (activeCrash) applyCrashZoom(chart, activeCrash);
+    }
 
     return () => {
       cancelAnimationFrame(scaleFrame);
       scaleObserver.disconnect();
-      chart.unsubscribeCrosshairMove(syncUnifiedCrosshair);
+      chart.unsubscribeCrosshairMove(handleCrosshair);
+      chart.unsubscribeClick(handleClick);
       if (primitiveRef.current === primitive) primitiveRef.current = null;
       try {
-        panes[0]?.detachPrimitive(primitive);
+        pane?.detachPrimitive(primitive);
+        pane?.detachPrimitive(bravosPrimitive);
       } catch {
-        // The chart may already have torn down the primitive.
+        // The chart may already have torn down the primitives.
       }
       if (chartRef.current === chart) chartRef.current = null;
       chart.remove();
     };
   }, [
-    asset,
+    assetKey,
     bands,
+    bravosData,
+    compareAssets,
     crashes,
-    curveData,
-    fedData,
     isDark,
-    primaryColor,
-    primaryData,
-    primarySoft,
-    strengthData,
+    onSelect,
+    seriesData,
+    seriesKeys,
     timeline,
-    tone,
+    tone.axis,
   ]);
 
   useEffect(() => {
@@ -552,6 +622,14 @@ export function RegimeTimeline({
     }
   }, [selectedCrash, selectedId]);
 
+  useEffect(() => {
+    const primitive = primitiveRef.current;
+    if (primitive) {
+      primitive.hoveredId = hoveredCrashId;
+      primitive.requestUpdate();
+    }
+  }, [hoveredCrashId]);
+
   if (!Array.isArray(timeline) || timeline.length === 0) return null;
 
   return (
@@ -560,18 +638,17 @@ export function RegimeTimeline({
       className="relative ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] mt-4 w-screen scroll-mt-24"
     >
       <h2 id="regime-timeline-title" className="sr-only">
-        Immersive 120-year macro regime terminal
+        Unified Bravos macro and multi-asset regime chart
       </h2>
       <p className="sr-only">
-        Three synchronized lightweight-charts panes: a log-scale target asset
-        (S&amp;P 500, London gold, or Treasury bonds) with NBER recession
-        shading, Fed Funds and 10Y–2Y yield curve, and the 0–100 macro strength
-        oscillator. Hover the chart to update the macro HUD. Use the asset
-        toggle to change the primary pane and the NBER dossier rail to zoom to a
-        recession window.
+        One percentage-scaled chart of the S&amp;P 500, London gold and Treasury
+        bonds with NBER recession shading. A colour-coded Bravos histogram from
+        -50 to +50 sits in the lower quarter of the same chart. Hover a red NBER
+        band for the crash name, peak-to-trough drawdown and Bravos score; click
+        it to zoom to the event.
       </p>
 
-      <div className="sticky top-0 z-30 border-b border-black/5 bg-[#f5f0e8]/80 backdrop-blur-2xl dark:border-white/5 dark:bg-[#06060a]/75">
+      <div className="sticky top-0 z-30 border-b border-black/5 bg-[#f5f0e8]/85 backdrop-blur-2xl dark:border-white/5 dark:bg-[#06060a]/80">
         <MacroHUD
           point={displayPoint}
           isDark={isDark}
@@ -581,57 +658,129 @@ export function RegimeTimeline({
           assetKey={asset.key}
           onAssetChange={onAssetChange}
           forecast={forecast}
-        />
-        <CrashTape
-          crashes={crashes}
-          selectedId={selectedId}
-          onSelect={onSelect}
+          compareAssets={compareAssets}
+          onCompareToggle={onCompareToggle}
         />
       </div>
 
-      <div className="relative h-[68vh] min-h-[560px] w-full">
+      <div className="relative h-[68vh] min-h-[560px] w-full sm:min-h-[600px]">
         <div
           ref={containerRef}
           data-testid="regime-terminal-chart"
           className="absolute inset-0"
         />
 
-        <ChartCrosshairLegend point={displayPoint} />
-
-        <div
-          aria-hidden="true"
-          data-testid="unified-crosshair"
-          className={`pointer-events-none absolute top-0 z-20 w-px bg-[#ff8b77]/70 shadow-[0_0_12px_rgba(255,139,119,0.45)] ${
-            crosshairX == null ? "opacity-0" : "opacity-100"
-          }`}
-          style={{
-            left: crosshairX == null ? 0 : crosshairX,
-            bottom: timeScaleHeight,
-          }}
+        <ChartCrosshairLegend
+          point={displayPoint}
+          asset={asset}
+          compareAssets={compareAssets}
         />
+
+        {hoveredMetric ? (
+          <div
+            role="status"
+            aria-live="polite"
+            data-testid="crash-hover-tooltip"
+            className="pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/75 px-3.5 py-2 font-mono text-[10px] font-medium text-white/80 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:top-4 sm:text-micro"
+          >
+            <span className="text-white/90">{hoveredMetric.name}</span>
+            <span className="mx-2 text-white/25">|</span>
+            <span className="text-[#ffb4a8]">
+              {hoveredMetric.drawdown == null
+                ? "—"
+                : formatPercent(hoveredMetric.drawdown, 1)}
+            </span>
+            <span className="mx-2 text-white/25">|</span>
+            <span
+              style={{
+                color: bravosTone(
+                  hoveredMetric.score == null
+                    ? null
+                    : hoveredMetric.score >= 25
+                      ? "strong_bullish"
+                      : hoveredMetric.score >= 0
+                        ? "calm_bullish"
+                        : hoveredMetric.score > -25
+                          ? "bearish_warning"
+                          : "extreme_bearish",
+                  true,
+                ).color,
+              }}
+            >
+              {formatSigned(hoveredMetric.score)}
+            </span>
+          </div>
+        ) : null}
 
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f1ebe2] via-[#f1ebe2]/55 to-transparent dark:from-[#020204] dark:via-[#020204]/55 sm:w-20" />
         <div
           className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#f1ebe2] via-[#f1ebe2]/55 to-transparent dark:from-[#020204] dark:via-[#020204]/55 sm:w-20"
           style={{ right: equityScaleWidth ? `${equityScaleWidth}px` : 0 }}
         />
+
+        <div
+          className="pointer-events-none absolute bottom-8 left-4 z-20 hidden select-none items-baseline gap-2 rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-mono text-[9px] text-black/40 backdrop-blur-xl dark:border-white/5 dark:bg-black/35 dark:text-white/40 sm:flex"
+          style={{ bottom: Math.max(12, timeScaleHeight - 8) }}
+        >
+          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
+            Bravos
+          </span>
+          <span>−50</span>
+          <span className="text-black/20 dark:text-white/20">/</span>
+          <span>0</span>
+          <span className="text-black/20 dark:text-white/20">/</span>
+          <span>+50</span>
+        </div>
       </div>
 
       <div className="border-t border-black/5 px-3 py-2.5 dark:border-white/5 sm:px-5 lg:px-8">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-1 text-micro text-black/40 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            {formatDate(coverage?.start)} → {formatDate(coverage?.end)} ·{" "}
-            {crashes?.length ?? 0} NBER windows ·{" "}
-            {resolution ? `${resolution} tape` : "macro tape"}
-          </span>
-          <span>
-            {firstProxy != null
-              ? "Selected asset rebased to 100 at first observation; log scale."
-              : "No asset history in this window."}{" "}
-            {fullStrengthFrom
-              ? `Full composite coverage from ${formatDate(fullStrengthFrom)}.`
-              : "Strength coverage is partial."}
-          </span>
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 text-micro text-black/40 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              {formatDate(coverage?.start)} → {formatDate(coverage?.end)} ·{" "}
+              {crashes?.length ?? 0} NBER windows ·{" "}
+              {resolution ? `${resolution} tape` : "macro tape"}
+            </span>
+            <span className="hidden text-black/20 dark:text-white/20 sm:inline">
+              /
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+              strong
+              <span className="h-1.5 w-1.5 rounded-full bg-[#d8b47a]" />
+              calm
+              <span className="h-1.5 w-1.5 rounded-full bg-[#fb923c]" />
+              warning
+              <span className="h-1.5 w-1.5 rounded-full bg-[#fb7185]" />
+              extreme
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="hidden sm:inline">
+              Hover a red NBER band for drawdown + score · click to zoom.
+            </span>
+            <label className="inline-flex items-center gap-1.5">
+              <span className="sr-only">Jump to NBER recession window</span>
+              <select
+                value={selectedId ?? ""}
+                onChange={(event) => {
+                  const crash = (crashes ?? []).find(
+                    (item) => item.id === event.target.value,
+                  );
+                  if (crash) onSelect?.(crash);
+                }}
+                className="max-w-[13rem] rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-sans text-micro text-black/55 outline-none focus:border-[#c0442f]/40 dark:border-white/5 dark:bg-black/30 dark:text-white/55"
+              >
+                <option value="">Jump to an NBER window</option>
+                {(crashes ?? []).map((crash) => (
+                  <option key={crash.id} value={crash.id}>
+                    {crash.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       </div>
     </section>

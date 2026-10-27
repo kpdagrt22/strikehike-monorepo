@@ -15,6 +15,7 @@ from regime.analytics import (  # noqa: E402
     annotate_nber,
     build_crashes,
     build_sp500_proxy,
+    calculate_bravos_composite,
     calculate_macro_strength,
     calculate_macro_strength_components,
     nber_episodes,
@@ -22,6 +23,7 @@ from regime.analytics import (  # noqa: E402
 from scripts.flows.macro_ingestion import (  # noqa: E402
     SERIES_REGISTRY,
     MacroConfigError,
+    _parse_blockchain_bitcoin,
     build_asset_targets,
     build_macro_frame,
     parse_fred_observations,
@@ -375,6 +377,7 @@ def test_asset_targets_serialize_gold_bonds_and_dollar():
     frame = pd.DataFrame(
         {
             "GOLD_LBMA": np.linspace(1000.0, 2000.0, len(index)),
+            "BTCUSD": np.linspace(100.0, 50000.0, len(index)),
             "DTWEXBGS": np.linspace(90.0, 120.0, len(index)),
             "DGS10": np.linspace(4.0, 2.0, len(index)),
         },
@@ -389,12 +392,16 @@ def test_asset_targets_serialize_gold_bonds_and_dollar():
         "gold_proxy_source",
         "bond_proxy",
         "bond_proxy_source",
+        "btc_proxy",
+        "btc_proxy_source",
         "dxy_proxy",
         "dxy_proxy_source",
     }.issubset(assets.columns)
     assert assets["gold_proxy"].iloc[-1] == pytest.approx(2000.0)
     assert assets["bond_proxy"].iloc[-1] > 0.0
     assert assets["bond_proxy_source"].iloc[-1] == "UST10Y_TOTAL_RETURN_PROXY"
+    assert assets["btc_proxy"].iloc[-1] == pytest.approx(50000.0)
+    assert assets["btc_proxy_source"].iloc[-1] == "BLOCKCHAIN_COM_MARKET_PRICE"
     assert {
         "gold_volatility_1y",
         "gold_drawdown_1y",
@@ -402,6 +409,9 @@ def test_asset_targets_serialize_gold_bonds_and_dollar():
         "bond_volatility_1y",
         "bond_drawdown_1y",
         "bond_1y_volatility_percentile",
+        "btc_volatility_1y",
+        "btc_drawdown_1y",
+        "btc_1y_volatility_percentile",
         "dxy_volatility_1y",
         "dxy_drawdown_1y",
         "dxy_1y_volatility_percentile",
@@ -429,3 +439,74 @@ def test_sp500_proxy_respects_raw_source_boundaries():
         "NASDAQCOM",
         "SP500",
     ]
+
+
+def test_bravos_composite_is_bounded_and_bucketed():
+    index = pd.date_range("1996-01-01", "2020-12-31", freq="D", tz="UTC")
+    trend = np.linspace(100.0, 1200.0, len(index))
+    credit = pd.Series(np.nan, index=index, dtype="float64")
+    credit.loc["1996-12-31":] = 4.0 + 0.8 * np.sin(
+        np.linspace(0.0, 50.0, len(credit.loc["1996-12-31":]))
+    )
+    frame = pd.DataFrame(
+        {
+            "sp500_proxy": trend,
+            "sp500_proxy_source": "TEST",
+            "BAMLH0A0HYM2": credit,
+            "fed_score": 55.0,
+            "curve_score": 50.0,
+        },
+        index=index,
+    )
+
+    out = calculate_bravos_composite(frame)
+    scored = out["bravos_score"].dropna()
+
+    assert scored.index.min() >= pd.Timestamp("1996-12-31", tz="UTC")
+    assert scored.between(-50.0, 50.0).all()
+    assert set(out["bravos_bucket"].dropna().unique()).issubset(
+        {
+            "strong_bullish",
+            "calm_bullish",
+            "bearish_warning",
+            "extreme_bearish",
+        }
+    )
+    assert np.allclose(
+        scored,
+        out.loc[scored.index, "bravos_composite"] - 50.0,
+    )
+    assert {"macro_score", "atr_pct", "bollinger_width", "rsi_14"}.issubset(
+        out.columns
+    )
+
+
+def test_blockchain_bitcoin_parser_filters_nonpositive_and_prehistory():
+    payload = (
+        b'{"values":['
+        b'{"x":1230940800,"y":0.0},'
+        b'{"x":1276560000,"y":0.06},'
+        b'{"x":1276646400,"y":-1.0},'
+        b'{"x":1276732800,"y":1.25},'
+        b'{"x":1276819200,"y":2.0}'
+        b']}'
+    )
+    series = _parse_blockchain_bitcoin(payload)
+    assert len(series) == 3
+    assert series.iloc[0] == 0.06
+    assert series.index.min() >= pd.Timestamp("2010-01-01", tz="UTC")
+    assert series.name == "BTCUSD"
+
+
+def test_sp500_proxy_carries_current_source_over_stale_tail():
+    index = pd.date_range("2020-01-01", periods=10, freq="D", tz="UTC")
+    frame = pd.DataFrame(index=index)
+    raw = pd.DataFrame(index=index)
+    raw["SP500"] = np.nan
+    raw.loc["2020-01-01":"2020-01-08", "SP500"] = np.linspace(3000.0, 3070.0, 8)
+    raw["NASDAQCOM"] = np.linspace(9000.0, 9100.0, len(index))
+
+    proxy = build_sp500_proxy(frame, raw_frame=raw)
+
+    assert proxy["sp500_proxy_source"].dropna().unique().tolist() == ["SP500"]
+    assert proxy["sp500_proxy"].iloc[-1] == pytest.approx(3070.0)

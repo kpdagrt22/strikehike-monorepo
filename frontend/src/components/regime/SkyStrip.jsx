@@ -11,7 +11,8 @@ function formatDegree(value) {
   return `${degree.toFixed(2)}°`;
 }
 
-export function SkyStrip({ asOf, contextLabel }) {
+export function SkyStrip({ asOf, contextLabel, variant = "default" }) {
+  const isFootnote = variant === "footnote";
   const [state, setState] = useState({
     status: "loading",
     bodies: null,
@@ -57,10 +58,16 @@ export function SkyStrip({ asOf, contextLabel }) {
   }, [asOf]);
 
   return (
-    <section className="mt-3 flex flex-col gap-2 rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 sm:flex-row sm:items-center sm:justify-between">
+    <section
+      className={
+        isFootnote
+          ? "mt-3 flex flex-col gap-2 border-t border-black/5 px-1 pt-3 dark:border-white/5 sm:flex-row sm:items-center sm:justify-between"
+          : "mt-3 flex flex-col gap-2 rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 sm:flex-row sm:items-center sm:justify-between"
+      }
+    >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
-          Sky at this date
+          {isFootnote ? "Sky at peak · historical footnote" : "Sky at this date"}
         </span>
         <span className="font-mono text-micro text-black/60 dark:text-white/60">
           {formatDate(asOf)}

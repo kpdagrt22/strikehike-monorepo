@@ -1,25 +1,26 @@
 "use client";
 
 import {
+  bravosTone,
   formatDate,
   formatNumber,
-  formatPercent,
-  formatScore,
+  formatSigned,
 } from "@/components/regime/regimeUtils";
 import {
-  getRegimeToneColor,
-  getRegimeToneLabel,
-} from "@/lib/regimeTone";
+  ASSET_ORDER,
+  ASSET_TARGETS,
+  assetChartColor,
+} from "@/components/regime/assetTargets";
 
-function LegendRow({ label, value, color, glow }) {
+function LegendRow({ label, value, color }) {
   return (
     <>
-      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/40">
+      <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/40">
         {label}
       </span>
       <span
         className="text-right font-mono text-micro font-semibold tracking-[-0.02em] text-white/85"
-        style={color ? { color, textShadow: glow } : undefined}
+        style={color ? { color } : undefined}
       >
         {value}
       </span>
@@ -27,21 +28,26 @@ function LegendRow({ label, value, color, glow }) {
   );
 }
 
-export function ChartCrosshairLegend({ point }) {
-  const toneColor =
-    getRegimeToneColor(point?.regime_state, true) ?? "#5eead4";
-  const toneLabel = getRegimeToneLabel(point?.regime_state) ?? "—";
-  const glow = `0 0 22px ${toneColor}55`;
+export function ChartCrosshairLegend({
+  point,
+  asset = ASSET_TARGETS.sp500,
+  compareAssets = false,
+}) {
+  const tone = bravosTone(point?.bravos_bucket, true);
+  const glow = `0 0 22px ${tone.color}55`;
+  const assets = compareAssets
+    ? ASSET_ORDER.map((key) => ASSET_TARGETS[key])
+    : [asset];
 
   return (
-    <div className="pointer-events-none absolute left-4 top-4 z-30 w-[214px] rounded-2xl border border-white/10 bg-black/60 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl sm:left-7 sm:w-[248px] sm:p-4">
+    <div className="pointer-events-none absolute left-4 top-4 z-30 w-[218px] rounded-2xl border border-white/10 bg-black/60 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl sm:left-7 sm:w-[244px] sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/40">
-          Event readout
+          Crosshair readout
         </span>
         <span
           className="h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: toneColor, boxShadow: glow }}
+          style={{ backgroundColor: tone.color, boxShadow: glow }}
           aria-hidden="true"
         />
       </div>
@@ -52,41 +58,34 @@ export function ChartCrosshairLegend({ point }) {
       <p className="text-micro text-white/35">{formatDate(point?.date)}</p>
 
       <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 border-t border-white/10 pt-2.5">
+        {assets.map((target) => (
+          <LegendRow
+            key={target.key}
+            label={target.label}
+            value={formatNumber(
+              point?.[target.valueField],
+              target.precision,
+            )}
+            color={assetChartColor(target, true)}
+          />
+        ))}
         <LegendRow
-          label="S&P 500"
-          value={formatNumber(point?.sp500_proxy, 2)}
-        />
-        <LegendRow
-          label="Fed funds"
-          value={formatPercent(point?.fed_funds, 2)}
-        />
-        <LegendRow
-          label="10Y–2Y"
-          value={formatPercent(point?.t10y2y, 2)}
-          color={
-            point?.t10y2y == null
-              ? null
-              : Number(point.t10y2y) < 0
-                ? "#fb7185"
-                : "#5eead4"
-          }
-        />
-        <LegendRow
-          label="Strength"
-          value={formatScore(point?.strength)}
-          color={toneColor}
-          glow={glow}
+          label="Bravos"
+          value={formatSigned(point?.bravos_score)}
+          color={tone.color}
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2">
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2">
         <span
-          className="text-[10px] font-medium uppercase tracking-[0.16em]"
-          style={{ color: toneColor }}
+          className="truncate text-[10px] font-medium uppercase tracking-[0.14em]"
+          style={{ color: tone.color }}
         >
-          {toneLabel}
+          {tone.label}
         </span>
-        <span className="font-mono text-[10px] text-white/30">0–100</span>
+        <span className="shrink-0 font-mono text-[10px] text-white/30">
+          −50 / +50
+        </span>
       </div>
     </div>
   );

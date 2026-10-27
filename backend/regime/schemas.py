@@ -13,6 +13,19 @@ class TimelinePoint(BaseModel):
     date: str
     strength: float | None = None
     regime_state: str | None = None
+    bravos_score: float | None = None
+    bravos_composite: float | None = None
+    bravos_bucket: str | None = None
+    macro_score: float | None = None
+    credit_score: float | None = None
+    bravos_volatility_score: float | None = None
+    bravos_momentum_score: float | None = None
+    hy_oas: float | None = None
+    atr_pct: float | None = None
+    bollinger_width: float | None = None
+    rsi_14: float | None = None
+    macd: float | None = None
+    macd_hist: float | None = None
     volatility_1y: float | None = None
     drawdown_1y: float | None = None
     volatility_percentile_1y: float | None = Field(
@@ -37,6 +50,14 @@ class TimelinePoint(BaseModel):
         default=None,
         alias="bond_1y_volatility_percentile",
     )
+    btc_proxy: float | None = None
+    btc_proxy_source: str | None = None
+    btc_volatility_1y: float | None = None
+    btc_drawdown_1y: float | None = None
+    btc_volatility_percentile_1y: float | None = Field(
+        default=None,
+        alias="btc_1y_volatility_percentile",
+    )
     dxy_proxy: float | None = None
     dxy_proxy_source: str | None = None
     dxy_volatility_1y: float | None = None
@@ -60,6 +81,8 @@ class PreCrashState(BaseModel):
     fed_funds: float | None = None
     curve_inverted: bool | None = None
     macro_strength: float | None = None
+    bravos_score: float | None = None
+    bravos_bucket: str | None = None
     sp500_proxy: float | None = None
     phase: str | None = None
 
@@ -116,6 +139,7 @@ class LatestStrength(BaseModel):
     date: str
     score: float | None = None
     label: str | None = None
+    bucket: str | None = None
     regime_state: str | None = None
     coverage: float | None = None
 
@@ -128,6 +152,10 @@ class ResponseMeta(BaseModel):
     strength_weights: dict[str, float]
     regime_thresholds: dict[str, float] | None = None
     latest_strength: LatestStrength | None = None
+    bravos_version: str | None = None
+    bravos_weights: dict[str, float] | None = None
+    bravos_buckets: dict[str, str] | None = None
+    latest_bravos: LatestStrength | None = None
     proxy_sources: list[ProxySource]
     nber_source: str
     transport: str | None = None
@@ -210,4 +238,58 @@ class ForecastResponse(BaseModel):
     risk_pct: float
     coefficients: dict[str, float]
     intercept: float
+    notes: list[str]
+
+
+class CryptoAssetStats(BaseModel):
+    label: str
+    available: bool = False
+    start_value: float | None = None
+    peak_value: float | None = None
+    trough_value: float | None = None
+    end_value: float | None = None
+    peak_date: str | None = None
+    trough_date: str | None = None
+    drawdown_pct: float | None = None
+    return_pct: float | None = None
+    observations: int | None = None
+
+
+class CryptoBravos(BaseModel):
+    at_peak: float | None = None
+    at_peak_date: str | None = None
+    at_peak_bucket: str | None = None
+    at_trough: float | None = None
+    at_trough_date: str | None = None
+    at_trough_bucket: str | None = None
+    min: float | None = None
+    min_date: str | None = None
+    max: float | None = None
+    max_date: str | None = None
+    observations: int | None = None
+
+
+class CryptoMilestoneEvent(BaseModel):
+    id: str
+    name: str
+    short_name: str | None = None
+    category: str
+    window: ZoomWindow
+    peak: str
+    trough: str | None = None
+    date_precision: str | None = None
+    summary: str | None = None
+    context: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    assets: dict[str, CryptoAssetStats]
+    bravos: CryptoBravos
+
+
+class CryptoMilestonesResponse(BaseModel):
+    as_of: str
+    coverage: Coverage
+    version: str
+    kind: str
+    assets: dict[str, str]
+    events: list[CryptoMilestoneEvent]
     notes: list[str]
