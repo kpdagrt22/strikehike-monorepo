@@ -17,6 +17,8 @@ export function ModeSwitch() {
   const pathname = usePathname();
   const focusedDate = useChronoStore((state) => state.focusedDate);
   const isRegime = pathname === "/regime" || pathname?.startsWith("/regime/");
+  const isConvergence =
+    pathname === "/convergence" || pathname?.startsWith("/convergence/");
   const dateQuery = focusedDate ? `?d=${encodeURIComponent(focusedDate)}` : "";
 
   return (
@@ -27,12 +29,14 @@ export function ModeSwitch() {
       <Link
         href={`/${dateQuery}`}
         prefetch={false}
-        aria-current={!isRegime ? "page" : undefined}
-        className={tabClass(!isRegime)}
+        aria-current={!isRegime && !isConvergence ? "page" : undefined}
+        className={tabClass(!isRegime && !isConvergence)}
       >
         <span
           className={`h-1 w-1 rounded-full ${
-            !isRegime ? "bg-current" : "bg-black/20 dark:bg-white/20"
+            !isRegime && !isConvergence
+              ? "bg-current"
+              : "bg-black/20 dark:bg-white/20"
           }`}
           aria-hidden="true"
         />
@@ -50,6 +54,19 @@ export function ModeSwitch() {
           aria-hidden="true"
         />
         Regime
+      </Link>
+      <Link
+        href={`/convergence${dateQuery}`}
+        aria-current={isConvergence ? "page" : undefined}
+        className={tabClass(isConvergence)}
+      >
+        <span
+          className={`h-1 w-1 rounded-full ${
+            isConvergence ? "bg-current" : "bg-black/20 dark:bg-white/20"
+          }`}
+          aria-hidden="true"
+        />
+        Convergence
       </Link>
     </nav>
   );

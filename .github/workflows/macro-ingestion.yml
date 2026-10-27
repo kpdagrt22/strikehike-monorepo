@@ -58,3 +58,4 @@ jobs:
           path: |
             backend/data/processed/macro_regime_history.parquet
             backend/data/processed/macro_regime_history.meta.json
+            backend/data/processed/crypto_milestones.json

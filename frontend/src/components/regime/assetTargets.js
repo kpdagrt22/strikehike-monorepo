@@ -1,4 +1,6 @@
 export const ASSET_ORDER = ["sp500", "gold", "bonds"];
+export const CONVERGENCE_ASSET_ORDER = [...ASSET_ORDER, "bitcoin"];
+export const ALL_ASSET_ORDER = CONVERGENCE_ASSET_ORDER;
 
 export const ASSET_TARGETS = {
   sp500: {
@@ -51,6 +53,23 @@ export const ASSET_TARGETS = {
     light: "#6d5bd0",
     darkSoft: "rgba(196, 181, 253, 0.18)",
     lightSoft: "rgba(109, 91, 208, 0.14)",
+  },
+  bitcoin: {
+    key: "bitcoin",
+    label: "Bitcoin",
+    fullLabel: "Bitcoin — USD market price",
+    metricLabel: "Bitcoin $",
+    valueField: "btc_proxy",
+    sourceField: "btc_proxy_source",
+    volatilityField: "btc_volatility_1y",
+    drawdownField: "btc_drawdown_1y",
+    percentileField: "btc_1y_volatility_percentile",
+    precision: 0,
+    unit: "$",
+    dark: "#f7931a",
+    light: "#c2410c",
+    darkSoft: "rgba(247, 147, 26, 0.18)",
+    lightSoft: "rgba(194, 65, 12, 0.14)",
   },
 };
 

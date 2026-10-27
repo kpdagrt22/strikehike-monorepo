@@ -27,6 +27,7 @@ COPY data/historical_events.json ./data/historical_events.json
 COPY data/processed/final_data_with_regimes.csv ./data/processed/final_data_with_regimes.csv
 COPY data/processed/macro_regime_history.parquet ./data/processed/macro_regime_history.parquet
 COPY data/processed/macro_regime_history.meta.json ./data/processed/macro_regime_history.meta.json
+COPY data/processed/crypto_milestones.json ./data/processed/crypto_milestones.json
 
 RUN mkdir -p /app/data/runtime
 
