@@ -1,10 +1,10 @@
 "use client";
 
-function badgeTone(score, isDark) {
-  if (score == null) {
+function badgeTone(score, isDark, status) {
+  if (score == null || status === "error") {
     return {
-      color: isDark ? "#9ca3af" : "#6b7280",
-      label: "Reading match",
+      color: null,
+      label: status === "loading" ? "Reading match" : "Unavailable",
     };
   }
   if (score > 80) {
@@ -25,50 +25,39 @@ function badgeTone(score, isDark) {
   };
 }
 
-export function SimilarityBadge({ score, isDark }) {
-  const tone = badgeTone(score, isDark);
+export function SimilarityBadge({ score, isDark, status }) {
+  const tone = badgeTone(score, isDark, status);
+  // Without a score the badge stays neutral (theme-aware ink, no tone colour).
+  const toneStyle = tone.color ? { color: tone.color } : undefined;
   return (
     <div className="flex items-center justify-center py-1 lg:h-full lg:flex-col lg:px-2">
-      <div
-        className="relative w-full max-w-[230px] overflow-hidden rounded-2xl border border-white/10 bg-black/45 px-4 py-3 text-center backdrop-blur-xl lg:max-w-none lg:px-3 lg:py-5"
-        style={{
-          boxShadow: `0 0 36px ${tone.color}22, 0 16px 50px rgba(0,0,0,0.35)`,
-        }}
-      >
-        <span
-          className="pointer-events-none absolute -inset-8 opacity-30 blur-2xl"
-          style={{
-            background: `radial-gradient(circle, ${tone.color}55 0%, transparent 65%)`,
-          }}
-          aria-hidden="true"
-        />
+      <div className="relative w-full max-w-[230px] overflow-hidden rounded-2xl border border-black/5 bg-white/50 px-4 py-3 text-center dark:border-white/5 dark:bg-black/30 lg:max-w-none lg:px-3 lg:py-5">
         <div className="relative">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/40">
+          <p className="text-micro font-medium uppercase tracking-[0.18em] text-black/60 dark:text-white/60">
             Pattern similarity
           </p>
           <p
-            className="mt-1.5 font-mono text-3xl font-semibold leading-none tracking-[-0.06em] sm:text-4xl lg:text-3xl"
-            style={{ color: tone.color, textShadow: `0 0 24px ${tone.color}55` }}
+            className="mt-1.5 font-mono text-3xl font-semibold leading-none tracking-[-0.06em] text-black/60 dark:text-white/60 sm:text-4xl lg:text-3xl"
+            style={toneStyle}
           >
-            {score == null ? "—" : `${Math.round(score)}%`}
+            {tone.color ? `${Math.round(score)}%` : "—"}
           </p>
           <p
-            className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.12em]"
-            style={{ color: tone.color }}
+            className="mt-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60"
+            style={toneStyle}
           >
             {tone.label}
           </p>
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/8 dark:bg-white/10">
             <div
               className="h-full rounded-full"
               style={{
-                width: `${Math.max(0, Math.min(100, score ?? 0))}%`,
-                backgroundColor: tone.color,
-                boxShadow: `0 0 12px ${tone.color}`,
+                width: `${tone.color ? Math.max(0, Math.min(100, score)) : 0}%`,
+                backgroundColor: tone.color ?? undefined,
               }}
             />
           </div>
-          <p className="mt-2 text-[9px] leading-relaxed text-white/30">
+          <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
             normalized 12-month path correlation
           </p>
         </div>

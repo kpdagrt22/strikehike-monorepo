@@ -11,6 +11,10 @@ export function currentUtcDate() {
 // timeline marker, event, future ladder entry, or precise datetime.
 export const DEFAULT_FOCUSED_DATE = currentUtcDate();
 
+// One shared empty list: a scrub step that clears the parallels keeps the same
+// reference, so subscribers that only read `parallels` do not re-render.
+const NO_PARALLELS = [];
+
 export const useChronoStore = create((set) => ({
   focusedDate: DEFAULT_FOCUSED_DATE,
   focusedTime: "00:00",
@@ -31,21 +35,26 @@ export const useChronoStore = create((set) => ({
   regimeOverlay: false,
   regimeTone: null,
   regimeOverlayStatus: "idle",
+  // Moment the current `positions` describe ("YYYY-MM-DDTHH:MM"), so a failed
+  // date change is never shown as the new sky. Bumping the retry key re-runs
+  // the positions request for the focused moment.
+  positionsDateTime: null,
+  positionsRetryKey: 0,
 
   setFocusedDate: (focusedDate) =>
     set({
       focusedDate,
       focusedTime: "00:00",
-      parallels: [],
+      parallels: NO_PARALLELS,
       status: "loading",
     }),
   setFocusedTime: (focusedTime) =>
-    set({ focusedTime, parallels: [], status: "loading" }),
+    set({ focusedTime, parallels: NO_PARALLELS, status: "loading" }),
   setFocusedDateTime: (focusedDate, focusedTime) =>
     set({
       focusedDate,
       focusedTime: focusedTime || "00:00",
-      parallels: [],
+      parallels: NO_PARALLELS,
       status: "loading",
     }),
   setCameraView: (cameraView) =>
@@ -74,6 +83,7 @@ export const useChronoStore = create((set) => ({
         responseDateTime === selectedDateTime
         ? {
             positions: payload.bodies,
+            positionsDateTime: responseDateTime,
             source: payload.source,
             status: "ready",
             energy: payload.energy ?? null,
@@ -85,4 +95,9 @@ export const useChronoStore = create((set) => ({
     }),
 
   setStatus: (status) => set({ status }),
+  retryPositions: () =>
+    set((state) => ({
+      positionsRetryKey: state.positionsRetryKey + 1,
+      status: "loading",
+    })),
 }));

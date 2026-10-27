@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
@@ -15,6 +21,10 @@ import {
   formatSigned,
 } from "@/components/regime/regimeUtils";
 import { useChronoStore } from "@/store/chronoStore";
+
+const subscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 function StatusBadge({ status }) {
   const config =
@@ -37,7 +47,7 @@ function StatusBadge({ status }) {
           };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/55 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/55">
+    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/60">
       <span
         className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
           config.pulse ? "animate-pulse" : ""
@@ -52,7 +62,7 @@ function StatusBadge({ status }) {
 function Stat({ label, value, suffix, detail, accent }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30">
-      <p className="text-micro uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
+      <p className="text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
         {label}
       </p>
       <p
@@ -61,12 +71,12 @@ function Stat({ label, value, suffix, detail, accent }) {
       >
         {value}
         {suffix ? (
-          <span className="ml-1 text-micro font-normal tracking-normal text-black/35 dark:text-white/35">
+          <span className="ml-1 text-micro font-normal tracking-normal text-black/60 dark:text-white/60">
             {suffix}
           </span>
         ) : null}
       </p>
-      <p className="mt-0.5 text-micro text-black/45 dark:text-white/45">
+      <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
         {detail}
       </p>
     </div>
@@ -77,7 +87,7 @@ function LoadingState() {
   return (
     <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-micro uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
+        <p className="text-micro uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
           Loading 170 years of macro history
         </p>
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d8b47a]" />
@@ -99,10 +109,10 @@ function ErrorState({ message, onRetry }) {
           <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
             The macro archive is not responding.
           </h2>
-          <p className="mt-2 text-meta leading-relaxed text-black/55 dark:text-white/55">
+          <p className="mt-2 text-meta leading-relaxed text-black/60 dark:text-white/60">
             {message || "The API returned an empty response."}
           </p>
-          <p className="mt-2 text-micro leading-relaxed text-black/40 dark:text-white/40">
+          <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
             A 503 means the parquet artifact has not been published to this
             environment yet. The rest of the Chrono engine is unaffected.
           </p>
@@ -111,13 +121,13 @@ function ErrorState({ message, onRetry }) {
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-full border border-black/5 px-3.5 py-2 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
+            className="rounded-full border border-black/5 px-3.5 py-2 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             Retry
           </button>
           <Link
             href="/"
-            className="rounded-full border border-transparent bg-[#14121a] px-3.5 py-2 text-micro font-medium text-[#f2ede4] transition-colors hover:bg-[#f05d49] dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-[#ff8b77]"
+            className="rounded-full border border-transparent bg-[#14121a] px-3.5 py-2 text-micro font-medium text-[#f2ede4] transition-colors hover:bg-[#f05d49] hover:text-[#14121a] focus-visible:bg-[#f05d49] focus-visible:text-[#14121a] dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-[#ff8b77] dark:focus-visible:bg-[#ff8b77]"
           >
             Orrery
           </Link>
@@ -148,9 +158,9 @@ function MethodDetails({ meta }) {
 
   return (
     <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 sm:p-6">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/50 [&::-webkit-details-marker]:hidden dark:text-white/50">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
         Method & limits
-        <span className="text-base font-normal text-black/30 transition-transform group-open:rotate-45 dark:text-white/30">
+        <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60" aria-hidden="true">
           +
         </span>
       </summary>
@@ -160,7 +170,7 @@ function MethodDetails({ meta }) {
           {allNotes.map((note, index) => (
             <li
               key={`${index}-${note}`}
-              className="flex gap-2 text-meta leading-relaxed text-black/55 dark:text-white/55"
+              className="flex gap-2 text-meta leading-relaxed text-black/60 dark:text-white/60"
             >
               <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#f05d49]" />
               <span>{note}</span>
@@ -169,14 +179,14 @@ function MethodDetails({ meta }) {
         </ul>
 
         <div>
-          <p className="text-micro uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
+          <p className="text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             Asset proxy sources
           </p>
           <ul className="mt-2 space-y-1.5">
             {sources.map((source) => (
               <li
                 key={`${source.source}-${source.start}`}
-                className="font-mono text-micro text-black/50 dark:text-white/50"
+                className="font-mono text-micro text-black/60 dark:text-white/60"
               >
                 {source.source} · {formatDate(source.start)} →{" "}
                 {formatDate(source.end)}
@@ -186,7 +196,7 @@ function MethodDetails({ meta }) {
         </div>
       </div>
 
-      <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
+      <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60">
         Data version {meta?.data_version ?? "—"} ·{" "}
         {meta?.core_index_version ?? meta?.strength_version ?? "—"} · Source
         FRED, World Bank, Blockchain.com, Yahoo Finance. Descriptive historical
@@ -198,7 +208,13 @@ function MethodDetails({ meta }) {
 
 export default function RegimePage() {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme !== "light";
+  // false during SSR/hydration, true after: server and first client render agree.
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+  const isDark = mounted ? resolvedTheme !== "light" : true;
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState("sp500");
@@ -213,9 +229,10 @@ export default function RegimePage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch("/api/v1/regime/macro-history?resolution=weekly", {
+    // view=atlas: only the fields this page reads (≈1.7 MB instead of 11 MB);
+    // the route sends Cache-Control, so repeat visits reuse it.
+    fetch("/api/v1/regime/macro-history?resolution=weekly&view=atlas", {
       signal: controller.signal,
-      cache: "no-store",
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -319,10 +336,10 @@ export default function RegimePage() {
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Regime Intelligence
             </p>
-            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-6xl">
+            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-5xl">
               The −50 to +50 macro atlas.
             </h1>
-            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
+            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/60 dark:text-white/60 sm:text-body">
               One full-bleed market chart. The Core Index composite blends credit,
               volatility and momentum; every NBER window carries its own
               drawdown and score. Compare the S&amp;P 500, gold, Treasuries and
@@ -334,7 +351,7 @@ export default function RegimePage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={state.status} />
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/45 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/45">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               FRED ·{" "}
               {data?.coverage?.start?.slice(0, 4) ?? "1854"}–
               {data?.coverage?.end?.slice(0, 4) ?? "2026"}
@@ -371,7 +388,16 @@ export default function RegimePage() {
               <Stat
                 label="NBER windows"
                 value={String(data.crashes.length)}
-                detail="Hover a red band · click to zoom"
+                detail={
+                  <>
+                    <span className="[@media(hover:none)]:hidden">
+                      Hover a red band · click to zoom
+                    </span>
+                    <span className="hidden [@media(hover:none)]:inline">
+                      Press and hold the chart to scrub
+                    </span>
+                  </>
+                }
               />
             </div>
 
@@ -413,7 +439,7 @@ export default function RegimePage() {
 
             <MethodDetails meta={data.meta} />
 
-            <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+            <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
               <span>
                 FRED · World Bank · Blockchain.com · Yahoo Finance ·{" "}
                 {data.meta?.core_index_version ?? "core-index-v1"}
@@ -426,7 +452,7 @@ export default function RegimePage() {
                       new Event("strikehike:show-onboarding"),
                     )
                   }
-                  className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+                  className="text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
                 >
                   How it works
                 </button>
@@ -436,7 +462,7 @@ export default function RegimePage() {
                       ? `/?d=${encodeURIComponent(orreryDate)}`
                       : "/"
                   }
-                  className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+                  className="text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
                 >
                   Open the Orrery at this date
                 </Link>

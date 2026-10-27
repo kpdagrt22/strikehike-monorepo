@@ -1,4 +1,8 @@
-import { NextResponse } from "next/server";
+import {
+  cachedRoute,
+  jsonTextResponse,
+  type RouteLoadResult,
+} from "@/lib/server/routeCache";
 
 export const dynamic = "force-dynamic";
 
@@ -6,10 +10,55 @@ const BACKEND_URL = (
   process.env.CHRONO_API_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 const BACKEND_TIMEOUT_MS = 15_000;
+const CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600";
+const CACHE_POLICY = { ttlMs: 15 * 60_000, maxStaleMs: 60 * 60_000 };
+const UNAVAILABLE = { error: "Macro regime service is unavailable." };
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const query = searchParams.toString();
+// view=atlas (weekly only): the timeline fields the /regime page reads
+// (RegimeTimeline, MacroHUD, ChartCrosshairLegend, PhasePlane and the asset
+// fields in assetTargets.js). Re-check those consumers before changing this.
+// Daily windows are never projected.
+const ATLAS_FIELDS = [
+  "date",
+  "core_index",
+  "core_index_bucket",
+  "sp500_proxy",
+  "proxy_source",
+  "gold_proxy",
+  "bond_proxy",
+  "nifty_proxy",
+  "1y_volatility_percentile",
+  "drawdown_1y",
+  "gold_1y_volatility_percentile",
+  "gold_drawdown_1y",
+  "bond_1y_volatility_percentile",
+  "bond_drawdown_1y",
+  "nifty_1y_volatility_percentile",
+  "nifty_drawdown_1y",
+];
+
+type JsonRecord = Record<string, unknown>;
+
+/** Keeps every top-level key; slims timeline points and omits null values. */
+function projectAtlas(payload: JsonRecord): JsonRecord {
+  if (!Array.isArray(payload?.timeline)) return payload;
+  return {
+    ...payload,
+    timeline: payload.timeline.map((point: JsonRecord) => {
+      const slim: JsonRecord = {};
+      for (const field of ATLAS_FIELDS) {
+        const value = point?.[field];
+        if (value !== null && value !== undefined) slim[field] = value;
+      }
+      return slim;
+    }),
+  };
+}
+
+async function loadMacroHistory(
+  query: string,
+  atlas: boolean,
+): Promise<RouteLoadResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
 
@@ -18,26 +67,44 @@ export async function GET(request: Request) {
       `${BACKEND_URL}/api/v1/regime/macro-history${query ? `?${query}` : ""}`,
       { signal: controller.signal, cache: "no-store" },
     );
-    const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
-      return NextResponse.json(
-        payload ?? { error: "Macro regime service is unavailable." },
-        { status: response.status },
-      );
+      const payload = await response.json().catch(() => null);
+      return {
+        status: response.status,
+        body: JSON.stringify(payload ?? UNAVAILABLE),
+      };
     }
 
-    return NextResponse.json(payload, {
-      headers: {
-        "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
-      },
-    });
+    if (!atlas) {
+      // Default contract: the upstream JSON passes through unparsed.
+      return { status: 200, body: await response.text() };
+    }
+
+    return {
+      status: 200,
+      body: JSON.stringify(projectAtlas(await response.json())),
+    };
   } catch {
-    return NextResponse.json(
-      { error: "Macro regime service is unavailable." },
-      { status: 503 },
-    );
+    return { status: 503, body: JSON.stringify(UNAVAILABLE) };
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const atlasRequested = searchParams.get("view") === "atlas";
+  const atlas = atlasRequested && searchParams.get("resolution") === "weekly";
+  if (atlasRequested) searchParams.delete("view");
+
+  const query = searchParams.toString();
+  const keyParams = new URLSearchParams(searchParams);
+  keyParams.sort();
+  const result = await cachedRoute(
+    `macro-history:${atlas ? "atlas" : "full"}?${keyParams.toString()}`,
+    CACHE_POLICY,
+    () => loadMacroHistory(query, atlas),
+  );
+  return jsonTextResponse(result, CACHE_CONTROL);
 }

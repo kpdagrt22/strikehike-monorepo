@@ -39,6 +39,64 @@
   --engine-fallback: #020204;
 }
 
+/* Refinement tokens. Motion values are mirrored for framer-motion and GSAP in
+   src/lib/motion.js; colour tokens name existing palette values only. */
+:root {
+  --sh-ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* existing signature: enter / settle */
+  --sh-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* scene & camera (≈ GSAP power3.inOut) */
+  --sh-ease-exit: cubic-bezier(0.4, 0, 1, 1); /* exits */
+  --sh-dur-micro: 140ms; /* hover / press colour & opacity */
+  --sh-dur-reveal: 200ms; /* tooltips, popovers, panels' content, nav pill content */
+  --sh-dur-reveal-out: 140ms;
+  --sh-dur-panel: 280ms; /* side panels, sheets, tray, nav pill */
+  --sh-dur-panel-out: 200ms;
+  --sh-dur-modal: 320ms; /* date picker, onboarding (backdrop 200ms) */
+  --sh-dur-data: 600ms; /* energy arc, label crossfades, lane line */
+
+  /* named roots (existing values) */
+  --sh-ink: #14121a;
+  --sh-pearl: #f2ede4;
+  --sh-signal: #f05d49;
+  --sh-signal-hover: #e8533f;
+  --sh-signal-ink: #c0442f;
+  --sh-gold: #d8b47a;
+  /* text steps: step 3 is the minimum for readable text, step 4 is decorative only */
+  --sh-text-1: rgb(20 18 26 / 0.88);
+  --sh-text-2: rgb(20 18 26 / 0.7);
+  --sh-text-3: rgb(20 18 26 / 0.6);
+  --sh-text-4: rgb(20 18 26 / 0.38);
+  --sh-line-1: rgb(20 18 26 / 0.08);
+  --sh-line-2: rgb(20 18 26 / 0.14);
+  --sh-surface-float: rgb(255 255 255 / 0.62); /* floating over the canvas, blur 16px */
+  --sh-surface-card: rgb(255 255 255 / 0.5); /* in-flow cards, no blur */
+  --sh-surface-overlay: rgb(255 255 255 / 0.92); /* sheets, popovers, tooltips, dialogs, chart overlays */
+  --sh-shadow-float: 0 12px 40px rgb(20 18 26 / 0.12);
+  --sh-shadow-overlay: 0 24px 80px rgb(20 18 26 / 0.18);
+  --sh-hover: rgb(20 18 26 / 0.04);
+  --sh-press: rgb(20 18 26 / 0.08);
+  --sh-selected: rgb(20 18 26 / 0.07);
+  --sh-focus: rgb(192 68 47 / 0.7);
+}
+
+.dark {
+  --sh-signal-ink: #ff8b77;
+  --sh-text-1: rgb(242 237 228 / 0.92);
+  --sh-text-2: rgb(242 237 228 / 0.72);
+  --sh-text-3: rgb(242 237 228 / 0.6);
+  --sh-text-4: rgb(242 237 228 / 0.38);
+  --sh-line-1: rgb(255 255 255 / 0.08);
+  --sh-line-2: rgb(255 255 255 / 0.14);
+  --sh-surface-float: rgb(8 8 14 / 0.55);
+  --sh-surface-card: rgb(0 0 0 / 0.3);
+  --sh-surface-overlay: rgb(11 11 18 / 0.92);
+  --sh-shadow-float: 0 12px 40px rgb(0 0 0 / 0.45);
+  --sh-shadow-overlay: 0 24px 80px rgb(0 0 0 / 0.55);
+  --sh-hover: rgb(255 255 255 / 0.06);
+  --sh-press: rgb(255 255 255 / 0.1);
+  --sh-selected: rgb(255 255 255 / 0.08);
+  --sh-focus: rgb(255 139 119 / 0.75);
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -62,36 +120,19 @@
   .dark body {
     color: #f2ede4;
   }
-}
 
-/* Info module enquiries: no native chrome, just a lit baseline. */
-.info-input {
-  width: 100%;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 0;
-  background: transparent;
-  padding: 0.5rem 0;
-  color: #ffffff;
-  font-size: var(--text-meta);
-  line-height: 1.5;
-  outline: none;
-  transition: border-color 180ms ease, box-shadow 180ms ease;
-}
+  /* The ring colour is set at rest, so transition-colors (it includes
+     outline-color) never fades the ring in from currentColor on focus. */
+  :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])) {
+    outline-color: var(--sh-focus);
+  }
 
-.info-input::placeholder {
-  color: rgba(255, 255, 255, 0.32);
-}
-
-.info-input:focus {
-  border-bottom-color: rgba(240, 93, 73, 0.7);
-  box-shadow: 0 8px 18px -14px rgba(240, 93, 73, 0.9);
-}
-
-.info-input:autofill,
-.info-input:-webkit-autofill {
-  -webkit-text-fill-color: #ffffff;
-  transition: background-color 9999s ease-in-out 0s;
+  /* One on-brand focus ring. Components that draw their own focus-visible
+     ring keep outline-none; nothing else removes this. */
+  :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--sh-focus);
+    outline-offset: 2px;
+  }
 }
 
 /* Mobile bottom sheets rise from the controls instead of popping in. */
@@ -108,34 +149,34 @@
 
 @media (max-width: 1023.98px) {
   .animate-sheet-up {
-    animation: sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: sheet-up var(--sh-dur-panel) var(--sh-ease-out) both;
   }
 }
 
-/* Recent-manifestation glass edge: a slow, low-contrast pulse. */
-@keyframes recent-glow {
-  0%,
-  100% {
-    border-color: rgba(240, 93, 73, 0.22);
-    box-shadow: 0 0 0 rgba(240, 93, 73, 0);
+/* Nakshatra halo (nav Easter egg): drawn over the logo, fades in quietly and
+   never moves. */
+@keyframes sh-fade-in {
+  from {
+    opacity: 0;
   }
-  50% {
-    border-color: rgba(240, 93, 73, 0.52);
-    box-shadow: 0 0 18px rgba(240, 93, 73, 0.16);
+  to {
+    opacity: 1;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .recent-glow {
-    animation: recent-glow 3.8s ease-in-out infinite;
-  }
+.sh-halo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  animation: sh-fade-in var(--sh-dur-reveal) var(--sh-ease-out) both;
 }
 
 /* Timeline scrubber: a hairline track with a small pearl/obsidian thumb. */
 .chrono-range {
   --chrono-thumb: #14121a;
   --chrono-thumb-border: rgba(255, 255, 255, 0.85);
-  --chrono-focus: rgba(240, 93, 73, 0.55);
 }
 
 .dark .chrono-range {
@@ -185,7 +226,20 @@
 }
 
 .chrono-range:focus-visible {
-  outline: 2px solid var(--chrono-focus);
+  outline: 2px solid var(--sh-focus);
   outline-offset: 4px;
   border-radius: 9999px;
+}
+
+/* One switch for DOM motion: honour the OS setting everywhere. framer-motion
+   follows the same preference through <MotionConfig reducedMotion="user">. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -15,10 +15,15 @@ import {
 } from "@/components/regime/assetTargets";
 
 const WIDTH = 560;
-const HEIGHT = 168;
-const PAD = { top: 22, right: 10, bottom: 28, left: 30 };
+// Labels render as HTML (SVG text shrinks with the viewBox); the plot area is unchanged.
+const HEIGHT = 146;
+const PAD = { top: 22, right: 10, bottom: 6, left: 30 };
 const PLOT_W = WIDTH - PAD.left - PAD.right;
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
+
+function pct(value, total) {
+  return `${(value / total) * 100}%`;
+}
 
 export function ConvergenceMiniChart({
   timeline,
@@ -92,7 +97,7 @@ export function ConvergenceMiniChart({
 
   if (!geometry) {
     return (
-      <div className="grid h-[150px] place-items-center rounded-xl border border-dashed border-black/5 px-4 text-center text-micro text-black/45 dark:border-white/5 dark:text-white/45">
+      <div className="grid h-[150px] place-items-center rounded-xl border border-dashed border-black/5 px-4 text-center text-micro text-black/60 dark:border-white/5 dark:text-white/60">
         No {asset.label} quote in this comparison window.
       </div>
     );
@@ -102,43 +107,44 @@ export function ConvergenceMiniChart({
 
   return (
     <div className="overflow-hidden rounded-xl border border-black/5 bg-white/35 dark:border-white/5 dark:bg-black/20">
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="h-auto w-full"
-        role="img"
-        aria-label={`${asset.label} mini chart for ${event?.name ?? "the selected event"}`}
-      >
-        <line
-          x1={PAD.left}
-          x2={WIDTH - PAD.right}
-          y1={PAD.top + PLOT_H}
-          y2={PAD.top + PLOT_H}
-          stroke={tone.grid}
-        />
-        <line
-          x1={PAD.left}
-          x2={WIDTH - PAD.right}
-          y1={PAD.top + PLOT_H / 2}
-          y2={PAD.top + PLOT_H / 2}
-          stroke={tone.grid}
-          strokeDasharray="2 4"
-        />
-
-        {segments.map((segment, index) => (
-          <path
-            key={`convergence-mini-${index}`}
-            d={pathFromSegment(segment)}
-            fill="none"
-            stroke={color}
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          className="h-auto w-full"
+          role="img"
+          aria-label={`${asset.label} mini chart for ${event?.name ?? "the selected event"}`}
+        >
+          <line
+            x1={PAD.left}
+            x2={WIDTH - PAD.right}
+            y1={PAD.top + PLOT_H}
+            y2={PAD.top + PLOT_H}
+            stroke={tone.grid}
           />
-        ))}
+          <line
+            x1={PAD.left}
+            x2={WIDTH - PAD.right}
+            y1={PAD.top + PLOT_H / 2}
+            y2={PAD.top + PLOT_H / 2}
+            stroke={tone.grid}
+            strokeDasharray="2 4"
+          />
 
-        {markers.map((marker) => (
-          <g key={`convergence-marker-${marker.key}`}>
+          {segments.map((segment, index) => (
+            <path
+              key={`convergence-mini-${index}`}
+              d={pathFromSegment(segment)}
+              fill="none"
+              stroke={color}
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+
+          {markers.map((marker) => (
             <line
+              key={`convergence-marker-${marker.key}`}
               x1={x(marker.ms)}
               x2={x(marker.ms)}
               y1={PAD.top - 2}
@@ -147,39 +153,46 @@ export function ConvergenceMiniChart({
               strokeOpacity="0.55"
               strokeDasharray="2 4"
             />
-            <text
-              x={x(marker.ms)}
-              y={PAD.top - 7}
-              fill={marker.color}
-              fontSize="8"
-              textAnchor="middle"
-              className="font-mono"
-            >
-              {marker.label}
-            </text>
-          </g>
-        ))}
-
-        <text
-          x={PAD.left}
-          y={HEIGHT - 9}
-          fill={tone.axisStrong}
-          fontSize="8"
-          className="font-mono"
-        >
-          {formatDate(startMs)}
-        </text>
-        <text
-          x={WIDTH - PAD.right}
-          y={HEIGHT - 9}
-          fill={tone.axisStrong}
-          fontSize="8"
-          textAnchor="end"
-          className="font-mono"
-        >
-          {formatDate(endMs)}
-        </text>
-      </svg>
+          ))}
+        </svg>
+        {markers.length > 0 ? (
+          <div
+            className="pointer-events-none absolute inset-0 font-mono text-micro leading-none text-black/60 dark:text-white/60"
+            aria-hidden="true"
+          >
+            {markers.map((marker) => {
+              const markerX = x(marker.ms);
+              // Centred over the line; flush to the line near either edge.
+              const align =
+                markerX > WIDTH * 0.9
+                  ? "-translate-x-full"
+                  : markerX < WIDTH * 0.1
+                    ? ""
+                    : "-translate-x-1/2";
+              return (
+                <span
+                  key={`convergence-label-${marker.key}`}
+                  className={`absolute top-0 whitespace-nowrap ${align}`}
+                  style={{ left: pct(markerX, WIDTH) }}
+                >
+                  {marker.label}
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+      <div
+        className="flex justify-between gap-2 pb-2 font-mono text-micro text-black/70 dark:text-white/70"
+        style={{
+          paddingLeft: pct(PAD.left, WIDTH),
+          paddingRight: pct(PAD.right, WIDTH),
+        }}
+        aria-hidden="true"
+      >
+        <span>{formatDate(startMs)}</span>
+        <span>{formatDate(endMs)}</span>
+      </div>
     </div>
   );
 }

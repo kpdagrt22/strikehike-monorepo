@@ -10,7 +10,10 @@ import {
   getChartTone,
   pathFromSegment,
 } from "@/components/regime/regimeUtils";
-import { getAssetTarget } from "@/components/regime/assetTargets";
+import {
+  ASSET_TARGETS,
+  getAssetTarget,
+} from "@/components/regime/assetTargets";
 
 const WIDTH = 760;
 const HEIGHT = 420;
@@ -20,6 +23,43 @@ const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
 const VOL_THRESHOLD = 50;
 const DRAWDOWN_THRESHOLD = -10;
 const TRACE_DAYS = 90;
+// Fetch a trace only once the pointer rests on a week, and keep recent traces
+// so scrubbing back and forth does not refetch them.
+const TRACE_DWELL_MS = 220;
+const TRACE_CACHE_LIMIT = 24;
+const TRACE_FIELDS = [
+  "date",
+  "core_index",
+  "core_index_bucket",
+  ...Object.values(ASSET_TARGETS).flatMap((target) => [
+    target.percentileField,
+    target.drawdownField,
+  ]),
+];
+const EMPTY_TIMELINE = [];
+const FOCUS_RING_INSET =
+  "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
+
+// Parsed, ready traces keyed `${start}|${asOf}`; least recently used first.
+const traceCache = new Map();
+
+function rememberTrace(key, timeline) {
+  traceCache.delete(key);
+  traceCache.set(key, timeline);
+  while (traceCache.size > TRACE_CACHE_LIMIT) {
+    traceCache.delete(traceCache.keys().next().value);
+  }
+}
+
+function slimTrace(timeline) {
+  return timeline.map((item) => {
+    const slim = {};
+    for (const field of TRACE_FIELDS) {
+      if (item?.[field] != null) slim[field] = item[field];
+    }
+    return slim;
+  });
+}
 
 const QUADRANTS = {
   calm_bullish: {
@@ -72,8 +112,8 @@ function Quadrant({ x, y, width, height, quadrant, isDark, strong }) {
       <text
         x={x + width / 2}
         y={y + height / 2 + 12}
-        fill={isDark ? "rgba(242,237,228,0.45)" : "rgba(20,18,26,0.42)"}
-        fontSize="8"
+        fill={isDark ? "rgba(242,237,228,0.6)" : "rgba(20,18,26,0.6)"}
+        fontSize="10"
         textAnchor="middle"
         className="font-mono"
       >
@@ -92,22 +132,28 @@ export function PhasePlane({
 }) {
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
   const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
+  const traceStart = asOf ? addDaysIso(asOf, -TRACE_DAYS) : null;
+  const traceKey = traceStart ? `${traceStart}|${asOf}` : null;
   const [trace, setTrace] = useState({
+    key: null,
     status: "idle",
-    timeline: [],
+    timeline: EMPTY_TIMELINE,
     error: null,
   });
 
   useEffect(() => {
-    if (!asOf) return undefined;
-    const start = addDaysIso(asOf, -TRACE_DAYS);
-    if (!start) return undefined;
+    if (!traceKey) return undefined;
+    if (traceCache.has(traceKey)) {
+      rememberTrace(traceKey, traceCache.get(traceKey));
+      return undefined;
+    }
+    const [start, end] = traceKey.split("|");
 
     const controller = new AbortController();
     const timer = setTimeout(() => {
       fetch(
-        `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${asOf}`,
-        { signal: controller.signal, cache: "no-store" },
+        `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${end}`,
+        { signal: controller.signal },
       )
         .then(async (response) => {
           if (!response.ok) {
@@ -121,34 +167,47 @@ export function PhasePlane({
           return response.json();
         })
         .then((payload) => {
-          setTrace({
-            status: "ready",
-            timeline: Array.isArray(payload?.timeline)
-              ? payload.timeline
-              : [],
-            error: null,
-          });
+          const timeline = slimTrace(
+            Array.isArray(payload?.timeline) ? payload.timeline : [],
+          );
+          rememberTrace(traceKey, timeline);
+          setTrace({ key: traceKey, status: "ready", timeline, error: null });
         })
         .catch((error) => {
           if (error.name !== "AbortError") {
             setTrace({
+              key: traceKey,
               status: "error",
-              timeline: [],
+              timeline: EMPTY_TIMELINE,
               error: error.message,
             });
           }
         });
-    }, 90);
+    }, TRACE_DWELL_MS);
 
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [asOf]);
+  }, [traceKey]);
+
+  // A cached trace is shown at once; otherwise only the trace fetched for
+  // this exact window counts, so a previous week's path never stands in.
+  const cachedTimeline = traceKey ? traceCache.get(traceKey) : undefined;
+  const traceStatus = cachedTimeline
+    ? "ready"
+    : trace.key === traceKey
+      ? trace.status
+      : traceKey
+        ? "loading"
+        : "idle";
+  const traceTimeline =
+    cachedTimeline ??
+    (trace.key === traceKey ? trace.timeline : EMPTY_TIMELINE);
 
   const tracePoints = useMemo(() => {
-    if (!Array.isArray(trace.timeline)) return [];
-    return trace.timeline
+    if (!Array.isArray(traceTimeline)) return [];
+    return traceTimeline
       .map((item) => ({
         ...item,
         vol:
@@ -165,7 +224,8 @@ export function PhasePlane({
           Number.isFinite(item.vol) && Number.isFinite(item.drawdown),
       )
       .slice(-TRACE_DAYS);
-  }, [trace.timeline, asset]);
+  }, [traceTimeline, asset]);
+  const traceEmpty = traceStatus === "ready" && tracePoints.length === 0;
 
   const passedPoint = point
     ? {
@@ -214,10 +274,13 @@ export function PhasePlane({
       : QUADRANTS[currentQuadrant].fill
     : toneForIndex.color;
 
+  // Weeks without volatility data have no point and no trace; keep the scale
+  // finite so the four zones always draw.
   const minDrawdown = Math.min(
     -10,
-    currentDrawdown,
-    ...tracePoints.map((item) => item.drawdown),
+    ...[currentDrawdown, ...tracePoints.map((item) => item.drawdown)].filter(
+      Number.isFinite,
+    ),
   );
   const yMin = Math.min(-40, minDrawdown * 1.15);
 
@@ -251,42 +314,38 @@ export function PhasePlane({
           >
             The 90-day path
           </h2>
-          <p className="mt-1 text-micro text-black/45 dark:text-white/45">
-            {formatDate(asOf)} · {contextLabel} · move your cursor on the chart
-            to trace the cycle
+          <p className="mt-1 text-micro text-black/60 dark:text-white/60">
+            {formatDate(asOf)} · {contextLabel} ·{" "}
+            <span className="[@media(hover:none)]:hidden">
+              move your cursor on the chart to trace the cycle
+            </span>
+            <span className="hidden [@media(hover:none)]:inline">
+              Press and hold the chart to scrub
+            </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 text-micro text-black/40 dark:text-white/40">
+        <div className="flex items-center gap-2 text-micro text-black/60 dark:text-white/60">
           <span
             className="h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: traceColor, boxShadow: `0 0 14px ${traceColor}` }}
+            style={{ backgroundColor: traceColor }}
             aria-hidden="true"
           />
           Glowing trace: prior {TRACE_DAYS} days
         </div>
       </div>
 
-      <div className="overflow-x-auto p-2 sm:p-3">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Cycle map, scrollable"
+        className={`overflow-x-auto p-2 sm:p-3 ${FOCUS_RING_INSET}`}
+      >
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[560px]"
           role="img"
           aria-label={`Two by two cycle map of ${asset.label} volatility percentile versus one-year drawdown as of ${formatDate(asOf)}`}
         >
-          <defs>
-            <filter id="phase-trace-glow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-            <radialGradient id="phase-marker-glow">
-              <stop offset="0%" stopColor={markerColor} stopOpacity="0.42" />
-              <stop offset="100%" stopColor={markerColor} stopOpacity="0" />
-            </radialGradient>
-          </defs>
-
           <Quadrant
             x={PAD.left}
             y={PAD.top}
@@ -355,7 +414,7 @@ export function PhasePlane({
             x={PAD.left + PLOT_W / 2}
             y={HEIGHT - 8}
             fill={tone.axisStrong}
-            fontSize="9"
+            fontSize="10"
             textAnchor="middle"
             className="font-mono"
           >
@@ -365,7 +424,7 @@ export function PhasePlane({
             x={16}
             y={PAD.top + PLOT_H / 2}
             fill={tone.axisStrong}
-            fontSize="9"
+            fontSize="10"
             textAnchor="middle"
             transform={`rotate(-90 16 ${PAD.top + PLOT_H / 2})`}
             className="font-mono"
@@ -380,10 +439,9 @@ export function PhasePlane({
                 fill="none"
                 stroke={traceColor}
                 strokeWidth="7"
-                strokeOpacity="0.34"
+                strokeOpacity="0.22"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                filter="url(#phase-trace-glow)"
               />
               <path
                 d={pathFromSegment(segment)}
@@ -412,12 +470,6 @@ export function PhasePlane({
               <circle
                 cx={x(currentVol)}
                 cy={y(currentDrawdown)}
-                r="28"
-                fill="url(#phase-marker-glow)"
-              />
-              <circle
-                cx={x(currentVol)}
-                cy={y(currentDrawdown)}
                 r="5.5"
                 fill={markerColor}
                 stroke={isDark ? "#020204" : "#f1ebe2"}
@@ -427,7 +479,7 @@ export function PhasePlane({
                 x={x(currentVol) + (currentVol > 80 ? -10 : 10)}
                 y={y(currentDrawdown) - 10}
                 fill={markerColor}
-                fontSize="9"
+                fontSize="10"
                 textAnchor={currentVol > 80 ? "end" : "start"}
                 className="font-mono"
               >
@@ -438,12 +490,14 @@ export function PhasePlane({
             <text
               x={PAD.left + PLOT_W / 2}
               y={PAD.top + PLOT_H / 2}
-              fill={tone.axis}
+              fill={tone.axisText}
               fontSize="10"
               textAnchor="middle"
               className="font-mono"
             >
-              Move across the chart to load the cycle path
+              {traceEmpty
+                ? "No volatility data for this window"
+                : "Move across the chart to load the cycle path"}
             </text>
           )}
         </svg>
@@ -451,7 +505,7 @@ export function PhasePlane({
 
       <div className="grid grid-cols-2 gap-2 border-t border-black/5 px-4 py-3 dark:border-white/5 sm:grid-cols-3">
         <div>
-          <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Current
           </p>
           <p
@@ -460,11 +514,15 @@ export function PhasePlane({
           >
             {currentQuadrant
               ? QUADRANTS[currentQuadrant].label
-              : "Awaiting trace"}
+              : traceEmpty
+                ? "No data"
+                : traceStatus === "error"
+                  ? "Unavailable"
+                  : "Awaiting trace"}
           </p>
         </div>
         <div>
-          <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Core Index
           </p>
           <p
@@ -479,21 +537,23 @@ export function PhasePlane({
           </p>
         </div>
         <div>
-          <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Trace
           </p>
           <p className="mt-0.5 font-mono text-meta text-[#14121a] dark:text-[#f2ede4]">
             {tracePoints.length > 0
               ? `${tracePoints.length} days`
-              : trace.status === "error"
+              : traceStatus === "error"
                 ? "Unavailable"
-                : "Loading…"}
+                : traceStatus === "ready"
+                  ? "No data"
+                  : "Loading…"}
           </p>
         </div>
       </div>
 
       <div className="border-t border-black/5 px-4 py-3 dark:border-white/5">
-        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+        <p className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
           Contrarian playbook
         </p>
         <p className="mt-1 text-meta leading-relaxed" style={{ color: toneForIndex.color }}>
@@ -501,8 +561,14 @@ export function PhasePlane({
         </p>
       </div>
 
-      <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
-        Hover the main chart to redraw the glowing 90-day trail. The quadrants
+      <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60">
+        <span className="[@media(hover:none)]:hidden">
+          Hover the main chart to redraw the glowing 90-day trail.
+        </span>
+        <span className="hidden [@media(hover:none)]:inline">
+          Press and hold the chart to scrub.
+        </span>{" "}
+        The quadrants
         are contrarian risk-posture zones: trim into complacency and euphoria,
         build into despair and panic. They are not personalised advice.
       </p>

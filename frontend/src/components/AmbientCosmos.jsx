@@ -8,6 +8,9 @@ const DUST_COUNT = 720;
 const NAKSHATRA_COUNT = 27;
 const RING_RADIUS = 4.15;
 const DUST_RADIUS = 3.82;
+// After an on-demand pause the frame delta spans the whole pause; clamp it so
+// the drift never jumps when motion resumes.
+const MAX_FRAME_DELTA = 1 / 30;
 
 /** Deterministic dust layout, so a remount never reshuffles the sky. */
 function seededRandom(seed) {
@@ -242,7 +245,7 @@ function ThemeLights({ isDark }) {
   );
 }
 
-export function AmbientCosmos({ isDark = true }) {
+export function AmbientCosmos({ isDark = true, ambientRef = null }) {
   const dustRef = useRef(null);
   const ringRef = useRef(null);
   const viewport = useThree((state) => state.viewport);
@@ -251,13 +254,18 @@ export function AmbientCosmos({ isDark = true }) {
   const fit = Math.min(1, viewport.width / 9.2);
 
   useFrame((_, delta) => {
-    // Unconditional, delta-based motion. No date, planet or time-travel state is read here.
+    // Delta-based drift. No date, planet or time-travel state is read here.
+    // The shared ambient factor is 1 while the sky is awake, eases to 0 at
+    // rest, and stays 0 under reduced motion.
+    const step = Math.min(delta, MAX_FRAME_DELTA) * (ambientRef?.current ?? 1);
+    if (step === 0) return;
+
     if (dustRef.current) {
-      dustRef.current.rotation.y += delta * 0.008;
+      dustRef.current.rotation.y += step * 0.008;
     }
 
     if (ringRef.current) {
-      ringRef.current.rotation.z += delta * 0.024;
+      ringRef.current.rotation.z += step * 0.024;
     }
   });
 

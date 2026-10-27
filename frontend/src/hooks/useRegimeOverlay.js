@@ -3,6 +3,23 @@
 import { useEffect } from "react";
 import { useChronoStore } from "@/store/chronoStore";
 
+// A scrub fires one overlay request once the date settles, not one per step.
+const OVERLAY_FETCH_DEBOUNCE_MS = 200;
+
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
+
 function shiftIsoDate(value, days) {
   if (!value) return null;
   const date = new Date(`${value}T00:00:00Z`);
@@ -46,10 +63,13 @@ export function useRegimeOverlay() {
       return undefined;
     }
 
-    fetch(
-      `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${focusedDate}`,
-      { signal: controller.signal, cache: "no-store" },
-    )
+    delay(OVERLAY_FETCH_DEBOUNCE_MS, controller.signal)
+      .then(() =>
+        fetch(
+          `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${focusedDate}`,
+          { signal: controller.signal, cache: "no-store" },
+        ),
+      )
       .then(async (response) => {
         if (!response.ok) {
           const error = new Error(`HTTP ${response.status}`);

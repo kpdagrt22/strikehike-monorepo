@@ -11,7 +11,7 @@ function formatDegree(value) {
   return `${degree.toFixed(2)}°`;
 }
 
-export function AstroLens({ asOf, contextLabel, isDark }) {
+export function AstroLens({ asOf, contextLabel }) {
   const [state, setState] = useState({
     status: "loading",
     bodies: null,
@@ -24,7 +24,6 @@ export function AstroLens({ asOf, contextLabel, isDark }) {
 
     fetch(`/api/chrono/positions?date=${encodeURIComponent(asOf)}`, {
       signal: controller.signal,
-      cache: "no-store",
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -57,28 +56,22 @@ export function AstroLens({ asOf, contextLabel, isDark }) {
   }, [asOf]);
 
   return (
-    <div
-      className={`rounded-2xl border p-4 ${
-        isDark
-          ? "border-white/[0.08] bg-white/[0.025]"
-          : "border-black/[0.06] bg-black/[0.018]"
-      }`}
-    >
+    <div className="rounded-2xl border border-black/[0.06] bg-black/[0.018] p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
+        <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
           Sky at peak
         </p>
-        <p className="font-mono text-micro text-black/35 dark:text-white/35">
+        <p className="font-mono text-micro text-black/60 dark:text-white/60">
           {formatDate(asOf)} · {contextLabel}
         </p>
       </div>
 
       {state.status === "loading" ? (
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {BODIES.map((name) => (
             <div
               key={name}
-              className="h-16 animate-pulse rounded-xl bg-black/[0.04] dark:bg-white/[0.05]"
+              className="h-12 animate-pulse rounded-xl bg-black/[0.04] dark:bg-white/[0.05] sm:h-16"
             />
           ))}
         </div>
@@ -91,32 +84,37 @@ export function AstroLens({ asOf, contextLabel, isDark }) {
       ) : null}
 
       {state.status === "ready" ? (
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        // Phones: hairline rows (name and degree on one line, Nakshatra under
+        // it). From sm: the three cards. Nakshatra names wrap, never truncate.
+        <div className="mt-3 divide-black/[0.06] max-sm:divide-y sm:grid sm:grid-cols-3 sm:gap-2 dark:divide-white/[0.08]">
           {BODIES.map((name) => {
             const body = state.bodies?.[name];
             const retrograde = body?.retro ?? body?.retrograde;
             return (
               <div
                 key={name}
-                className="rounded-xl border border-black/[0.05] bg-white/45 px-3 py-2.5 dark:border-white/[0.06] dark:bg-black/20"
+                className="max-sm:py-2.5 max-sm:first:pt-0 max-sm:last:pb-0 sm:rounded-xl sm:border sm:border-black/[0.05] sm:bg-white/45 sm:px-3 sm:py-2.5 sm:dark:border-white/[0.06] sm:dark:bg-black/20"
               >
-                <div className="flex items-center justify-between gap-1">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
-                    {name}
+                <div className="flex items-baseline justify-between gap-3 sm:block">
+                  <div className="flex items-center gap-1 sm:justify-between">
+                    <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+                      {name}
+                    </p>
+                    {retrograde ? (
+                      <span
+                        title="Retrograde"
+                        className="text-micro text-[#c0442f] dark:text-[#ff8b77]"
+                      >
+                        <span aria-hidden="true">℞</span>
+                        <span className="sr-only">retrograde</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="font-mono text-lg font-medium tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4] sm:mt-1">
+                    {formatDegree(body?.lon ?? body?.degree)}
                   </p>
-                  {retrograde ? (
-                    <span
-                      title="Retrograde"
-                      className="text-[10px] text-[#c0442f] dark:text-[#ff8b77]"
-                    >
-                      ℞
-                    </span>
-                  ) : null}
                 </div>
-                <p className="mt-1 font-mono text-lg font-medium tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
-                  {formatDegree(body?.lon ?? body?.degree)}
-                </p>
-                <p className="mt-0.5 truncate text-[10px] text-black/40 dark:text-white/40">
+                <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
                   {body?.nakshatra ?? "—"} · {body?.rashi ?? "—"}
                 </p>
               </div>
@@ -125,7 +123,7 @@ export function AstroLens({ asOf, contextLabel, isDark }) {
         </div>
       ) : null}
 
-      <p className="mt-3 text-[10px] leading-relaxed text-black/35 dark:text-white/35">
+      <p className="mt-3 text-micro leading-relaxed text-black/60 dark:text-white/60">
         Lahiri sidereal ephemeris. A historical correspondence lens, not a
         causal input to the Core Index composite.
       </p>

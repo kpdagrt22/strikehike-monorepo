@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { PeekIntoFuture } from "@/components/patterns/PeekIntoFuture";
 import { PatternEraPanel } from "@/components/patterns/PatternEraPanel";
@@ -14,14 +14,18 @@ import {
 } from "@/components/regime/assetTargets";
 import { formatDate } from "@/components/regime/regimeUtils";
 
+const subscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 function SectionLabel({ number, children }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="font-mono text-[10px] text-[#c0442f] dark:text-[#ff8b77]">
+      <span className="font-mono text-micro text-[#c0442f] dark:text-[#ff8b77]">
         {number}
       </span>
       <span className="h-px w-8 bg-black/10 dark:bg-white/15" aria-hidden="true" />
-      <p className="text-micro font-medium uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+      <p className="text-micro font-medium uppercase tracking-[0.18em] text-black/60 dark:text-white/60">
         {children}
       </p>
     </div>
@@ -57,7 +61,7 @@ function similarityMeta(score, isDark) {
   if (score == null) {
     return {
       label: "Reading echo",
-      color: isDark ? "#9ca3af" : "#6b7280",
+      color: null,
     };
   }
   if (score > 80) {
@@ -78,10 +82,10 @@ function similarityMeta(score, isDark) {
   };
 }
 
-function AssetLens({ assetKey, isDark, onChange }) {
+function AssetLens({ assetKey, onChange }) {
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+      <span className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
         Market lens
       </span>
       <div
@@ -92,7 +96,8 @@ function AssetLens({ assetKey, isDark, onChange }) {
         {PATTERN_ASSET_ORDER.map((key) => {
           const target = ASSET_TARGETS[key];
           const selected = key === assetKey;
-          const color = assetChartColor(target, isDark);
+          // Both theme colours ride on CSS variables so the server markup is
+          // theme-agnostic; the .dark class picks the pair, never JS.
           return (
             <button
               key={key}
@@ -101,12 +106,12 @@ function AssetLens({ assetKey, isDark, onChange }) {
               aria-pressed={selected}
               className={`rounded-full px-3 py-1.5 text-micro font-medium transition-colors ${
                 selected
-                  ? ""
-                  : "text-black/45 hover:text-black/75 dark:text-white/45 dark:hover:text-white/75"
+                  ? "bg-white/80 text-(--lens-light) dark:bg-(--lens-dark)/12 dark:text-(--lens-dark)"
+                  : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
               }`}
               style={
                 selected
-                  ? { color, backgroundColor: `${color}1f`, boxShadow: `0 0 18px ${color}22` }
+                  ? { "--lens-light": target.light, "--lens-dark": target.dark }
                   : undefined
               }
             >
@@ -121,8 +126,17 @@ function AssetLens({ assetKey, isDark, onChange }) {
 
 export default function PatternsPage() {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme !== "light";
+  // false during SSR/hydration, true after: the server cannot know the theme, so
+  // JS-computed colours switch to the resolved theme only once mounted.
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+  const isDark = !mounted || resolvedTheme !== "light";
+  const marketsHeadingRef = useRef(null);
   const [assetKey, setAssetKey] = useState("sp500");
+  const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({
     status: "loading",
     data: null,
@@ -134,7 +148,6 @@ export default function PatternsPage() {
 
     fetch(`/api/v1/patterns?asset=${encodeURIComponent(assetKey)}`, {
       signal: controller.signal,
-      cache: "no-store",
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -160,12 +173,19 @@ export default function PatternsPage() {
       });
 
     return () => controller.abort();
-  }, [assetKey]);
+  }, [assetKey, reloadKey]);
 
   const handleAssetChange = (key) => {
     if (key === assetKey) return;
     setState({ status: "loading", data: null, error: null });
     setAssetKey(key);
+  };
+
+  const handleRetry = () => {
+    // The alert (and this button) unmount on retry; keep focus in the section.
+    marketsHeadingRef.current?.focus({ preventScroll: true });
+    setState({ status: "loading", data: null, error: null });
+    setReloadKey((key) => key + 1);
   };
 
   const data = state.data;
@@ -186,7 +206,13 @@ export default function PatternsPage() {
       "The asset does not reach back 120 years; the earliest complete one-year mirror is used."
     : "Railroads, electricity and the road to 1907";
   const echo = similarityMeta(data?.similarity_percentage, isDark);
-  const echoLabel = fallback ? "Short-history lens" : echo.label;
+  const echoLabel = fallback
+    ? "Short-history lens"
+    : state.status === "error"
+      ? "Unavailable"
+      : echo.label;
+  const pendingDate =
+    state.status === "error" ? "Archive unavailable" : "Loading archive…";
 
   return (
     <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-3 sm:pt-4">
@@ -201,7 +227,7 @@ export default function PatternsPage() {
                 ? "The Indian market mirror."
                 : "The 120-year mirror."}
             </h1>
-            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
+            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70 sm:text-body">
               A rolling comparison of two market windows, the correlation
               between them, and exactly what happened in the historical year
               that followed. Different technology, different headlines,
@@ -209,19 +235,18 @@ export default function PatternsPage() {
             </p>
             <AssetLens
               assetKey={assetKey}
-              isDark={isDark}
               onChange={handleAssetChange}
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/55 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/55">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/60">
               <span
                 className="h-1.5 w-1.5 rounded-full bg-[#0f766e] dark:bg-[#5eead4]"
                 aria-hidden="true"
               />
               {fallback ? "Earliest mirror" : "120-year study"}
             </span>
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/45 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/45">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               {nowDate ? formatDate(nowDate) : "—"} ·{" "}
               {thenDate ? formatDate(thenDate) : "—"}
             </span>
@@ -231,13 +256,13 @@ export default function PatternsPage() {
         <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/40 p-4 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 sm:p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 dark:border-white/5 dark:bg-white/[0.03]">
-              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                 Today
               </p>
               <p className="mt-1 font-mono text-lg font-medium tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
-                {nowDate ? formatDate(nowDate) : "Loading archive…"}
+                {nowDate ? formatDate(nowDate) : pendingDate}
               </p>
-              <p className="mt-0.5 text-micro text-black/40 dark:text-white/40">
+              <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
                 {assetKey === "nifty"
                   ? "Domestic flows, earnings and a valuation reset"
                   : "AI, ETFs and concentrated leadership"}
@@ -245,19 +270,19 @@ export default function PatternsPage() {
             </div>
             <div className="flex items-center justify-center gap-2 py-1 sm:flex-col">
               <span className="h-px w-10 bg-black/10 sm:h-8 sm:w-px dark:bg-white/15" />
-              <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
+              <span className="whitespace-nowrap font-mono text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
                 {fallback ? `${asset.label} mirror` : "120 years"}
               </span>
               <span className="h-px w-10 bg-black/10 sm:h-8 sm:w-px dark:bg-white/15" />
             </div>
             <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 dark:border-white/5 dark:bg-white/[0.03]">
-              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                 {thenLabel}
               </p>
               <p className="mt-1 font-mono text-lg font-medium tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
-                {thenDate ? formatDate(thenDate) : "Loading archive…"}
+                {thenDate ? formatDate(thenDate) : pendingDate}
               </p>
-              <p className="mt-0.5 text-micro text-black/40 dark:text-white/40">
+              <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
                 {thenContext}
               </p>
             </div>
@@ -267,15 +292,37 @@ export default function PatternsPage() {
         <section className="mt-8">
           <SectionLabel number="01">Markets · then vs now</SectionLabel>
           <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
+            <h2
+              ref={marketsHeadingRef}
+              tabIndex={-1}
+              className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] focus:outline-none dark:text-[#f2ede4] sm:text-3xl"
+            >
               The same market animal.
             </h2>
-            <p className="max-w-xl text-micro leading-relaxed text-black/45 dark:text-white/45">
+            <p className="max-w-xl text-micro leading-relaxed text-black/60 dark:text-white/60">
               {fallback
                 ? `The closest available ${asset.label} mirror is used because the index does not reach back 120 years. The historical forward tape is still real.`
                 : "A century apart, both markets were near highs, calm on the surface, and leaning on a powerful new technology story."}
             </p>
           </div>
+
+          {state.status === "error" ? (
+            <div
+              role="alert"
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ef4444]/25 bg-[#ef4444]/4 px-4 py-3"
+            >
+              <p className="text-micro text-[#c0442f] dark:text-[#ff8b77]">
+                Pattern archive unavailable: {state.error}
+              </p>
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="shrink-0 rounded-full border border-black/14 px-3.5 py-1.5 text-micro font-medium text-black/70 transition-colors hover:bg-black/4 focus-visible:bg-black/4 pointer-coarse:min-h-11 dark:border-white/14 dark:text-white/70 dark:hover:bg-white/6 dark:focus-visible:bg-white/6"
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
 
           <div className="mt-4 grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
             {state.status === "loading" ? (
@@ -309,6 +356,7 @@ export default function PatternsPage() {
                 <SimilarityBadge
                   score={data?.similarity_percentage}
                   isDark={isDark}
+                  status={state.status}
                 />
                 <PatternMarketCard
                   side="Then"
@@ -328,13 +376,8 @@ export default function PatternsPage() {
             )}
           </div>
           {fallback && data?.mirror_note ? (
-            <p className="mt-2 text-micro leading-relaxed text-black/40 dark:text-white/40">
+            <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
               {data.mirror_note}
-            </p>
-          ) : null}
-          {state.status === "error" ? (
-            <p className="mt-2 text-micro text-[#c0442f] dark:text-[#ff8b77]">
-              Pattern archive unavailable: {state.error}
             </p>
           ) : null}
 
@@ -354,7 +397,7 @@ export default function PatternsPage() {
             <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
               Different tools, familiar tensions.
             </h2>
-            <p className="max-w-xl text-micro leading-relaxed text-black/45 dark:text-white/45">
+            <p className="max-w-xl text-micro leading-relaxed text-black/60 dark:text-white/60">
               A general-purpose technology, a contested chokepoint, and a
               political order under strain. The nouns change; the grammar
               repeats.
@@ -422,22 +465,30 @@ export default function PatternsPage() {
                   <span className="font-mono text-[5rem] font-medium leading-[0.72] tracking-[-0.08em] text-[#14121a] dark:text-[#f2ede4] sm:text-[6rem]">
                     {fallback ? "1Y" : "120"}
                   </span>
-                  <span className="pb-2 text-micro uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
+                  <span className="pb-2 text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                     {fallback ? "mirror" : "years"}
                   </span>
                 </div>
-                <p className="mt-3 max-w-xs text-meta leading-relaxed text-black/55 dark:text-white/55">
+                <p className="mt-3 max-w-xs text-meta leading-relaxed text-black/70 dark:text-white/70">
                   {fallback
                     ? `The ${asset.label} lens uses its earliest complete one-year window. The pattern still rhymes: emotion, leverage and a technology story.`
                     : "The century repeats in structure: a new technology, a credit cycle, and a contest for power."}
                 </p>
                 <span
-                  className="mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-micro font-medium"
-                  style={{
-                    borderColor: `${echo.color}33`,
-                    backgroundColor: `${echo.color}16`,
-                    color: echo.color,
-                  }}
+                  className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-micro font-medium ${
+                    echo.color
+                      ? "bg-white/80 dark:bg-(--echo-tint)"
+                      : "border-black/14 text-black/60 dark:border-white/14 dark:text-white/60"
+                  }`}
+                  style={
+                    echo.color
+                      ? {
+                          borderColor: `${echo.color}33`,
+                          "--echo-tint": `${echo.color}16`,
+                          color: echo.color,
+                        }
+                      : undefined
+                  }
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-current" />
                   {echoLabel}
@@ -448,7 +499,7 @@ export default function PatternsPage() {
                 <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
                   History does not repeat. It rhymes.
                 </h2>
-                <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55">
+                <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70">
                   Human emotion, debt and technological booms are the
                   constants. The 1906 boom in rails and electricity, the 2008
                   credit shock and the 2026 boom in AI and compute are different
@@ -467,10 +518,10 @@ export default function PatternsPage() {
                       key={label}
                       className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]"
                     >
-                      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
+                      <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                         {label}
                       </p>
-                      <p className="mt-1 text-micro leading-relaxed text-black/55 dark:text-white/55">
+                      <p className="mt-1 text-micro leading-relaxed text-black/70 dark:text-white/70">
                         {text}
                       </p>
                     </div>
@@ -478,7 +529,7 @@ export default function PatternsPage() {
                 </div>
               </div>
             </div>
-            <p className="mt-6 border-t border-black/5 pt-4 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
+            <p className="mt-6 border-t border-black/5 pt-4 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60">
               The Repeatability Index is an editorial analogy, not a
               statistical forecast. A high price correlation is a descriptive
               echo, not a guarantee of the next move.
@@ -486,7 +537,7 @@ export default function PatternsPage() {
           </div>
         </section>
 
-        <div className="mt-6 flex flex-col gap-3 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-6 flex flex-col gap-3 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
           <span>
             Study of Patterns · {asset.label} lens · data from the StrikeHike
             macro archive
@@ -494,13 +545,13 @@ export default function PatternsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/regime"
-              className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
             >
               Open the Core Index atlas
             </Link>
             <Link
               href="/convergence"
-              className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
             >
               Compare two events
             </Link>

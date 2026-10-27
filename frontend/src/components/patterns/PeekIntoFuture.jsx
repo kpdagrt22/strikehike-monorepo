@@ -17,19 +17,27 @@ const PAD = { top: 28, right: 24, bottom: 34, left: 42 };
 const PLOT_W = WIDTH - PAD.left - PAD.right;
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
 
+// Dark values are unchanged; light values are the existing light counterparts
+// from the palette (Risk Elevated, Bonds, S&P 500 and Gold pairs).
 const CATEGORY_COLORS = {
-  Financial: "#fb7185",
-  Geopolitics: "#a78bfa",
-  Science: "#67e8f9",
-  "Science & Technology": "#67e8f9",
+  Financial: { dark: "#fb7185", light: "#c0442f" },
+  Geopolitics: { dark: "#a78bfa", light: "#5b21b6" },
+  Science: { dark: "#67e8f9", light: "#0e7490" },
+  "Science & Technology": { dark: "#67e8f9", light: "#0e7490" },
 };
+const CATEGORY_FALLBACK = { dark: "#facc15", light: "#a16207" };
 
-function categoryColor(category) {
-  return CATEGORY_COLORS[category] ?? "#facc15";
+function categoryPair(category) {
+  return CATEGORY_COLORS[category] ?? CATEGORY_FALLBACK;
+}
+
+function pct(value, total) {
+  return `${(value / total) * 100}%`;
 }
 
 function ForwardChart({ forward, accent, isDark }) {
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
+  const markColor = isDark ? "#fb7185" : "#c0442f";
   const geometry = useMemo(() => {
     if (!forward || !Array.isArray(forward.series)) return null;
     const points = forward.series
@@ -93,7 +101,7 @@ function ForwardChart({ forward, accent, isDark }) {
 
   if (!geometry) {
     return (
-      <div className="grid h-[250px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/35 dark:border-white/5 dark:text-white/35">
+      <div className="grid h-[250px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
         Forward tape unavailable for this asset.
       </div>
     );
@@ -122,125 +130,136 @@ function ForwardChart({ forward, accent, isDark }) {
     troughMs == null
       ? null
       : { ms: troughMs, value: Number(forward.trough?.value) };
+  // Labels are HTML over the plot so they keep the text floor at any width;
+  // near an edge they flip sides instead of being clipped.
+  const peakX = peakPoint ? x(peakPoint.ms) : 0;
+  const troughX = troughPoint ? x(troughPoint.ms) : 0;
+  const peakFlip = peakX > WIDTH * 0.85;
+  const troughFlip = troughX < WIDTH * 0.3;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-black/5 bg-black/[0.02] p-2 dark:border-white/5 dark:bg-black/25 sm:p-3">
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="h-auto w-full"
-        role="img"
-        aria-label={`Historical one-year forward price path for ${forward.asset}, ${formatDate(forward.start)} to ${formatDate(forward.end)}`}
-      >
-        <defs>
-          <linearGradient id="peek-forward-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.24" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
-          </linearGradient>
-        </defs>
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          className="h-auto w-full"
+          role="img"
+          aria-label={`Historical one-year forward price path for ${forward.asset}, ${formatDate(forward.start)} to ${formatDate(forward.end)}`}
+        >
+          <defs>
+            <linearGradient id="peek-forward-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.24" />
+              <stop offset="100%" stopColor={accent} stopOpacity="0" />
+            </linearGradient>
+          </defs>
 
-        <line
-          x1={PAD.left}
-          x2={WIDTH - PAD.right}
-          y1={PAD.top + PLOT_H}
-          y2={PAD.top + PLOT_H}
-          stroke={tone.grid}
-        />
-        <path d={area} fill="url(#peek-forward-fill)" />
-        {segments.map((segment, index) => (
-          <path
-            key={`peek-forward-line-${index}`}
-            d={pathFromSegment(segment)}
-            fill="none"
-            stroke={accent}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <line
+            x1={PAD.left}
+            x2={WIDTH - PAD.right}
+            y1={PAD.top + PLOT_H}
+            y2={PAD.top + PLOT_H}
+            stroke={tone.grid}
           />
-        ))}
-
-        {peakPoint ? (
-          <g>
-            <line
-              x1={x(peakPoint.ms)}
-              x2={x(peakPoint.ms)}
-              y1={PAD.top}
-              y2={PAD.top + PLOT_H}
-              stroke="#fb7185"
-              strokeOpacity="0.45"
-              strokeDasharray="3 4"
-            />
-            <circle
-              cx={x(peakPoint.ms)}
-              cy={y(peakPoint.value)}
-              r="4"
-              fill="#fb7185"
-              stroke={isDark ? "#08080c" : "#f6f1e9"}
+          <path d={area} fill="url(#peek-forward-fill)" />
+          {segments.map((segment, index) => (
+            <path
+              key={`peek-forward-line-${index}`}
+              d={pathFromSegment(segment)}
+              fill="none"
+              stroke={accent}
               strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-            <text
-              x={x(peakPoint.ms) + 7}
-              y={y(peakPoint.value) - 8}
-              fill="#fb7185"
-              fontSize="9"
-              className="font-mono"
+          ))}
+
+          {peakPoint ? (
+            <g>
+              <line
+                x1={peakX}
+                x2={peakX}
+                y1={PAD.top}
+                y2={PAD.top + PLOT_H}
+                stroke={markColor}
+                strokeOpacity="0.45"
+                strokeDasharray="3 4"
+              />
+              <circle
+                cx={peakX}
+                cy={y(peakPoint.value)}
+                r="4"
+                fill={markColor}
+                stroke={isDark ? "#08080c" : "#f6f1e9"}
+                strokeWidth="2"
+              />
+            </g>
+          ) : null}
+
+          {troughPoint ? (
+            <g>
+              <line
+                x1={troughX}
+                x2={troughX}
+                y1={PAD.top}
+                y2={PAD.top + PLOT_H}
+                stroke={markColor}
+                strokeOpacity="0.5"
+                strokeDasharray="3 4"
+              />
+              <circle
+                cx={troughX}
+                cy={y(troughPoint.value)}
+                r="4.5"
+                fill={markColor}
+                stroke={isDark ? "#08080c" : "#f6f1e9"}
+                strokeWidth="2"
+              />
+            </g>
+          ) : null}
+        </svg>
+        <div
+          className="pointer-events-none absolute inset-0 font-mono text-micro leading-none text-[#c0442f] dark:text-[#fb7185]"
+          aria-hidden="true"
+        >
+          {peakPoint ? (
+            <span
+              className={`absolute -translate-y-full whitespace-nowrap ${
+                peakFlip ? "-translate-x-full" : ""
+              }`}
+              style={{
+                left: pct(peakFlip ? peakX - 7 : peakX + 7, WIDTH),
+                top: pct(y(peakPoint.value) - 6, HEIGHT),
+              }}
             >
               PEAK
-            </text>
-          </g>
-        ) : null}
-
-        {troughPoint ? (
-          <g>
-            <line
-              x1={x(troughPoint.ms)}
-              x2={x(troughPoint.ms)}
-              y1={PAD.top}
-              y2={PAD.top + PLOT_H}
-              stroke="#fb7185"
-              strokeOpacity="0.5"
-              strokeDasharray="3 4"
-            />
-            <circle
-              cx={x(troughPoint.ms)}
-              cy={y(troughPoint.value)}
-              r="4.5"
-              fill="#fb7185"
-              stroke={isDark ? "#08080c" : "#f6f1e9"}
-              strokeWidth="2"
-            />
-            <text
-              x={x(troughPoint.ms) - 8}
-              y={y(troughPoint.value) + 15}
-              fill="#fb7185"
-              fontSize="9"
-              textAnchor="end"
-              className="font-mono"
+            </span>
+          ) : null}
+          {troughPoint ? (
+            <span
+              className={`absolute mt-0.5 whitespace-nowrap ${
+                troughFlip ? "" : "-translate-x-full"
+              }`}
+              style={{
+                left: pct(troughFlip ? troughX + 8 : troughX - 8, WIDTH),
+                top: pct(y(troughPoint.value), HEIGHT),
+              }}
             >
               {formatPercent(forward.max_drawdown_pct, 1)} DRAWDOWN
-            </text>
-          </g>
-        ) : null}
-
-        <text
-          x={PAD.left}
-          y={HEIGHT - 8}
-          fill={tone.axisStrong}
-          fontSize="8"
-          className="font-mono"
-        >
-          {formatDate(startMs)}
-        </text>
-        <text
-          x={WIDTH - PAD.right}
-          y={HEIGHT - 8}
-          fill={tone.axisStrong}
-          fontSize="8"
-          textAnchor="end"
-          className="font-mono"
-        >
-          {formatDate(endMs)}
-        </text>
-      </svg>
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div
+        className="mt-1 flex justify-between gap-2 font-mono text-micro text-black/70 dark:text-white/70"
+        style={{
+          paddingLeft: pct(PAD.left, WIDTH),
+          paddingRight: pct(PAD.right, WIDTH),
+        }}
+        aria-hidden="true"
+      >
+        <span>{formatDate(startMs)}</span>
+        <span>{formatDate(endMs)}</span>
+      </div>
     </div>
   );
 }
@@ -264,13 +283,13 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
             >
               A Peek Into The Future: What Happened Next?
             </h2>
-            <p className="mt-2 max-w-2xl text-meta leading-relaxed text-black/50 dark:text-white/50">
+            <p className="mt-2 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70">
               The exact year that followed the historical setup, shown through
               the same asset lens. These are historical events, not predictions
               for today.
             </p>
           </div>
-          <span className="rounded-full border border-black/5 bg-black/[0.03] px-3 py-1.5 font-mono text-micro text-black/45 dark:border-white/5 dark:bg-white/[0.04] dark:text-white/45">
+          <span className="rounded-full border border-black/5 bg-black/[0.03] px-3 py-1.5 font-mono text-micro text-black/60 dark:border-white/5 dark:bg-white/[0.04] dark:text-white/60">
             {assetLabel}
           </span>
         </div>
@@ -279,11 +298,11 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
       <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.25fr_0.75fr]">
         <div>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
+            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
               The market echo
             </p>
             <div className="flex flex-wrap items-baseline gap-3 text-micro">
-              <span className="text-black/40 dark:text-white/40">
+              <span className="text-black/60 dark:text-white/60">
                 Forward return{" "}
                 <strong className="font-mono text-black/70 dark:text-white/70">
                   {formatPercent(forward?.return_pct, 1)}
@@ -304,7 +323,7 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2 dark:border-white/5 dark:bg-white/[0.03]">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+              <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
                 Drawdown peak
               </p>
               <p className="mt-0.5 font-mono text-micro text-[#14121a] dark:text-[#f2ede4]">
@@ -315,7 +334,7 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
               </p>
             </div>
             <div className="rounded-xl border border-[#ef4444]/15 bg-[#ef4444]/[0.035] px-3 py-2 dark:border-[#fb7185]/15 dark:bg-[#fb7185]/[0.055]">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-[#c0442f]/70 dark:text-[#ff8b77]/70">
+              <p className="text-micro uppercase tracking-[0.12em] text-[#c0442f] dark:text-[#ff8b77]">
                 Peak-to-trough
               </p>
               <p className="mt-0.5 font-mono text-micro text-[#c0442f] dark:text-[#ff8b77]">
@@ -327,10 +346,10 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
 
         <div className="min-w-0">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
+            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
               The event echo
             </p>
-            <span className="font-mono text-[10px] text-black/30 dark:text-white/30">
+            <span className="font-mono text-micro text-black/60 dark:text-white/60">
               {events.length} moments
             </span>
           </div>
@@ -338,42 +357,36 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
           <div className="relative mt-3 border-l border-black/10 pl-4 dark:border-white/10">
             {events.length > 0 ? (
               events.map((event) => {
-                const color = categoryColor(event.category);
+                const pair = categoryPair(event.category);
                 return (
                   <article
                     key={`${event.date}-${event.title}`}
                     className="relative pb-4 last:pb-0"
+                    style={{ "--cat-light": pair.light, "--cat-dark": pair.dark }}
                   >
                     <span
-                      className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#f5f0e8] dark:border-[#07070b]"
-                      style={{ backgroundColor: color }}
+                      className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#f5f0e8] bg-(--cat-light) dark:border-[#07070b] dark:bg-(--cat-dark)"
                       aria-hidden="true"
                     />
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-[10px] text-black/35 dark:text-white/35">
+                      <span className="font-mono text-micro text-black/60 dark:text-white/60">
                         {formatDate(event.date)}
                       </span>
-                      <span
-                        className="rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em]"
-                        style={{
-                          color,
-                          backgroundColor: `${color}16`,
-                        }}
-                      >
+                      <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-micro font-medium uppercase tracking-[0.08em] text-(--cat-light) dark:bg-(--cat-dark)/9 dark:text-(--cat-dark)">
                         {event.category}
                       </span>
                     </div>
                     <h3 className="mt-1 text-meta font-semibold leading-snug text-[#14121a] dark:text-[#f2ede4]">
                       {event.title}
                     </h3>
-                    <p className="mt-1 text-micro leading-relaxed text-black/45 dark:text-white/45">
+                    <p className="mt-1 text-micro leading-relaxed text-black/60 dark:text-white/60">
                       {event.summary}
                     </p>
                   </article>
                 );
               })
             ) : (
-              <p className="text-micro leading-relaxed text-black/40 dark:text-white/40">
+              <p className="text-micro leading-relaxed text-black/60 dark:text-white/60">
                 No curated event archive for this historical window yet.
               </p>
             )}
@@ -381,7 +394,7 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
         </div>
       </div>
 
-      <p className="border-t border-black/5 px-5 py-3 text-[10px] leading-relaxed text-black/35 dark:border-white/5 dark:text-white/35 sm:px-6">
+      <p className="border-t border-black/5 px-5 py-3 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60 sm:px-6">
         This is a historical echo of what followed a similar market setup. It
         is descriptive research, not a forecast or investment advice.
       </p>

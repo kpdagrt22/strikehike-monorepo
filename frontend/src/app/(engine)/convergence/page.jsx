@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useTheme } from "next-themes";
 import { AstroLens } from "@/components/regime/AstroLens";
 import { ConvergenceMiniChart } from "@/components/regime/ConvergenceMiniChart";
@@ -8,7 +15,6 @@ import { OnboardingModal } from "@/components/ui/OnboardingModal";
 import {
   CONVERGENCE_ASSET_ORDER,
   ASSET_TARGETS,
-  assetChartColor,
   getAssetTarget,
 } from "@/components/regime/assetTargets";
 import {
@@ -18,6 +24,10 @@ import {
   formatPercent,
   formatSigned,
 } from "@/components/regime/regimeUtils";
+
+const subscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 function StatusBadge({ status }) {
   const config =
@@ -40,7 +50,7 @@ function StatusBadge({ status }) {
           };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/55 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/55">
+    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/60">
       <span
         className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
           config.pulse ? "animate-pulse" : ""
@@ -111,7 +121,7 @@ function CoreIndexScale({ peak, trough, isDark }) {
           />
         ) : null}
       </div>
-      <div className="mt-1 flex justify-between font-mono text-[9px] text-black/30 dark:text-white/30">
+      <div className="mt-1 flex justify-between font-mono text-micro text-black/60 dark:text-white/60">
         <span>−50</span>
         <span>0</span>
         <span>+50</span>
@@ -128,10 +138,12 @@ function EventPanel({
   timeline,
   windowStatus,
   windowError,
+  onRetryWindow,
   assetKey,
   asset,
   isDark,
 }) {
+  const headingRef = useRef(null);
   const coreIndex = event?.core_index ?? {};
   const hasTrough = event?.trough != null;
   const headlineScore = hasTrough ? coreIndex.at_trough : coreIndex.at_peak;
@@ -142,7 +154,12 @@ function EventPanel({
   const headlineLabel = hasTrough ? "Core Index at trough" : "Core Index at peak";
   const stats = event?.assets?.[assetKey] ?? null;
   const hasAsset = Boolean(stats?.available);
-  const accent = assetChartColor(asset, isDark);
+
+  const handleRetryWindow = () => {
+    // The error box (and this button) unmount on retry; keep focus in the panel.
+    headingRef.current?.focus({ preventScroll: true });
+    onRetryWindow();
+  };
 
   return (
     <article className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
@@ -151,16 +168,20 @@ function EventPanel({
           <p className="text-micro font-medium uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
             {side} · {event?.category ?? "event"}
           </p>
-          <span className="font-mono text-[10px] text-black/30 dark:text-white/30">
+          <span className="shrink-0 whitespace-nowrap font-mono text-micro text-black/60 dark:text-white/60">
             {event?.window?.start} → {event?.window?.end}
           </span>
         </div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] focus:outline-none dark:text-[#f2ede4] sm:text-3xl"
+            >
               {event?.name ?? "Select an event"}
             </h2>
-            <p className="mt-1 text-micro text-black/45 dark:text-white/45">
+            <p className="mt-1 text-micro text-black/60 dark:text-white/60">
               {event?.tags?.join(" · ")}
             </p>
           </div>
@@ -169,7 +190,7 @@ function EventPanel({
             <select
               value={event?.id ?? ""}
               onChange={(eventTarget) => onChange(eventTarget.target.value)}
-              className="max-w-[15rem] rounded-full border border-black/5 bg-white/45 px-3 py-1.5 font-sans text-micro text-black/60 outline-none focus:border-[#c0442f]/40 dark:border-white/5 dark:bg-black/30 dark:text-white/60"
+              className="max-w-[15rem] rounded-full border border-black/5 bg-white/45 px-3 py-1.5 font-sans text-micro text-black/60 focus:border-[#c0442f]/40 dark:border-white/5 dark:bg-black/30 dark:text-white/60"
             >
               {(events ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
@@ -184,7 +205,7 @@ function EventPanel({
       <div className="p-5 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
           <div className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.025]">
-            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
+            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
               {headlineLabel}
             </p>
             <div className="mt-2 flex items-end gap-2">
@@ -194,7 +215,7 @@ function EventPanel({
               >
                 {formatSigned(headlineScore)}
               </span>
-              <span className="pb-0.5 font-mono text-micro text-black/30 dark:text-white/30">
+              <span className="pb-0.5 font-mono text-micro text-black/60 dark:text-white/60">
                 / +50
               </span>
             </div>
@@ -210,14 +231,14 @@ function EventPanel({
               isDark={isDark}
             />
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-black/5 pt-2.5 dark:border-white/5">
-              <span className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+              <span className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
                 Peak reading
               </span>
               <span className="font-mono text-micro text-black/60 dark:text-white/60">
                 {formatSigned(coreIndex.at_peak)}
               </span>
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-black/35 dark:text-white/35">
+            <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
               {formatDate(coreIndex.at_trough_date ?? coreIndex.at_peak_date)} event
               reading · {coreIndex.observations ?? 0} composite obs in window
             </p>
@@ -225,14 +246,14 @@ function EventPanel({
 
           <div>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
+              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                 {asset.metricLabel} · event tape
               </p>
               <span
-                className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+                className="rounded-full bg-white/80 px-2 py-0.5 font-mono text-micro text-(--asset-light) dark:bg-(--asset-dark)/8 dark:text-(--asset-dark)"
                 style={{
-                  color: accent,
-                  backgroundColor: `${accent}14`,
+                  "--asset-light": asset.light,
+                  "--asset-dark": asset.dark,
                 }}
               >
                 {asset.label}
@@ -240,7 +261,7 @@ function EventPanel({
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-black/5 bg-white/35 px-3 py-2 dark:border-white/5 dark:bg-black/20">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-black/35 dark:text-white/35">
+                <p className="text-micro uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
                   Window return
                 </p>
                 <p
@@ -262,7 +283,7 @@ function EventPanel({
                 </p>
               </div>
               <div className="rounded-xl border border-black/5 bg-white/35 px-3 py-2 dark:border-white/5 dark:bg-black/20">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-black/35 dark:text-white/35">
+                <p className="text-micro uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
                   Peak-to-trough
                 </p>
                 <p className="mt-0.5 font-mono text-body font-medium text-[#c0442f] dark:text-[#ff8b77]">
@@ -274,8 +295,15 @@ function EventPanel({
               {windowStatus === "loading" ? (
                 <div className="h-[150px] animate-pulse rounded-xl bg-black/[0.04] dark:bg-white/[0.05]" />
               ) : windowStatus === "error" ? (
-                <div className="grid h-[150px] place-items-center rounded-xl border border-[#ef4444]/20 px-4 text-center text-micro text-[#c0442f] dark:text-[#ff8b77]">
-                  {windowError || "Daily window unavailable."}
+                <div className="grid h-[150px] place-content-center justify-items-center gap-2 rounded-xl border border-[#ef4444]/20 px-4 text-center text-micro text-[#c0442f] dark:text-[#ff8b77]">
+                  <p>{windowError || "Daily window unavailable."}</p>
+                  <button
+                    type="button"
+                    onClick={handleRetryWindow}
+                    className="rounded-full border border-black/14 px-3 py-1.5 text-micro font-medium text-black/70 transition-colors hover:bg-black/4 focus-visible:bg-black/4 pointer-coarse:min-h-11 dark:border-white/14 dark:text-white/70 dark:hover:bg-white/6 dark:focus-visible:bg-white/6"
+                  >
+                    Retry window
+                  </button>
                 </div>
               ) : (
                 <ConvergenceMiniChart
@@ -286,7 +314,7 @@ function EventPanel({
                 />
               )}
             </div>
-            <p className="mt-2 text-[10px] text-black/35 dark:text-white/35">
+            <p className="mt-2 text-micro text-black/60 dark:text-white/60">
               {hasAsset
                 ? `${formatNumber(stats.start_value, asset.precision)} → ${formatNumber(stats.end_value, asset.precision)} ${asset.unit} · indexed to 100 at the window start (log scale).`
                 : `No ${asset.label} observation in this window.`}
@@ -299,14 +327,13 @@ function EventPanel({
             key={event?.id}
             asOf={event?.peak}
             contextLabel={event?.short_name ?? "peak"}
-            isDark={isDark}
           />
         </div>
 
-        <p className="mt-4 border-t border-black/5 pt-3 text-meta leading-relaxed text-black/55 dark:border-white/5 dark:text-white/55">
+        <p className="mt-4 border-t border-black/5 pt-3 text-meta leading-relaxed text-black/70 dark:border-white/5 dark:text-white/70">
           {event?.summary}
         </p>
-        <p className="mt-2 text-micro leading-relaxed text-black/40 dark:text-white/40">
+        <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
           {event?.context}
         </p>
       </div>
@@ -355,7 +382,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
             Same lens, different tape.
           </h2>
         </div>
-        <p className="max-w-xl text-micro leading-relaxed text-black/45 dark:text-white/45">
+        <p className="max-w-xl text-micro leading-relaxed text-black/60 dark:text-white/60">
           Core Index is a contrarian sentiment composite; the asset columns show
           how the same macro state travelled through {asset.label.toLowerCase()}.
           A high score means euphoria and elevated risk, a low score means fear
@@ -364,45 +391,45 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-4">
-        <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Trough Core Index gap
           </p>
           <p className="mt-1 font-mono text-lg text-[#14121a] dark:text-[#f2ede4]">
             {scoreGap == null ? "—" : `${scoreGap.toFixed(1)} pts`}
           </p>
         </div>
-        <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Trough readings
           </p>
           <p className="mt-1 flex items-center gap-2 font-mono text-lg">
             <span style={{ color: leftTone.color }}>
               {formatSigned(leftScore)}
             </span>
-            <span className="text-black/20 dark:text-white/20">vs</span>
+            <span className="text-black/60 dark:text-white/60">vs</span>
             <span style={{ color: rightTone.color }}>
               {formatSigned(rightScore)}
             </span>
           </p>
         </div>
-        <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             {asset.label} drawdown gap
           </p>
           <p className="mt-1 font-mono text-lg text-[#14121a] dark:text-[#f2ede4]">
             {drawdownGap == null ? "—" : `${drawdownGap.toFixed(1)} pts`}
           </p>
         </div>
-        <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+          <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Window lengths
           </p>
           <p className="mt-1 font-mono text-lg text-[#14121a] dark:text-[#f2ede4]">
             {left?.window?.start && left?.window?.end
               ? `${Math.round((Date.parse(left.window.end) - Date.parse(left.window.start)) / 86400000)}d`
               : "—"}
-            <span className="text-black/20 dark:text-white/20"> / </span>
+            <span className="text-black/60 dark:text-white/60"> / </span>
             {right?.window?.start && right?.window?.end
               ? `${Math.round((Date.parse(right.window.end) - Date.parse(right.window.start)) / 86400000)}d`
               : "—"}
@@ -415,8 +442,16 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
 
 export default function ConvergencePage() {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme !== "light";
+  // false during SSR/hydration, true after: the server cannot know the theme, so
+  // JS-computed colours switch to the resolved theme only once mounted.
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+  const isDark = !mounted || resolvedTheme !== "light";
   const [reloadKey, setReloadKey] = useState(0);
+  const [windowsKey, setWindowsKey] = useState(0);
   const [state, setState] = useState({
     status: "loading",
     data: null,
@@ -437,7 +472,6 @@ export default function ConvergencePage() {
 
     fetch("/api/v1/regime/crypto-milestones", {
       signal: controller.signal,
-      cache: "no-store",
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -483,7 +517,7 @@ export default function ConvergencePage() {
     async function loadWindow(event) {
       const response = await fetch(
         `/api/v1/regime/macro-history?resolution=daily&start=${event.window.start}&end=${event.window.end}`,
-        { signal: controller.signal, cache: "no-store" },
+        { signal: controller.signal },
       );
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
@@ -518,7 +552,17 @@ export default function ConvergencePage() {
       });
 
     return () => controller.abort();
-  }, [leftEvent, rightEvent]);
+  }, [leftEvent, rightEvent, windowsKey]);
+
+  const handleRetryWindows = useCallback(() => {
+    setWindows({
+      status: "loading",
+      left: null,
+      right: null,
+      error: null,
+    });
+    setWindowsKey((key) => key + 1);
+  }, []);
 
   const handleRetry = useCallback(() => {
     setState({ status: "loading", data: null, error: null });
@@ -579,7 +623,7 @@ export default function ConvergencePage() {
             <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-6xl">
               Two events. One macro lens.
             </h1>
-            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
+            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70 sm:text-body">
               Put a crypto crisis next to a macro crash. Compare the Core Index
               regime, the selected asset tape and the Sun / Moon / Saturn
               ephemeris at each peak. The astro layer is a historical lens, not
@@ -588,7 +632,7 @@ export default function ConvergencePage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={state.status} />
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/45 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/45">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               {state.data?.events?.length ?? 7} curated windows ·{" "}
               {state.data?.as_of ?? "—"}
             </span>
@@ -614,7 +658,7 @@ export default function ConvergencePage() {
             <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
               Could not load the convergence windows.
             </h2>
-            <p className="mt-2 text-meta text-black/55 dark:text-white/55">
+            <p className="mt-2 text-meta text-black/70 dark:text-white/70">
               {state.error}
             </p>
             <button
@@ -631,7 +675,7 @@ export default function ConvergencePage() {
           <>
             <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-black/5 bg-white/45 p-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 sm:flex-row sm:items-center sm:justify-between sm:p-4">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+                <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                   Compare through
                 </p>
                 <div
@@ -642,7 +686,6 @@ export default function ConvergencePage() {
                   {CONVERGENCE_ASSET_ORDER.map((key) => {
                     const target = ASSET_TARGETS[key];
                     const selected = key === assetKey;
-                    const color = assetChartColor(target, isDark);
                     return (
                       <button
                         key={key}
@@ -651,14 +694,14 @@ export default function ConvergencePage() {
                         aria-pressed={selected}
                         className={`rounded-full px-2.5 py-1 text-micro font-medium transition-colors ${
                           selected
-                            ? ""
-                            : "text-black/45 hover:text-black/75 dark:text-white/45 dark:hover:text-white/75"
+                            ? "bg-white/80 text-(--asset-light) dark:bg-(--asset-dark)/12 dark:text-(--asset-dark)"
+                            : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
                         }`}
                         style={
                           selected
                             ? {
-                                color,
-                                backgroundColor: `${color}1f`,
+                                "--asset-light": target.light,
+                                "--asset-dark": target.dark,
                               }
                             : undefined
                         }
@@ -671,15 +714,15 @@ export default function ConvergencePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-micro text-black/40 dark:text-white/40">
+                <span className="text-micro text-black/70 dark:text-white/70">
                   {leftEvent?.name ?? "—"}{" "}
-                  <span className="text-black/20 dark:text-white/20">vs</span>{" "}
+                  <span className="text-black/60 dark:text-white/60">vs</span>{" "}
                   {rightEvent?.name ?? "—"}
                 </span>
                 <button
                   type="button"
                   onClick={swap}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/55 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/55 dark:hover:bg-white/[0.06]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/70 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/4 dark:border-white/5 dark:text-white/70 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/6"
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -707,6 +750,7 @@ export default function ConvergencePage() {
                 timeline={windows.left}
                 windowStatus={windowStatus("left")}
                 windowError={windows.error}
+                onRetryWindow={handleRetryWindows}
                 assetKey={assetKey}
                 asset={asset}
                 isDark={isDark}
@@ -719,6 +763,7 @@ export default function ConvergencePage() {
                 timeline={windows.right}
                 windowStatus={windowStatus("right")}
                 windowError={windows.error}
+                onRetryWindow={handleRetryWindows}
                 assetKey={assetKey}
                 asset={asset}
                 isDark={isDark}
@@ -734,13 +779,13 @@ export default function ConvergencePage() {
             />
 
             <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 sm:p-6">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/50 [&::-webkit-details-marker]:hidden dark:text-white/50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
                 Method & limits
-                <span className="text-base font-normal text-black/30 transition-transform group-open:rotate-45 dark:text-white/30">
+                <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60">
                   +
                 </span>
               </summary>
-              <div className="mt-4 grid gap-4 text-meta leading-relaxed text-black/55 dark:text-white/55 sm:grid-cols-2">
+              <div className="mt-4 grid gap-4 text-meta leading-relaxed text-black/70 dark:text-white/70 sm:grid-cols-2">
                 <p>
                   Event windows are hand-curated comparison windows, not
                   statistically detected crash dates. Core Index is the same
@@ -756,7 +801,7 @@ export default function ConvergencePage() {
                   peak.
                 </p>
               </div>
-              <p className="mt-4 border-t border-black/5 pt-3 text-micro text-black/40 dark:border-white/5 dark:text-white/40">
+              <p className="mt-4 border-t border-black/5 pt-3 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
                 Data version {state.data.as_of} · descriptive historical
                 research. Not investment advice.
               </p>
@@ -771,7 +816,7 @@ export default function ConvergencePage() {
                 new Event("strikehike:show-onboarding"),
               )
             }
-            className="text-micro text-black/45 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/45 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+            className="text-micro text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
           >
             How it works
           </button>

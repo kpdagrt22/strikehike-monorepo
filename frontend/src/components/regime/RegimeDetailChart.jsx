@@ -22,7 +22,7 @@ const DAY_MS = 86_400_000;
 
 function Legend({ tone }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-black/45 dark:text-white/45">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-black/60 dark:text-white/60">
       <span className="inline-flex items-center gap-1.5">
         <span
           className="h-0.5 w-3 rounded-full"
@@ -162,7 +162,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
 
   if (!geometry) {
     return (
-      <div className="grid h-[220px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/45 dark:border-white/5 dark:text-white/45">
+      <div className="grid h-[220px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
         No daily observations returned for this window.
       </div>
     );
@@ -188,7 +188,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/45 dark:border-white/5 dark:bg-black/25">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
-        <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+        <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
           Daily window · {timeline.length} observations
         </p>
         <Legend tone={tone} />
@@ -237,8 +237,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
                 <text
                   x={WIDTH - PAD.right + 8}
                   y={y + 3}
-                  fill={tone.axis}
-                  fontSize="9"
+                  fill={tone.axisText}
+                  fontSize="10"
                   className="font-mono"
                 >
                   {tick}
@@ -254,8 +254,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
                 key={`detail-equity-${tick}`}
                 x={PAD.left - 8}
                 y={y + 3}
-                fill={tone.axis}
-                fontSize="9"
+                fill={tone.axisText}
+                fontSize="10"
                 textAnchor="end"
                 className="font-mono"
               >
@@ -319,8 +319,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
               <text
                 x={marker.x + (marker.key === "6m" ? 3 : 0)}
                 y={PAD.top - 8}
-                fill={marker.colour}
-                fontSize="9"
+                fill={marker.emphasise ? marker.colour : tone.axisText}
+                fontSize="10"
                 textAnchor={marker.key === "6m" ? "start" : "middle"}
                 className="font-mono"
               >
@@ -333,7 +333,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             x={PAD.left}
             y={HEIGHT - 10}
             fill={tone.axisStrong}
-            fontSize="9"
+            fontSize="10"
             className="font-mono"
           >
             {formatDate(startMs)}
@@ -342,7 +342,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             x={WIDTH - PAD.right}
             y={HEIGHT - 10}
             fill={tone.axisStrong}
-            fontSize="9"
+            fontSize="10"
             textAnchor="end"
             className="font-mono"
           >
@@ -353,7 +353,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             <text
               x={WIDTH / 2}
               y={PAD.top + PLOT_H / 2}
-              fill={tone.axis}
+              fill={tone.axisText}
               fontSize="11"
               textAnchor="middle"
               className="font-mono"

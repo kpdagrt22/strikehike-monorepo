@@ -1,7 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { RegimeOverlayButton } from "@/components/ViewControls";
 import { useChronoStore } from "@/store/chronoStore";
+
+const SELECTED =
+  "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]";
 
 const PANEL_BUTTONS = [
   {
@@ -76,6 +80,7 @@ export function MobileDock() {
           return (
             <motion.button
               key={button.id}
+              id={`chrono-dock-${button.id}`}
               type="button"
               onClick={() =>
                 setMobileSheet(active ? null : button.id)
@@ -85,11 +90,11 @@ export function MobileDock() {
               aria-expanded={active}
               aria-pressed={active}
               title={`${button.label} panel`}
-              whileTap={{ scale: 0.94 }}
-              className={`flex h-11 items-center gap-1.5 rounded-full px-3 text-meta font-medium transition-colors ${
+              whileTap={{ scale: 0.97 }}
+              className={`relative flex h-11 items-center gap-1.5 rounded-full px-3 text-meta font-medium transition-colors duration-[140ms] ${
                 active
-                  ? "bg-[#14121a] text-[#f2ede4] dark:bg-[#f2ede4] dark:text-[#14121a]"
-                  : "text-black/65 hover:bg-black/[0.05] dark:text-white/65 dark:hover:bg-white/[0.07]"
+                  ? SELECTED
+                  : "text-black/65 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/65 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               }`}
             >
               <svg
@@ -105,6 +110,12 @@ export function MobileDock() {
                 {button.icon}
               </svg>
               <span>{button.label}</span>
+              {active ? (
+                <span
+                  className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-current"
+                  aria-hidden="true"
+                />
+              ) : null}
             </motion.button>
           );
         })}
@@ -122,11 +133,11 @@ export function MobileDock() {
               aria-label={button.label}
               aria-pressed={active}
               title={button.label}
-              whileTap={{ scale: 0.9 }}
-              className={`grid h-11 w-11 place-items-center rounded-full transition-colors ${
+              whileTap={{ scale: 0.97 }}
+              className={`relative grid h-11 w-11 place-items-center rounded-full transition-colors duration-[140ms] ${
                 active
-                  ? "text-[#f05d49]"
-                  : "text-black/50 hover:bg-black/[0.05] dark:text-white/50 dark:hover:bg-white/[0.07]"
+                  ? SELECTED
+                  : "text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               }`}
             >
               <svg
@@ -141,9 +152,19 @@ export function MobileDock() {
               >
                 {button.icon}
               </svg>
+              {active ? (
+                <span
+                  className="absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-current"
+                  aria-hidden="true"
+                />
+              ) : null}
             </motion.button>
           );
         })}
+
+        <span className="mx-0.5 h-6 w-px bg-black/10 dark:bg-white/10" />
+
+        <RegimeOverlayButton compact />
       </div>
     </div>
   );

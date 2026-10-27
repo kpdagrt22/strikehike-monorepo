@@ -15,16 +15,57 @@ import {
   ASSET_ORDER,
   ASSET_TARGETS,
   assetChartColor,
-  assetChartSoft,
   getAssetTarget,
 } from "@/components/regime/assetTargets";
 import {
   coreIndexTone,
   formatDate,
+  formatNumber,
   formatPercent,
   formatSigned,
   getChartTone,
 } from "@/components/regime/regimeUtils";
+
+// Keyboard slider steps over chart points: ±1 week, ±52 weeks (about a year).
+const PAGE_STEP = 52;
+const FOCUS_RING_INSET =
+  "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
+
+function withAlpha(hex, alpha) {
+  const value = Number.parseInt(String(hex).replace("#", ""), 16);
+  if (!Number.isFinite(value)) return hex;
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
+}
+
+function lowerBoundByTime(items, time) {
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (items[middle].time < time) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+function lowerBoundSorted(values, value) {
+  let low = 0;
+  let high = values.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (values[middle] < value) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+function crashAt(crashes, date) {
+  if (typeof date !== "string") return null;
+  return (
+    (crashes ?? []).find((crash) => date >= crash.start && date <= crash.end) ??
+    null
+  );
+}
 
 function lowerBoundByDate(points, date) {
   let low = 0;
@@ -311,15 +352,38 @@ export function RegimeTimeline({
   const containerRef = useRef(null);
   const onHoverPointRef = useRef(onHoverPoint);
   const chartRef = useRef(null);
+  const lineSeriesRef = useRef({});
   const primitiveRef = useRef(null);
   const selectedIdRef = useRef(selectedId);
+  const previousSelectedIdRef = useRef(selectedId);
+  const openerRef = useRef(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [hoveredCrashId, setHoveredCrashId] = useState(null);
+  const [crosshairActive, setCrosshairActive] = useState(false);
   const [equityScaleWidth, setEquityScaleWidth] = useState(0);
   const [timeScaleHeight, setTimeScaleHeight] = useState(26);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  // Closing the crash panel removes its focused Close button; hand focus back
+  // to the control that opened it (the NBER select or the chart slider).
+  useEffect(() => {
+    const previous = previousSelectedIdRef.current;
+    previousSelectedIdRef.current = selectedId;
+    if (!previous || selectedId) return;
+    const opener = openerRef.current;
+    openerRef.current = null;
+    if (!opener?.isConnected) return;
+    const active = document.activeElement;
+    if (
+      !active ||
+      active === document.body ||
+      active.closest?.('section[aria-label$="crash detail"]')
+    ) {
+      opener.focus();
+    }
   }, [selectedId]);
 
   useEffect(() => {
@@ -406,20 +470,163 @@ export function RegimeTimeline({
     return output;
   }, [timeline, seriesKeys, baseDate]);
 
+  // The keyboard slider walks the dates drawn on the chart (the union of the
+  // visible series), so every step lands where the crosshair can go.
+  const navTimes = useMemo(() => {
+    const times = new Set();
+    for (const key of seriesKeys) {
+      for (const item of seriesData[key] ?? []) times.add(item.time);
+    }
+    return Array.from(times).sort();
+  }, [seriesData, seriesKeys]);
+
+  const navIndex = useMemo(() => {
+    if (navTimes.length === 0) return 0;
+    if (!displayPoint?.date) return navTimes.length - 1;
+    return Math.min(
+      lowerBoundSorted(navTimes, displayPoint.date),
+      navTimes.length - 1,
+    );
+  }, [navTimes, displayPoint]);
+
+  const sliderValueText = displayPoint
+    ? [
+        formatDate(displayPoint.date),
+        `${asset.label} ${formatNumber(
+          displayPoint[asset.valueField],
+          asset.precision,
+        )}`,
+        `Core Index ${formatSigned(displayPoint.core_index)}`,
+        coreIndexTone(displayPoint.core_index_bucket, isDark).label,
+        crashAt(crashes, displayPoint.date)?.name,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "Awaiting market archive";
+
+  const drawCrosshairAt = (time) => {
+    const chart = chartRef.current;
+    if (!chart || !time) return;
+    try {
+      const timeScale = chart.timeScale();
+      const logical = timeScale.timeToIndex(time, true);
+      const range = timeScale.getVisibleLogicalRange();
+      if (logical != null && range) {
+        const span = range.to - range.from;
+        const pad = Math.min(span / 4, Math.max(2, span * 0.04));
+        const shift =
+          logical > range.to - pad
+            ? logical - (range.to - pad)
+            : logical < range.from + pad
+              ? logical - (range.from + pad)
+              : 0;
+        if (shift) {
+          timeScale.setVisibleLogicalRange({
+            from: range.from + shift,
+            to: range.to + shift,
+          });
+        }
+      }
+      for (const key of [assetKey, ...seriesKeys]) {
+        const items = seriesData[key] ?? [];
+        const item = items[lowerBoundByTime(items, time)];
+        const series = lineSeriesRef.current[key];
+        if (series && item?.time === time) {
+          chart.setCrosshairPosition(item.value, time, series);
+          return;
+        }
+      }
+    } catch {
+      // If the library rejects the position, the HUD and legend still update.
+    }
+  };
+
+  const moveSliderTo = (index) => {
+    const time = navTimes[index];
+    if (!time) return;
+    const pointIndex = lowerBoundByDate(timeline, time);
+    const point =
+      timeline[pointIndex]?.date === time ? timeline[pointIndex] : null;
+    drawCrosshairAt(time);
+    setHoveredPoint(point);
+    setHoveredCrashId(crashAt(crashes, time)?.id ?? null);
+    setCrosshairActive(true);
+    onHoverPointRef.current?.(point);
+  };
+
+  const handleSliderKeyDown = (event) => {
+    const last = navTimes.length - 1;
+    if (last < 0) return;
+    let next = null;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowUp":
+        next = navIndex + 1;
+        break;
+      case "ArrowLeft":
+      case "ArrowDown":
+        next = navIndex - 1;
+        break;
+      case "PageUp":
+        next = navIndex + PAGE_STEP;
+        break;
+      case "PageDown":
+        next = navIndex - PAGE_STEP;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = last;
+        break;
+      case "Enter": {
+        const crash = crashAt(crashes, displayPoint?.date);
+        if (!crash) return;
+        event.preventDefault();
+        openerRef.current = event.currentTarget;
+        onSelect?.(crash);
+        return;
+      }
+      case "Escape":
+        if (!hoveredPoint && !crosshairActive) return;
+        event.preventDefault();
+        chartRef.current?.clearCrosshairPosition();
+        setHoveredPoint(null);
+        setHoveredCrashId(null);
+        setCrosshairActive(false);
+        onHoverPointRef.current?.(null);
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    moveSliderTo(Math.max(0, Math.min(last, next)));
+  };
+
+  const handleSliderFocus = () => {
+    drawCrosshairAt(navTimes[navIndex]);
+  };
+
+  const handleSliderBlur = () => {
+    chartRef.current?.clearCrosshairPosition();
+    setCrosshairActive(false);
+  };
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container || timeline.length === 0) return undefined;
 
     setHoveredPoint(null);
     setHoveredCrashId(null);
+    setCrosshairActive(false);
 
     const chart = createChart(container, {
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: tone.axis,
+        textColor: tone.axisText,
         fontFamily: '"Onest", ui-sans-serif, system-ui, sans-serif',
-        fontSize: 10,
+        fontSize: 11,
       },
       grid: {
         vertLines: { visible: false },
@@ -475,6 +682,7 @@ export function RegimeTimeline({
       },
     });
     chartRef.current = chart;
+    const lineSeries = {};
 
     for (const key of seriesKeys) {
       const target = ASSET_TARGETS[key] ?? ASSET_TARGETS.sp500;
@@ -482,9 +690,10 @@ export function RegimeTimeline({
       const selected = key === assetKey;
       const lineWidth = compareAssets ? (selected ? 2.4 : 1.7) : 2.2;
 
-      if (selected) {
+      // A soft underlay marks the primary line only when several are drawn.
+      if (selected && compareAssets) {
         const glow = chart.addSeries(LineSeries, {
-          color: assetChartSoft(target, isDark),
+          color: withAlpha(color, 0.12),
           lineWidth: 5,
           priceScaleId: "right",
           priceLineVisible: false,
@@ -506,7 +715,9 @@ export function RegimeTimeline({
         crosshairMarkerBackgroundColor: color,
       });
       line.setData(seriesData[key] ?? []);
+      lineSeries[key] = line;
     }
+    lineSeriesRef.current = lineSeries;
 
     chart.priceScale("right").applyOptions({
       visible: true,
@@ -561,6 +772,7 @@ export function RegimeTimeline({
     const handleCrosshair = (param) => {
       if (!param?.time) {
         setHoveredCrashId(null);
+        setCrosshairActive(false);
         return;
       }
       const key =
@@ -569,6 +781,7 @@ export function RegimeTimeline({
       const point = pointsByTime.get(key) ?? null;
       setHoveredPoint(point);
       setHoveredCrashId(crash?.id ?? null);
+      setCrosshairActive(true);
       onHoverPointRef.current?.(point);
     };
 
@@ -600,6 +813,7 @@ export function RegimeTimeline({
         // The chart may already have torn down the primitives.
       }
       if (chartRef.current === chart) chartRef.current = null;
+      if (lineSeriesRef.current === lineSeries) lineSeriesRef.current = {};
       chart.remove();
     };
   }, [
@@ -613,7 +827,7 @@ export function RegimeTimeline({
     seriesData,
     seriesKeys,
     timeline,
-    tone.axis,
+    tone.axisText,
   ]);
 
   useEffect(() => {
@@ -668,29 +882,49 @@ export function RegimeTimeline({
       </div>
 
       <div className="relative h-[68vh] min-h-[560px] w-full sm:min-h-[600px]">
+        {/* Keyboard twin of the crosshair. It holds no children (the chart's
+            attribution link stays outside it) and lets pointer input through. */}
+        <div
+          tabIndex={0}
+          role="slider"
+          aria-label="Market tape date"
+          aria-valuemin={0}
+          aria-valuemax={Math.max(0, navTimes.length - 1)}
+          aria-valuenow={navIndex}
+          aria-valuetext={sliderValueText}
+          onKeyDown={handleSliderKeyDown}
+          onFocus={handleSliderFocus}
+          onBlur={handleSliderBlur}
+          className={`pointer-events-none absolute inset-0 z-[15] rounded-2xl ${FOCUS_RING_INSET}`}
+        />
+        {/* The TradingView attribution (licence) sits above the edge fades so
+            it stays legible and its focus ring is not covered. */}
         <div
           ref={containerRef}
           data-testid="regime-terminal-chart"
-          className="absolute inset-0"
+          className="absolute inset-0 [&_#tv-attr-logo]:z-20!"
         />
 
-        <ChartCrosshairLegend point={displayPoint} asset={asset} />
+        <ChartCrosshairLegend
+          point={displayPoint}
+          asset={asset}
+          isDark={isDark}
+          active={crosshairActive}
+        />
 
         {hoveredMetric ? (
           <div
-            role="status"
-            aria-live="polite"
             data-testid="crash-hover-tooltip"
-            className="pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-black/75 px-3.5 py-2 font-mono text-[10px] font-medium text-white/80 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:top-4 sm:text-micro"
+            className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 whitespace-nowrap rounded-full border border-black/[0.08] bg-white/[0.92] px-3.5 py-2 font-mono text-micro font-medium text-[#14121a] shadow-[0_24px_80px_rgba(20,18,26,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0b0b12]/[0.92] dark:text-[#f2ede4] dark:shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:top-4"
           >
-            <span className="text-white/90">{hoveredMetric.name}</span>
-            <span className="mx-2 text-white/25">|</span>
-            <span className="text-[#ffb4a8]">
+            <span>{hoveredMetric.name}</span>
+            <span className="mx-2 text-black/25 dark:text-white/25" aria-hidden="true">|</span>
+            <span className="text-[#c0442f] dark:text-[#ffb4a8]">
               {hoveredMetric.drawdown == null
                 ? "—"
                 : formatPercent(hoveredMetric.drawdown, 1)}
             </span>
-            <span className="mx-2 text-white/25">|</span>
+            <span className="mx-2 text-black/25 dark:text-white/25" aria-hidden="true">|</span>
             <span
               style={{
                 color: coreIndexTone(
@@ -703,7 +937,7 @@ export function RegimeTimeline({
                         : hoveredMetric.score > -25
                           ? "bearish_warning"
                           : "extreme_bearish",
-                  true,
+                  isDark,
                 ).color,
               }}
             >
@@ -719,10 +953,10 @@ export function RegimeTimeline({
         />
 
         <div
-          className="pointer-events-none absolute bottom-8 left-4 z-20 hidden select-none items-baseline gap-2 rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-mono text-[9px] text-black/40 backdrop-blur-xl dark:border-white/5 dark:bg-black/35 dark:text-white/40 sm:flex"
+          className="pointer-events-none absolute bottom-8 left-14 z-20 hidden select-none items-baseline gap-2 rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-mono text-micro text-black/60 backdrop-blur-xl dark:border-white/5 dark:bg-black/35 dark:text-white/60 sm:flex"
           style={{ bottom: Math.max(12, timeScaleHeight - 8) }}
         >
-          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
+          <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             Core Index
           </span>
           <span>−50</span>
@@ -734,7 +968,7 @@ export function RegimeTimeline({
       </div>
 
       <div className="border-t border-black/5 px-3 py-2.5 dark:border-white/5 sm:px-5 lg:px-8">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 text-micro text-black/40 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 text-micro text-black/60 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <span>
               {formatDate(coverage?.start)} → {formatDate(coverage?.end)} ·{" "}
@@ -757,8 +991,11 @@ export function RegimeTimeline({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="hidden sm:inline">
+            <span className="hidden sm:inline [@media(hover:none)]:hidden">
               Hover a red NBER band for drawdown + score · click to zoom.
+            </span>
+            <span className="hidden sm:[@media(hover:none)]:inline">
+              Press and hold the chart to scrub
             </span>
             <label className="inline-flex items-center gap-1.5">
               <span className="sr-only">Jump to NBER recession window</span>
@@ -768,9 +1005,12 @@ export function RegimeTimeline({
                   const crash = (crashes ?? []).find(
                     (item) => item.id === event.target.value,
                   );
-                  if (crash) onSelect?.(crash);
+                  if (crash) {
+                    openerRef.current = event.currentTarget;
+                    onSelect?.(crash);
+                  }
                 }}
-                className="max-w-[13rem] rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-sans text-micro text-black/55 outline-none focus:border-[#c0442f]/40 dark:border-white/5 dark:bg-black/30 dark:text-white/55"
+                className="max-w-[13rem] rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-sans text-micro text-black/60 focus:border-[#c0442f]/40 dark:border-white/5 dark:bg-black/30 dark:text-white/60"
               >
                 <option value="">Jump to an NBER window</option>
                 {(crashes ?? []).map((crash) => (

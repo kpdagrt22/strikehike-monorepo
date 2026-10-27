@@ -11,8 +11,9 @@ import {
 } from "@/components/regime/regimeUtils";
 
 const WIDTH = 520;
-const HEIGHT = 118;
-const PAD = { top: 12, right: 8, bottom: 24, left: 8 };
+// Date labels render as HTML below the plot (SVG text shrinks with the viewBox).
+const HEIGHT = 98;
+const PAD = { top: 12, right: 8, bottom: 4, left: 8 };
 const PLOT_W = WIDTH - PAD.left - PAD.right;
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
 
@@ -60,56 +61,50 @@ export function PatternSparkline({ timeline, color, isDark }) {
 
   if (!geometry) {
     return (
-      <div className="grid h-[112px] place-items-center rounded-xl border border-dashed border-black/5 text-micro text-black/35 dark:border-white/5 dark:text-white/35">
+      <div className="grid h-[112px] place-items-center rounded-xl border border-dashed border-black/5 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
         Market tape unavailable
       </div>
     );
   }
 
   return (
-    <svg
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      className="h-auto w-full"
-      role="img"
-      aria-label={`Market path from ${formatDate(geometry.startMs)} to ${formatDate(geometry.endMs)}`}
-    >
-      <line
-        x1={PAD.left}
-        x2={WIDTH - PAD.right}
-        y1={PAD.top + PLOT_H}
-        y2={PAD.top + PLOT_H}
-        stroke={tone.grid}
-      />
-      {geometry.segments.map((segment, index) => (
-        <path
-          key={`pattern-spark-${index}`}
-          d={pathFromSegment(segment)}
-          fill="none"
-          stroke={color}
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <div>
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="h-auto w-full"
+        role="img"
+        aria-label={`Market path from ${formatDate(geometry.startMs)} to ${formatDate(geometry.endMs)}`}
+      >
+        <line
+          x1={PAD.left}
+          x2={WIDTH - PAD.right}
+          y1={PAD.top + PLOT_H}
+          y2={PAD.top + PLOT_H}
+          stroke={tone.grid}
         />
-      ))}
-      <text
-        x={PAD.left}
-        y={HEIGHT - 7}
-        fill={tone.axis}
-        fontSize="8"
-        className="font-mono"
+        {geometry.segments.map((segment, index) => (
+          <path
+            key={`pattern-spark-${index}`}
+            d={pathFromSegment(segment)}
+            fill="none"
+            stroke={color}
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+      <div
+        className="mt-1 flex justify-between gap-2 font-mono text-micro text-black/60 dark:text-white/60"
+        style={{
+          paddingLeft: `${(PAD.left / WIDTH) * 100}%`,
+          paddingRight: `${(PAD.right / WIDTH) * 100}%`,
+        }}
+        aria-hidden="true"
       >
-        {formatDate(geometry.startMs)}
-      </text>
-      <text
-        x={WIDTH - PAD.right}
-        y={HEIGHT - 7}
-        fill={tone.axis}
-        fontSize="8"
-        textAnchor="end"
-        className="font-mono"
-      >
-        {formatDate(geometry.endMs)}
-      </text>
-    </svg>
+        <span>{formatDate(geometry.startMs)}</span>
+        <span>{formatDate(geometry.endMs)}</span>
+      </div>
+    </div>
   );
 }

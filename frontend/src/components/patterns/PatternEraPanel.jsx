@@ -31,7 +31,7 @@ function PlaceholderVisual({ era, accent, isDark }) {
       />
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
         <div>
-          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/40">
+          <p className="text-micro font-medium uppercase tracking-[0.2em] text-white/60">
             Editorial visual placeholder
           </p>
           <p className="mt-1 font-mono text-3xl font-medium tracking-[-0.05em] text-white/80">
@@ -39,7 +39,7 @@ function PlaceholderVisual({ era, accent, isDark }) {
           </p>
         </div>
         <span
-          className="rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-white/55"
+          className="shrink-0 rounded-full border px-2.5 py-1 font-mono text-micro uppercase tracking-[0.14em] text-white/70"
           style={{ borderColor: `${accent}66`, backgroundColor: `${accent}18` }}
         >
           Field note
@@ -71,14 +71,14 @@ export function PatternEraPanel({
         <h3 className="mt-1 text-xl font-semibold tracking-[-0.035em] text-[#14121a] dark:text-[#f2ede4]">
           {title}
         </h3>
-        <p className="mt-2 text-meta leading-relaxed text-black/55 dark:text-white/55">
+        <p className="mt-2 text-meta leading-relaxed text-black/70 dark:text-white/70">
           {summary}
         </p>
         <ul className="mt-3 grid gap-1.5 border-t border-black/5 pt-3 dark:border-white/5">
           {bullets.map((bullet) => (
             <li
               key={bullet}
-              className="flex gap-2 text-micro leading-relaxed text-black/50 dark:text-white/50"
+              className="flex gap-2 text-micro leading-relaxed text-black/60 dark:text-white/60"
             >
               <span
                 className="mt-1.5 h-1 w-1 shrink-0 rounded-full"

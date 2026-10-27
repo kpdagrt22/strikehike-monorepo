@@ -2,11 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useIsPresent } from "framer-motion";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { DUR, EASE } from "@/lib/motion";
 import { currentUtcDate } from "@/store/chronoStore";
 
 const DAY_MS = 86_400_000;
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 const MONTHS = [
   "January",
   "February",
@@ -45,7 +56,7 @@ function TimeField({ label, value, max, onChange, ariaLabel }) {
 
   return (
     <div className="rounded-xl border border-black/10 bg-black/[0.025] px-2 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-      <p className="text-[7px] font-medium uppercase tracking-[0.18em] text-black/35 dark:text-white/30">
+      <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
         {label}
       </p>
       <div className="mt-1 flex items-center justify-between gap-1">
@@ -53,7 +64,7 @@ function TimeField({ label, value, max, onChange, ariaLabel }) {
           type="button"
           onClick={() => onChange(clamp(value - 1))}
           aria-label={`Decrease ${ariaLabel}`}
-          className="grid h-6 w-6 place-items-center rounded-full border border-black/10 text-[12px] text-black/45 transition-colors hover:bg-black/[0.05] dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.06]"
+          className="grid h-6 w-6 place-items-center rounded-full border border-black/10 text-[12px] text-black/60 transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
         >
           −
         </button>
@@ -68,13 +79,13 @@ function TimeField({ label, value, max, onChange, ariaLabel }) {
           }}
           onFocus={(event) => event.target.select()}
           aria-label={ariaLabel}
-          className="w-8 appearance-none bg-transparent text-center text-[18px] font-light tabular-nums tracking-[-0.04em] text-black/75 outline-none dark:text-white/75"
+          className="w-8 appearance-none rounded-md bg-transparent text-center text-[18px] font-light tabular-nums tracking-[-0.04em] text-black/75 dark:text-white/75"
         />
         <button
           type="button"
           onClick={() => onChange(clamp(value + 1))}
           aria-label={`Increase ${ariaLabel}`}
-          className="grid h-6 w-6 place-items-center rounded-full border border-black/10 text-[12px] text-black/45 transition-colors hover:bg-black/[0.05] dark:border-white/10 dark:text-white/45 dark:hover:bg-white/[0.06]"
+          className="grid h-6 w-6 place-items-center rounded-full border border-black/10 text-[12px] text-black/60 transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
         >
           +
         </button>
@@ -100,6 +111,9 @@ function PickerDialog({
   );
   const [view, setView] = useState(() => monthOf(initialDate));
   const panelRef = useRef(null);
+  // False as soon as the exit animation starts, so focus returns to the
+  // trigger immediately rather than after the fade.
+  const isPresent = useIsPresent();
 
   const today = currentUtcDate();
   const dateParts = parseIso(draftDate);
@@ -107,18 +121,16 @@ function PickerDialog({
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, []);
+
+  useDialogFocus(isPresent, {
+    containerRef: panelRef,
+    initialFocusRef: panelRef,
+    onClose,
+  });
 
   const days = useMemo(() => {
     const firstWeekday = new Date(
@@ -134,6 +146,8 @@ function PickerDialog({
       return {
         iso,
         day: date.getUTCDate(),
+        // Starts with the visible number: "27 October 2026, Tuesday".
+        label: `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}, ${WEEKDAY_NAMES[date.getUTCDay()]}`,
         inMonth: date.getUTCMonth() === view.month,
         disabled: iso < minDate || iso > maxDate,
       };
@@ -163,11 +177,14 @@ function PickerDialog({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: DUR.backdrop, ease: EASE.out }}
     >
+      {/* Scrim: still closes on click, but is no Tab stop and no AT node;
+          the dialog's own Close button carries the name. */}
       <button
         type="button"
-        aria-label="Close date and time picker"
+        tabIndex={-1}
+        aria-hidden="true"
         onClick={onClose}
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
       />
@@ -176,17 +193,17 @@ function PickerDialog({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="date-picker-title"
+        aria-label="Choose date and time (UTC)"
         tabIndex={-1}
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.985 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-[1.5rem] border border-black/10 bg-white/95 p-4 text-[#14121a] shadow-[0_30px_100px_rgba(20,18,26,0.28)] backdrop-blur-2xl outline-none dark:border-white/15 dark:bg-[#11101a]/95 dark:text-[#f2ede4] dark:shadow-[0_30px_100px_rgba(0,0,0,0.7)]"
+        transition={{ duration: DUR.modal, ease: EASE.out }}
+        className="relative w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-[1.5rem] border border-black/10 bg-white/95 p-4 text-[#14121a] shadow-[0_30px_100px_rgba(20,18,26,0.28)] backdrop-blur-2xl outline-none focus-visible:border-(--sh-focus) dark:border-white/15 dark:bg-[#11101a]/95 dark:text-[#f2ede4] dark:shadow-[0_30px_100px_rgba(0,0,0,0.7)] dark:focus-visible:border-(--sh-focus)"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[8px] font-medium uppercase tracking-[0.24em] text-black/40 dark:text-white/35">
+            <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
               Precise UTC
             </p>
             <h2
@@ -200,7 +217,7 @@ function PickerDialog({
             type="button"
             onClick={onClose}
             aria-label="Close date and time picker"
-            className="grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/35 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/35 dark:hover:bg-white/[0.06]"
+            className="grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             <svg
               viewBox="0 0 16 16"
@@ -221,7 +238,7 @@ function PickerDialog({
             type="button"
             onClick={() => moveMonth(-1)}
             aria-label="Previous month"
-            className="grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/40 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/40 dark:hover:bg-white/[0.06]"
+            className="grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             <svg
               viewBox="0 0 16 16"
@@ -235,7 +252,7 @@ function PickerDialog({
               <path d="M10 3.5 5.5 8 10 12.5" />
             </svg>
           </button>
-          <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/30">
+          <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             {dateParts.month === view.month &&
             dateParts.year === view.year
               ? "Selected month"
@@ -245,7 +262,7 @@ function PickerDialog({
             type="button"
             onClick={() => moveMonth(1)}
             aria-label="Next month"
-            className="grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/40 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/40 dark:hover:bg-white/[0.06]"
+            className="grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             <svg
               viewBox="0 0 16 16"
@@ -265,7 +282,7 @@ function PickerDialog({
           {WEEKDAYS.map((weekday) => (
             <span
               key={weekday}
-              className="py-1 text-[8px] font-medium uppercase tracking-[0.08em] text-black/35 dark:text-white/30"
+              className="py-1 text-micro font-medium uppercase tracking-[0.08em] text-black/60 dark:text-white/60"
             >
               {weekday}
             </span>
@@ -281,23 +298,23 @@ function PickerDialog({
                 type="button"
                 disabled={day.disabled}
                 onClick={() => selectDay(day.iso, day.inMonth)}
-                aria-label={day.iso}
+                aria-label={day.label}
                 aria-pressed={selected}
-                className={`relative mx-auto grid h-8 w-8 place-items-center rounded-full text-[10px] tabular-nums transition-colors ${
+                className={`relative mx-auto grid h-8 w-8 place-items-center rounded-full text-micro tabular-nums transition-colors ${
                   selected
-                    ? "bg-[#f05d49] font-medium text-white shadow-[0_0_16px_rgba(240,93,73,0.35)]"
+                    ? "bg-[#f05d49] font-medium text-[#14121a]"
                     : day.disabled
-                      ? "cursor-not-allowed text-black/15 dark:text-white/10"
+                      ? "cursor-not-allowed text-black/[0.38] dark:text-white/[0.38]"
                       : day.inMonth
-                        ? "text-black/65 hover:bg-black/[0.05] dark:text-white/65 dark:hover:bg-white/[0.07]"
-                        : "text-black/25 hover:bg-black/[0.03] dark:text-white/20 dark:hover:bg-white/[0.04]"
+                        ? "text-black/80 hover:bg-black/[0.05] focus-visible:bg-black/[0.05] dark:text-white/80 dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.07]"
+                        : "text-black/60 hover:bg-black/[0.03] focus-visible:bg-black/[0.03] dark:text-white/60 dark:hover:bg-white/[0.04] dark:focus-visible:bg-white/[0.04]"
                 } ${isToday && !selected ? "ring-1 ring-[#f05d49]/55" : ""}`}
               >
                 {day.day}
                 {isToday ? (
                   <span
                     className={`absolute bottom-1 h-0.5 w-0.5 rounded-full ${
-                      selected ? "bg-white" : "bg-[#f05d49]"
+                      selected ? "bg-[#14121a]" : "bg-[#f05d49]"
                     }`}
                   />
                 ) : null}
@@ -308,7 +325,7 @@ function PickerDialog({
 
         <div className="mt-4 border-t border-black/10 pt-3 dark:border-white/10">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[8px] font-medium uppercase tracking-[0.2em] text-black/35 dark:text-white/30">
+            <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
               Time · UTC
             </p>
             <div className="flex items-center gap-1">
@@ -325,10 +342,10 @@ function PickerDialog({
                       setDraftHour(Number(time.slice(0, 2)));
                       setDraftMinute(Number(time.slice(3, 5)));
                     }}
-                    className={`rounded-full border px-2 py-1 text-[8px] tabular-nums transition-colors ${
+                    className={`rounded-full border px-2 py-1.5 text-micro tabular-nums transition-colors ${
                       active
                         ? "border-[#f05d49]/40 text-[#c0442f] dark:text-[#ff8b77]"
-                        : "border-black/10 text-black/35 hover:bg-black/[0.04] dark:border-white/10 dark:text-white/35 dark:hover:bg-white/[0.06]"
+                        : "border-black/10 text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
                     }`}
                   >
                     {time}
@@ -360,14 +377,14 @@ function PickerDialog({
           <button
             type="button"
             onClick={() => onApply(today, "00:00")}
-            className="rounded-full border border-black/10 px-2.5 py-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-black/45 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/40 dark:hover:bg-white/[0.06]"
+            className="rounded-full border border-black/10 px-2.5 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             Today
           </button>
           <button
             type="button"
             onClick={() => onApply(today, nowTime)}
-            className="rounded-full border border-black/10 px-2.5 py-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-black/45 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/40 dark:hover:bg-white/[0.06]"
+            className="rounded-full border border-black/10 px-2.5 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             Now
           </button>
@@ -375,14 +392,14 @@ function PickerDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full px-3 py-1.5 text-[9px] font-medium text-black/45 transition-colors hover:bg-black/[0.04] dark:text-white/40 dark:hover:bg-white/[0.06]"
+            className="rounded-full px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={apply}
-            className="rounded-full bg-[#f05d49] px-4 py-1.5 text-[9px] font-medium uppercase tracking-[0.14em] text-white shadow-[0_0_20px_rgba(240,93,73,0.25)] transition-colors hover:bg-[#e8533f]"
+            className="rounded-full bg-[#f05d49] px-4 py-1.5 text-micro font-medium uppercase tracking-[0.14em] text-[#14121a] transition-colors hover:bg-[#e8533f] focus-visible:bg-[#e8533f]"
           >
             Apply
           </button>

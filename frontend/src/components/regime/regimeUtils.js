@@ -128,7 +128,7 @@ export function coreIndexTone(bucket, isDark) {
       action: "Hold",
       allocation:
         "No contrarian allocation while the Core Index is unavailable.",
-      color: isDark ? "rgba(242,237,228,0.55)" : "rgba(20,18,26,0.55)",
+      color: isDark ? "rgba(242,237,228,0.6)" : "rgba(20,18,26,0.6)",
       soft: isDark
         ? "rgba(242,237,228,0.06)"
         : "rgba(20,18,26,0.05)",
@@ -215,6 +215,8 @@ export function getChartTone(isDark) {
     strengthSoft: isDark ? "rgba(94,234,212,0.22)" : "rgba(15,118,110,0.16)",
     grid: isDark ? "rgba(255,255,255,0.075)" : "rgba(20,18,26,0.075)",
     axis: isDark ? "rgba(242,237,228,0.45)" : "rgba(20,18,26,0.45)",
+    // Readable chart text (axis labels, tick values): the 0.6 text floor.
+    axisText: isDark ? "rgba(242,237,228,0.6)" : "rgba(20,18,26,0.6)",
     axisStrong: isDark ? "rgba(242,237,228,0.72)" : "rgba(20,18,26,0.7)",
     crimson: CRIMSON,
   };

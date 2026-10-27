@@ -12,7 +12,7 @@ import { PatternSparkline } from "@/components/patterns/PatternSparkline";
 function Stat({ label, value, color }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
+      <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
         {label}
       </p>
       <p
@@ -73,11 +73,11 @@ export function PatternMarketCard({
               {label}
             </h3>
           </div>
-          <span className="font-mono text-micro text-black/35 dark:text-white/35">
+          <span className="font-mono text-micro text-black/60 dark:text-white/60">
             {formatDate(date)}
           </span>
         </div>
-        <p className="mt-2 text-micro text-black/45 dark:text-white/45">
+        <p className="mt-2 text-micro text-black/60 dark:text-white/60">
           {summary?.source ?? "Market history"} · 12-month window
         </p>
       </div>
@@ -85,7 +85,7 @@ export function PatternMarketCard({
       <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
               Equity level
             </p>
             <p
@@ -96,7 +96,7 @@ export function PatternMarketCard({
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/35 dark:text-white/35">
+            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
               Market state
             </p>
             <p className="mt-1 text-meta font-semibold text-[#14121a] dark:text-[#f2ede4]">
@@ -135,12 +135,12 @@ export function PatternMarketCard({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3 dark:border-white/5">
-          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
+          <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             Core Index
           </span>
           {summary?.coreIndex == null ? (
-            <span className="font-mono text-micro text-black/35 dark:text-white/35">
-              Pre-index history
+            <span className="font-mono text-micro text-black/60 dark:text-white/60">
+              {summary ? "Pre-index history" : "—"}
             </span>
           ) : (
             <span
@@ -148,14 +148,14 @@ export function PatternMarketCard({
               style={{ color: tone.color }}
             >
               {formatSigned(summary.coreIndex)}
-              <span className="font-sans text-[10px] uppercase tracking-[0.12em] opacity-80">
+              <span className="font-sans text-micro uppercase tracking-[0.12em]">
                 {tone.label}
               </span>
             </span>
           )}
         </div>
 
-        <p className="mt-4 text-meta leading-relaxed text-black/55 dark:text-white/55">
+        <p className="mt-4 text-meta leading-relaxed text-black/70 dark:text-white/70">
           {editorial}
         </p>
       </div>

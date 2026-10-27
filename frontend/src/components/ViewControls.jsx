@@ -29,9 +29,13 @@ const VIEWS = [
   },
 ];
 
-export function ViewControls() {
-  const cameraView = useChronoStore((state) => state.cameraView);
-  const setCameraView = useChronoStore((state) => state.setCameraView);
+/**
+ * The regime-overlay toggle. Desktop shows it in the view pill with its label;
+ * the mobile dock uses the compact 44px icon variant. Both share the same
+ * accessible name, aria-pressed state, title strings and tone dot, and only
+ * one of them is ever visible.
+ */
+export function RegimeOverlayButton({ compact = false }) {
   const regimeOverlay = useChronoStore((state) => state.regimeOverlay);
   const regimeTone = useChronoStore((state) => state.regimeTone);
   const regimeOverlayStatus = useChronoStore(
@@ -66,6 +70,61 @@ export function ViewControls() {
             ? `Regime overlay: ${toneLabel}`
             : "Regime overlay";
 
+  const stateClass = regimeOverlay
+    ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
+    : "text-black/60 hover:bg-black/[0.04] hover:text-[#14121a] focus-visible:bg-black/[0.04] focus-visible:text-[#14121a] dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-[#f2ede4] dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-[#f2ede4]";
+
+  return (
+    <button
+      type="button"
+      onClick={() => setRegimeOverlay(!regimeOverlay)}
+      aria-pressed={regimeOverlay}
+      aria-label="Toggle regime overlay"
+      title={overlayTitle}
+      className={
+        compact
+          ? `relative grid h-11 w-11 place-items-center rounded-full transition-colors duration-[140ms] ${stateClass}`
+          : `flex h-11 items-center gap-2 rounded-full border border-transparent px-2.5 text-micro font-medium uppercase tracking-[0.12em] transition-colors duration-[140ms] ${stateClass}`
+      }
+    >
+      {compact ? (
+        <>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.25"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m12 4.5 8 4-8 4-8-4 8-4Z" />
+            <path d="m4 12.5 8 4 8-4" />
+            <path d="m4 16.5 8 4 8-4" />
+          </svg>
+          <span
+            className={`absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full ${dotClass}`}
+            aria-hidden="true"
+          />
+        </>
+      ) : (
+        <>
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`}
+            aria-hidden="true"
+          />
+          Regime
+        </>
+      )}
+    </button>
+  );
+}
+
+export function ViewControls() {
+  const cameraView = useChronoStore((state) => state.cameraView);
+  const setCameraView = useChronoStore((state) => state.setCameraView);
+
   return (
     <div className="pointer-events-auto fixed bottom-24 right-5 z-30 hidden lg:block">
       <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/45 p-1 shadow-[0_16px_50px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-black/30 dark:shadow-[0_16px_50px_rgba(0,0,0,0.45)]">
@@ -80,12 +139,11 @@ export function ViewControls() {
               aria-label={view.label}
               aria-pressed={active}
               title={view.label}
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.94 }}
-              className={`grid h-11 w-11 place-items-center rounded-full border transition-colors duration-200 ${
+              whileTap={{ scale: 0.97 }}
+              className={`relative grid h-11 w-11 place-items-center rounded-full transition-colors duration-[140ms] ${
                 active
-                  ? "border-black/10 bg-[#14121a] text-[#f2ede4] dark:border-white/15 dark:bg-[#f2ede4] dark:text-[#14121a]"
-                  : "border-transparent text-black/45 hover:bg-black/[0.05] dark:text-white/45 dark:hover:bg-white/[0.07]"
+                  ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
+                  : "text-black/60 hover:bg-black/[0.04] hover:text-[#14121a] focus-visible:bg-black/[0.04] focus-visible:text-[#14121a] dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-[#f2ede4] dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-[#f2ede4]"
               }`}
             >
               <svg
@@ -99,6 +157,12 @@ export function ViewControls() {
               >
                 {view.icon}
               </svg>
+              {active ? (
+                <span
+                  className="absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-current"
+                  aria-hidden="true"
+                />
+              ) : null}
             </motion.button>
           );
         })}
@@ -108,24 +172,7 @@ export function ViewControls() {
           aria-hidden="true"
         />
 
-        <button
-          type="button"
-          onClick={() => setRegimeOverlay(!regimeOverlay)}
-          aria-pressed={regimeOverlay}
-          aria-label="Toggle regime overlay"
-          title={overlayTitle}
-          className={`flex h-11 items-center gap-2 rounded-full border border-transparent px-2.5 text-[10px] font-medium uppercase tracking-[0.12em] transition-colors duration-200 ${
-            regimeOverlay
-              ? "bg-black/[0.05] text-black/70 dark:bg-white/[0.08] dark:text-white/70"
-              : "text-black/45 hover:bg-black/[0.05] dark:text-white/45 dark:hover:bg-white/[0.07]"
-          }`}
-        >
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`}
-            aria-hidden="true"
-          />
-          Regime
-        </button>
+        <RegimeOverlayButton />
       </div>
     </div>
   );
