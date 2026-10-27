@@ -79,7 +79,7 @@ export function EnergyGauge({ isDark = true }) {
     (status === "loading" ? "Reading sky" : "Awaiting data");
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-3 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center sm:top-6 sm:w-[min(23rem,calc(100vw-2rem))]">
+    <div className="pointer-events-none absolute left-1/2 top-[4.5rem] z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center sm:top-6 sm:w-[min(23rem,calc(100vw-2rem))]">
       <div className="relative h-[116px] w-[116px]">
         <div
           aria-hidden="true"
