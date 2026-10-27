@@ -42,6 +42,7 @@ EVENT_ASSETS = {
     "gold": ("gold_proxy", "Gold — London bullion"),
     "bonds": ("bond_proxy", "Treasury bonds"),
     "bitcoin": ("btc_proxy", "Bitcoin"),
+    "nifty": ("nifty_proxy", "Nifty 50 — India"),
 }
 
 
@@ -145,6 +146,11 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "btc_volatility_1y",
             "btc_drawdown_1y",
             "btc_1y_volatility_percentile",
+            "nifty_proxy",
+            "nifty_proxy_source",
+            "nifty_volatility_1y",
+            "nifty_drawdown_1y",
+            "nifty_1y_volatility_percentile",
             "dxy_proxy",
             "dxy_proxy_source",
             "dxy_volatility_1y",
@@ -262,6 +268,19 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 ),
                 "btc_1y_volatility_percentile": _as_float(
                     row.get("btc_1y_volatility_percentile"), 1
+                ),
+                "nifty_proxy": _as_float(row.get("nifty_proxy"), 2),
+                "nifty_proxy_source": _as_str(
+                    row.get("nifty_proxy_source")
+                ),
+                "nifty_volatility_1y": _as_float(
+                    row.get("nifty_volatility_1y"), 2
+                ),
+                "nifty_drawdown_1y": _as_float(
+                    row.get("nifty_drawdown_1y"), 2
+                ),
+                "nifty_1y_volatility_percentile": _as_float(
+                    row.get("nifty_1y_volatility_percentile"), 1
                 ),
                 "dxy_proxy": _as_float(row.get("dxy_proxy"), 2),
                 "dxy_proxy_source": _as_str(
@@ -760,6 +779,21 @@ class MacroRegimeService:
                 "Astrology is a historical lens, not a forecast or causal claim.",
             ],
         }
+
+    def patterns(
+        self,
+        *,
+        today: date | str | None = None,
+        asset: str = "sp500",
+    ) -> dict[str, Any]:
+        """Rolling 120-year similarity and one-year forward historical echo."""
+        from regime.patterns import build_patterns_payload
+
+        return build_patterns_payload(
+            self._load(),
+            today=today,
+            asset=asset,
+        )
 
     def forecast(self) -> dict[str, Any]:
         """30-day forward probability of a Disruptive macro regime.

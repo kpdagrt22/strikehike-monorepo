@@ -1,4 +1,5 @@
-export const ASSET_ORDER = ["sp500", "gold", "bonds"];
+export const ASSET_ORDER = ["sp500", "gold", "bonds", "nifty"];
+export const PATTERN_ASSET_ORDER = ["sp500", "nifty"];
 export const CONVERGENCE_ASSET_ORDER = [...ASSET_ORDER, "bitcoin"];
 export const ALL_ASSET_ORDER = CONVERGENCE_ASSET_ORDER;
 
@@ -53,6 +54,23 @@ export const ASSET_TARGETS = {
     light: "#5b21b6",
     darkSoft: "rgba(139, 92, 246, 0.24)",
     lightSoft: "rgba(91, 33, 182, 0.16)",
+  },
+  nifty: {
+    key: "nifty",
+    label: "Nifty 50",
+    fullLabel: "Nifty 50 — India",
+    metricLabel: "Nifty 50",
+    valueField: "nifty_proxy",
+    sourceField: "nifty_proxy_source",
+    volatilityField: "nifty_volatility_1y",
+    drawdownField: "nifty_drawdown_1y",
+    percentileField: "nifty_1y_volatility_percentile",
+    precision: 0,
+    unit: "index",
+    dark: "#34d399",
+    light: "#047857",
+    darkSoft: "rgba(52, 211, 153, 0.22)",
+    lightSoft: "rgba(4, 120, 87, 0.16)",
   },
   bitcoin: {
     key: "bitcoin",

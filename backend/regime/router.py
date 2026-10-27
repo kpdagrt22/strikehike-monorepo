@@ -11,11 +11,13 @@ from regime.schemas import (
     CryptoMilestonesResponse,
     ForecastResponse,
     MacroHistoryResponse,
+    PatternsResponse,
     RegimeRunsResponse,
 )
 from regime.service import MacroRegimeService
 
 router = APIRouter(prefix="/regime", tags=["regime"])
+patterns_router = APIRouter(prefix="/patterns", tags=["patterns"])
 _service = MacroRegimeService()
 
 
@@ -135,6 +137,37 @@ def get_regime_forecast() -> dict:
             detail=(
                 "Macro regime artifact is not available. Run the Phase 1 "
                 "ingestion pipeline and redeploy the backend."
+            ),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@patterns_router.get(
+    "",
+    response_model=PatternsResponse,
+    summary="Rolling 120-year pattern similarity and one-year forward echo",
+    description=(
+        "Uses the current system date to find the exact date 120 years ago, "
+        "compares the trailing 365-day normalized selected-asset paths with a "
+        "Pearson correlation, and returns the historical one-year forward "
+        "window with peak, maximum drawdown and curated major events."
+    ),
+)
+def get_patterns(
+    asset: str = Query(
+        "sp500",
+        description="sp500, nifty, gold, bonds or bitcoin.",
+    ),
+) -> dict:
+    try:
+        return _service.patterns(asset=asset)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Macro regime artifact is not available. Run the ingestion "
+                "pipeline and redeploy the backend."
             ),
         ) from exc
     except ValueError as exc:

@@ -58,6 +58,14 @@ class TimelinePoint(BaseModel):
         default=None,
         alias="btc_1y_volatility_percentile",
     )
+    nifty_proxy: float | None = None
+    nifty_proxy_source: str | None = None
+    nifty_volatility_1y: float | None = None
+    nifty_drawdown_1y: float | None = None
+    nifty_volatility_percentile_1y: float | None = Field(
+        default=None,
+        alias="nifty_1y_volatility_percentile",
+    )
     dxy_proxy: float | None = None
     dxy_proxy_source: str | None = None
     dxy_volatility_1y: float | None = None
@@ -292,4 +300,73 @@ class CryptoMilestonesResponse(BaseModel):
     kind: str
     assets: dict[str, str]
     events: list[CryptoMilestoneEvent]
+    notes: list[str]
+
+
+class PatternSeriesPoint(BaseModel):
+    date: str
+    value: float
+
+
+class PatternMarketWindow(BaseModel):
+    start: str
+    end: str
+    asset: str
+    source: str | None = None
+    level: float
+    return_pct: float | None = None
+    drawdown_pct: float | None = None
+    phase: str
+    state: str
+    core_index: float | None = None
+    core_index_bucket: str | None = None
+    series: list[PatternSeriesPoint]
+
+
+class PatternPeak(BaseModel):
+    date: str
+    value: float
+
+
+class PatternEvent(BaseModel):
+    date: str
+    title: str
+    category: str
+    summary: str
+    source: str
+
+
+class PatternForwardWindow(BaseModel):
+    start: str
+    end: str
+    asset: str
+    first_value: float
+    last_value: float
+    return_pct: float | None = None
+    peak: PatternPeak
+    drawdown_peak: PatternPeak
+    trough: PatternPeak
+    max_drawdown_pct: float
+    max_drawdown_from_peak: float
+    series: list[PatternSeriesPoint]
+    events: list[PatternEvent]
+
+
+class PatternsResponse(BaseModel):
+    as_of: str
+    historical_date: str
+    requested_historical_date: str
+    mirror_fallback: bool
+    mirror_note: str | None = None
+    asset: str
+    asset_label: str
+    forward_end: str
+    similarity_percentage: float
+    correlation: float
+    method: str
+    window_days: int
+    current: PatternMarketWindow
+    historical: PatternMarketWindow
+    forward: PatternForwardWindow
+    events: list[PatternEvent]
     notes: list[str]

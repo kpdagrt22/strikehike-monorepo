@@ -42,6 +42,7 @@ jobs:
             tests/test_energy_metric_compiler.py \
             tests/test_historical_parallels.py \
             tests/test_macro_ingestion.py \
+            tests/test_patterns.py \
             tests/test_regime_service.py \
             -q
 

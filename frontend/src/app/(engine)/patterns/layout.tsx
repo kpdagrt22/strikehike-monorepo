@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 const TITLE = "Study of Patterns";
 const DESCRIPTION =
-  "A 120-year magazine-style comparison of markets, geopolitics, science and the structural patterns that repeat across centuries.";
+  "A rolling 120-year comparison of S&P 500 and Nifty 50 paths, similarity scoring, one-year forward echoes, geopolitics and the structural patterns that repeat across centuries.";
 
 export const metadata: Metadata = {
   title: TITLE,
