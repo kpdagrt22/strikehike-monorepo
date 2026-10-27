@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from regime.analytics import (
-    BRAVOS_VERSION,
+    CORE_INDEX_VERSION,
     STRENGTH_VERSION,
     STRENGTH_WEIGHTS,
     build_crashes,
@@ -112,13 +112,13 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "macro_strength",
             "macro_strength_coverage",
             "regime_state",
-            "bravos_score",
-            "bravos_composite",
-            "bravos_bucket",
+            "core_index",
+            "core_index_composite",
+            "core_index_bucket",
             "macro_score",
             "credit_score",
-            "bravos_volatility_score",
-            "bravos_momentum_score",
+            "core_volatility_score",
+            "core_momentum_score",
             "hy_oas",
             "atr_pct",
             "bollinger_width",
@@ -171,7 +171,7 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
     # A right-labelled weekly/monthly bucket can end after the last observation.
     resampled = resampled.loc[: subset.index.max()]
     # Keep the current partial bucket visible so the HUD and the header stat
-    # agree on the latest daily Bravos reading.
+    # agree on the latest daily Core Index reading.
     if not resampled.empty and subset.index[-1] > resampled.index[-1]:
         resampled.loc[subset.index[-1]] = subset.iloc[-1]
     return resampled
@@ -181,10 +181,10 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
     points: list[dict[str, Any]] = []
     for timestamp, row in frame.iterrows():
         strength = _as_float(row.get("macro_strength"), 2)
-        bravos = _as_float(row.get("bravos_score"), 2)
+        core_index = _as_float(row.get("core_index"), 2)
         sp500 = _as_float(row.get("sp500_proxy"), 2)
         usrec = _as_int(row.get("nber_recession"))
-        if strength is None and bravos is None and sp500 is None and usrec is None:
+        if strength is None and core_index is None and sp500 is None and usrec is None:
             continue
         phase = (
             "recession"
@@ -198,18 +198,18 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 "date": timestamp.date().isoformat(),
                 "strength": strength,
                 "regime_state": _as_str(row.get("regime_state")),
-                "bravos_score": bravos,
-                "bravos_composite": _as_float(
-                    row.get("bravos_composite"), 2
+                "core_index": core_index,
+                "core_index_composite": _as_float(
+                    row.get("core_index_composite"), 2
                 ),
-                "bravos_bucket": _as_str(row.get("bravos_bucket")),
+                "core_index_bucket": _as_str(row.get("core_index_bucket")),
                 "macro_score": _as_float(row.get("macro_score"), 2),
                 "credit_score": _as_float(row.get("credit_score"), 2),
-                "bravos_volatility_score": _as_float(
-                    row.get("bravos_volatility_score"), 2
+                "core_volatility_score": _as_float(
+                    row.get("core_volatility_score"), 2
                 ),
-                "bravos_momentum_score": _as_float(
-                    row.get("bravos_momentum_score"), 2
+                "core_momentum_score": _as_float(
+                    row.get("core_momentum_score"), 2
                 ),
                 "hy_oas": _as_float(row.get("hy_oas"), 3),
                 "atr_pct": _as_float(row.get("atr_pct"), 3),
@@ -358,27 +358,27 @@ def _value_on_or_before(
     return float(series.iloc[-1]), series.index[-1].date().isoformat()
 
 
-def _event_bravos(
+def _event_core_index(
     frame: pd.DataFrame,
     start: str,
     end: str,
     peak: str,
     trough: str | None,
 ) -> dict[str, Any]:
-    if "bravos_score" not in frame.columns:
+    if "core_index" not in frame.columns:
         return {}
-    series = pd.to_numeric(frame["bravos_score"], errors="coerce").loc[start:end].dropna()
-    at_peak, peak_asof = _value_on_or_before(frame, "bravos_score", peak)
+    series = pd.to_numeric(frame["core_index"], errors="coerce").loc[start:end].dropna()
+    at_peak, peak_asof = _value_on_or_before(frame, "core_index", peak)
     trough_date = trough or end
     at_trough, trough_asof = _value_on_or_before(
-        frame, "bravos_score", trough_date
+        frame, "core_index", trough_date
     )
     bucket_at_peak = None
     bucket_at_trough = None
-    if peak_asof is not None and "bravos_bucket" in frame.columns:
-        bucket_at_peak = _as_str(frame.loc[peak_asof, "bravos_bucket"])
-    if trough_asof is not None and "bravos_bucket" in frame.columns:
-        bucket_at_trough = _as_str(frame.loc[trough_asof, "bravos_bucket"])
+    if peak_asof is not None and "core_index_bucket" in frame.columns:
+        bucket_at_peak = _as_str(frame.loc[peak_asof, "core_index_bucket"])
+    if trough_asof is not None and "core_index_bucket" in frame.columns:
+        bucket_at_trough = _as_str(frame.loc[trough_asof, "core_index_bucket"])
     return {
         "at_peak": round(at_peak, 2) if at_peak is not None else None,
         "at_peak_date": peak_asof,
@@ -448,7 +448,7 @@ class MacroRegimeService:
         if not proxy_sources:
             proxy_sources = _proxy_sources_from_frame(frame)
         strength = self._meta.get("strength", {})
-        bravos = self._meta.get("bravos", {})
+        core_index = self._meta.get("core_index", {})
         source = self._meta.get("source", {})
         notes = self._meta.get("notes") or [
             "Descriptive historical classification. Not a forecast or investment advice."
@@ -461,10 +461,10 @@ class MacroRegimeService:
             "strength_weights": strength.get("weights", dict(STRENGTH_WEIGHTS)),
             "regime_thresholds": strength.get("regime_thresholds"),
             "latest_strength": strength.get("latest"),
-            "bravos_version": bravos.get("version", BRAVOS_VERSION),
-            "bravos_weights": bravos.get("weights"),
-            "bravos_buckets": bravos.get("buckets"),
-            "latest_bravos": bravos.get("latest"),
+            "core_index_version": core_index.get("version", CORE_INDEX_VERSION),
+            "core_index_weights": core_index.get("weights"),
+            "core_index_buckets": core_index.get("buckets"),
+            "latest_core_index": core_index.get("latest"),
             "proxy_sources": proxy_sources,
             "nber_source": self._meta.get("nber", {}).get("source", "USREC"),
             "transport": source.get("transport"),
@@ -699,7 +699,7 @@ class MacroRegimeService:
         }
 
     def crypto_milestones(self) -> dict[str, Any]:
-        """Editorial crypto windows enriched with asset and Bravos readings."""
+        """Editorial crypto windows enriched with asset and Core Index readings."""
         frame = self._load()
         artifact = _read_json(self.crypto_milestones_path)
         definitions = artifact.get("events")
@@ -728,7 +728,7 @@ class MacroRegimeService:
                     **(stats or {}),
                 }
             item["assets"] = assets
-            item["bravos"] = _event_bravos(
+            item["core_index"] = _event_core_index(
                 frame,
                 start,
                 end,
@@ -755,7 +755,7 @@ class MacroRegimeService:
             "events": events,
             "notes": [
                 "Event windows are hand-curated comparison windows, not statistically detected crash dates.",
-                "Bravos is a macro/volatility/momentum composite from the same long-run artifact; it is not a crypto-specific model.",
+                "Core Index is a macro/volatility/momentum composite from the same long-run artifact; it is not a crypto-specific model.",
                 "Bitcoin prices are Blockchain.com daily market prices from 2010-08-18; Genesis predates a market quote.",
                 "Astrology is a historical lens, not a forecast or causal claim.",
             ],

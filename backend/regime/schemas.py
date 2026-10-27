@@ -13,13 +13,13 @@ class TimelinePoint(BaseModel):
     date: str
     strength: float | None = None
     regime_state: str | None = None
-    bravos_score: float | None = None
-    bravos_composite: float | None = None
-    bravos_bucket: str | None = None
+    core_index: float | None = None
+    core_index_composite: float | None = None
+    core_index_bucket: str | None = None
     macro_score: float | None = None
     credit_score: float | None = None
-    bravos_volatility_score: float | None = None
-    bravos_momentum_score: float | None = None
+    core_volatility_score: float | None = None
+    core_momentum_score: float | None = None
     hy_oas: float | None = None
     atr_pct: float | None = None
     bollinger_width: float | None = None
@@ -81,8 +81,8 @@ class PreCrashState(BaseModel):
     fed_funds: float | None = None
     curve_inverted: bool | None = None
     macro_strength: float | None = None
-    bravos_score: float | None = None
-    bravos_bucket: str | None = None
+    core_index: float | None = None
+    core_index_bucket: str | None = None
     sp500_proxy: float | None = None
     phase: str | None = None
 
@@ -152,10 +152,10 @@ class ResponseMeta(BaseModel):
     strength_weights: dict[str, float]
     regime_thresholds: dict[str, float] | None = None
     latest_strength: LatestStrength | None = None
-    bravos_version: str | None = None
-    bravos_weights: dict[str, float] | None = None
-    bravos_buckets: dict[str, str] | None = None
-    latest_bravos: LatestStrength | None = None
+    core_index_version: str | None = None
+    core_index_weights: dict[str, float] | None = None
+    core_index_buckets: dict[str, str] | None = None
+    latest_core_index: LatestStrength | None = None
     proxy_sources: list[ProxySource]
     nber_source: str
     transport: str | None = None
@@ -255,7 +255,7 @@ class CryptoAssetStats(BaseModel):
     observations: int | None = None
 
 
-class CryptoBravos(BaseModel):
+class CryptoCoreIndex(BaseModel):
     at_peak: float | None = None
     at_peak_date: str | None = None
     at_peak_bucket: str | None = None
@@ -282,7 +282,7 @@ class CryptoMilestoneEvent(BaseModel):
     context: str | None = None
     tags: list[str] = Field(default_factory=list)
     assets: dict[str, CryptoAssetStats]
-    bravos: CryptoBravos
+    core_index: CryptoCoreIndex
 
 
 class CryptoMilestonesResponse(BaseModel):

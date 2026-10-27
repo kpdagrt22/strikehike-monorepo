@@ -75,7 +75,7 @@
       "volatility_field": "volatility_1y"
     }
   },
-  "bravos": {
+  "core_index": {
     "buckets": {
       "bearish_warning": "-1 to -24",
       "calm_bullish": "0 to 24",
@@ -95,7 +95,7 @@
       "date": "2026-10-26",
       "score": 10.69
     },
-    "version": "bravos-v1",
+    "version": "core-index-v1",
     "weights": {
       "macro": 0.4,
       "momentum": 0.3,
@@ -107,7 +107,7 @@
     "start": "1854-12-01",
     "years": 171.9
   },
-  "data_version": "3924d32cc8cb",
+  "data_version": "f8d19ef660bc",
   "frame": {
     "columns": 153,
     "columns_list": [
@@ -257,17 +257,17 @@
       "macro_score",
       "atr_score",
       "bollinger_score",
-      "bravos_volatility_score",
+      "core_volatility_score",
       "macd_score",
       "rsi_score",
-      "bravos_momentum_score",
-      "bravos_composite",
-      "bravos_score",
-      "bravos_bucket"
+      "core_momentum_score",
+      "core_index_composite",
+      "core_index",
+      "core_index_bucket"
     ],
     "rows": 62787
   },
-  "generated_at": "2026-10-27T07:03:59.997215+00:00",
+  "generated_at": "2026-10-27T07:42:50.757708+00:00",
   "nber": {
     "current_phase": "expansion",
     "episodes": [
@@ -771,7 +771,7 @@
     "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
     "USREC is excluded from the strength inputs to avoid target leakage.",
     "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index; Bitcoin is the Blockchain.com daily market price from 2010-08-18.",
-    "Bravos is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
+    "Core Index is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
     "FRED's keyless CSV endpoint exposes only a rolling three-year ICE BofA HY OAS window. The pipeline merges FRED's recent observations with a cached public 1996+ mirror; the official FRED API path retains the full provider history.",
     "Crypto milestone dates are editorial comparison windows, not statistically detected events or NBER recession dates."
   ],

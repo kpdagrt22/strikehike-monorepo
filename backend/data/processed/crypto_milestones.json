@@ -1,10 +1,10 @@
 {
   "version": "crypto-milestones-v1",
-  "generated_at": "2026-10-27T07:04:00.022723+00:00",
+  "generated_at": "2026-10-27T07:42:50.794543+00:00",
   "kind": "editorial",
   "notes": [
     "Event windows are hand-curated comparison windows, not detected crash dates.",
-    "Market statistics and Bravos readings are joined by the live service from the macro artifact.",
+    "Market statistics and Core Index readings are joined by the live service from the macro artifact.",
     "Genesis has no market price; the first Blockchain.com observation is 2010-08-18."
   ],
   "events": [
@@ -21,7 +21,7 @@
       "trough": "2010-07-17",
       "date_precision": "day",
       "summary": "The Bitcoin network's first block is mined. Market pricing does not begin until July 2010, so the window is an origin marker rather than an investable drawdown.",
-      "context": "A cypherpunk proof-of-work experiment becomes a live ledger. There is no exchange tape, no Bravos equity proxy input and no tradable price at the genesis date.",
+      "context": "A cypherpunk proof-of-work experiment becomes a live ledger. There is no exchange tape, no Core Index equity proxy input and no tradable price at the genesis date.",
       "tags": [
         "origin",
         "protocol"

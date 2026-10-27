@@ -49,13 +49,13 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from regime.analytics import (  # noqa: E402
-    BRAVOS_WEIGHTS,
-    BRAVOS_VERSION,
+    CORE_INDEX_WEIGHTS,
+    CORE_INDEX_VERSION,
     STRENGTH_VERSION,
     STRENGTH_WEIGHTS,
     annotate_nber,
     build_sp500_proxy,
-    calculate_bravos_composite,
+    calculate_core_index,
     calculate_macro_strength_components,
     nber_episodes,
 )
@@ -1347,28 +1347,28 @@ def build_metadata(
     else:
         latest_strength = None
 
-    scored_bravos = (
-        frame["bravos_score"].dropna()
-        if "bravos_score" in frame.columns
+    scored_core_index = (
+        frame["core_index"].dropna()
+        if "core_index" in frame.columns
         else pd.Series(dtype="float64")
     )
-    if not scored_bravos.empty:
-        latest_bravos_index = scored_bravos.index.max()
-        latest_bravos = {
-            "date": latest_bravos_index.date().isoformat(),
-            "score": round(float(scored_bravos.loc[latest_bravos_index]), 2),
-            "bucket": str(frame.loc[latest_bravos_index, "bravos_bucket"])
-            if "bravos_bucket" in frame.columns
-            and not pd.isna(frame.loc[latest_bravos_index, "bravos_bucket"])
+    if not scored_core_index.empty:
+        latest_core_index_date = scored_core_index.index.max()
+        latest_core_index = {
+            "date": latest_core_index_date.date().isoformat(),
+            "score": round(float(scored_core_index.loc[latest_core_index_date]), 2),
+            "bucket": str(frame.loc[latest_core_index_date, "core_index_bucket"])
+            if "core_index_bucket" in frame.columns
+            and not pd.isna(frame.loc[latest_core_index_date, "core_index_bucket"])
             else None,
             "composite": round(
-                float(frame.loc[latest_bravos_index, "bravos_composite"]), 2
+                float(frame.loc[latest_core_index_date, "core_index_composite"]), 2
             )
-            if "bravos_composite" in frame.columns
+            if "core_index_composite" in frame.columns
             else None,
         }
     else:
-        latest_bravos = None
+        latest_core_index = None
 
     coverage_start = None
     full_coverage_start = None
@@ -1395,7 +1395,7 @@ def build_metadata(
         "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
         "USREC is excluded from the strength inputs to avoid target leakage.",
         "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index; Bitcoin is the Blockchain.com daily market price from 2010-08-18.",
-        "Bravos is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
+        "Core Index is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
         "FRED's keyless CSV endpoint exposes only a rolling three-year ICE BofA HY OAS window. The pipeline merges FRED's recent observations with a cached public 1996+ mirror; the official FRED API path retains the full provider history.",
         "Crypto milestone dates are editorial comparison windows, not statistically detected events or NBER recession dates.",
     ]
@@ -1449,9 +1449,9 @@ def build_metadata(
             "latest": latest_strength,
             "notes": notes[2:3],
         },
-        "bravos": {
-            "version": BRAVOS_VERSION,
-            "weights": dict(BRAVOS_WEIGHTS),
+        "core_index": {
+            "version": CORE_INDEX_VERSION,
+            "weights": dict(CORE_INDEX_WEIGHTS),
             "features": [
                 "hy_oas",
                 "atr_14",
@@ -1459,7 +1459,7 @@ def build_metadata(
                 "macd",
                 "rsi_14",
             ],
-            "latest": latest_bravos,
+            "latest": latest_core_index,
             "buckets": {
                 "strong_bullish": ">= 25",
                 "calm_bullish": "0 to 24",
@@ -1563,8 +1563,8 @@ def run_pipeline(
 
     strength = calculate_macro_strength_components(frame)
     frame = frame.join(strength)
-    bravos = calculate_bravos_composite(frame)
-    frame = frame.join(bravos)
+    core_index = calculate_core_index(frame)
+    frame = frame.join(core_index)
 
     output_dir = Path(output_dir)
     parquet_path = output_dir / "macro_regime_history.parquet"
@@ -1595,7 +1595,7 @@ def run_pipeline(
         "series_loaded": len(series_map),
         "nber_episodes": len(metadata["nber"]["episodes"]),
         "latest_strength": metadata["strength"]["latest"],
-        "latest_bravos": metadata["bravos"]["latest"],
+        "latest_core_index": metadata["core_index"]["latest"],
         "data_version": data_version,
         "transport": transport,
         "parquet": str(parquet_path),

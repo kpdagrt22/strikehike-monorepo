@@ -6,9 +6,10 @@ import { AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
 import { PhasePlane } from "@/components/regime/PhasePlane";
+import { OnboardingModal } from "@/components/ui/OnboardingModal";
 import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
 import {
-  bravosTone,
+  coreIndexTone,
   formatDate,
   formatNumber,
   formatSigned,
@@ -132,9 +133,8 @@ function MethodDetails({ meta }) {
     ? meta.proxy_sources
     : [];
   const allNotes = [
-    "Bravos is a 40/30/30 descriptive composite: Macro 40% (credit 40%, Fed 30%, curve 30%), Volatility 30% (14d ATR / 20d Bollinger width) and Momentum 30% (MACD 12/26/9 / 14d RSI). The 0-100 composite is mapped to -50..+50; zero is neutral and +25 / -25 begin the strong / extreme bands.",
+    "Core Index is a 40/30/30 descriptive composite: Macro 40% (credit 40%, Fed 30%, curve 30%), Volatility 30% (14d ATR / 20d Bollinger width) and Momentum 30% (MACD 12/26/9 / 14d RSI). The 0-100 composite is mapped to -50..+50; zero is neutral and +25 / -25 begin the strong / extreme bands.",
     ...notes,
-    "The 30-day disruptive-risk estimate is a lightweight logistic regression on the V2 fed_cross, curve_cross and sahm_alert features; it is macro-regime risk, not a security-specific forecast.",
   ];
 
   return (
@@ -179,7 +179,7 @@ function MethodDetails({ meta }) {
 
       <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
         Data version {meta?.data_version ?? "—"} ·{" "}
-        {meta?.bravos_version ?? meta?.strength_version ?? "—"} · Source FRED,
+        {meta?.core_index_version ?? meta?.strength_version ?? "—"} · Source FRED,
         World Bank, Blockchain.com. Descriptive historical research. Not
         investment advice.
       </p>
@@ -194,7 +194,7 @@ export default function RegimePage() {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState("sp500");
   const [compareAssets, setCompareAssets] = useState(false);
-  const [forecast, setForecast] = useState(null);
+  const [hoverPoint, setHoverPoint] = useState(null);
   const [state, setState] = useState({
     status: "loading",
     data: null,
@@ -241,30 +241,6 @@ export default function RegimePage() {
     return () => controller.abort();
   }, [reloadKey]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetch("/api/v1/regime/forecast", {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json();
-      })
-      .then((payload) => {
-        if (payload && Number.isFinite(Number(payload.risk_pct))) {
-          setForecast(payload);
-        } else {
-          setForecast(null);
-        }
-      })
-      .catch((loadError) => {
-        if (loadError.name !== "AbortError") setForecast(null);
-      });
-
-    return () => controller.abort();
-  }, [reloadKey]);
 
   useEffect(() => {
     const date = new URLSearchParams(window.location.search).get("d");
@@ -274,15 +250,15 @@ export default function RegimePage() {
   }, []);
 
   const data = state.data;
-  const latestBravos = data?.meta?.latest_bravos ?? null;
-  const latestTone = bravosTone(latestBravos?.bucket, isDark);
+  const latestCoreIndex = data?.meta?.latest_core_index ?? null;
+  const latestTone = coreIndexTone(latestCoreIndex?.bucket, isDark);
   const selectedCrash = useMemo(
     () => data?.crashes.find((crash) => crash.id === selectedId) ?? null,
     [data, selectedId],
   );
   const phaseDate =
     (selectedCrash?.within_coverage ? selectedCrash.start : null) ??
-    latestBravos?.date ??
+    latestCoreIndex?.date ??
     data?.coverage?.end ??
     null;
   const phasePoint = useMemo(() => {
@@ -293,10 +269,14 @@ export default function RegimePage() {
       null
     );
   }, [data, phaseDate]);
-  const phaseContext = selectedCrash?.within_coverage
-    ? `${selectedCrash.name} peak`
-    : "Latest observation";
-  const orreryDate = selectedCrash?.start ?? latestBravos?.date ?? null;
+  const phaseAsOf = hoverPoint?.date ?? phaseDate;
+  const phaseDisplayPoint = hoverPoint ?? phasePoint;
+  const phaseContext = hoverPoint
+    ? "Hovered date"
+    : selectedCrash?.within_coverage
+      ? `${selectedCrash.name} peak`
+      : "Latest observation";
+  const orreryDate = selectedCrash?.start ?? latestCoreIndex?.date ?? null;
 
   const handleSelect = useCallback((crash) => {
     setSelectedId(crash.id);
@@ -304,6 +284,10 @@ export default function RegimePage() {
     const url = new URL(window.location.href);
     url.searchParams.set("d", crash.start);
     window.history.replaceState(null, "", url);
+  }, []);
+
+  const handleHoverPoint = useCallback((point) => {
+    setHoverPoint(point ?? null);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -330,7 +314,7 @@ export default function RegimePage() {
               The −50 to +50 macro atlas.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
-              One full-bleed market chart. The Bravos composite blends credit,
+              One full-bleed market chart. The Core Index composite blends credit,
               volatility and momentum; every NBER window carries its own
               drawdown and score. Compare the S&amp;P 500, gold and Treasuries
               on a single percentage scale. Research, not investment advice.
@@ -357,15 +341,15 @@ export default function RegimePage() {
           <>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat
-                label="Latest Bravos"
-                value={formatSigned(latestBravos?.score)}
+                label="Latest Core Index"
+                value={formatSigned(latestCoreIndex?.score)}
                 suffix="/ +50"
                 detail={latestTone.label}
                 accent={latestTone.color}
               />
               <Stat
                 label="As of"
-                value={latestBravos?.date ? formatDate(latestBravos.date) : "—"}
+                value={latestCoreIndex?.date ? formatDate(latestCoreIndex.date) : "—"}
                 detail={`${formatNumber(data.point_count)} timeline points`}
               />
               <Stat
@@ -390,9 +374,9 @@ export default function RegimePage() {
               resolution={data.resolution}
               assetKey={selectedAsset}
               onAssetChange={setSelectedAsset}
-              forecast={forecast}
               compareAssets={compareAssets}
               onCompareToggle={() => setCompareAssets((value) => !value)}
+              onHoverPoint={handleHoverPoint}
             />
 
             <AnimatePresence mode="wait" initial={false}>
@@ -408,8 +392,8 @@ export default function RegimePage() {
 
             <div className="mt-4">
               <PhasePlane
-                point={phasePoint}
-                asOf={phasePoint?.date ?? phaseDate}
+                point={phaseDisplayPoint}
+                asOf={phaseAsOf}
                 contextLabel={phaseContext}
                 isDark={isDark}
                 assetKey={selectedAsset}
@@ -421,22 +405,36 @@ export default function RegimePage() {
             <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/40 dark:border-white/5 dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
               <span>
                 FRED · World Bank · Blockchain.com ·{" "}
-                {data.meta?.bravos_version ?? "bravos-v1"}
+                {data.meta?.core_index_version ?? "core-index-v1"}
               </span>
-              <Link
-                href={
-                  orreryDate
-                    ? `/?d=${encodeURIComponent(orreryDate)}`
-                    : "/"
-                }
-                className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
-              >
-                Open the Orrery at this date
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new Event("strikehike:show-onboarding"),
+                    )
+                  }
+                  className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+                >
+                  How it works
+                </button>
+                <Link
+                  href={
+                    orreryDate
+                      ? `/?d=${encodeURIComponent(orreryDate)}`
+                      : "/"
+                  }
+                  className="text-black/55 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/55 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+                >
+                  Open the Orrery at this date
+                </Link>
+              </div>
             </footer>
           </>
         ) : null}
       </div>
+      <OnboardingModal />
     </main>
   );
 }

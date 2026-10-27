@@ -30,8 +30,8 @@ STRENGTH_WEIGHTS: dict[str, float] = {
     "curve_score": 0.30,
     "labor_score": 0.40,
 }
-BRAVOS_VERSION = "bravos-v1"
-BRAVOS_WEIGHTS: dict[str, float] = {
+CORE_INDEX_VERSION = "core-index-v1"
+CORE_INDEX_WEIGHTS: dict[str, float] = {
     "macro": 0.40,
     "volatility": 0.30,
     "momentum": 0.30,
@@ -417,7 +417,7 @@ def _continuous_proxy(frame: pd.DataFrame) -> pd.Series:
     return adjusted.rename("sp500_continuous")
 
 
-def _bravos_bucket(score: pd.Series) -> pd.Series:
+def _core_index_bucket(score: pd.Series) -> pd.Series:
     bucket = pd.Series(pd.NA, index=score.index, dtype="string")
     bucket.loc[score.ge(25.0)] = "strong_bullish"
     bucket.loc[score.ge(0.0) & score.lt(25.0)] = "calm_bullish"
@@ -426,18 +426,18 @@ def _bravos_bucket(score: pd.Series) -> pd.Series:
     return bucket
 
 
-def calculate_bravos_composite(frame: pd.DataFrame) -> pd.DataFrame:
-    """Compute the Bravos-style macro/volatility/momentum composite.
+def calculate_core_index(frame: pd.DataFrame) -> pd.DataFrame:
+    """Compute the StrikeHike Core Index macro/volatility/momentum composite.
 
     Macro (40%): high-yield credit spread (40% inside macro), Fed panic/easing
     component (30%) and curve level/momentum component (30%). Volatility (30%):
     14d ATR and 20d Bollinger band width, both inverted so calm tape is
     constructive. Momentum (30%): MACD (12/26/9) and 14d RSI.
 
-    ``bravos_score`` is the final 0-100 composite transformed to -50..+50.
-    Zero is the neutral baseline. The credit series starts in 1997, so the
-    composite intentionally begins there rather than manufacturing a pre-credit
-    score.
+    ``core_index`` is the final 0-100 composite transformed to -50..+50.
+    Zero is the neutral baseline. The credit series starts at the end of
+    1996, so the composite intentionally begins there rather than manufacturing
+    a pre-credit score.
     """
     out = pd.DataFrame(index=frame.index)
     proxy = _continuous_proxy(frame)
@@ -509,29 +509,29 @@ def calculate_bravos_composite(frame: pd.DataFrame) -> pd.DataFrame:
     out["atr_score"] = atr_score
     out["bollinger_score"] = bollinger_score
     volatility_score = 0.50 * atr_score + 0.50 * bollinger_score
-    out["bravos_volatility_score"] = volatility_score
+    out["core_volatility_score"] = volatility_score
 
     macd_score = _scale(macd_pct, -1.0, 1.0)
     rsi_score = _scale(rsi, 30.0, 70.0)
     out["macd_score"] = macd_score
     out["rsi_score"] = rsi_score
     momentum_score = 0.50 * macd_score + 0.50 * rsi_score
-    out["bravos_momentum_score"] = momentum_score
+    out["core_momentum_score"] = momentum_score
 
     composite = (
-        BRAVOS_WEIGHTS["macro"] * macro_score
-        + BRAVOS_WEIGHTS["volatility"] * volatility_score
-        + BRAVOS_WEIGHTS["momentum"] * momentum_score
+        CORE_INDEX_WEIGHTS["macro"] * macro_score
+        + CORE_INDEX_WEIGHTS["volatility"] * volatility_score
+        + CORE_INDEX_WEIGHTS["momentum"] * momentum_score
     )
     composite = composite.where(
         macro_score.notna()
         & volatility_score.notna()
         & momentum_score.notna()
     )
-    out["bravos_composite"] = composite
+    out["core_index_composite"] = composite
     score = composite - 50.0
-    out["bravos_score"] = score
-    out["bravos_bucket"] = _bravos_bucket(score)
+    out["core_index"] = score
+    out["core_index_bucket"] = _core_index_bucket(score)
     return out
 
 
@@ -640,8 +640,8 @@ def pre_crash_snapshot(
         "fed_funds": None,
         "curve_inverted": None,
         "macro_strength": None,
-        "bravos_score": None,
-        "bravos_bucket": None,
+        "core_index": None,
+        "core_index_bucket": None,
         "sp500_proxy": None,
         "phase": None,
     }
@@ -665,8 +665,8 @@ def pre_crash_snapshot(
         "fed_funds": fed_funds,
         "curve_inverted": None if t10y2y is None else bool(t10y2y < 0.0),
         "macro_strength": _as_float(row.get("macro_strength"), 2),
-        "bravos_score": _as_float(row.get("bravos_score"), 2),
-        "bravos_bucket": _as_str(row.get("bravos_bucket")),
+        "core_index": _as_float(row.get("core_index"), 2),
+        "core_index_bucket": _as_str(row.get("core_index_bucket")),
         "sp500_proxy": _as_float(row.get("sp500_proxy"), 2),
         "phase": _as_str(row.get("nber_phase")),
     }

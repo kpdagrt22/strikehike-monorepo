@@ -15,7 +15,7 @@ from regime.analytics import (  # noqa: E402
     annotate_nber,
     build_crashes,
     build_sp500_proxy,
-    calculate_bravos_composite,
+    calculate_core_index,
     calculate_macro_strength,
     calculate_macro_strength_components,
     nber_episodes,
@@ -441,7 +441,7 @@ def test_sp500_proxy_respects_raw_source_boundaries():
     ]
 
 
-def test_bravos_composite_is_bounded_and_bucketed():
+def test_core_index_composite_is_bounded_and_bucketed():
     index = pd.date_range("1996-01-01", "2020-12-31", freq="D", tz="UTC")
     trend = np.linspace(100.0, 1200.0, len(index))
     credit = pd.Series(np.nan, index=index, dtype="float64")
@@ -459,12 +459,12 @@ def test_bravos_composite_is_bounded_and_bucketed():
         index=index,
     )
 
-    out = calculate_bravos_composite(frame)
-    scored = out["bravos_score"].dropna()
+    out = calculate_core_index(frame)
+    scored = out["core_index"].dropna()
 
     assert scored.index.min() >= pd.Timestamp("1996-12-31", tz="UTC")
     assert scored.between(-50.0, 50.0).all()
-    assert set(out["bravos_bucket"].dropna().unique()).issubset(
+    assert set(out["core_index_bucket"].dropna().unique()).issubset(
         {
             "strong_bullish",
             "calm_bullish",
@@ -474,7 +474,7 @@ def test_bravos_composite_is_bounded_and_bucketed():
     )
     assert np.allclose(
         scored,
-        out.loc[scored.index, "bravos_composite"] - 50.0,
+        out.loc[scored.index, "core_index_composite"] - 50.0,
     )
     assert {"macro_score", "atr_pct", "bollinger_width", "rsi_14"}.issubset(
         out.columns

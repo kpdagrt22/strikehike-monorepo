@@ -1,18 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  bravosTone,
+  addDaysIso,
+  buildSegments,
   clamp,
+  coreIndexTone,
   formatDate,
-  formatPercent,
-  formatSigned,
   getChartTone,
+  pathFromSegment,
 } from "@/components/regime/regimeUtils";
-import {
-  assetChartColor,
-  getAssetTarget,
-} from "@/components/regime/assetTargets";
+import { getAssetTarget } from "@/components/regime/assetTargets";
 
 const WIDTH = 760;
 const HEIGHT = 420;
@@ -21,18 +19,36 @@ const PLOT_W = WIDTH - PAD.left - PAD.right;
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
 const VOL_THRESHOLD = 50;
 const DRAWDOWN_THRESHOLD = -10;
+const TRACE_DAYS = 90;
 
-function Quadrant({
-  x,
-  y,
-  width,
-  height,
-  fill,
-  label,
-  detail,
-  tone,
-  strong,
-}) {
+const QUADRANTS = {
+  calm_bullish: {
+    label: "Calm Bullish",
+    detail: "low volatility · shallow",
+    fill: "#0f766e",
+    fillDark: "#5eead4",
+  },
+  volatile_bullish: {
+    label: "Volatile Bullish",
+    detail: "high volatility · shallow",
+    fill: "#b45309",
+    fillDark: "#fbbf24",
+  },
+  calm_bearish: {
+    label: "Calm Bearish",
+    detail: "low volatility · deep",
+    fill: "#2563eb",
+    fillDark: "#60a5fa",
+  },
+  volatile_bearish: {
+    label: "Volatile Bearish",
+    detail: "high volatility · deep",
+    fill: "#c0442f",
+    fillDark: "#fb7185",
+  },
+};
+
+function Quadrant({ x, y, width, height, quadrant, isDark, strong }) {
   return (
     <g>
       <rect
@@ -40,29 +56,28 @@ function Quadrant({
         y={y}
         width={width}
         height={height}
-        fill={fill}
-        fillOpacity={strong ? 0.16 : 0.075}
+        fill={isDark ? quadrant.fillDark : quadrant.fill}
+        fillOpacity={strong ? 0.17 : 0.065}
       />
       <text
         x={x + width / 2}
         y={y + height / 2 - 2}
-        fill={tone}
+        fill={isDark ? "rgba(242,237,228,0.78)" : "rgba(20,18,26,0.72)"}
         fontSize="10"
         textAnchor="middle"
-        className="font-mono font-semibold tracking-[0.14em]"
+        className="font-mono font-semibold tracking-[0.1em]"
       >
-        {label}
+        {quadrant.label.toUpperCase()}
       </text>
       <text
         x={x + width / 2}
         y={y + height / 2 + 12}
-        fill={tone}
-        fillOpacity="0.55"
+        fill={isDark ? "rgba(242,237,228,0.45)" : "rgba(20,18,26,0.42)"}
         fontSize="8"
         textAnchor="middle"
         className="font-mono"
       >
-        {detail}
+        {quadrant.detail}
       </text>
     </g>
   );
@@ -77,23 +92,134 @@ export function PhasePlane({
 }) {
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
   const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
-  const assetColor = assetChartColor(asset, isDark);
-  const bravos = bravosTone(point?.bravos_bucket, isDark);
-  const vol =
-    point?.[asset.percentileField] == null
-      ? Number.NaN
-      : Number(point[asset.percentileField]);
-  const drawdown =
-    point?.[asset.drawdownField] == null
-      ? Number.NaN
-      : Number(point[asset.drawdownField]);
-  const hasPoint = Number.isFinite(vol) && Number.isFinite(drawdown);
-  const markerColor = point?.bravos_bucket ? bravos.color : assetColor;
+  const [trace, setTrace] = useState({
+    status: "idle",
+    timeline: [],
+    error: null,
+  });
 
-  const yMin = Math.min(-40, (hasPoint ? drawdown : -10) * 1.15);
-  const yTicks = [];
-  const floor = Math.ceil(yMin / 10) * 10;
-  for (let value = 0; value >= floor; value -= 10) yTicks.push(value);
+  useEffect(() => {
+    if (!asOf) return undefined;
+    const start = addDaysIso(asOf, -TRACE_DAYS);
+    if (!start) return undefined;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(
+        `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${asOf}`,
+        { signal: controller.signal, cache: "no-store" },
+      )
+        .then(async (response) => {
+          if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            throw new Error(
+              payload?.detail ||
+                payload?.error ||
+                `Phase trace returned ${response.status}.`,
+            );
+          }
+          return response.json();
+        })
+        .then((payload) => {
+          setTrace({
+            status: "ready",
+            timeline: Array.isArray(payload?.timeline)
+              ? payload.timeline
+              : [],
+            error: null,
+          });
+        })
+        .catch((error) => {
+          if (error.name !== "AbortError") {
+            setTrace({
+              status: "error",
+              timeline: [],
+              error: error.message,
+            });
+          }
+        });
+    }, 90);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [asOf]);
+
+  const tracePoints = useMemo(() => {
+    if (!Array.isArray(trace.timeline)) return [];
+    return trace.timeline
+      .map((item) => ({
+        ...item,
+        vol:
+          item[asset.percentileField] == null
+            ? Number.NaN
+            : Number(item[asset.percentileField]),
+        drawdown:
+          item[asset.drawdownField] == null
+            ? Number.NaN
+            : Number(item[asset.drawdownField]),
+      }))
+      .filter(
+        (item) =>
+          Number.isFinite(item.vol) && Number.isFinite(item.drawdown),
+      )
+      .slice(-TRACE_DAYS);
+  }, [trace.timeline, asset]);
+
+  const passedPoint = point
+    ? {
+        ...point,
+        vol:
+          point[asset.percentileField] == null
+            ? Number.NaN
+            : Number(point[asset.percentileField]),
+        drawdown:
+          point[asset.drawdownField] == null
+            ? Number.NaN
+            : Number(point[asset.drawdownField]),
+      }
+    : null;
+  const current =
+    passedPoint &&
+    Number.isFinite(passedPoint.vol) &&
+    Number.isFinite(passedPoint.drawdown)
+      ? passedPoint
+      : tracePoints.at(-1) ?? null;
+
+  const hasPoint =
+    current != null &&
+    Number.isFinite(current.vol) &&
+    Number.isFinite(current.drawdown);
+  const currentVol = hasPoint ? current.vol : Number.NaN;
+  const currentDrawdown = hasPoint ? current.drawdown : Number.NaN;
+  const currentQuadrant =
+    !hasPoint
+      ? null
+      : currentVol >= VOL_THRESHOLD &&
+          currentDrawdown <= DRAWDOWN_THRESHOLD
+        ? "volatile_bearish"
+        : currentVol >= VOL_THRESHOLD
+          ? "volatile_bullish"
+          : currentDrawdown <= DRAWDOWN_THRESHOLD
+            ? "calm_bearish"
+            : "calm_bullish";
+  const toneForIndex = coreIndexTone(
+    current?.core_index_bucket ?? point?.core_index_bucket,
+    isDark,
+  );
+  const markerColor = currentQuadrant
+    ? isDark
+      ? QUADRANTS[currentQuadrant].fillDark
+      : QUADRANTS[currentQuadrant].fill
+    : toneForIndex.color;
+
+  const minDrawdown = Math.min(
+    -10,
+    currentDrawdown,
+    ...tracePoints.map((item) => item.drawdown),
+  );
+  const yMin = Math.min(-40, minDrawdown * 1.15);
 
   const x = (value) =>
     PAD.left + (clamp(value, 0, 100) / 100) * PLOT_W;
@@ -101,36 +227,43 @@ export function PhasePlane({
     PAD.top + (clamp(value, yMin, 0) / yMin) * PLOT_H;
   const thresholdY = y(DRAWDOWN_THRESHOLD);
   const thresholdX = x(VOL_THRESHOLD);
-  const currentQuadrant =
-    !hasPoint
-      ? null
-      : vol >= VOL_THRESHOLD && drawdown <= DRAWDOWN_THRESHOLD
-        ? "crisis"
-        : vol >= VOL_THRESHOLD
-          ? "choppy"
-          : drawdown <= DRAWDOWN_THRESHOLD
-            ? "grind"
-            : "calm";
+  const traceSegments = buildSegments(
+    tracePoints,
+    (item) => item.drawdown,
+    (item) => x(item.vol),
+    (value) => y(value),
+  );
+  const traceColor = isDark ? "#a5f3fc" : "#0e7490";
 
   return (
     <section
       aria-labelledby="phase-plane-title"
       className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
     >
-      <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
-        <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
-          Phase plane · {asset.label}
-        </p>
-        <h2
-          id="phase-plane-title"
-          className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4] sm:text-2xl"
-        >
-          The 2×2 volatility map
-        </h2>
-        <p className="mt-1 text-micro text-black/45 dark:text-white/45">
-          {formatDate(asOf)} · {contextLabel} · one-year volatility percentile
-          vs drawdown from the one-year high
-        </p>
+      <div className="flex flex-col gap-2 border-b border-black/5 p-5 dark:border-white/5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+        <div>
+          <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
+            Cycle map · {asset.label}
+          </p>
+          <h2
+            id="phase-plane-title"
+            className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4] sm:text-2xl"
+          >
+            The 90-day path
+          </h2>
+          <p className="mt-1 text-micro text-black/45 dark:text-white/45">
+            {formatDate(asOf)} · {contextLabel} · move your cursor on the chart
+            to trace the cycle
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-micro text-black/40 dark:text-white/40">
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: traceColor, boxShadow: `0 0 14px ${traceColor}` }}
+            aria-hidden="true"
+          />
+          Glowing trace: prior {TRACE_DAYS} days
+        </div>
       </div>
 
       <div className="overflow-x-auto p-2 sm:p-3">
@@ -138,9 +271,16 @@ export function PhasePlane({
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[560px]"
           role="img"
-          aria-label={`Two by two phase plane of ${asset.label} volatility percentile versus one-year drawdown as of ${formatDate(asOf)}`}
+          aria-label={`Two by two cycle map of ${asset.label} volatility percentile versus one-year drawdown as of ${formatDate(asOf)}`}
         >
           <defs>
+            <filter id="phase-trace-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
             <radialGradient id="phase-marker-glow">
               <stop offset="0%" stopColor={markerColor} stopOpacity="0.42" />
               <stop offset="100%" stopColor={markerColor} stopOpacity="0" />
@@ -152,95 +292,64 @@ export function PhasePlane({
             y={PAD.top}
             width={PLOT_W / 2}
             height={thresholdY - PAD.top}
-            fill={isDark ? "#5eead4" : "#0f766e"}
-            label="CALM"
-            detail="low vol · shallow"
-            tone={tone.axisStrong}
-            strong={currentQuadrant === "calm"}
+            quadrant={QUADRANTS.calm_bullish}
+            isDark={isDark}
+            strong={currentQuadrant === "calm_bullish"}
           />
           <Quadrant
             x={thresholdX}
             y={PAD.top}
             width={PLOT_W / 2}
             height={thresholdY - PAD.top}
-            fill={isDark ? "#fbbf24" : "#b45309"}
-            label="CHOPPY"
-            detail="high vol · shallow"
-            tone={tone.axisStrong}
-            strong={currentQuadrant === "choppy"}
+            quadrant={QUADRANTS.volatile_bullish}
+            isDark={isDark}
+            strong={currentQuadrant === "volatile_bullish"}
           />
           <Quadrant
             x={PAD.left}
             y={thresholdY}
             width={PLOT_W / 2}
             height={PAD.top + PLOT_H - thresholdY}
-            fill={isDark ? "#60a5fa" : "#2563eb"}
-            label="GRIND"
-            detail="low vol · deep"
-            tone={tone.axisStrong}
-            strong={currentQuadrant === "grind"}
+            quadrant={QUADRANTS.calm_bearish}
+            isDark={isDark}
+            strong={currentQuadrant === "calm_bearish"}
           />
           <Quadrant
             x={thresholdX}
             y={thresholdY}
             width={PLOT_W / 2}
             height={PAD.top + PLOT_H - thresholdY}
-            fill={isDark ? "#fb7185" : "#c0442f"}
-            label="CRISIS"
-            detail="high vol · deep"
-            tone={isDark ? "#fda4af" : "#c0442f"}
-            strong={currentQuadrant === "crisis"}
+            quadrant={QUADRANTS.volatile_bearish}
+            isDark={isDark}
+            strong={currentQuadrant === "volatile_bearish"}
           />
 
-          {[0, 25, 50, 75, 100].map((tick) => (
-            <g key={`phase-x-${tick}`}>
-              <line
-                x1={x(tick)}
-                x2={x(tick)}
-                y1={PAD.top}
-                y2={PAD.top + PLOT_H}
-                stroke={tone.grid}
-                strokeOpacity={tick === VOL_THRESHOLD ? 0.65 : 0.4}
-                strokeDasharray={tick === VOL_THRESHOLD ? "3 4" : undefined}
-              />
-              <text
-                x={x(tick)}
-                y={HEIGHT - 28}
-                fill={tone.axis}
-                fontSize="9"
-                textAnchor="middle"
-                className="font-mono"
-              >
-                {tick}
-              </text>
-            </g>
-          ))}
-
-          {yTicks.map((tick) => (
-            <g key={`phase-y-${tick}`}>
-              <line
-                x1={PAD.left}
-                x2={PAD.left + PLOT_W}
-                y1={y(tick)}
-                y2={y(tick)}
-                stroke={tone.grid}
-                strokeOpacity={tick === DRAWDOWN_THRESHOLD ? 0.65 : 0.4}
-                strokeDasharray={
-                  tick === DRAWDOWN_THRESHOLD ? "3 4" : undefined
-                }
-              />
-              <text
-                x={PAD.left - 9}
-                y={y(tick) + 3}
-                fill={tone.axis}
-                fontSize="9"
-                textAnchor="end"
-                className="font-mono"
-              >
-                {tick}%
-              </text>
-            </g>
-          ))}
+          <rect
+            x={PAD.left}
+            y={PAD.top}
+            width={PLOT_W}
+            height={PLOT_H}
+            fill="none"
+            stroke={tone.grid}
+          />
+          <line
+            x1={thresholdX}
+            x2={thresholdX}
+            y1={PAD.top}
+            y2={PAD.top + PLOT_H}
+            stroke={tone.axis}
+            strokeOpacity="0.35"
+            strokeDasharray="4 5"
+          />
+          <line
+            x1={PAD.left}
+            x2={PAD.left + PLOT_W}
+            y1={thresholdY}
+            y2={thresholdY}
+            stroke={tone.axis}
+            strokeOpacity="0.35"
+            strokeDasharray="4 5"
+          />
 
           <text
             x={PAD.left + PLOT_W / 2}
@@ -250,7 +359,7 @@ export function PhasePlane({
             textAnchor="middle"
             className="font-mono"
           >
-            1Y VOLATILITY PERCENTILE →
+            CALM → VOLATILE
           </text>
           <text
             x={16}
@@ -261,31 +370,65 @@ export function PhasePlane({
             transform={`rotate(-90 16 ${PAD.top + PLOT_H / 2})`}
             className="font-mono"
           >
-            DRAWDOWN FROM 1Y HIGH ↓
+            SHALLOW → DEEP
           </text>
+
+          {traceSegments.map((segment, index) => (
+            <g key={`phase-trace-${index}`}>
+              <path
+                d={pathFromSegment(segment)}
+                fill="none"
+                stroke={traceColor}
+                strokeWidth="7"
+                strokeOpacity="0.34"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#phase-trace-glow)"
+              />
+              <path
+                d={pathFromSegment(segment)}
+                fill="none"
+                stroke={traceColor}
+                strokeWidth="2"
+                strokeOpacity="0.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          ))}
+
+          {tracePoints.length > 1 ? (
+            <circle
+              cx={x(tracePoints[0].vol)}
+              cy={y(tracePoints[0].drawdown)}
+              r="3"
+              fill={traceColor}
+              fillOpacity="0.75"
+            />
+          ) : null}
 
           {hasPoint ? (
             <g>
               <circle
-                cx={x(vol)}
-                cy={y(drawdown)}
+                cx={x(currentVol)}
+                cy={y(currentDrawdown)}
                 r="28"
                 fill="url(#phase-marker-glow)"
               />
               <circle
-                cx={x(vol)}
-                cy={y(drawdown)}
+                cx={x(currentVol)}
+                cy={y(currentDrawdown)}
                 r="5.5"
                 fill={markerColor}
                 stroke={isDark ? "#020204" : "#f1ebe2"}
                 strokeWidth="2"
               />
               <text
-                x={x(vol) + (vol > 80 ? -10 : 10)}
-                y={y(drawdown) - 10}
+                x={x(currentVol) + (currentVol > 80 ? -10 : 10)}
+                y={y(currentDrawdown) - 10}
                 fill={markerColor}
                 fontSize="9"
-                textAnchor={vol > 80 ? "end" : "start"}
+                textAnchor={currentVol > 80 ? "end" : "start"}
                 className="font-mono"
               >
                 {formatDate(asOf)}
@@ -300,54 +443,58 @@ export function PhasePlane({
               textAnchor="middle"
               className="font-mono"
             >
-              No serialized phase features for this date
+              Move across the chart to load the cycle path
             </text>
           )}
         </svg>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-t border-black/5 px-4 py-3 dark:border-white/5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 border-t border-black/5 px-4 py-3 dark:border-white/5 sm:grid-cols-3">
         <div>
           <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
-            Vol
+            Current
           </p>
-          <p className="mt-0.5 font-mono text-meta text-[#14121a] dark:text-[#f2ede4]">
-            {hasPoint ? `${Math.round(vol)}th pct` : "—"}
+          <p
+            className="mt-0.5 font-mono text-meta uppercase"
+            style={{ color: markerColor }}
+          >
+            {currentQuadrant
+              ? QUADRANTS[currentQuadrant].label
+              : "Awaiting trace"}
           </p>
         </div>
         <div>
           <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
-            Drawdown
-          </p>
-          <p className="mt-0.5 font-mono text-meta text-[#14121a] dark:text-[#f2ede4]">
-            {hasPoint ? formatPercent(drawdown, 1) : "—"}
-          </p>
-        </div>
-        <div>
-          <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
-            Bravos
+            Core Index
           </p>
           <p
             className="mt-0.5 font-mono text-meta"
-            style={{ color: markerColor }}
+            style={{ color: toneForIndex.color }}
           >
-            {formatSigned(point?.bravos_score)}
+            {current?.core_index == null
+              ? "—"
+              : current.core_index > 0
+                ? `+${Number(current.core_index).toFixed(1)}`
+                : Number(current.core_index).toFixed(1)}
           </p>
         </div>
         <div>
           <p className="text-micro uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
-            Quadrant
+            Trace
           </p>
-          <p className="mt-0.5 font-mono text-meta uppercase text-[#14121a] dark:text-[#f2ede4]">
-            {currentQuadrant ?? "—"}
+          <p className="mt-0.5 font-mono text-meta text-[#14121a] dark:text-[#f2ede4]">
+            {tracePoints.length > 0
+              ? `${tracePoints.length} days`
+              : trace.status === "error"
+                ? "Unavailable"
+                : "Loading…"}
           </p>
         </div>
       </div>
 
       <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/40 dark:border-white/5 dark:text-white/40">
-        The 2×2 grid uses a 50th percentile volatility threshold and a −10%
-        drawdown threshold. Quadrants are descriptive, not trading signals.
-        Gold, bond and Bitcoin points use the same serialized target features.
+        Hover the main chart to redraw the glowing 90-day trail. The four
+        quadrants describe the market mood; they are not buy or sell signals.
       </p>
     </section>
   );

@@ -67,9 +67,9 @@ export function formatSigned(value, digits = 1) {
   return number >= 0 ? `+${formatted}` : formatted;
 }
 
-export const BRAVOS_BUCKETS = {
+export const CORE_INDEX_BUCKETS = {
   strong_bullish: {
-    label: "Strong bullish",
+    label: "Strong Growth",
     description: "+25 to +50",
     dark: "#34d399",
     light: "#0f766e",
@@ -77,7 +77,7 @@ export const BRAVOS_BUCKETS = {
     lightSoft: "rgba(15, 118, 110, 0.12)",
   },
   calm_bullish: {
-    label: "Calm bullish",
+    label: "Calm Bullish",
     description: "0 to +24",
     dark: "#d8b47a",
     light: "#8a6a3a",
@@ -85,7 +85,7 @@ export const BRAVOS_BUCKETS = {
     lightSoft: "rgba(138, 106, 58, 0.12)",
   },
   bearish_warning: {
-    label: "Bearish warning",
+    label: "Caution",
     description: "-1 to -24",
     dark: "#fb923c",
     light: "#b45309",
@@ -93,7 +93,7 @@ export const BRAVOS_BUCKETS = {
     lightSoft: "rgba(180, 83, 9, 0.12)",
   },
   extreme_bearish: {
-    label: "Extreme bearish",
+    label: "Extreme Danger",
     description: "-25 to -50",
     dark: "#fb7185",
     light: "#c0442f",
@@ -102,19 +102,19 @@ export const BRAVOS_BUCKETS = {
   },
 };
 
-export function bravosMeta(bucket) {
-  return BRAVOS_BUCKETS[bucket] ?? null;
+export function coreIndexMeta(bucket) {
+  return CORE_INDEX_BUCKETS[bucket] ?? null;
 }
 
-export function bravosLabel(bucket) {
-  return BRAVOS_BUCKETS[bucket]?.label ?? "No composite";
+export function coreIndexLabel(bucket) {
+  return CORE_INDEX_BUCKETS[bucket]?.label ?? "No score";
 }
 
-export function bravosTone(bucket, isDark) {
-  const meta = BRAVOS_BUCKETS[bucket];
+export function coreIndexTone(bucket, isDark) {
+  const meta = CORE_INDEX_BUCKETS[bucket];
   if (!meta) {
     return {
-      label: "No composite",
+      label: "No score",
       color: isDark ? "rgba(242,237,228,0.55)" : "rgba(20,18,26,0.55)",
       soft: isDark
         ? "rgba(242,237,228,0.06)"
@@ -194,8 +194,8 @@ export function decadeTicks(startMs, endMs, step = 25) {
 
 export function getChartTone(isDark) {
   return {
-    equity: isDark ? "#d8b47a" : "#8a6a3a",
-    equitySoft: isDark ? "rgba(216,180,122,0.18)" : "rgba(138,106,58,0.14)",
+    equity: isDark ? "#67e8f9" : "#0e7490",
+    equitySoft: isDark ? "rgba(103,232,249,0.20)" : "rgba(14,116,144,0.14)",
     strength: isDark ? "#5eead4" : "#0f766e",
     strengthSoft: isDark ? "rgba(94,234,212,0.22)" : "rgba(15,118,110,0.16)",
     grid: isDark ? "rgba(255,255,255,0.075)" : "rgba(20,18,26,0.075)",

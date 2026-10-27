@@ -19,7 +19,7 @@ import {
   getAssetTarget,
 } from "@/components/regime/assetTargets";
 import {
-  bravosTone,
+  coreIndexTone,
   formatDate,
   formatPercent,
   formatSigned,
@@ -79,7 +79,7 @@ function buildCrashMetrics(timeline, crashes) {
         ? (trough / peak - 1) * 100
         : null;
     const scores = points
-      .map((point) => Number(point.bravos_score))
+      .map((point) => Number(point.core_index))
       .filter((value) => Number.isFinite(value));
     return {
       id: crash.id,
@@ -205,7 +205,7 @@ function createRecessionBandsPrimitive(bands, initialSelectedId) {
   return primitive;
 }
 
-function createBravosHistogramPrimitive(points, isDark) {
+function createCoreIndexHistogramPrimitive(points, isDark) {
   const renderer = {
     draw: (target) => {
       target.useMediaCoordinateSpace(({ context, mediaSize }) => {
@@ -304,11 +304,12 @@ export function RegimeTimeline({
   resolution,
   assetKey = "sp500",
   onAssetChange,
-  forecast,
   compareAssets = false,
   onCompareToggle,
+  onHoverPoint,
 }) {
   const containerRef = useRef(null);
+  const onHoverPointRef = useRef(onHoverPoint);
   const chartRef = useRef(null);
   const primitiveRef = useRef(null);
   const selectedIdRef = useRef(selectedId);
@@ -320,6 +321,10 @@ export function RegimeTimeline({
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  useEffect(() => {
+    onHoverPointRef.current = onHoverPoint;
+  }, [onHoverPoint]);
 
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
   const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
@@ -357,18 +362,18 @@ export function RegimeTimeline({
     [crashMetrics, hoveredCrashId],
   );
 
-  const bravosData = useMemo(
+  const coreIndexData = useMemo(
     () =>
       timeline
         .filter(
         (point) =>
-          point.bravos_score != null &&
-          Number.isFinite(Number(point.bravos_score)),
+          point.core_index != null &&
+          Number.isFinite(Number(point.core_index)),
       )
         .map((point) => ({
           time: point.date,
-          value: Number(point.bravos_score),
-          color: bravosTone(point.bravos_bucket, isDark).color,
+          value: Number(point.core_index),
+          color: coreIndexTone(point.core_index_bucket, isDark).color,
         })),
     [timeline, isDark],
   );
@@ -377,8 +382,8 @@ export function RegimeTimeline({
     () =>
       timeline.find(
         (point) =>
-          point.bravos_score != null &&
-          Number.isFinite(Number(point.bravos_score)),
+          point.core_index != null &&
+          Number.isFinite(Number(point.core_index)),
       )?.date ?? timeline[0]?.date,
     [timeline],
   );
@@ -535,11 +540,11 @@ export function RegimeTimeline({
     );
     pane?.attachPrimitive(primitive);
     primitiveRef.current = primitive;
-    const bravosPrimitive = createBravosHistogramPrimitive(
-      bravosData,
+    const coreIndexPrimitive = createCoreIndexHistogramPrimitive(
+      coreIndexData,
       isDark,
     );
-    pane?.attachPrimitive(bravosPrimitive);
+    pane?.attachPrimitive(coreIndexPrimitive);
 
     const pointsByTime = new Map(
       timeline.map((point) => [point.date, point]),
@@ -555,15 +560,16 @@ export function RegimeTimeline({
 
     const handleCrosshair = (param) => {
       if (!param?.time) {
-        setHoveredPoint(null);
         setHoveredCrashId(null);
         return;
       }
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
       const crash = crashForTime(key);
-      setHoveredPoint(pointsByTime.get(key) ?? null);
+      const point = pointsByTime.get(key) ?? null;
+      setHoveredPoint(point);
       setHoveredCrashId(crash?.id ?? null);
+      onHoverPointRef.current?.(point);
     };
 
     const handleClick = (param) => {
@@ -589,7 +595,7 @@ export function RegimeTimeline({
       if (primitiveRef.current === primitive) primitiveRef.current = null;
       try {
         pane?.detachPrimitive(primitive);
-        pane?.detachPrimitive(bravosPrimitive);
+        pane?.detachPrimitive(coreIndexPrimitive);
       } catch {
         // The chart may already have torn down the primitives.
       }
@@ -599,7 +605,7 @@ export function RegimeTimeline({
   }, [
     assetKey,
     bands,
-    bravosData,
+    coreIndexData,
     compareAssets,
     crashes,
     isDark,
@@ -638,13 +644,13 @@ export function RegimeTimeline({
       className="relative ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] mt-4 w-screen scroll-mt-24"
     >
       <h2 id="regime-timeline-title" className="sr-only">
-        Unified Bravos macro and multi-asset regime chart
+        Unified Core Index macro and multi-asset regime chart
       </h2>
       <p className="sr-only">
         One percentage-scaled chart of the S&amp;P 500, London gold and Treasury
-        bonds with NBER recession shading. A colour-coded Bravos histogram from
+        bonds with NBER recession shading. A colour-coded Core Index histogram from
         -50 to +50 sits in the lower quarter of the same chart. Hover a red NBER
-        band for the crash name, peak-to-trough drawdown and Bravos score; click
+        band for the crash name, peak-to-trough drawdown and Core Index score; click
         it to zoom to the event.
       </p>
 
@@ -654,10 +660,8 @@ export function RegimeTimeline({
           isDark={isDark}
           resolution={resolution}
           activeCrash={selectedCrash}
-          asset={asset}
           assetKey={asset.key}
           onAssetChange={onAssetChange}
-          forecast={forecast}
           compareAssets={compareAssets}
           onCompareToggle={onCompareToggle}
         />
@@ -670,11 +674,7 @@ export function RegimeTimeline({
           className="absolute inset-0"
         />
 
-        <ChartCrosshairLegend
-          point={displayPoint}
-          asset={asset}
-          compareAssets={compareAssets}
-        />
+        <ChartCrosshairLegend point={displayPoint} asset={asset} />
 
         {hoveredMetric ? (
           <div
@@ -693,7 +693,7 @@ export function RegimeTimeline({
             <span className="mx-2 text-white/25">|</span>
             <span
               style={{
-                color: bravosTone(
+                color: coreIndexTone(
                   hoveredMetric.score == null
                     ? null
                     : hoveredMetric.score >= 25
@@ -723,7 +723,7 @@ export function RegimeTimeline({
           style={{ bottom: Math.max(12, timeScaleHeight - 8) }}
         >
           <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-black/35 dark:text-white/35">
-            Bravos
+            Core Index
           </span>
           <span>−50</span>
           <span className="text-black/20 dark:text-white/20">/</span>
@@ -746,13 +746,13 @@ export function RegimeTimeline({
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
-              strong
+              growth
               <span className="h-1.5 w-1.5 rounded-full bg-[#d8b47a]" />
               calm
               <span className="h-1.5 w-1.5 rounded-full bg-[#fb923c]" />
-              warning
+              caution
               <span className="h-1.5 w-1.5 rounded-full bg-[#fb7185]" />
-              extreme
+              danger
             </span>
           </div>
 

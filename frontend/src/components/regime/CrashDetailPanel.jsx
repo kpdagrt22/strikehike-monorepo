@@ -9,7 +9,6 @@ import {
   addMonthsIso,
   formatDate,
   formatNumber,
-  formatPercent,
   formatSigned,
 } from "@/components/regime/regimeUtils";
 
@@ -27,19 +26,16 @@ function Metric({ label, value }) {
 }
 
 function PreCrashCard({ label, data }) {
-  const inversion = data?.curve_inverted;
-  const curveLabel =
-    inversion == null
-      ? "No curve data"
-      : inversion
-        ? "Inverted"
-        : "Positive";
-  const curveClass =
-    inversion == null
-      ? "border-black/5 text-black/45 dark:border-white/5 dark:text-white/45"
-      : inversion
-        ? "border-[#ef4444]/30 text-[#c0442f] dark:text-[#ff8b77]"
-        : "border-[#0f766e]/25 text-[#0f766e] dark:text-[#5eead4]";
+  const phase = data?.phase
+    ? `${data.phase[0].toUpperCase()}${data.phase.slice(1)}`
+    : "—";
+  const coreIndex = data?.core_index;
+  const tone =
+    coreIndex == null
+      ? "text-black/45 dark:text-white/45"
+      : coreIndex >= 0
+        ? "text-[#0f766e] dark:text-[#5eead4]"
+        : "text-[#c0442f] dark:text-[#ff8b77]";
 
   return (
     <div className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.03]">
@@ -53,30 +49,28 @@ function PreCrashCard({ label, data }) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <Metric label="Fed Funds" value={formatPercent(data?.fed_funds)} />
-        <Metric label="10y–2y" value={formatPercent(data?.t10y2y)} />
+        <Metric label="Core Index" value={formatSigned(coreIndex)} />
+        <Metric
+          label="Market level"
+          value={formatNumber(data?.sp500_proxy, 2)}
+        />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-micro ${curveClass}`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {curveLabel}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3 text-micro dark:border-white/5">
+        <span className="text-black/40 dark:text-white/40">
+          Market was in {phase.toLowerCase()}
         </span>
-        <span className="font-mono text-micro text-black/45 dark:text-white/45">
-          Bravos {formatSigned(data?.bravos_score)}
+        <span className={`font-mono ${tone}`}>
+          {coreIndex == null
+            ? "No score"
+            : coreIndex >= 25
+              ? "Strong Growth"
+              : coreIndex >= 0
+                ? "Calm Bullish"
+                : coreIndex > -25
+                  ? "Caution"
+                  : "Extreme Danger"}
         </span>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3 text-micro text-black/40 dark:border-white/5 dark:text-white/40">
-        <span>
-          Equity proxy{" "}
-          {data?.sp500_proxy != null
-            ? formatNumber(data.sp500_proxy, 2)
-            : "—"}
-        </span>
-        <span>Phase {data?.phase ?? "—"}</span>
       </div>
     </div>
   );
@@ -273,8 +267,8 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
 
         <p className="mt-4 text-micro leading-relaxed text-black/40 dark:text-white/40">
           The peak month is the NBER peak; USREC shading begins the following
-          month. Pre-crash values are the last observation on or before the
-          3-month and 6-month dates. The sky strip is a historical ephemeris
+          month. The two cards show the Core Index and market level three and
+          six months before the peak. The sky strip is a historical ephemeris
           footnote, not an economic input.
         </p>
       </div>

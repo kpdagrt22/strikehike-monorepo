@@ -91,12 +91,12 @@ def get_regime_runs(
 @router.get(
     "/crypto-milestones",
     response_model=CryptoMilestonesResponse,
-    summary="Editorial crypto event windows enriched with Bravos and asset returns",
+    summary="Editorial crypto event windows enriched with Core Index and asset returns",
     description=(
         "Returns the curated Bitcoin/crypto milestone windows (Genesis, Mt. Gox, "
         "ICO peak, Crypto Winter, COVID, Terra-LUNA and the spot ETF peak), "
         "each joined to peak-to-trough statistics for the S&P proxy, gold, "
-        "Treasuries and Bitcoin plus the corresponding Bravos readings. The "
+        "Treasuries and Bitcoin plus the corresponding Core Index readings. The "
         "Convergence tab uses these windows for side-by-side comparison."
     ),
 )

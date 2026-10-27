@@ -19,7 +19,7 @@ export function SiteHeader() {
           className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-black/10 shadow-[0_0_14px_rgba(216,180,122,0.2)] sm:h-6 sm:w-6 dark:ring-white/10"
         />
 
-        <span className="flex items-baseline">
+        <span className="hidden items-baseline min-[430px]:flex">
           <span className="text-[11px] font-semibold tracking-[-0.03em] sm:text-strong">
             strikehike
           </span>

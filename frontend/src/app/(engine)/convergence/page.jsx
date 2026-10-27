@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { AstroLens } from "@/components/regime/AstroLens";
 import { ConvergenceMiniChart } from "@/components/regime/ConvergenceMiniChart";
+import { OnboardingModal } from "@/components/ui/OnboardingModal";
 import {
   CONVERGENCE_ASSET_ORDER,
   ASSET_TARGETS,
@@ -11,7 +12,7 @@ import {
   getAssetTarget,
 } from "@/components/regime/assetTargets";
 import {
-  bravosTone,
+  coreIndexTone,
   formatDate,
   formatNumber,
   formatPercent,
@@ -51,8 +52,8 @@ function StatusBadge({ status }) {
   );
 }
 
-function BravosScale({ peak, trough, isDark }) {
-  const peakTone = bravosTone(
+function CoreIndexScale({ peak, trough, isDark }) {
+  const peakTone = coreIndexTone(
     peak == null
       ? null
       : peak >= 25
@@ -64,7 +65,7 @@ function BravosScale({ peak, trough, isDark }) {
             : "extreme_bearish",
     isDark,
   );
-  const troughTone = bravosTone(
+  const troughTone = coreIndexTone(
     trough == null
       ? null
       : trough >= 25
@@ -95,7 +96,7 @@ function BravosScale({ peak, trough, isDark }) {
               backgroundColor: peakTone.color,
               boxShadow: `0 0 12px ${peakTone.color}88`,
             }}
-            title={`Peak Bravos ${formatSigned(peak)}`}
+            title={`Peak Core Index ${formatSigned(peak)}`}
           />
         ) : null}
         {trough != null ? (
@@ -106,7 +107,7 @@ function BravosScale({ peak, trough, isDark }) {
               backgroundColor: troughTone.color,
               boxShadow: `0 0 10px ${troughTone.color}66`,
             }}
-            title={`Trough Bravos ${formatSigned(trough)}`}
+            title={`Trough Core Index ${formatSigned(trough)}`}
           />
         ) : null}
       </div>
@@ -131,14 +132,14 @@ function EventPanel({
   asset,
   isDark,
 }) {
-  const bravos = event?.bravos ?? {};
+  const coreIndex = event?.core_index ?? {};
   const hasTrough = event?.trough != null;
-  const headlineScore = hasTrough ? bravos.at_trough : bravos.at_peak;
+  const headlineScore = hasTrough ? coreIndex.at_trough : coreIndex.at_peak;
   const headlineBucket = hasTrough
-    ? bravos.at_trough_bucket
-    : bravos.at_peak_bucket;
-  const headlineTone = bravosTone(headlineBucket, isDark);
-  const headlineLabel = hasTrough ? "Bravos at trough" : "Bravos at peak";
+    ? coreIndex.at_trough_bucket
+    : coreIndex.at_peak_bucket;
+  const headlineTone = coreIndexTone(headlineBucket, isDark);
+  const headlineLabel = hasTrough ? "Core Index at trough" : "Core Index at peak";
   const stats = event?.assets?.[assetKey] ?? null;
   const hasAsset = Boolean(stats?.available);
   const accent = assetChartColor(asset, isDark);
@@ -203,9 +204,9 @@ function EventPanel({
             >
               {headlineTone.label}
             </p>
-            <BravosScale
-              peak={bravos.at_peak}
-              trough={bravos.at_trough}
+            <CoreIndexScale
+              peak={coreIndex.at_peak}
+              trough={coreIndex.at_trough}
               isDark={isDark}
             />
             <div className="mt-3 flex items-center justify-between gap-2 border-t border-black/5 pt-2.5 dark:border-white/5">
@@ -213,12 +214,12 @@ function EventPanel({
                 Peak reading
               </span>
               <span className="font-mono text-micro text-black/60 dark:text-white/60">
-                {formatSigned(bravos.at_peak)}
+                {formatSigned(coreIndex.at_peak)}
               </span>
             </div>
             <p className="mt-2 text-[10px] leading-relaxed text-black/35 dark:text-white/35">
-              {formatDate(bravos.at_trough_date ?? bravos.at_peak_date)} event
-              reading · {bravos.observations ?? 0} composite obs in window
+              {formatDate(coreIndex.at_trough_date ?? coreIndex.at_peak_date)} event
+              reading · {coreIndex.observations ?? 0} composite obs in window
             </p>
           </div>
 
@@ -315,11 +316,11 @@ function EventPanel({
 
 function ComparisonRead({ left, right, assetKey, asset, isDark }) {
   const leftScore =
-    left?.trough != null ? left?.bravos?.at_trough : left?.bravos?.at_peak;
+    left?.trough != null ? left?.core_index?.at_trough : left?.core_index?.at_peak;
   const rightScore =
     right?.trough != null
-      ? right?.bravos?.at_trough
-      : right?.bravos?.at_peak;
+      ? right?.core_index?.at_trough
+      : right?.core_index?.at_peak;
   const leftDrawdown = left?.assets?.[assetKey]?.drawdown_pct;
   const rightDrawdown = right?.assets?.[assetKey]?.drawdown_pct;
   const scoreGap =
@@ -330,16 +331,16 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
     leftDrawdown != null && rightDrawdown != null
       ? Math.abs(leftDrawdown - rightDrawdown)
       : null;
-  const leftTone = bravosTone(
+  const leftTone = coreIndexTone(
     left?.trough != null
-      ? left?.bravos?.at_trough_bucket
-      : left?.bravos?.at_peak_bucket,
+      ? left?.core_index?.at_trough_bucket
+      : left?.core_index?.at_peak_bucket,
     isDark,
   );
-  const rightTone = bravosTone(
+  const rightTone = coreIndexTone(
     right?.trough != null
-      ? right?.bravos?.at_trough_bucket
-      : right?.bravos?.at_peak_bucket,
+      ? right?.core_index?.at_trough_bucket
+      : right?.core_index?.at_peak_bucket,
     isDark,
   );
 
@@ -355,7 +356,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
           </h2>
         </div>
         <p className="max-w-xl text-micro leading-relaxed text-black/45 dark:text-white/45">
-          Bravos is a macro composite; the asset columns show how the same
+          Core Index is a macro composite; the asset columns show how the same
           macro state travelled through {asset.label.toLowerCase()}. A high score
           is calm/constructive, not a directional prediction.
         </p>
@@ -364,7 +365,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
       <div className="mt-4 grid gap-2 sm:grid-cols-4">
         <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
           <p className="text-[10px] uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
-            Trough Bravos gap
+            Trough Core Index gap
           </p>
           <p className="mt-1 font-mono text-lg text-[#14121a] dark:text-[#f2ede4]">
             {scoreGap == null ? "—" : `${scoreGap.toFixed(1)} pts`}
@@ -578,7 +579,7 @@ export default function ConvergencePage() {
               Two events. One macro lens.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/55 dark:text-white/55 sm:text-body">
-              Put a crypto crisis next to a macro crash. Compare the Bravos
+              Put a crypto crisis next to a macro crash. Compare the Core Index
               regime, the selected asset tape and the Sun / Moon / Saturn
               ephemeris at each peak. The astro layer is a historical lens, not
               a forecast.
@@ -741,7 +742,7 @@ export default function ConvergencePage() {
               <div className="mt-4 grid gap-4 text-meta leading-relaxed text-black/55 dark:text-white/55 sm:grid-cols-2">
                 <p>
                   Event windows are hand-curated comparison windows, not
-                  statistically detected crash dates. Bravos is the same
+                  statistically detected crash dates. Core Index is the same
                   macro / volatility / momentum composite used on the Regime
                   tab; it is not a crypto-specific score.
                 </p>
@@ -760,7 +761,21 @@ export default function ConvergencePage() {
             </details>
           </>
         ) : null}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(
+                new Event("strikehike:show-onboarding"),
+              )
+            }
+            className="text-micro text-black/45 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] dark:text-white/45 dark:decoration-white/20 dark:hover:text-[#ff8b77]"
+          >
+            How it works
+          </button>
+        </div>
       </div>
+      <OnboardingModal />
     </main>
   );
 }

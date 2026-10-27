@@ -40,13 +40,13 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
     frame["1y_volatility_percentile"] = 50.0
     frame["volatility_1y"] = 12.0
     frame["drawdown_1y"] = -5.0
-    frame["bravos_score"] = 12.34
-    frame["bravos_composite"] = 62.34
-    frame["bravos_bucket"] = "calm_bullish"
+    frame["core_index"] = 12.34
+    frame["core_index_composite"] = 62.34
+    frame["core_index_bucket"] = "calm_bullish"
     frame["macro_score"] = 55.0
     frame["credit_score"] = 70.0
-    frame["bravos_volatility_score"] = 60.0
-    frame["bravos_momentum_score"] = 50.0
+    frame["core_volatility_score"] = 60.0
+    frame["core_momentum_score"] = 50.0
     frame["hy_oas"] = 3.25
     frame["btc_proxy"] = np.linspace(7000.0, 29000.0, len(index))
     frame["btc_proxy_source"] = "TEST_BTC"
@@ -84,8 +84,8 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
                 }
             ]
         },
-        "bravos": {
-            "version": "bravos-v1",
+        "core_index": {
+            "version": "core-index-v1",
             "weights": {"macro": 0.4, "volatility": 0.3, "momentum": 0.3},
             "latest": {
                 "date": "2020-12-31",
@@ -119,11 +119,11 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert payload["timeline"][0]["proxy_source"] == "TEST"
     assert payload["timeline"][0]["regime_state"] == "favorable"
     assert payload["timeline"][0]["1y_volatility_percentile"] == 50.0
-    assert payload["timeline"][0]["bravos_score"] == 12.34
-    assert payload["timeline"][0]["bravos_bucket"] == "calm_bullish"
+    assert payload["timeline"][0]["core_index"] == 12.34
+    assert payload["timeline"][0]["core_index_bucket"] == "calm_bullish"
     assert payload["timeline"][0]["btc_proxy"] is not None
-    assert payload["meta"]["latest_bravos"]["score"] == 12.34
-    assert payload["meta"]["bravos_version"] == "bravos-v1"
+    assert payload["meta"]["latest_core_index"]["score"] == 12.34
+    assert payload["meta"]["core_index_version"] == "core-index-v1"
 
     monthly = service.macro_history(resolution="monthly")
     assert monthly["resolution"] == "monthly"
@@ -138,7 +138,7 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert crash["pre_crash_indicators"]["3m"]["as_of"] == "2019-11-01"
     assert crash["pre_crash_indicators"]["6m"]["as_of"] == "2019-08-01"
     assert crash["pre_crash_indicators"]["3m"]["fed_funds"] == 2.0
-    assert crash["pre_crash_indicators"]["3m"]["bravos_score"] == 12.34
+    assert crash["pre_crash_indicators"]["3m"]["core_index"] == 12.34
 
 
 def test_regime_runs_returns_transition_matrix_and_durations(tmp_path):
@@ -221,7 +221,7 @@ def test_invalid_ranges_raise_value_error(tmp_path):
         service.regime_runs(start="2030-01-01", end="2030-12-31")
 
 
-def test_crypto_milestones_join_market_stats_and_bravos(tmp_path):
+def test_crypto_milestones_join_market_stats_and_core_index(tmp_path):
     artifact, meta_path = _write_artifact(tmp_path)
     service = MacroRegimeService(
         artifact_path=artifact,
@@ -242,6 +242,6 @@ def test_crypto_milestones_join_market_stats_and_bravos(tmp_path):
     assert covid["assets"]["bitcoin"]["start_value"] > 0
     assert covid["assets"]["bitcoin"]["end_value"] > 0
     assert covid["assets"]["sp500"]["available"] is True
-    assert covid["bravos"]["at_peak"] == 12.34
-    assert covid["bravos"]["at_trough"] == 12.34
-    assert covid["bravos"]["at_peak_bucket"] == "calm_bullish"
+    assert covid["core_index"]["at_peak"] == 12.34
+    assert covid["core_index"]["at_trough"] == 12.34
+    assert covid["core_index"]["at_peak_bucket"] == "calm_bullish"

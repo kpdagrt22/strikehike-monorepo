@@ -127,7 +127,7 @@ export function AstroLens({ asOf, contextLabel, isDark }) {
 
       <p className="mt-3 text-[10px] leading-relaxed text-black/35 dark:text-white/35">
         Lahiri sidereal ephemeris. A historical correspondence lens, not a
-        causal input to the Bravos composite.
+        causal input to the Core Index composite.
       </p>
     </div>
   );

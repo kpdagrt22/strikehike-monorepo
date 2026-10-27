@@ -2,7 +2,7 @@
 
 The dates are deliberately hand-curated. They are event windows for visual
 comparison, not NBER-style or statistically detected crash dates. The service
-enriches them with the latest serialized asset and Bravos history at request
+enriches them with the latest serialized asset and Core Index history at request
 time, while the JSON artifact keeps the editorial definitions stable.
 """
 
@@ -33,7 +33,7 @@ _CRYPTO_MILESTONES: tuple[dict[str, Any], ...] = (
         ),
         "context": (
             "A cypherpunk proof-of-work experiment becomes a live ledger. There "
-            "is no exchange tape, no Bravos equity proxy input and no tradable "
+            "is no exchange tape, no Core Index equity proxy input and no tradable "
             "price at the genesis date."
         ),
         "tags": ["origin", "protocol"],
@@ -175,7 +175,7 @@ def build_crypto_milestones_artifact() -> dict[str, Any]:
         "kind": "editorial",
         "notes": [
             "Event windows are hand-curated comparison windows, not detected crash dates.",
-            "Market statistics and Bravos readings are joined by the live service from the macro artifact.",
+            "Market statistics and Core Index readings are joined by the live service from the macro artifact.",
             "Genesis has no market price; the first Blockchain.com observation is 2010-08-18.",
         ],
         "events": milestone_definitions(),
