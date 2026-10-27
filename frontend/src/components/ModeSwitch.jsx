@@ -13,7 +13,7 @@ function tabClass(active) {
   ].join(" ");
 }
 
-export function ModeSwitch() {
+export function ModeSwitch({ onNavigate }) {
   const pathname = usePathname();
   const focusedDate = useChronoStore((state) => state.focusedDate);
   const isRegime = pathname === "/regime" || pathname?.startsWith("/regime/");
@@ -31,6 +31,7 @@ export function ModeSwitch() {
       <Link
         href={`/${dateQuery}`}
         prefetch={false}
+        onClick={onNavigate}
         aria-current={
           !isRegime && !isConvergence && !isPatterns ? "page" : undefined
         }
@@ -48,6 +49,7 @@ export function ModeSwitch() {
       </Link>
       <Link
         href={`/regime${dateQuery}`}
+        onClick={onNavigate}
         aria-current={isRegime ? "page" : undefined}
         className={tabClass(isRegime)}
       >
@@ -61,6 +63,7 @@ export function ModeSwitch() {
       </Link>
       <Link
         href={`/convergence${dateQuery}`}
+        onClick={onNavigate}
         aria-current={isConvergence ? "page" : undefined}
         className={tabClass(isConvergence)}
       >
@@ -75,6 +78,7 @@ export function ModeSwitch() {
       </Link>
       <Link
         href={`/patterns${dateQuery}`}
+        onClick={onNavigate}
         aria-current={isPatterns ? "page" : undefined}
         className={tabClass(isPatterns)}
       >

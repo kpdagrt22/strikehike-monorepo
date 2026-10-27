@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useChronoStore } from "@/store/chronoStore";
@@ -66,9 +67,11 @@ export function SponsorModule() {
             </div>
 
             <div className="mt-3 flex justify-center rounded-xl border border-black/10 bg-white p-2 dark:border-white/10">
-              <img
+              <Image
                 src="/support-qr-cropped.webp"
                 alt="PhonePe UPI QR code to support StrikeHike"
+                width={359}
+                height={359}
                 className="w-[min(13.5rem,100%)] rounded-lg object-contain"
               />
             </div>
