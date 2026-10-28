@@ -23,7 +23,7 @@ function SelectedDayParallel({ parallels }) {
   const tone = categoryTone(parallel.category);
 
   return (
-    <div className="mt-3 w-full text-center">
+    <div data-hud-part="parallel" className="mt-3 w-full text-center">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={`${parallel.date}-${parallel.name}-${parallel.similarity_percent}`}
@@ -89,7 +89,7 @@ export function EnergyGauge({ isDark = true }) {
   return (
     <div
       data-hud="gauge"
-      className={`pointer-events-none absolute left-1/2 top-[4.5rem] z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:top-6 sm:w-[min(23rem,calc(100vw-2rem))] ${
+      className={`pointer-events-none absolute left-1/2 top-[4.5rem] z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:top-(--sh-header-clear) sm:w-[min(23rem,calc(100vw-2rem))] ${
         mobileSheet ? "max-lg:opacity-0" : ""
       }`}
     >

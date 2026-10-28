@@ -5,8 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT_URL } from "@/lib/contact";
 import { INTENT, reveal } from "@/lib/motion";
 
-// The panel covers the archive, so a hover preview waits a touch longer than
-// the nav's intent delay.
+// The panel covers the alignment panel, so a hover preview waits a touch
+// longer than the nav's intent delay.
 const HOVER_PREVIEW_MS = 150;
 
 export function InfoModule() {
@@ -131,7 +131,7 @@ export function InfoModule() {
     <div
       ref={rootRef}
       id="contact"
-      className="fixed left-3 top-3 z-[60] flex flex-col items-start sm:left-5 sm:top-5"
+      className="fixed right-3 top-3 z-[60] flex flex-col items-end sm:right-5 sm:top-5"
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
       onBlurCapture={handleBlurCapture}
@@ -144,7 +144,7 @@ export function InfoModule() {
         aria-controls="strikehike-info-panel"
         onClick={handleTriggerClick}
         onKeyUp={handleTriggerKeyUp}
-        className="group grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/45 text-black/60 shadow-(--sh-shadow-float) backdrop-blur-2xl transition-[color,border-color,opacity] hover:border-[#f05d49]/40 hover:text-[#c0442f] focus-visible:border-[#f05d49]/40 focus-visible:text-[#c0442f] dark:border-white/10 dark:bg-black/40 dark:text-white/60 dark:hover:border-[#ff8b77]/40 dark:hover:text-[#ff8b77] dark:focus-visible:border-[#ff8b77]/40 dark:focus-visible:text-[#ff8b77]"
+        className="group grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/45 text-black/60 shadow-(--sh-shadow-float) backdrop-blur-2xl transition-[color,border-color] hover:border-[#f05d49]/40 hover:text-[#c0442f] focus-visible:border-[#f05d49]/40 focus-visible:text-[#c0442f] dark:border-white/10 dark:bg-black/40 dark:text-white/60 dark:hover:border-[#ff8b77]/40 dark:hover:text-[#ff8b77] dark:focus-visible:border-[#ff8b77]/40 dark:focus-visible:text-[#ff8b77]"
       >
         <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
           <circle
@@ -176,7 +176,7 @@ export function InfoModule() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-left overflow-hidden rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4]"
+            className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-right overflow-hidden rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4]"
           >
             <div className="flex items-start justify-between gap-4">
               <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">

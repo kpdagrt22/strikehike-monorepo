@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -18,18 +18,78 @@ import {
   getAssetTarget,
 } from "@/components/regime/assetTargets";
 import {
+  CORE_INDEX_BUCKETS,
+  bucketEnvelope,
+  chartTimeToIso,
+  clamp,
   coreIndexTone,
+  formatChartTick,
   formatDate,
   formatNumber,
   formatPercent,
   formatSigned,
   getChartTone,
+  indexAxisLevels,
+  monotoneCurveAt,
+  monotoneTangents,
+  refineLevelOfDetail,
+  selectLevelOfDetail,
+  steadyBucketWidth,
+  steadyTolerance,
+  traceMonotoneCurve,
+  traceQuadraticBSpline,
 } from "@/components/regime/regimeUtils";
 
 // Keyboard slider steps over chart points: ±1 week, ±52 weeks (about a year).
 const PAGE_STEP = 52;
 const FOCUS_RING_INSET =
   "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
+// Level of detail for the drawn price lines: about one point per 2-3 px at
+// rest (3-4 px on panes under 640 px, where 12 years share about 330 px) and
+// every week once weeks are 2 px or more apart. No weekly close is further
+// than the tolerance from the drawn line, and a peak or trough that is the
+// extreme within LOD_REACH buckets either side, or of an NBER window, is
+// always drawn exactly.
+const LOD_TARGET_PX = 2;
+const LOD_TOLERANCE_PX = 6;
+const LOD_NARROW_PANE_PX = 640;
+const LOD_NARROW_TARGET_PX = 3;
+const LOD_NARROW_TOLERANCE_PX = 8;
+const LOD_REACH = 6;
+const LOD_CACHE_SIZE = 8;
+// The Core Index ribbon at rest: the weekly range taken from zero, over
+// buckets √2 narrower than the price line's (about 1.4-2 px; they follow its
+// width, so a zoom reselects both together), each held RIBBON_BACK buckets
+// after it and shown at most RIBBON_AHEAD bucket before it. Its two outer
+// edges carry the stroke, which fades out within RIBBON_EDGE_FADE points of
+// zero. Weekly from 2 px per week.
+const RIBBON_BACK = 3;
+const RIBBON_AHEAD = 1;
+const RIBBON_EDGE_FADE = 6;
+// One price-axis width (the widest round label fits), so the plot never
+// changes width while zooming, scrubbing or switching assets.
+const PRICE_AXIS_WIDTH = 64;
+const AXIS_LABEL_LIMIT = 10;
+const AXIS_LABEL_GAP = 60;
+const AXIS_LABEL_X = 8;
+const CHART_FONT = '"Onest", ui-sans-serif, system-ui, sans-serif';
+const CHART_FONT_SIZE = 11;
+// The time axis is 28 px tall with an 11 px font (measured; read again once
+// the chart is up).
+const TIME_AXIS_HEIGHT = 28;
+// The Core Index ribbon fills the lower quarter of the pane; the price scale
+// keeps its bottom 32 % free for it (scaleMargins.bottom).
+const RIBBON_TOP = 0.71;
+const RIBBON_HEIGHT = 0.26;
+const RIBBON_BANDS = [
+  "strong_bullish",
+  "calm_bullish",
+  "bearish_warning",
+  "extreme_bearish",
+];
+// The ribbon's fill alpha at 0, ±25 and ±50: quiet at the neutral line and
+// fuller towards the extremes, so the shape's outer edge reads first.
+const RIBBON_FILL_ALPHA = { dark: [0.05, 0.14, 0.26], light: [0.06, 0.16, 0.28] };
 
 function withAlpha(hex, alpha) {
   const value = Number.parseInt(String(hex).replace("#", ""), 16);
@@ -147,6 +207,8 @@ function applyCrashZoom(chart, crash) {
 }
 
 // The resting frame: the latest 30 years (12 on phones), up to the last week.
+// Bar spacing and right offset are set outright, in one frame: no glide
+// (scrollToRealTime animates, ignores reduced motion and stops short).
 function applyOverview(chart, container) {
   if (!chart) return;
   const viewportWidth = container?.clientWidth || 1200;
@@ -155,7 +217,6 @@ function applyOverview(chart, container) {
     barSpacing: Math.max(0.02, viewportWidth / (52 * targetYears)),
     rightOffset: 1,
   });
-  chart.timeScale().scrollToRealTime();
 }
 
 // The snapshot card sits at the chart's top left (about 28-272 px). Once the
@@ -266,86 +327,605 @@ function createRecessionBandsPrimitive(bands, initialSelectedId) {
   return primitive;
 }
 
-function createCoreIndexHistogramPrimitive(points, isDark) {
+function rememberSelection(cache, key, compute) {
+  let value = cache.get(key);
+  if (value === undefined) {
+    value = compute();
+    cache.set(key, value);
+    if (cache.size > LOD_CACHE_SIZE) cache.delete(cache.keys().next().value);
+  }
+  return value;
+}
+
+// Each point's logical index on the chart's time scale (the union of every
+// drawn series' weeks), or null before the data is in.
+function chartPositions(timeScale, points) {
+  const positions = new Float64Array(points.length);
+  for (let index = 0; index < points.length; index += 1) {
+    const logical = timeScale.timeToIndex(points[index].time, false);
+    if (logical == null) return null;
+    positions[index] = logical;
+  }
+  return positions;
+}
+
+// Logical position → x (CSS px). The time scale is linear in the logical
+// index, but logicalToCoordinate answers 0 for a fractional index, so map
+// from two integer anchors instead (bucket means are fractional).
+function logicalToX(timeScale, near) {
+  const anchor = Math.round(near);
+  const x0 = timeScale.logicalToCoordinate(anchor);
+  const x1 = timeScale.logicalToCoordinate(anchor + 1);
+  if (x0 == null || x1 == null) return null;
+  const spacing = x1 - x0;
+  return (logical) => x0 + (logical - anchor) * spacing;
+}
+
+// Entries start..end (inclusive) of an ascending list to draw for logical
+// positions from..to, with one entry beyond each edge so lines reach them.
+function visibleSpan(count, positionAt, from, to) {
+  let low = 0;
+  let high = count;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (positionAt(middle) < from) low = middle + 1;
+    else high = middle;
+  }
+  const start = Math.max(0, low - 1);
+  high = count;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (positionAt(middle) <= to) low = middle + 1;
+    else high = middle;
+  }
+  return [start, Math.min(count - 1, low)];
+}
+
+function curveThrough(count, xAt, yAt) {
+  const size = Math.max(0, count);
+  const xs = new Float64Array(size);
+  const ys = new Float64Array(size);
+  for (let k = 0; k < size; k += 1) {
+    xs[k] = xAt(k);
+    ys[k] = yAt(k);
+  }
+  return { xs, ys, tangents: monotoneTangents(xs, ys, size), count: size };
+}
+
+function strokeCurve(context, curve, color, width) {
+  if (!curve || curve.count < 2) return;
+  context.beginPath();
+  traceMonotoneCurve(context, curve.xs, curve.ys, curve.tangents, 0, curve.count - 1);
+  context.strokeStyle = color;
+  context.lineWidth = width;
+  context.stroke();
+}
+
+// A vertical gradient in the four Core Index band tones (+50…+25, +25…0,
+// 0…−25, −25…−50) that changes exactly at the band edges.
+function bandGradient(context, zeroY, half, isDark, alpha) {
+  const gradient = context.createLinearGradient(0, zeroY - half, 0, zeroY + half);
+  const edge = 0.125 / Math.max(1, half);
+  RIBBON_BANDS.forEach((bucket, index) => {
+    const meta = CORE_INDEX_BUCKETS[bucket];
+    const color = withAlpha(isDark ? meta.dark : meta.light, alpha);
+    gradient.addColorStop(index === 0 ? 0 : index / 4 + edge, color);
+    gradient.addColorStop(index === 3 ? 1 : (index + 1) / 4 - edge, color);
+  });
+  return gradient;
+}
+
+// The ribbon's fill: the same band tones, quiet at the zero line and fuller
+// towards ±50 (RIBBON_FILL_ALPHA), so the extremes read first.
+function rampGradient(context, zeroY, half, isDark) {
+  const [atZero, atQuarter, atEdge] = isDark
+    ? RIBBON_FILL_ALPHA.dark
+    : RIBBON_FILL_ALPHA.light;
+  const tone = (bucket) => {
+    const meta = CORE_INDEX_BUCKETS[bucket];
+    return isDark ? meta.dark : meta.light;
+  };
+  const gradient = context.createLinearGradient(0, zeroY - half, 0, zeroY + half);
+  const edge = 0.125 / Math.max(1, half);
+  const stops = [
+    [0, "strong_bullish", atEdge],
+    [0.25 - edge, "strong_bullish", atQuarter],
+    [0.25 + edge, "calm_bullish", atQuarter],
+    [0.5 - edge, "calm_bullish", atZero],
+    [0.5 + edge, "bearish_warning", atZero],
+    [0.75 - edge, "bearish_warning", atQuarter],
+    [0.75 + edge, "extreme_bearish", atQuarter],
+    [1, "extreme_bearish", atEdge],
+  ];
+  for (const [offset, bucket, alpha] of stops) {
+    gradient.addColorStop(offset, withAlpha(tone(bucket), alpha));
+  }
+  return gradient;
+}
+
+// The ribbon edges' ink: the band tones of bandGradient, fading out within
+// RIBBON_EDGE_FADE points of zero, so an edge that lies on the zero line (no
+// reading on that side) draws nothing over it.
+function edgeGradient(context, zeroY, half, isDark) {
+  const tone = (bucket, alpha) => {
+    const meta = CORE_INDEX_BUCKETS[bucket];
+    return withAlpha(isDark ? meta.dark : meta.light, alpha);
+  };
+  const gradient = context.createLinearGradient(0, zeroY - half, 0, zeroY + half);
+  const edge = 0.125 / Math.max(1, half);
+  const fade = RIBBON_EDGE_FADE / 100;
+  const stops = [
+    [0, "strong_bullish", 0.9],
+    [0.25 - edge, "strong_bullish", 0.9],
+    [0.25 + edge, "calm_bullish", 0.9],
+    [0.5 - fade, "calm_bullish", 0.9],
+    [0.5, "calm_bullish", 0],
+    [0.5, "bearish_warning", 0],
+    [0.5 + fade, "bearish_warning", 0.9],
+    [0.75 - edge, "bearish_warning", 0.9],
+    [0.75 + edge, "extreme_bearish", 0.9],
+    [1, "extreme_bearish", 0.9],
+  ];
+  for (const [offset, bucket, alpha] of stops) {
+    gradient.addColorStop(offset, tone(bucket, alpha));
+  }
+  return gradient;
+}
+
+// The lowest and the highest point of each window (NBER recessions), as
+// sorted indices into `points`.
+function windowExtremes(points, windows) {
+  const picks = new Set();
+  for (const span of windows ?? []) {
+    let low = -1;
+    let high = -1;
+    for (
+      let index = lowerBoundByTime(points, span.start);
+      index < points.length && points[index].time <= span.end;
+      index += 1
+    ) {
+      if (low < 0 || points[index].value < points[low].value) low = index;
+      if (high < 0 || points[index].value > points[high].value) high = index;
+    }
+    if (low >= 0) picks.add(low);
+    if (high >= 0) picks.add(high);
+  }
+  return Int32Array.from(picks).sort();
+}
+
+// One asset line, drawn by a primitive at its level of detail: about one
+// point per 2-3 px at rest, every week once weeks are 2 px or more apart (a
+// crash zoom). Points join as a monotone curve, which never overshoots a peak
+// or a trough. The hidden full-resolution series it is attached to keeps
+// driving the crosshair, the readouts and the autoscale.
+function createLevelOfDetailLinePrimitive(points, { color, lineWidth, glowColor, windows }) {
+  const levels = Float64Array.from(points, (point) => Math.log10(point.value));
+  const every = Int32Array.from(points, (_, index) => index);
+  // Each NBER window's trough and peak are always drawn, at any zoom.
+  const keep = windowExtremes(points, windows);
+  const selections = new Map();
+  let positions = null;
+  let path = null;
+  let pathKey = "";
+  // The level of detail in use; it holds through small zoom steps.
+  let width = 0;
+  let tolerance = 0;
+
+  // Recomputed only when the visible range, the pane size or the price scale
+  // changes (at most once per chart frame), never on a pointer move.
+  const ensurePath = (mediaSize) => {
+    const { chart, series } = primitive;
+    if (!chart || !series || points.length === 0) return null;
+    const timeScale = chart.timeScale();
+    const range = timeScale.getVisibleLogicalRange();
+    const y100 = series.priceToCoordinate(100);
+    const y1000 = series.priceToCoordinate(1000);
+    if (!range || y100 == null || y1000 == null || y100 === y1000) return null;
+    const key = `${range.from}|${range.to}|${mediaSize.width}|${mediaSize.height}|${y100}|${y1000}`;
+    if (key === pathKey) return path;
+    positions ??= chartPositions(timeScale, points);
+    const toX = logicalToX(timeScale, range.from);
+    if (!positions || !toX) return null;
+    const narrow = mediaSize.width < LOD_NARROW_PANE_PX;
+    width = steadyBucketWidth(
+      width,
+      mediaSize.width / Math.max(1e-6, range.to - range.from),
+      narrow ? LOD_NARROW_TARGET_PX : LOD_TARGET_PX,
+    );
+    // The tolerance in log10 units for the current px per decade.
+    tolerance = steadyTolerance(
+      tolerance,
+      (narrow ? LOD_NARROW_TOLERANCE_PX : LOD_TOLERANCE_PX) / Math.abs(y100 - y1000),
+    );
+    const selection =
+      width === 1
+        ? every
+        : rememberSelection(selections, `${width}|${tolerance}`, () =>
+            refineLevelOfDetail(
+              selectLevelOfDetail(positions, levels, width, LOD_REACH, keep),
+              positions,
+              levels,
+              tolerance,
+            ),
+          );
+    const [start, end] = visibleSpan(
+      selection.length,
+      (k) => positions[selection[k]],
+      range.from - width,
+      range.to + width,
+    );
+    path = curveThrough(
+      end - start + 1,
+      (k) => toX(positions[selection[start + k]]),
+      (k) => series.priceToCoordinate(points[selection[start + k]].value),
+    );
+    pathKey = key;
+    return path;
+  };
+
   const renderer = {
     draw: (target) => {
       target.useMediaCoordinateSpace(({ context, mediaSize }) => {
-        const timeScale = primitive.chart?.timeScale();
-        if (!timeScale || !Array.isArray(points) || points.length === 0) {
-          return;
-        }
-        const top = mediaSize.height * 0.71;
-        const plotHeight = mediaSize.height * 0.26;
-        const zeroY = top + plotHeight / 2;
-        const half = plotHeight / 2;
-        const barWidth = Math.max(
-          1,
-          Math.min(3, (timeScale.options()?.barSpacing ?? 1) * 0.55),
-        );
-
-        for (const point of points) {
-          if (!Number.isFinite(Number(point.value))) continue;
-          const x = timeScale.timeToCoordinate(point.time);
-          if (x == null) continue;
-          const value = Math.max(-50, Math.min(50, Number(point.value)));
-          const y = zeroY - (value / 50) * half;
-          const height = Math.max(1, Math.abs(zeroY - y));
-          context.fillStyle = point.color;
-          context.fillRect(
-            x - barWidth / 2,
-            Math.min(y, zeroY),
-            barWidth,
-            height,
-          );
-        }
-
-        const line = isDark
-          ? "rgba(242, 237, 228, 0.28)"
-          : "rgba(20, 18, 26, 0.24)";
-        context.strokeStyle = line;
-        context.lineWidth = 1;
-        context.beginPath();
-        context.moveTo(0, zeroY);
-        context.lineTo(mediaSize.width, zeroY);
-        context.stroke();
-        context.strokeStyle = isDark
-          ? "rgba(242, 237, 228, 0.10)"
-          : "rgba(20, 18, 26, 0.08)";
-        context.setLineDash([3, 4]);
-        for (const value of [-25, 25]) {
-          const y = zeroY - (value / 50) * half;
-          context.beginPath();
-          context.moveTo(0, y);
-          context.lineTo(mediaSize.width, y);
-          context.stroke();
-        }
-        context.setLineDash([]);
+        const current = ensurePath(mediaSize);
+        if (!current) return;
+        context.save();
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        if (glowColor) strokeCurve(context, current, glowColor, 5);
+        strokeCurve(context, current, color, lineWidth);
+        context.restore();
       });
     },
   };
-  const view = {
-    zOrder: () => "top",
-    renderer: () => renderer,
-  };
-  const views = [view];
+  const views = [{ renderer: () => renderer }];
   const primitive = {
-    requestUpdate: () => {},
-    unsubscribe: null,
-    view,
-    attached({ chart, requestUpdate }) {
+    chart: null,
+    series: null,
+    attached({ chart, series }) {
       primitive.chart = chart;
-      primitive.requestUpdate = requestUpdate;
-      const timeScale = chart.timeScale();
-      const handleRange = () => requestUpdate();
-      timeScale.subscribeVisibleLogicalRangeChange(handleRange);
-      primitive.unsubscribe = () =>
-        timeScale.unsubscribeVisibleLogicalRangeChange(handleRange);
+      primitive.series = series;
     },
     detached() {
-      primitive.unsubscribe?.();
-      primitive.unsubscribe = null;
       primitive.chart = null;
-      primitive.requestUpdate = () => {};
+      primitive.series = null;
+    },
+    updateAllViews() {},
+    paneViews() {
+      return views;
+    },
+    // The drawn line's y at x (CSS px), so the crosshair mark sits on it.
+    yAt(x) {
+      return path
+        ? monotoneCurveAt(path.xs, path.ys, path.tangents, path.count, x)
+        : null;
+    },
+  };
+  return primitive;
+}
+
+function pointsThrough(count, xAt, yAt) {
+  const size = Math.max(0, count);
+  const xs = new Float64Array(size);
+  const ys = new Float64Array(size);
+  for (let k = 0; k < size; k += 1) {
+    xs[k] = xAt(k);
+    ys[k] = yAt(k);
+  }
+  return { xs, ys, count: size };
+}
+
+// The Core Index as one calm shape around the zero line.
+// At rest (weeks less than 2 px apart) the shape is the weekly range taken
+// from zero over narrow buckets (bucketEnvelope), each held RIBBON_BACK
+// buckets after it and shown at most RIBBON_AHEAD bucket before it, drawn as
+// a quadratic B-spline: every weekly value lies inside it, every top and
+// bottom reaches its outer edge, and no reading shows more than about a
+// bucket before it happened. The two outer edges carry a fine stroke. Once
+// weeks are 2 px or more apart (a crash zoom) the shape follows the weekly
+// values. Any −50…+50 series works.
+function createCoreIndexRibbonPrimitive(points, isDark) {
+  const values = Float64Array.from(points, (point) =>
+    clamp(Number(point.value), -50, 50),
+  );
+  const envelopes = new Map();
+  let positions = null;
+  let shape = null;
+  let shapeKey = "";
+  let geometry = null;
+  // The level of detail in use; it holds through small zoom steps.
+  let bandWidth = 0;
+
+  const ensureShape = (mediaSize) => {
+    const chart = primitive.chart;
+    if (!chart) return null;
+    const half = (mediaSize.height * RIBBON_HEIGHT) / 2;
+    const zeroY = mediaSize.height * RIBBON_TOP + half;
+    geometry = { zeroY, half };
+    if (values.length < 2) return null;
+    const timeScale = chart.timeScale();
+    const range = timeScale.getVisibleLogicalRange();
+    if (!range) return null;
+    const key = `${range.from}|${range.to}|${mediaSize.width}|${mediaSize.height}`;
+    if (key === shapeKey) return shape;
+    positions ??= chartPositions(timeScale, points);
+    const toX = logicalToX(timeScale, range.from);
+    if (!positions || !toX) return null;
+    const pxPerPoint = mediaSize.width / Math.max(1e-6, range.to - range.from);
+    const toY = (value) => zeroY - (value / 50) * half;
+    bandWidth = steadyBucketWidth(bandWidth, pxPerPoint, LOD_TARGET_PX);
+    if (bandWidth === 1) {
+      const [start, end] = visibleSpan(
+        values.length,
+        (k) => positions[k],
+        range.from - 1,
+        range.to + 1,
+      );
+      shape = {
+        weekly: curveThrough(
+          end - start + 1,
+          (k) => toX(positions[start + k]),
+          (k) => toY(values[start + k]),
+        ),
+      };
+    } else {
+      const width = bandWidth * Math.SQRT1_2;
+      const envelope = rememberSelection(envelopes, width, () =>
+        bucketEnvelope(positions, values, width, {
+          back: RIBBON_BACK,
+          ahead: RIBBON_AHEAD,
+        }),
+      );
+      // Three control points beyond each edge: a span depends on its
+      // neighbours, so the visible part never changes while panning.
+      const [start, end] = visibleSpan(
+        envelope.at.length,
+        (k) => envelope.at[k],
+        range.from - 3 * width,
+        range.to + 3 * width,
+      );
+      const x = (k) => toX(envelope.at[start + k]);
+      shape = {
+        upper: pointsThrough(end - start + 1, x, (k) =>
+          toY(envelope.upper[start + k]),
+        ),
+        lower: pointsThrough(end - start + 1, x, (k) =>
+          toY(envelope.lower[start + k]),
+        ),
+      };
+    }
+    shapeKey = key;
+    return shape;
+  };
+
+  // Hairlines one device pixel thick, across the whole pane, as before.
+  const drawHairlines = (target, levels, color) => {
+    target.useBitmapCoordinateSpace(({ context, bitmapSize, verticalPixelRatio }) => {
+      const half = (bitmapSize.height * RIBBON_HEIGHT) / 2;
+      const zeroY = bitmapSize.height * RIBBON_TOP + half;
+      const thickness = Math.max(1, Math.floor(verticalPixelRatio));
+      context.fillStyle = color;
+      for (const level of levels) {
+        const y = Math.round(zeroY - (level / 50) * half - thickness / 2);
+        context.fillRect(0, y, bitmapSize.width, thickness);
+      }
+    });
+  };
+
+  const renderer = {
+    draw: (target) => {
+      drawHairlines(
+        target,
+        [-25, 25],
+        isDark ? "rgba(242, 237, 228, 0.10)" : "rgba(20, 18, 26, 0.08)",
+      );
+      target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+        const current = ensureShape(mediaSize);
+        if (!current) return;
+        const { zeroY, half } = geometry;
+        const { weekly, upper, lower } = current;
+        if (weekly ? weekly.count < 2 : upper.count < 2) return;
+        context.save();
+        context.beginPath();
+        if (weekly) {
+          context.moveTo(weekly.xs[0], zeroY);
+          traceMonotoneCurve(context, weekly.xs, weekly.ys, weekly.tangents, 0, weekly.count - 1, true);
+          context.lineTo(weekly.xs[weekly.count - 1], zeroY);
+        } else {
+          traceQuadraticBSpline(context, upper.xs, upper.ys, 0, upper.count - 1);
+          traceQuadraticBSpline(context, lower.xs, lower.ys, lower.count - 1, 0, true);
+        }
+        context.closePath();
+        context.fillStyle = rampGradient(context, zeroY, half, isDark);
+        context.fill();
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        if (weekly) {
+          strokeCurve(context, weekly, bandGradient(context, zeroY, half, isDark, 0.9), 1.25);
+        } else {
+          const ink = edgeGradient(context, zeroY, half, isDark);
+          for (const edge of [upper, lower]) {
+            context.beginPath();
+            traceQuadraticBSpline(context, edge.xs, edge.ys, 0, edge.count - 1);
+            context.strokeStyle = ink;
+            context.lineWidth = 1.25;
+            context.stroke();
+          }
+        }
+        context.restore();
+      });
+      drawHairlines(
+        target,
+        [0],
+        isDark ? "rgba(242, 237, 228, 0.28)" : "rgba(20, 18, 26, 0.24)",
+      );
+    },
+  };
+  const views = [{ renderer: () => renderer }];
+  const primitive = {
+    chart: null,
+    attached({ chart }) {
+      primitive.chart = chart;
+    },
+    detached() {
+      primitive.chart = null;
+    },
+    updateAllViews() {},
+    paneViews() {
+      return views;
+    },
+    // A Core Index value's y in the ribbon (CSS px), for the crosshair mark.
+    valueToY(value) {
+      if (!geometry || !Number.isFinite(Number(value))) return null;
+      return geometry.zeroY - (clamp(Number(value), -50, 50) / 50) * geometry.half;
+    },
+  };
+  return primitive;
+}
+
+// A label's row on the device-pixel grid: the gridline's first bitmap row,
+// its thickness and its centre (bitmap px).
+function axisRow(y, pixelRatio) {
+  const thickness = Math.max(1, Math.floor(pixelRatio));
+  const top = Math.round(y * pixelRatio - thickness / 2);
+  return { top, thickness, centre: top + thickness / 2 };
+}
+
+// Exact round labels for the log-scaled price axis (change since the base
+// week: 0%, +100%, +300% …), each drawn at its own value, with faint
+// gridlines at the same rows. The built-in tick labels are hidden. Labels are
+// drawn here rather than as axis views so each one's ink box is centred on
+// its gridline's device-pixel row (an axis view's box puts the text 1-2 px
+// low). Where the ink box and the row cannot share a centre (an even ink
+// height on a one-pixel row at 1x), the label sits half a pixel high.
+function createIndexAxisPrimitive({ textColor, gridColor, fontWeight }) {
+  let labels = [];
+  let labelsKey = "";
+  const gridRenderer = {
+    draw: (target) => {
+      target.useBitmapCoordinateSpace(({ context, bitmapSize, verticalPixelRatio }) => {
+        context.fillStyle = gridColor;
+        for (const label of labels) {
+          const row = axisRow(label.y, verticalPixelRatio);
+          context.fillRect(0, row.top, bitmapSize.width, row.thickness);
+        }
+      });
+    },
+  };
+  const labelRenderer = {
+    draw: (target) => {
+      target.useBitmapCoordinateSpace(
+        ({ context, horizontalPixelRatio, verticalPixelRatio }) => {
+          context.font = `${fontWeight} ${CHART_FONT_SIZE * verticalPixelRatio}px ${CHART_FONT}`;
+          context.fillStyle = textColor;
+          context.textAlign = "left";
+          context.textBaseline = "alphabetic";
+          for (const label of labels) {
+            const row = axisRow(label.y, verticalPixelRatio);
+            const ink = context.measureText(label.text);
+            const baseline = Math.floor(
+              row.centre +
+                ((ink.actualBoundingBoxAscent || 0) - (ink.actualBoundingBoxDescent || 0)) / 2,
+            );
+            context.fillText(
+              label.text,
+              Math.round(AXIS_LABEL_X * horizontalPixelRatio),
+              baseline,
+            );
+          }
+        },
+      );
+    },
+  };
+  const paneViews = [{ zOrder: () => "bottom", renderer: () => gridRenderer }];
+  const axisPaneViews = [{ renderer: () => labelRenderer }];
+  const primitive = {
+    chart: null,
+    series: null,
+    attached({ chart, series }) {
+      primitive.chart = chart;
+      primitive.series = series;
+    },
+    detached() {
+      primitive.chart = null;
+      primitive.series = null;
+      labels = [];
+    },
+    // Runs after the price scale is recalculated and before the axis and the
+    // pane are painted, so labels and gridlines move together with the line.
+    updateAllViews() {
+      const { chart, series } = primitive;
+      if (!chart || !series) return;
+      const height = chart.paneSize(0)?.height ?? 0;
+      // Labels stay above the axis fade beside the Core Index ribbon.
+      const top = 12;
+      const bottom = height * 0.64 - 6;
+      const high = series.coordinateToPrice(top);
+      const low = series.coordinateToPrice(bottom);
+      const key = `${height}|${high}|${low}`;
+      if (key === labelsKey) return;
+      labelsKey = key;
+      labels =
+        high == null || low == null || bottom <= top
+          ? []
+          : indexAxisLevels(
+              Number(low),
+              Number(high),
+              (level) => series.priceToCoordinate(level),
+              { gap: AXIS_LABEL_GAP, top, bottom },
+            ).slice(0, AXIS_LABEL_LIMIT);
+    },
+    priceAxisPaneViews() {
+      return axisPaneViews;
+    },
+    paneViews() {
+      return paneViews;
+    },
+  };
+  return primitive;
+}
+
+// The crosshair marks, on the top layer: a dot on each drawn price line at
+// the crosshair (on the line as drawn, so it never floats beside it) and a
+// dot on the ribbon at the week's Core Index, in its band's tone.
+function createCrosshairMarksPrimitive({ lines, ribbon, weeks, ringColor }) {
+  const dot = (context, x, y, radius, fill) => {
+    context.beginPath();
+    context.arc(x, y, radius + 1.5, 0, Math.PI * 2);
+    context.fillStyle = ringColor;
+    context.fill();
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fillStyle = fill;
+    context.fill();
+  };
+  const renderer = {
+    draw: (target) => {
+      const { chart, time } = primitive;
+      if (!chart || !time) return;
+      const x = chart.timeScale().timeToCoordinate(time);
+      if (x == null) return;
+      target.useMediaCoordinateSpace(({ context }) => {
+        for (const line of lines) {
+          const y = line.primitive.yAt(x);
+          if (y != null) dot(context, x, y, 3.5, line.color);
+        }
+        const week = weeks.get(time);
+        const y = week ? ribbon.valueToY(week.value) : null;
+        if (y != null) dot(context, x, y, 3, week.color);
+      });
+    },
+  };
+  const views = [{ zOrder: () => "top", renderer: () => renderer }];
+  const primitive = {
+    chart: null,
+    // The week under the crosshair ("YYYY-MM-DD"), or null when it is hidden.
+    time: null,
+    attached({ chart }) {
+      primitive.chart = chart;
+    },
+    detached() {
+      primitive.chart = null;
+      primitive.time = null;
     },
     updateAllViews() {},
     paneViews() {
@@ -374,6 +954,7 @@ export function RegimeTimeline({
   const chartRef = useRef(null);
   const lineSeriesRef = useRef({});
   const primitiveRef = useRef(null);
+  const marksRef = useRef(null);
   const selectedIdRef = useRef(selectedId);
   const previousSelectedIdRef = useRef(selectedId);
   const zoomedIdRef = useRef(selectedId);
@@ -382,8 +963,10 @@ export function RegimeTimeline({
   const [hoveredCrashId, setHoveredCrashId] = useState(null);
   const [crosshairActive, setCrosshairActive] = useState(false);
   const [legendSide, setLegendSide] = useState("left");
-  const [equityScaleWidth, setEquityScaleWidth] = useState(0);
-  const [timeScaleHeight, setTimeScaleHeight] = useState(26);
+  // The axis is a fixed width, so the first paint is already final.
+  const [equityScaleWidth, setEquityScaleWidth] = useState(PRICE_AXIS_WIDTH);
+  const [timeScaleHeight, setTimeScaleHeight] = useState(TIME_AXIS_HEIGHT);
+  const [chartWidth, setChartWidth] = useState(0);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -511,6 +1094,20 @@ export function RegimeTimeline({
     );
   }, [navTimes, displayPoint]);
 
+  // The snapshot card pads the asset readout to the widest value in the
+  // archive (prices are positive: the largest has the most digits), so the
+  // card's figures keep one width while scrubbing.
+  const assetValueChars = useMemo(() => {
+    let largest = null;
+    for (const point of timeline) {
+      const value = Number(point[asset.valueField]);
+      if (Number.isFinite(value) && (largest == null || value > largest)) {
+        largest = value;
+      }
+    }
+    return largest == null ? 0 : formatNumber(largest, asset.precision).length;
+  }, [timeline, asset]);
+
   const sliderValueText = displayPoint
     ? [
         formatDate(displayPoint.date),
@@ -536,6 +1133,8 @@ export function RegimeTimeline({
         const series = lineSeriesRef.current[key];
         if (series && item?.time === time) {
           chart.setCrosshairPosition(item.value, time, series);
+          // A synthetic position fires no crosshair event: move the marks too.
+          if (marksRef.current) marksRef.current.time = time;
           return;
         }
       }
@@ -559,6 +1158,7 @@ export function RegimeTimeline({
           // hides the snapshot) and place it once the range is in, so it
           // lands on the date rather than on the old pixel.
           chart.clearCrosshairPosition();
+          if (marksRef.current) marksRef.current.time = null;
           timeScale.setVisibleLogicalRange({
             from: range.from + shift,
             to: range.to + shift,
@@ -632,6 +1232,7 @@ export function RegimeTimeline({
         if (!hoveredPoint && !crosshairActive) return;
         event.preventDefault();
         chartRef.current?.clearCrosshairPosition();
+        if (marksRef.current) marksRef.current.time = null;
         setHoveredPoint(null);
         setHoveredCrashId(null);
         setCrosshairActive(false);
@@ -656,8 +1257,30 @@ export function RegimeTimeline({
 
   const handleSliderBlur = () => {
     chartRef.current?.clearCrosshairPosition();
+    if (marksRef.current) marksRef.current.time = null;
     setCrosshairActive(false);
   };
+
+  // A crash zoom moves the weeks under the crosshair: the library re-reads
+  // it at its old pixel, which is now another week. The week on show stays
+  // on show when it lies inside the window (Enter on a band, a click);
+  // otherwise the crosshair and the snapshot clear.
+  const weekToKeep = useEffectEvent((crash) => {
+    const shown = crosshairActive ? hoveredPoint?.date : null;
+    return shown && shown >= crash.start && shown <= crash.end ? shown : null;
+  });
+  const settleCrosshair = useEffectEvent((time) => {
+    if (time) {
+      moveSliderTo(Math.min(lowerBoundSorted(navTimes, time), navTimes.length - 1));
+      return;
+    }
+    chartRef.current?.clearCrosshairPosition();
+    if (marksRef.current) marksRef.current.time = null;
+    setHoveredPoint(null);
+    setHoveredCrashId(null);
+    setCrosshairActive(false);
+    onHoverPointRef.current?.(null);
+  });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -672,8 +1295,8 @@ export function RegimeTimeline({
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: tone.axisText,
-        fontFamily: '"Onest", ui-sans-serif, system-ui, sans-serif',
-        fontSize: 11,
+        fontFamily: CHART_FONT,
+        fontSize: CHART_FONT_SIZE,
       },
       grid: {
         vertLines: { visible: false },
@@ -682,32 +1305,38 @@ export function RegimeTimeline({
       localization: {
         priceFormatter: (price) =>
           `${(Number(price) - 100).toFixed(0)}%`,
+        // Any date the chart formats reads like every other ("05 Sep 2008").
+        timeFormatter: (time) => formatDate(chartTimeToIso(time)),
       },
+      // One calm vertical hairline and nothing else: no horizontal line, no
+      // price label, and no date pill on the time axis (it covered part of
+      // the neighbouring tick labels); the HUD and the snapshot carry the
+      // date and the values.
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
           color: isDark
-            ? "rgba(255, 139, 119, 0.55)"
-            : "rgba(192, 68, 47, 0.45)",
+            ? "rgba(242, 237, 228, 0.3)"
+            : "rgba(20, 18, 26, 0.26)",
           width: 1,
-          style: LineStyle.Dotted,
-          labelBackgroundColor: isDark ? "#24222b" : "#e8e0d4",
+          style: LineStyle.Solid,
+          labelVisible: false,
         },
         horzLine: {
-          color: isDark
-            ? "rgba(242, 237, 228, 0.16)"
-            : "rgba(20, 18, 26, 0.12)",
-          width: 1,
-          style: LineStyle.Dotted,
-          labelBackgroundColor: isDark ? "#24222b" : "#e8e0d4",
+          visible: false,
+          labelVisible: false,
         },
       },
+      // A fixed width, and the built-in (uneven) tick text hidden: the index
+      // axis primitive draws exact round labels instead.
       rightPriceScale: {
         visible: true,
         borderVisible: false,
         mode: PriceScaleMode.Logarithmic,
         scaleMargins: { top: 0.07, bottom: 0.32 },
         entireTextOnly: true,
+        minimumWidth: PRICE_AXIS_WIDTH,
+        textColor: "rgba(0, 0, 0, 0)",
       },
       timeScale: {
         borderVisible: false,
@@ -715,6 +1344,7 @@ export function RegimeTimeline({
         secondsVisible: false,
         minBarSpacing: 0.01,
         rightOffset: 1,
+        tickMarkFormatter: formatChartTick,
       },
       handleScroll: {
         mouseWheel: true,
@@ -730,6 +1360,7 @@ export function RegimeTimeline({
     });
     chartRef.current = chart;
     const lineSeries = {};
+    const drawnLines = [];
 
     for (const key of seriesKeys) {
       const target = ASSET_TARGETS[key] ?? ASSET_TARGETS.sp500;
@@ -737,31 +1368,32 @@ export function RegimeTimeline({
       const selected = key === assetKey;
       const lineWidth = compareAssets ? (selected ? 2.4 : 1.7) : 2.2;
 
-      // A soft underlay marks the primary line only when several are drawn.
-      if (selected && compareAssets) {
-        const glow = chart.addSeries(LineSeries, {
-          color: withAlpha(color, 0.12),
-          lineWidth: 5,
-          priceScaleId: "right",
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        glow.setData(seriesData[key] ?? []);
-      }
-
+      // The full weekly series stays on the chart but is not drawn: it drives
+      // the crosshair, the readouts, the keyboard slider and the autoscale,
+      // so every number shown is a true weekly value.
       const line = chart.addSeries(LineSeries, {
         color,
         lineWidth,
+        lineVisible: false,
         priceScaleId: "right",
         priceLineVisible: false,
         lastValueVisible: false,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 3.5,
-        crosshairMarkerBorderColor: isDark ? "#08080c" : "#f6f1e9",
-        crosshairMarkerBackgroundColor: color,
+        crosshairMarkerVisible: false,
+        // Never "hovered" (a negative hit radius): hovering an undrawn line
+        // would only repaint the main layer while scrubbing.
+        hitTestTolerance: -1,
       });
       line.setData(seriesData[key] ?? []);
+      // What is drawn is the level-of-detail line. A soft underlay marks the
+      // primary line only when several are drawn.
+      const drawn = createLevelOfDetailLinePrimitive(seriesData[key] ?? [], {
+        color,
+        lineWidth,
+        glowColor: selected && compareAssets ? withAlpha(color, 0.12) : null,
+        windows: crashes,
+      });
+      line.attachPrimitive(drawn);
+      drawnLines.push({ primitive: drawn, color });
       lineSeries[key] = line;
     }
     lineSeriesRef.current = lineSeries;
@@ -777,9 +1409,9 @@ export function RegimeTimeline({
     applyOverview(chart, container);
 
     const syncScaleWidth = () => {
-      const width = chart.priceScale("right").width() ?? 0;
-      setEquityScaleWidth(width);
-      setTimeScaleHeight(chart.timeScale().height() ?? 26);
+      setEquityScaleWidth(chart.priceScale("right").width() || PRICE_AXIS_WIDTH);
+      setTimeScaleHeight(chart.timeScale().height() || TIME_AXIS_HEIGHT);
+      setChartWidth(container.clientWidth);
     };
     const scaleFrame = requestAnimationFrame(syncScaleWidth);
     const scaleObserver = new ResizeObserver(syncScaleWidth);
@@ -792,11 +1424,30 @@ export function RegimeTimeline({
     );
     pane?.attachPrimitive(primitive);
     primitiveRef.current = primitive;
-    const coreIndexPrimitive = createCoreIndexHistogramPrimitive(
+    const coreIndexPrimitive = createCoreIndexRibbonPrimitive(
       coreIndexData,
       isDark,
     );
     pane?.attachPrimitive(coreIndexPrimitive);
+    // Light mode takes the stronger axis ink and a medium weight: thin dark
+    // 11 px glyphs on the warm paper otherwise measure about 3-4:1 at their
+    // cores.
+    const axisPrimitive = createIndexAxisPrimitive({
+      textColor: isDark ? tone.axisText : tone.axisStrong,
+      gridColor: isDark ? "rgba(242, 237, 228, 0.05)" : "rgba(20, 18, 26, 0.06)",
+      fontWeight: isDark ? 400 : 500,
+    });
+    lineSeries[assetKey]?.attachPrimitive(axisPrimitive);
+    const marks = createCrosshairMarksPrimitive({
+      lines: drawnLines,
+      ribbon: coreIndexPrimitive,
+      weeks: new Map(coreIndexData.map((point) => [point.time, point])),
+      ringColor: isDark ? "#08080c" : "#f6f1e9",
+    });
+    // On a series, so its top-layer view repaints with the crosshair (pane
+    // primitives are painted only with the main layer).
+    lineSeries[assetKey]?.attachPrimitive(marks);
+    marksRef.current = marks;
 
     const pointsByTime = new Map(
       timeline.map((point) => [point.date, point]),
@@ -812,6 +1463,7 @@ export function RegimeTimeline({
 
     const handleCrosshair = (param) => {
       if (!param?.time) {
+        marks.time = null;
         setHoveredCrashId(null);
         setCrosshairActive(false);
         return;
@@ -820,6 +1472,8 @@ export function RegimeTimeline({
       if (x != null) setLegendSide((side) => legendSideFor(side, x));
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
+      // Set before the chart paints its top layer on this frame.
+      marks.time = key;
       const crash = crashForTime(key);
       const point = pointsByTime.get(key) ?? null;
       setHoveredPoint(point);
@@ -849,6 +1503,7 @@ export function RegimeTimeline({
       chart.unsubscribeCrosshairMove(handleCrosshair);
       chart.unsubscribeClick(handleClick);
       if (primitiveRef.current === primitive) primitiveRef.current = null;
+      if (marksRef.current === marks) marksRef.current = null;
       try {
         pane?.detachPrimitive(primitive);
         pane?.detachPrimitive(coreIndexPrimitive);
@@ -870,6 +1525,7 @@ export function RegimeTimeline({
     seriesData,
     seriesKeys,
     timeline,
+    tone.axisStrong,
     tone.axisText,
   ]);
 
@@ -880,8 +1536,16 @@ export function RegimeTimeline({
       primitive.requestUpdate();
     }
 
-    if (chartRef.current && selectedCrash) {
-      applyCrashZoom(chartRef.current, selectedCrash);
+    let settleFrame = 0;
+    const chart = chartRef.current;
+    if (chart && selectedCrash) {
+      const keep = weekToKeep(selectedCrash);
+      applyCrashZoom(chart, selectedCrash);
+      // The new range is applied on the chart's next frame (and the library
+      // moves the crosshair then); settle it just after.
+      settleFrame = requestAnimationFrame(() => {
+        if (chartRef.current === chart) settleCrosshair(keep);
+      });
     }
 
     // Closing the detail returns the chart to its resting frame and drops the
@@ -891,11 +1555,13 @@ export function RegimeTimeline({
     if (previous && !selectedId) {
       applyOverview(chartRef.current, containerRef.current);
       chartRef.current?.clearCrosshairPosition();
+      if (marksRef.current) marksRef.current.time = null;
       setCrosshairActive(false);
       setHoveredPoint(null);
       setHoveredCrashId(null);
       onHoverPointRef.current?.(null);
     }
+    return () => cancelAnimationFrame(settleFrame);
   }, [selectedCrash, selectedId]);
 
   useEffect(() => {
@@ -911,7 +1577,7 @@ export function RegimeTimeline({
   return (
     <section
       aria-labelledby="regime-timeline-title"
-      className="relative ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] mt-4 w-screen scroll-mt-24"
+      className="relative ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] mt-4 w-screen scroll-mt-24 overflow-clip"
     >
       <h2 id="regime-timeline-title" className="sr-only">
         Unified Core Index macro and multi-asset regime chart
@@ -919,14 +1585,19 @@ export function RegimeTimeline({
       <p className="sr-only">
         One percentage-scaled chart of the S&amp;P 500, London gold, Treasury
         bonds and Nifty 50 with NBER recession shading. A colour-coded Core Index
-        histogram from -50 to +50 sits in the lower quarter of the same chart.
+        ribbon from -50 to +50 sits in the lower quarter of the same chart.
         Hover a red NBER band for the crash name, peak-to-trough drawdown and
         Core Index score; click it to zoom to the event.
       </p>
 
-      {/* Sticky from sm up; on phones the HUD scrolls away so the chart gets
-          the screen, and the snapshot card is the scrub readout. */}
-      <div className="relative z-30 border-b border-black/5 bg-[#f5f0e8]/85 dark:border-white/5 dark:bg-[#06060a]/80 sm:sticky sm:top-0 sm:backdrop-blur-2xl">
+      {/* Sticky from sm up where the window has the height for it
+          (sm-tall: 40rem wide and tall), just below the fixed site header
+          (--sh-header-clear), so nothing hides under the brand or the tab cue.
+          The strip above it is covered while it is stuck; at rest that cover
+          sits above the section and the section's overflow-clip hides it.
+          On phones and short landscape windows the HUD scrolls away so the
+          chart gets the screen, and the snapshot card is the scrub readout. */}
+      <div className="relative z-30 border-b border-black/5 bg-[#f5f0e8]/85 dark:border-white/5 dark:bg-[#06060a]/80 sm-tall:sticky sm-tall:top-(--sh-header-clear) sm-tall:backdrop-blur-2xl sm-tall:before:pointer-events-none sm-tall:before:absolute sm-tall:before:inset-x-0 sm-tall:before:bottom-full sm-tall:before:h-(--sh-header-clear) sm-tall:before:bg-[#f5f0e8] sm-tall:dark:before:bg-[#06060a]">
         <MacroHUD
           point={displayPoint}
           isDark={isDark}
@@ -958,7 +1629,7 @@ export function RegimeTimeline({
         {/* The TradingView attribution (licence) sits above the edge fades so
             it stays legible and its focus ring is not covered. The right
             price-axis cell fades out where the Core Index band begins
-            (scaleMargins.bottom 0.32), so no % labels sit beside the bars. */}
+            (scaleMargins.bottom 0.32), so no % labels sit beside the ribbon. */}
         <div
           ref={containerRef}
           data-testid="regime-terminal-chart"
@@ -971,7 +1642,9 @@ export function RegimeTimeline({
           isDark={isDark}
           active={crosshairActive}
           side={legendSide}
-          style={{ "--legend-right": `${equityScaleWidth + 28}px` }}
+          room={chartWidth}
+          rightInset={equityScaleWidth + 28}
+          valueChars={assetValueChars}
         />
 
         {hoveredMetric ? (

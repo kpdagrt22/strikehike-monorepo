@@ -333,16 +333,17 @@ export default function RegimePage() {
   }, []);
 
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24">
-      {/* The top padding lives here, not on the scroll container, so the HUD
-          sticks flush at 0 with no slit above it. */}
-      <div className="mx-auto w-full max-w-[1600px] px-3 pt-3 sm:px-5 sm:pt-4 lg:px-8">
+    <main className="relative h-full w-full scroll-pt-(--sh-header-clear) overflow-y-auto overflow-x-hidden pb-24">
+      {/* The top padding (the header clearance) lives here, not on the scroll
+          container, so the HUD sticks at the same offset with no slit above
+          it. */}
+      <div className="mx-auto w-full max-w-[1600px] px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Regime Intelligence
             </p>
-            <h1 className="mt-2 pr-16 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:pr-0">
+            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl">
               The −50 to +50 macro atlas.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/60 dark:text-white/60 sm:text-body">

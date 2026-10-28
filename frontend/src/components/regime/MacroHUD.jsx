@@ -4,11 +4,48 @@ import {
   coreIndexTone,
   formatDate,
   formatSigned,
+  padReadout,
 } from "@/components/regime/regimeUtils";
 import {
   ASSET_ORDER,
   ASSET_TARGETS,
 } from "@/components/regime/assetTargets";
+
+// A slim −50…+50 track under the score: ticks at −25, 0 and +25 and a marker
+// at the current value in its band's tone. The marker keeps one layout
+// position (the track's left end) and moves by a transform, without
+// animation, so scrubbing never shifts layout.
+function CoreIndexScale({ value, color }) {
+  const number = Number(value);
+  const known = value != null && Number.isFinite(number);
+  const share = (Math.max(-50, Math.min(50, number)) + 50) / 100;
+  return (
+    <div
+      aria-hidden="true"
+      className="relative mt-2 h-2 w-(--scale-track) [--scale-track:9rem] sm:[--scale-track:10.5rem]"
+    >
+      <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-black/15 dark:bg-white/15" />
+      {[25, 50, 75].map((stop) => (
+        <span
+          key={stop}
+          className={`absolute top-1/2 w-px -translate-x-1/2 -translate-y-1/2 bg-black/30 dark:bg-white/30 ${
+            stop === 50 ? "h-2" : "h-1.5"
+          }`}
+          style={{ left: `${stop}%` }}
+        />
+      ))}
+      {known ? (
+        <span
+          className="absolute left-0 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-2 ring-[#f5f0e8] dark:ring-[#06060a]"
+          style={{
+            transform: `translateX(calc(${share} * var(--scale-track) - 50%))`,
+            backgroundColor: color,
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 export function MacroHUD({
   point,
@@ -31,22 +68,28 @@ export function MacroHUD({
               StrikeHike Core Index
             </p>
             <div className="mt-1 flex items-end gap-1.5 sm:gap-2">
+              {/* A fixed five-character box (a signed score with one decimal,
+                  "+22.4"), always filled (shorter scores are padded): digits
+                  change in place and "/ +50" never moves while scrubbing. */}
               <span
-                className="font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] tabular-nums sm:text-[3.5rem]"
+                className="inline-block w-[calc(5ch-0.375em)] text-right font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] tabular-nums sm:text-[3.5rem]"
                 style={{ color: tone.color }}
               >
-                {formatSigned(point?.core_index)}
+                {padReadout(formatSigned(point?.core_index), 5)}
               </span>
               <span className="pb-1 font-mono text-micro text-black/60 dark:text-white/60">
                 / +50
               </span>
             </div>
+            <CoreIndexScale value={point?.core_index} color={tone.color} />
             <p className="mt-1 font-mono text-micro text-black/60 dark:text-white/60">
               −50 ↔ +50 · contrarian sentiment map
             </p>
           </div>
 
-          <div className="min-w-0 border-l border-black/5 pl-4 dark:border-white/5 sm:pl-6">
+          {/* Sized by the row's width, not by the state's text, so it wraps
+              under the score at the same widths for every week. */}
+          <div className="min-w-[min(16rem,100%)] max-w-[24.0625rem] flex-1 basis-0 border-l border-black/5 pl-4 dark:border-white/5 sm:min-w-[18.25rem] sm:pl-6">
             <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
               State · action
             </p>
@@ -56,8 +99,9 @@ export function MacroHUD({
             >
               {tone.label}
             </p>
-            {/* Two lines reserved, so hovering across buckets never moves the chart. */}
-            <p className="mt-1.5 min-h-[3.25em] max-w-[360px] text-micro leading-relaxed text-black/60 dark:text-white/60">
+            {/* Lines reserved for the longest allocation (three below sm, two
+                from sm), so hovering across buckets never moves the chart. */}
+            <p className="mt-1.5 min-h-[4.875em] max-w-[360px] text-micro leading-relaxed text-black/60 dark:text-white/60 sm:min-h-[3.25em]">
               <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
                 Smart money
               </span>{" "}
