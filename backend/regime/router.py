@@ -93,13 +93,14 @@ def get_regime_runs(
 @router.get(
     "/crypto-milestones",
     response_model=CryptoMilestonesResponse,
+    deprecated=True,
     summary="Editorial crypto event windows enriched with Core Index and asset returns",
     description=(
         "Returns the curated Bitcoin/crypto milestone windows (Genesis, Mt. Gox, "
         "ICO peak, Crypto Winter, COVID, Terra-LUNA and the spot ETF peak), "
         "each joined to peak-to-trough statistics for the S&P proxy, gold, "
-        "Treasuries and Bitcoin plus the corresponding Core Index readings. The "
-        "Convergence tab uses these windows for side-by-side comparison."
+        "Treasuries and Bitcoin plus the corresponding Core Index readings. "
+        "Deprecated: the Convergence page uses /regime/cases."
     ),
 )
 def get_crypto_milestones() -> dict:
@@ -146,12 +147,19 @@ def get_regime_forecast() -> dict:
 @patterns_router.get(
     "",
     response_model=PatternsResponse,
-    summary="Rolling 120-year pattern similarity and one-year forward echo",
+    summary=(
+        "Closest historical setups to the trailing 12 months, what followed "
+        "them, the usual year, and the measured track record"
+    ),
     description=(
-        "Uses the current system date to find the exact date 120 years ago, "
-        "compares the trailing 365-day normalized selected-asset paths with a "
-        "Pearson correlation, and returns the historical one-year forward "
-        "window with peak, maximum drawdown and curated major events."
+        "The engine block (version patterns-v2) lists the past 12-month "
+        "windows that most resemble the latest 12 months, using only setups "
+        "whose following 12 months ended before today's window began, and what "
+        "followed each one. Counts sit beside the usual rate across all years; "
+        "there are no blended probabilities. It adds the 120-year mirror where "
+        "the history reaches back that far, and the walk-forward track record "
+        "precomputed offline. engine is null if it cannot be built. The older "
+        "top-level fields are unchanged for compatibility."
     ),
 )
 def get_patterns(

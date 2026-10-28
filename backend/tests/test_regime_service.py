@@ -10,6 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from regime.schemas import MacroHistoryResponse  # noqa: E402
 from regime.service import MacroRegimeService  # noqa: E402
 
 
@@ -43,6 +44,25 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
     frame["core_index"] = 12.34
     frame["core_index_composite"] = 62.34
     frame["core_index_bucket"] = "calm_bullish"
+    # Core Index v2 severity and warning, as the artifact stores them
+    # (pandas string and nullable boolean), with a decline in Mar-Apr 2020.
+    covid = (index >= pd.Timestamp("2020-03-01", tz="UTC")) & (
+        index < pd.Timestamp("2020-05-01", tz="UTC")
+    )
+    frame["core_index_severity"] = pd.array(
+        np.where(covid, "bear", "none"), dtype="string"
+    )
+    frame["core_index_warning"] = pd.array(covid, dtype="boolean")
+    # The trend warning (nullable boolean): unknown during a warm-up that
+    # ends on Friday 2019-03-01, on from Friday 2020-02-28 through Thursday
+    # 2020-06-11, off otherwise.
+    trend = pd.array(
+        (index >= pd.Timestamp("2020-02-28", tz="UTC"))
+        & (index < pd.Timestamp("2020-06-12", tz="UTC")),
+        dtype="boolean",
+    )
+    trend[index < pd.Timestamp("2019-03-01", tz="UTC")] = pd.NA
+    frame["core_index_trend_warning"] = trend
     frame["macro_score"] = 55.0
     frame["credit_score"] = 70.0
     frame["core_volatility_score"] = 60.0
@@ -85,13 +105,35 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
             ]
         },
         "core_index": {
-            "version": "core-index-v1",
-            "weights": {"macro": 0.4, "volatility": 0.3, "momentum": 0.3},
+            "version": "core-index-v2",
+            "method": "weekly trend-and-stress state machine (Friday close), held until the next Friday",
+            "cadence": "weekly",
+            "first_scored": "2019-01-04",
+            "weights": {},
+            "buckets": {
+                "strong_bullish": ">= 25",
+                "calm_bullish": "0 to 24",
+                "bearish_warning": "-1 to -24",
+                "extreme_bearish": "<= -25",
+            },
+            "severities": ["none", "correction", "bear", "crash"],
+            "trend_warning": {
+                "version": "trend-warning-40w-v1",
+                "column": "core_index_trend_warning",
+                "rule": "on when the Friday close is below the average of the last 40 Friday closes",
+                "weeks": 40,
+                "first_value": "2019-03-01",
+                "record": {"falls_of_20pct_or_more": {"count": 1, "on_within_first_20pct": 1}},
+            },
             "latest": {
                 "date": "2020-12-31",
+                "signal_date": "2020-12-25",
                 "score": 12.34,
                 "bucket": "calm_bullish",
                 "composite": 62.34,
+                "severity": "none",
+                "warning": False,
+                "trend_warning": False,
             },
         },
         "nber": {"source": "USREC"},
@@ -123,7 +165,10 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert payload["timeline"][0]["core_index_bucket"] == "calm_bullish"
     assert payload["timeline"][0]["btc_proxy"] is not None
     assert payload["meta"]["latest_core_index"]["score"] == 12.34
-    assert payload["meta"]["core_index_version"] == "core-index-v1"
+    assert payload["meta"]["core_index_version"] == "core-index-v2"
+    assert payload["meta"]["core_index_weights"] == {}
+    assert payload["meta"]["core_index_cadence"] == "weekly"
+    assert payload["meta"]["core_index_first_scored"] == "2019-01-04"
 
     monthly = service.macro_history(resolution="monthly")
     assert monthly["resolution"] == "monthly"
@@ -139,6 +184,102 @@ def test_macro_history_returns_timeline_and_crash_windows(tmp_path):
     assert crash["pre_crash_indicators"]["6m"]["as_of"] == "2019-08-01"
     assert crash["pre_crash_indicators"]["3m"]["fed_funds"] == 2.0
     assert crash["pre_crash_indicators"]["3m"]["core_index"] == 12.34
+    assert crash["pre_crash_indicators"]["3m"]["core_index_severity"] == "none"
+    assert crash["pre_crash_indicators"]["3m"]["core_index_warning"] is False
+
+
+def test_macro_history_exposes_core_index_severity_and_warning(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+
+    for resolution in ("weekly", "monthly"):
+        timeline = service.macro_history(resolution=resolution)["timeline"]
+        for point in timeline:
+            assert isinstance(point["core_index_severity"], str), point["date"]
+            assert isinstance(point["core_index_warning"], bool), point["date"]
+        decline = [p for p in timeline if "2020-03-01" <= p["date"] <= "2020-04-30"]
+        calm = [p for p in timeline if p["date"] <= "2020-02-28"]
+        assert decline and calm
+        assert {(p["core_index_severity"], p["core_index_warning"]) for p in decline} == {
+            ("bear", True)
+        }
+        assert {(p["core_index_severity"], p["core_index_warning"]) for p in calm} == {
+            ("none", False)
+        }
+
+    # Weekly points carry the Friday value: the week ending 2020-03-06 is
+    # inside the decline and the week ending 2020-05-01 is out of it.
+    weekly = {p["date"]: p for p in service.macro_history(resolution="weekly")["timeline"]}
+    assert weekly["2020-03-06"]["core_index_warning"] is True
+    assert weekly["2020-05-01"]["core_index_warning"] is False
+
+    daily = service.macro_history(resolution="daily", start="2020-04-29", end="2020-05-02")
+    assert [p["core_index_severity"] for p in daily["timeline"]] == ["bear", "bear", "none", "none"]
+
+
+def test_macro_history_exposes_core_index_trend_warning(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+
+    # Weekly points carry the Friday value; null while the flag is unknown.
+    weekly = {p["date"]: p for p in service.macro_history(resolution="weekly")["timeline"]}
+    assert weekly["2019-02-22"]["core_index_trend_warning"] is None
+    assert weekly["2019-03-01"]["core_index_trend_warning"] is False
+    assert weekly["2020-02-21"]["core_index_trend_warning"] is False
+    assert weekly["2020-02-28"]["core_index_trend_warning"] is True
+    assert weekly["2020-06-05"]["core_index_trend_warning"] is True
+    assert weekly["2020-06-12"]["core_index_trend_warning"] is False
+    # A separate flag: on in weeks where the Core Index warning is off.
+    assert weekly["2020-05-08"]["core_index_warning"] is False
+    assert weekly["2020-05-08"]["core_index_trend_warning"] is True
+
+    monthly = {p["date"]: p for p in service.macro_history(resolution="monthly")["timeline"]}
+    assert monthly["2019-01-31"]["core_index_trend_warning"] is None
+    assert monthly["2020-03-31"]["core_index_trend_warning"] is True
+    assert monthly["2020-06-30"]["core_index_trend_warning"] is False
+
+    daily = service.macro_history(resolution="daily", start="2020-06-10", end="2020-06-13")
+    assert [p["core_index_trend_warning"] for p in daily["timeline"]] == [True, True, False, False]
+
+    payload = service.macro_history(resolution="weekly")
+    dumped = MacroHistoryResponse.model_validate(payload).model_dump(by_alias=True)
+    for raw, kept in zip(payload["timeline"], dumped["timeline"]):
+        assert kept["core_index_trend_warning"] == raw["core_index_trend_warning"]
+    meta = dumped["meta"]
+    assert meta["latest_core_index"]["trend_warning"] is False
+    assert meta["core_index_trend_warning"]["weeks"] == 40
+    assert meta["core_index_trend_warning"]["first_value"] == "2019-03-01"
+    assert meta["core_index_trend_warning"]["record"]["falls_of_20pct_or_more"]["count"] == 1
+
+
+def test_macro_history_payload_survives_response_model(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+
+    payload = service.macro_history(resolution="weekly")
+    dumped = MacroHistoryResponse.model_validate(payload).model_dump(by_alias=True)
+
+    for raw, kept in zip(payload["timeline"], dumped["timeline"]):
+        assert kept["core_index_severity"] == raw["core_index_severity"]
+        assert kept["core_index_warning"] == raw["core_index_warning"]
+    assert any(p["core_index_warning"] for p in dumped["timeline"])
+
+    latest = dumped["meta"]["latest_core_index"]
+    assert latest["severity"] == "none"
+    assert latest["warning"] is False
+    assert latest["composite"] == 62.34
+    assert latest["signal_date"] == "2020-12-25"
+    assert latest["score"] == 12.34
+    assert latest["bucket"] == "calm_bullish"
+    meta = dumped["meta"]
+    assert meta["core_index_severities"] == ["none", "correction", "bear", "crash"]
+    assert meta["core_index_first_scored"] == "2019-01-04"
+    assert meta["core_index_cadence"] == "weekly"
+    assert meta["core_index_version"] == "core-index-v2"
+    assert meta["core_index_weights"] == {}
+    crash = dumped["crashes"][0]["pre_crash_indicators"]
+    assert crash["3m"]["core_index_severity"] == "none"
+    assert crash["3m"]["core_index_warning"] is False
 
 
 def test_regime_runs_returns_transition_matrix_and_durations(tmp_path):

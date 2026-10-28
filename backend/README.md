@@ -1,464 +1,151 @@
-# 🌌 Astro Finance - Enterprise ML Platform
+# StrikeHike backend
 
-[![CI/CD](https://github.com/kpdagrt22/astro_finance/actions/workflows/production.yml/badge.svg)](https://github.com/yourusername/astro_finance/actions)
-[![License](https://img.shields.io/badge/license-MPL%202.0-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+The FastAPI service behind [strikehike.com](https://strikehike.com), the macro regime package it serves, the ingestion flow that builds its data artifact, and the data files themselves. For the whole system (frontend, deployment, data sources), see the [root README](../README.md).
 
-> **Enterprise-grade financial prediction platform combining Machine Learning, Gann Theory, and Astronomical Analysis**
+## What runs
 
-**✅ Phase 4 Complete:** All 6 TradingView indicators delivered, enhanced dashboard with historical charts
+The production entry point is `uvicorn api_server:app` on port 8010 (see `Dockerfile`; Docker Compose publishes it on `127.0.0.1:8010`). At startup the app:
 
-## 🎯 Overview
+- loads `data/processed/final_data_with_regimes.csv` and fits the energy metric compiler on it;
+- seeds the SQLite event store from `data/historical_events.json` if the store is missing or empty;
+- leaves the earlier HMM and XGBoost model files unloaded unless `LOAD_ML_MODELS=1`.
 
-Astro Finance is a production-ready platform that achieves **97.67% crash prediction accuracy** and **95.68% regime detection accuracy** by combining:
+The regime routes load `data/processed/macro_regime_history.parquet` on first use and reload it whenever the file changes. Nothing in the request path calls an external service.
 
-- **Machine Learning**: XGBoost models trained on 33+ years of market data (1992-2025)
-- **Gann Theory**: Automated angle detection, Square of 9 calculations
-- **Astronomical Analysis**: Lunar phases, planetary retrogrades, aspects
-- **Real-time Processing**: WebSocket streaming and microservices architecture
-- **TradingView Suite**: 6 production-grade Pine Script indicators
+| Path | Role |
+|---|---|
+| `api_server.py` | The FastAPI app. Mounts the regime and patterns routers under `/api/v1` and serves planetary positions, historical parallels, the forecast ladder, the event list and `/health`. |
+| `regime/router.py` | Routes under `/api/v1/regime` and `/api/v1/patterns`. |
+| `regime/service.py` | `MacroRegimeService`: loads the parquet artifact and its metadata, caches payloads, and builds the timeline, regime runs, crypto milestones, pattern comparison and 30-day regime probability. |
+| `regime/analytics.py` | Macro strength meter, Core Index, NBER episodes and crash windows, and the long-run S&P 500 series. Shared with the ingestion flow. |
+| `regime/patterns.py`, `regime/patterns_events.json` | The 120-year pattern comparison and its curated events. |
+| `regime/patterns_v2.py` | Study of Patterns v2: the past 12-month setups closest to the latest 12 months, what followed them beside the usual rate, and the 120-year mirror. Served as the `engine` block of `/api/v1/patterns`. |
+| `regime/crypto_milestones.py` | Hand-picked crypto comparison windows (editorial, not statistically detected). |
+| `regime/schemas.py` | Pydantic response models. |
+| `src/astro_finance/energy_metric_compiler.py` | Turns a row of the precomputed daily frame into a 0–100 energy score and a polarity state. |
+| `src/astro_finance/historical_parallels.py` | The SQLite event store, Swiss Ephemeris (Lahiri) geometry for each event, the similarity search and the forecast ladder. |
+| `scripts/flows/macro_ingestion.py` | Offline ingestion that builds the macro artifact (see below). |
+| `scripts/recompute_core_index.py` | Recomputes only the Core Index v2 columns of the committed parquet from its stored inputs and updates the metadata; `--check` is read-only and exits 1 when they are stale. |
+| `scripts/patterns_v2_evidence.py` | The offline walk-forward track record for Study of Patterns v2; writes `data/processed/patterns_v2_skill.json`. |
+| `scripts/force_reseed_db.py`, `scripts/seed_historical_events.py` | Drop and rebuild the SQLite event store from the JSON seed. |
+| `Dockerfile` | Production image: Python 3.11.9-slim with `requirements-minimal.txt`, `api_server.py`, `src/`, `regime/`, `scripts/`, `websocket_server.py` and the six data files the API reads. |
+| `requirements-minimal.txt` | Dependencies installed by the image and by CI. |
+| `tests/` | The pytest suite. |
 
-## ✨ Features
+### In progress on this branch
 
-### 🤖 ML Models (Phase 1 ✅)
-- **Crash Prediction**: 97.67% accuracy for 10%+ drops
-- **Regime Detection**: 95.68% accuracy (Bull/Bear/Consolidation)
-- **415 Features**: Including 27 Gann-based astronomical indicators
-- **Daily Timeframe**: Optimized for swing trading
+Not yet on strikehike.com: the ingestion flow's daily S&P 500 history from Yahoo Finance (`^GSPC`), Core Index v2 with its severity, warning and trend-warning columns, Study of Patterns v2 (`regime/patterns_v2.py` and `data/processed/patterns_v2_skill.json`), and a Convergence case catalogue (`regime/cases.py`, `regime/cases_router.py`, `regime/case_schemas.py`, mounted under `/api/v1/regime`, with tests in `tests/test_regime_cases.py`).
 
-### 📊 TradingView Indicators (Phase 4 ✅ Complete - 6/6)
-- **Crash Risk Meter Pro**: Real-time crash probability histogram (0-100%)
-- **Gann Fan Automator**: Auto-detect swings, draw 1x1/2x1/3x1 angles
-- **Square of 9 Levels**: Harmonic support/resistance calculator
-- **Regime Detector Pro**: Multi-timeframe market regime classifier (95.68% accuracy)
-- **Astro-Momentum Oscillator**: Lunar + retrograde momentum (-100 to +100)
-- **Smart Entry/Exit System**: Complete strategy combining all 4 signals
+## Run
 
-### 🏗️ Enterprise Infrastructure (Phase 3 🔨)
-- **Microservices**: Prediction, Gann, Lunar, Data Ingestion services
-- **Kubernetes**: Auto-scaling, health checks, rolling deployments
-- **Monitoring**: Prometheus + Grafana dashboards
-- **CI/CD**: Automated testing, security scanning, blue-green deployment
-- **Caching**: Redis cluster with intelligent TTL
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.11+
-- Node.js 18+ (for web dashboard)
-- Git
-
-### 1. Clone Repository
-```bash
-git clone https://github.com/yourusername/astro_finance.git
-cd astro_finance
-```
-
-### 2. Start Services (Docker Compose)
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Start all services
-docker-compose up -d
-
-# Check health
-curl http://localhost:8000/health
-```
-
-**Services Running:**
-- 🔮 Prediction API: http://localhost:8000
-- 📐 Gann API: http://localhost:8001
-- 🌐 Web Dashboard: http://localhost:3000
-- 📊 Grafana: http://localhost:3001 (admin/admin)
-- 🔍 Prometheus: http://localhost:9090
-
-### 3. Test Predictions
-```bash
-# Crash prediction
-curl -X POST http://localhost:8000/v1/predict/crash \
-  -H "Content-Type: application/json" \
-  -d '{"symbol": "BTCUSD", "use_cache": false}'
-
-# Market regime
-curl -X POST http://localhost:8000/v1/predict/regime \
-  -H "Content-Type: application/json" \
-  -d '{"symbol": "BTCUSD"}'
-```
-
----
-
-## 📡 API Reference
-
-### Prediction Service (`:8000`)
-
-#### `POST /v1/predict/crash`
-Predict crash probability (10%+ drop)
-
-**Request:**
-```json
-{
-  "symbol": "BTCUSD",
-  "use_cache": true
-}
-```
-
-**Response:**
-```json
-{
-  "symbol": "BTCUSD",
-  "probability": 0.152,
-  "confidence": 0.9767,
-  "risk_level": "LOW",
-  "timestamp": "2026-01-13T21:30:00Z",
-  "model_version": "1.0.0",
-  "cached": false
-}
-```
-
-#### `POST /v1/predict/regime`
-Detect market regime
-
-**Response:**
-```json
-{
-  "symbol": "BTCUSD",
-  "regime": 1,
-  "regime_name": "Bull Market",
-  "confidence": 0.9568,
-  "timestamp": "2026-01-13T21:30:00Z"
-}
-```
-
-### Gann Service (`:8001`)
-
-#### `POST /v1/gann/fan`
-Calculate Gann Fan levels
-
-**Request:**
-```json
-{
-  "ticker": "BTCUSD",
-  "origin_date": "2026-01-01",
-  "origin_price": 42000,
-  "angle_type": "bullish",
-  "days_forward": 50
-}
-```
-
-#### `POST /v1/gann/square-of-9`
-Calculate Square of 9 support/resistance
-
-**Request:**
-```json
-{
-  "price": 42544,
-  "num_levels": 5
-}
-```
-
-**Response:**
-```json
-{
-  "base_price": 42544,
-  "resistance_levels": [45600, 48900, ...],
-  "support_levels": [40250, 38100, ...],
-  "nearest_harmonic": 42500
-}
-```
-
----
-
-## 🎨 TradingView Indicators
-
-### Installation
-
-1. Open TradingView chart
-2. Click "Indicators" → "Pine Editor"
-3. Copy indicator code from `tradingview/indicators/`
-4. Click "Add to Chart"
-
-### Available Indicators
-
-| Indicator | File | Description |
-|-----------|------|-------------|
-| Crash Risk Meter Pro | `crash_risk_meter_pro.pine` | 0-100% crash probability histogram |
-| Gann Fan Automator | `gann_fan_automator.pine` | Auto Gann angles (1x1, 2x1, 3x1) |
-| Square of 9 | `square_of_nine.pine` | Harmonic price levels |
-
-### Usage Example
-
-**Crash Risk Meter:**
-- 🟢 Green (0-30%): Safe to enter long positions
-- 🟡 Yellow (30-70%): Caution, tighten stops
-- 🔴 Red (70-100%): Exit longs, consider shorts
-
-**Alerts:**
-- Risk > 50%: Moderate risk alert
-- Risk > 70%: High risk alert
-- Risk < 30%: Safe to enter
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│  TradingView    │
-│   Indicators    │
-└────────┬────────┘
-         │
-┌────────▼────────┐      ┌─────────────┐
-│   Web Dashboard │      │  Mobile App │
-│   (Next.js)     │      │  (Future)   │
-└────────┬────────┘      └──────┬──────┘
-         │                      │
-         └──────────┬───────────┘
-                    │
-           ┌────────▼────────┐
-           │  API Gateway    │
-           │  (Kong/NGINX)   │
-           └────────┬────────┘
-                    │
-    ┌───────────────┼───────────────┐
-    │               │               │
-┌───▼───┐      ┌───▼───┐      ┌───▼───┐
-│Predict│      │ Gann  │      │ Lunar │
-│Service│      │Service│      │Service│
-└───┬───┘      └───┬───┘      └───┬───┘
-    │              │              │
-    └──────────────┼──────────────┘
-                   │
-        ┌──────────┼──────────┐
-        │          │          │
-    ┌───▼───┐  ┌──▼──┐   ┌──▼──┐
-    │Postgres│  │Redis│   │Cache│
-    └────────┘  └─────┘   └─────┘
-```
-
----
-
-## 📊 Model Performance
-
-| Model | Accuracy | Precision | Recall | F1-Score |
-|-------|----------|-----------|--------|----------|
-| Crash (XGBoost) | **97.67%** | 0.98 | 0.97 | 0.97 |
-| Regime (XGBoost) | **95.68%** | 0.96 | 0.96 | 0.95 |
-| Neural HMM | 68.07% | 0.69 | 0.68 | 0.68 |
-| LSTM | 75.97% | 0.76 | 0.75 | 0.75 |
-
-**Training Data:** 12,014 days (1992-01-01 to 2025-01-13)  
-**Features:** 415 total (27 Gann-based, 388 traditional)
-
----
-
-## 🛠️ Development
-
-### Local Development
+From this directory (the app opens `data/processed/final_data_with_regimes.csv` by a path relative to the working directory):
 
 ```bash
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Install service dependencies
-cd services/prediction && pip install -r requirements.txt
-
-# Run tests
-pytest tests/ --cov
-
-# Lint & type check
-ruff check .
-mypy src/
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements-minimal.txt
+uvicorn api_server:app --port 8000
 ```
 
-### Frontend Development
+The frontend's route handlers expect the backend at `http://127.0.0.1:8000` unless `CHRONO_API_URL` says otherwise. FastAPI serves interactive docs at `/docs` and `/redoc`. In production the port is reachable only from the host and the Compose network; the browser reaches the endpoints the site uses through the frontend's route handlers.
+
+## API
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/health` | `{"status": "healthy", ...}`; used by the Docker health check and the deploy workflow |
+| GET | `/api/v1/regime/macro-history` | The downsampled macro timeline (macro strength, regime state, Core Index, asset series, drawdowns, volatility percentiles) and every NBER recession window. Query: `resolution` (`auto`, `daily`, `weekly`, `monthly`), optional `start` and `end` |
+| GET | `/api/v1/regime/runs` | Monthly regime runs, the 3×3 transition matrix and median durations |
+| GET | `/api/v1/regime/crypto-milestones` | The curated crypto windows with asset drawdowns and Core Index readings |
+| GET | `/api/v1/regime/forecast` | The probability that the regime is "disruptive" 30 calendar days ahead, from a logistic regression on three artifact features (`fed_cross`, `curve_cross`, `sahm_alert`), fitted on first request and cached until the artifact changes |
+| GET | `/api/v1/patterns` | The 120-year pattern comparison and the historical year that followed, plus the Study of Patterns v2 `engine` block (closest historical setups, the usual rate, the 120-year mirror and the precomputed track record; `null` if it cannot be built). Query: `asset` (`sp500`, `nifty`, `gold`, `bonds`, `bitcoin`) |
+| GET | `/api/v1/astro-positions` | Planetary positions and the 0–100 energy metric for a `date` inside the precomputed frame (1992-02-11 to 2025-01-01) |
+| GET, POST | `/api/v1/historical-parallels` | Historical and recent events whose planetary geometry is closest to a date (and optional UTC minute) |
+| GET | `/api/v1/forecast-ladder` | The strongest upcoming geometric echoes of past events within the next `days` (1–180) |
+| GET | `/api/v1/events` | The curated event list, grouped into five categories |
+| GET | `/`, `/api/current-state`, `/api/historical` | Endpoints kept from the earlier API; the frontend does not call them |
+
+## Data files
+
+The image copies exactly these files; everything else under `data/` stays out of it.
+
+| File | Produced by | Read by |
+|---|---|---|
+| `data/processed/macro_regime_history.parquet` | `scripts/flows/macro_ingestion.py` | `regime/service.py` |
+| `data/processed/macro_regime_history.meta.json` | The same flow: coverage, versions, notes and warnings, each FRED series with its URL, and a source label for each asset series | `regime/service.py`, which returns parts of it as `meta` |
+| `data/processed/crypto_milestones.json` | The same flow, from `regime/crypto_milestones.py` | `regime/service.py` |
+| `data/processed/patterns_v2_skill.json` | The same flow, or `scripts/patterns_v2_evidence.py`: the Study of Patterns v2 track record per asset, stamped with the parquet's `data_version` | `regime/service.py` (the `engine.skill` block) |
+| `data/processed/final_data_with_regimes.csv` | Committed with the earlier project's code: a daily frame of planetary features, regime labels and volatility from 1992-02-11 to 2025-01-01. No script in this repository writes it | `api_server.py` and the energy metric compiler |
+| `data/historical_events.json` | Curated by hand | `historical_parallels.py`, which seeds SQLite at `HISTORICAL_EVENTS_DB` |
+
+## Ingestion flow
+
+`scripts/flows/macro_ingestion.py` runs offline, never in the request path. It:
+
+1. fetches every series in its FRED registry (`SERIES_REGISTRY`), using the official API when `FRED_API_KEY` is set and FRED's public CSV endpoint otherwise (`--source auto|api|csv`). Requests retry with backoff, and each series is cached as CSV in `data/raw/fred/` (git-ignored);
+2. fetches the series that do not come from FRED: the World Bank Pink Sheet London gold price (monthly), Blockchain.com's daily Bitcoin price, and Yahoo Finance daily closes for the Nifty 50 (`^NSEI`) and, on this branch, the S&P 500 (`^GSPC`). Without an API key it also backfills the ICE BofA high-yield spread from a public mirror, because FRED's CSV endpoint serves only the last three years of that series;
+3. merges everything onto one forward-filled daily calendar, marks NBER recession windows from `USREC`, and computes the macro strength meter (a 0–100 coincident heuristic from the Fed funds rate, the 10-year minus 2-year Treasury spread and a Sahm-rule unemployment proxy), the Core Index, the asset series, one-year drawdowns and volatility percentiles. The Core Index (`core-index-v2` in `regime/analytics.py`) is a weekly trend-and-stress state machine decided at each Friday close on the daily S&P 500 series, with credit spreads, unemployment and the yield curve as stress inputs, each lagged by its publication delay. It also writes a severity label, a warning flag and a separate 40-week trend warning, and keeps the retired v1 composite's inputs and sub-scores as diagnostic columns;
+4. writes the parquet file, its `.meta.json`, `crypto_milestones.json` and `patterns_v2_skill.json` to `--output-dir` (default `data/processed/`), each through a temporary file that then replaces the old one.
 
 ```bash
-cd web
-npm install
-npm run dev
+python -m scripts.flows.macro_ingestion --check-key   # validate FRED_API_KEY, if you have one
+python -m scripts.flows.macro_ingestion               # fetch (reusing fresh caches, see below) and build
+python -m scripts.flows.macro_ingestion --refresh     # ignore the caches
+python -m scripts.flows.macro_ingestion --offline     # build from the caches only, with no network requests
 ```
 
-### Running Individual Services
+Other options: `--series`, `--start`, `--end`, `--output-dir`, `--cache-dir`, `--max-age-hours` (default 24: how old a cached FRED series may be before it is fetched again), `--delay` (default 0.6 seconds between FRED requests) and `--verbose`. The other caches have fixed lifetimes (24 hours for Bitcoin and the Yahoo Finance series, 7 days for gold); the high-yield spread archive is reused until `--refresh`.
+
+The manual GitHub workflow `macro-ingestion.yml` runs the flow with `--source api` and the repository's `FRED_API_KEY` secret, then uploads the four files as a workflow artifact named `macro-regime-history`. It does not commit them. The site picks up new data only after the files are committed and deployed, because the image copies them at build time.
+
+## Configuration
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3001` | Comma-separated browser origins allowed by CORS |
+| `LOAD_ML_MODELS` | `0` | `1` loads `hmm_model.joblib` and `xgboost_model.joblib` at startup. No endpoint uses them, and the image does not contain them |
+| `ENABLE_LEGACY_WEBSOCKET` | `0` | `1` mounts the simulated Socket.IO feed from `websocket_server.py` |
+| `HISTORICAL_EVENTS_DB` | `data/historical_events.db` | Path of the SQLite event store |
+| `HISTORICAL_EVENTS_SEED` | `data/historical_events.json` | Seed file for the event store |
+| `FRED_API_KEY` | unset | Ingestion only. Read from the environment, `backend/.env` or the repository-root `.env` |
+
+Docker Compose sets `LOAD_ML_MODELS=0` and `ENABLE_LEGACY_WEBSOCKET=0`, keeps the event store on the `historical-data` volume (`/app/data/runtime/historical_events.db`), and takes `CORS_ORIGINS` from the repository-root `.env` on the host. `.env.example` in this folder lists the same variables.
+
+## Tests
+
+The "Backend tests" job in `.github/workflows/deploy-lightsail.yml` runs on every push to `main` and must pass before the deploy job starts. It installs `requirements-minimal.txt` on Python 3.11.9 and runs, from this directory with `PYTHONPATH=src:.`:
 
 ```bash
-# Prediction service
-cd services/prediction
-python main.py
-
-# Gann service
-cd services/gann
-python main.py
+python -m pytest \
+  tests/test_energy_metric_compiler.py \
+  tests/test_historical_parallels.py \
+  tests/test_macro_ingestion.py \
+  tests/test_patterns.py \
+  tests/test_regime_service.py \
+  tests/test_regime_cases.py \
+  -q
 ```
 
----
+On Windows, set `PYTHONPATH` to `src;.` instead.
 
-## 🚢 Deployment
+| Module | Covers |
+|---|---|
+| `test_energy_metric_compiler.py` | Polarity states, intensity weights and the bounded energy score |
+| `test_historical_parallels.py` | Event geometry, seeding and categories, the dual-epoch split and the forecast ladder |
+| `test_macro_ingestion.py` | The series registry, FRED and Yahoo parsing, the daily merge, NBER alignment, the macro strength meter, the S&P 500 series, the asset series and the Core Index |
+| `test_patterns.py` | The 120-year date, the one-year forward window and the fallback for assets with short histories; Study of Patterns v2 causality (no look-ahead), its API contract and the committed skill artifact |
+| `test_regime_service.py` | Macro history, regime runs, the 30-day probability, input validation and crypto milestones |
+| `test_regime_cases.py` | The Convergence case catalogue (in progress): episode detection, case and path contracts, caching and routes |
 
-### Kubernetes (Production)
+## Legacy code not used by the site
 
-```bash
-# Create namespace
-kubectl create namespace astrofinance
+This backend grew out of an earlier project, Astro Finance. Older experiments from that project were removed on 28 October 2026: its ML training and validation scripts, two microservices, Pine Script indicators, Prefect, Kubernetes and Prometheus configuration, and planning notes. Git history keeps them. The files below remain; strikehike.com does not run them, and the figures they contain are not claims about the current product.
 
-# Apply secrets
-kubectl apply -f kubernetes/secrets.yaml
+| Path | What it is | Status |
+|---|---|---|
+| `src/astro_finance/`, apart from `energy_metric_compiler.py` and `historical_parallels.py` | The earlier pipeline: data ingestion, features, Gann tools, models, validation and an older API | Copied into the image with `src/` but not imported by `api_server:app` (running `python api_server.py` directly also mounts `api/gann_routes.py`) |
+| `websocket_server.py` | A simulated Socket.IO feed | Off unless `ENABLE_LEGACY_WEBSOCKET=1` |
+| `data/processed/*.joblib`, `data/processed/*.pth`, `final_data_with_gann.csv`, `merged_data.csv`, `retraining_summary.json`, `data/validation_results_*.csv`, `data/raw/` | Model files, inputs and outputs from the earlier project | Not in the image |
+| `config/`, `requirements.txt` | The earlier pipeline's settings and its full dependency list | Not used by CI or the deploy |
 
-# Deploy services
-kubectl apply -f kubernetes/
-
-# Check status
-kubectl get pods -n astrofinance
-```
-
-### Environment Variables
-
-```bash
-# .env file
-POSTGRES_PASSWORD=your_secure_password
-REDIS_HOST=redis-service
-DATABASE_URL=postgresql://user:pass@host:5432/db
-CORS_ORIGINS=https://yourdomain.com
-```
-
----
-
-## 📈 Monitoring
-
-### Grafana Dashboards
-
-- **Service Health**: Uptime, latency, error rates
-- **ML Performance**: Predictions/min, accuracy drift
-- **Infrastructure**: CPU, memory, network
-- **Business**: API calls, users, revenue
-
-### Prometheus Metrics
-
-- `http_requests_total`: Total HTTP requests
-- `http_request_duration_seconds`: Request latency
-- `prediction_inference_time`: Model inference time
-- `cache_hit_ratio`: Redis cache effectiveness
-
-### Alerts
-
-- Service down > 1 minute → **Page**
-- Error rate > 5% → **Page**
-- p99 latency > 2s → **Slack**
-- Model drift detected → **Email**
-
----
-
-## 🔐 Security
-
-- ✅ JWT authentication with tier-based rate limiting
-- ✅ TLS 1.3 encryption (in-transit)
-- ✅ AES-256 encryption (at-rest)
-- ✅ Secrets management (AWS Secrets Manager)
-- ✅ Vulnerability scanning (Trivy + Snyk)
-- ✅ DDoS protection (Cloudflare)
-- ✅ WAF with OWASP rules
-
----
-
-## 📝 Project Structure
-
-```
-astro_finance/
-├── src/astro_finance/       # Core Python library
-│   ├── features/            # Feature engineering
-│   ├── gann/                # Gann Theory modules
-│   ├── astronomy/           # Lunar & planetary
-│   └── api/                 # API routes
-├── services/                # Microservices
-│   ├── prediction/          # ML inference service
-│   ├── gann/                # Gann calculations
-│   └── lunar/               # Astronomy service
-├── web/                     # Next.js dashboard
-├── tradingview/             # Pine Script indicators
-├── kubernetes/              # K8s manifests
-├── monitoring/              # Prometheus/Grafana
-├── scripts/                 # Utility scripts
-├── tests/                   # Test suite
-└── data/                    # Datasets & models
-```
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
-
-**Coding Standards:**
-- Python: ruff + mypy + pytest (90%+ coverage)
-- TypeScript: ESLint + Prettier
-- Commits: Conventional Commits format
-
----
-
-## 📄 License
-
-This project is licensed under the Mozilla Public License 2.0 - see [LICENSE](LICENSE) file.
-
----
-
-## 🙏 Acknowledgments
-
-- Swiss Ephemeris for astronomical calculations
-- TradingView for charting platform
-- XGBoost team for ML framework
-- Open-source community
-
----
-
-## ⚠️ Disclaimer
-
-**This software is for educational and research purposes only.**
-
-- Not financial advice
-- Past performance ≠ future results
-- Use at your own risk
-- Always implement proper risk management
-
----
-
-## 📞 Contact & Support
-
-- **Documentation**: https://docs.astrofinance.com
-- **Issues**: https://github.com/yourusername/astro_finance/issues
-- **Email**: support@astrofinance.com
-- **Discord**: https://discord.gg/astrofinance
-
----
-
-## 🗺️ Roadmap
-
-### Q1 2026
-- [x] Phase 1: ML Models (97.67% accuracy) ✅
-- [x] Phase 2: Web Dashboard ✅
-- [x] Phase 3: Enterprise Infrastructure 🔨
-- [x] Phase 3: Complete TradingView Suite
-
-### Q2 2026
-- [ ] Phase 4: Mobile App (React Native)
-- [ ] Real-time API for TradingView indicators
-- [ ] Portfolio-level risk aggregation
-- [ ] Multi-asset support (stocks, forex, commodities)
-
-### Q3 2026
-- [ ] Options strategies integration
-- [ ] Social sentiment analysis
-- [ ] Voice assistant (Alexa/Google Home)
-- [ ] White-label platform
-
----
-
-**Built with ❤️ by the Astro Finance Team**
-
-*Combining ancient wisdom with modern AI*
+`pyproject.toml` also dates from the earlier project; pytest still reads its `[tool.pytest.ini_options]` section.

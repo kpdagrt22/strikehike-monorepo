@@ -28,6 +28,7 @@ COPY data/processed/final_data_with_regimes.csv ./data/processed/final_data_with
 COPY data/processed/macro_regime_history.parquet ./data/processed/macro_regime_history.parquet
 COPY data/processed/macro_regime_history.meta.json ./data/processed/macro_regime_history.meta.json
 COPY data/processed/crypto_milestones.json ./data/processed/crypto_milestones.json
+COPY data/processed/patterns_v2_skill.json ./data/processed/patterns_v2_skill.json
 
 RUN mkdir -p /app/data/runtime
 

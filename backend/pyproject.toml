@@ -8,7 +8,7 @@ name = "astro_finance"
 version = "0.1.0"
 description = "Astro Finance Market Regime Intelligence"
 authors = [
-    {name = "Antigravity", email = "agent@google.com"},
+    {name = "Prakash Kantumutchu"},
 ]
 dependencies = [
     "pandas",
