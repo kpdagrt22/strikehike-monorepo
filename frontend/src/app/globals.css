@@ -75,7 +75,7 @@
   --sh-hover: rgb(20 18 26 / 0.04);
   --sh-press: rgb(20 18 26 / 0.08);
   --sh-selected: rgb(20 18 26 / 0.07);
-  --sh-focus: rgb(192 68 47 / 0.7);
+  --sh-focus: rgb(192 68 47);
 }
 
 .dark {
@@ -95,6 +95,26 @@
   --sh-press: rgb(255 255 255 / 0.1);
   --sh-selected: rgb(255 255 255 / 0.08);
   --sh-focus: rgb(255 139 119 / 0.75);
+}
+
+/* While the nav pill is open it sits over other corner chrome. On phones the
+   Info trigger steps aside; on narrower desktops the energy gauge recedes and
+   its own opacity transition fades it. Both return as soon as the pill starts
+   its exit (it is inert then), so they crossfade with it. The gauge rule sits
+   in the components layer so a mobile sheet's max-lg:opacity-0 still wins. */
+@media (max-width: 639.98px) {
+  body:has(#site-nav-expanded:not([inert])) #contact > button {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@layer components {
+  @media (min-width: 640px) and (max-width: 1499.98px) {
+    body:has(#site-nav-expanded:not([inert])) [data-hud="gauge"] {
+      opacity: 0.12;
+    }
+  }
 }
 
 @layer base {
@@ -132,6 +152,12 @@
   :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
     outline: 2px solid var(--sh-focus);
     outline-offset: 2px;
+  }
+
+  /* Headings that only receive focus by script (a dialog's title, main h1
+     after a dialog closes) are never in the Tab order: no UA box on them. */
+  :where(h1, h2)[tabindex="-1"]:focus {
+    outline: none;
   }
 }
 

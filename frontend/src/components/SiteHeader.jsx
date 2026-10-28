@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { ModeSwitch } from "@/components/ModeSwitch";
 import { INTENT, SPRING } from "@/lib/motion";
 import { useChronoStore } from "@/store/chronoStore";
@@ -48,6 +48,43 @@ function NakshatraHalo() {
         ),
       )}
     </svg>
+  );
+}
+
+// The open pill. While it plays its exit it is inert, so Tab and Shift+Tab
+// skip links that are about to unmount and focus never drops to <body>.
+function NavPill({ onNavigate }) {
+  const isPresent = useIsPresent();
+
+  return (
+    <motion.div
+      id="site-nav-expanded"
+      inert={!isPresent}
+      initial={{ opacity: 0, x: 16, scale: 0.96 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 12, scale: 0.98 }}
+      transition={SPRING.panel}
+      className="pointer-events-auto -mr-12 flex h-12 min-w-0 origin-right items-center gap-1 rounded-full border border-black/10 bg-white/85 py-1 pl-2 pr-[3.25rem] shadow-[0_18px_60px_rgba(20,18,26,0.18)] backdrop-blur-2xl dark:border-white/10 dark:bg-[rgb(11_11_18/0.85)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.6)] sm:gap-2 sm:pl-2.5"
+    >
+      <Link
+        href="/"
+        prefetch={false}
+        onClick={onNavigate}
+        aria-label="strikehike.com — home"
+        className="hidden shrink-0 items-baseline rounded-full px-2 py-1.5 text-[#14121a] transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] min-[460px]:inline-flex dark:text-[#f2ede4] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+      >
+        <span className="text-strong font-semibold tracking-[-0.03em]">
+          strikehike
+        </span>
+        <span className="text-micro font-medium tracking-[0.02em] text-[#c0442f] dark:text-[#ff8b77]">
+          .com
+        </span>
+      </Link>
+
+      <div className="min-w-0">
+        <ModeSwitch onNavigate={onNavigate} variant="bare" />
+      </div>
+    </motion.div>
   );
 }
 
@@ -112,15 +149,18 @@ export function SiteHeader() {
     const handleOutside = (event) => {
       if (!headerRef.current?.contains(event.target)) close();
     };
+    // On document, so it runs before window listeners (the planet readout);
+    // marking Escape as handled means one press closes one layer.
     const handleKey = (event) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       close(Boolean(headerRef.current?.contains(document.activeElement)));
+      event.preventDefault();
     };
     document.addEventListener("pointerdown", handleOutside);
-    window.addEventListener("keydown", handleKey);
+    document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("pointerdown", handleOutside);
-      window.removeEventListener("keydown", handleKey);
+      document.removeEventListener("keydown", handleKey);
     };
   }, [open, close, armBackstop]);
 
@@ -203,7 +243,7 @@ export function SiteHeader() {
     <header
       ref={headerRef}
       id="site-nav-bubble"
-      className="pointer-events-none fixed right-2 top-2 z-[70] flex max-w-[calc(100vw-1rem)] flex-row-reverse items-center sm:right-5 sm:top-5"
+      className="pointer-events-none fixed right-3 top-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-row-reverse items-center sm:right-5 sm:top-5"
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
       onFocusCapture={handleFocusCapture}
@@ -221,7 +261,7 @@ export function SiteHeader() {
         className={`pointer-events-auto relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-full border text-[#14121a] transition-[background-color,border-color,box-shadow,scale] duration-(--sh-dur-micro) active:scale-[0.97] dark:text-[#f2ede4] ${
           open
             ? "border-transparent bg-transparent hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
-            : "border-black/10 bg-white/45 shadow-[0_14px_44px_rgba(20,18,26,0.18)] backdrop-blur-2xl hover:border-[#f05d49]/35 hover:bg-white/65 focus-visible:border-[#f05d49]/35 focus-visible:bg-white/65 dark:border-white/10 dark:bg-black/40 dark:shadow-[0_14px_44px_rgba(0,0,0,0.55)] dark:hover:border-[#ff8b77]/30 dark:hover:bg-black/55 dark:focus-visible:border-[#ff8b77]/30 dark:focus-visible:bg-black/55"
+            : "border-black/10 bg-white/45 shadow-(--sh-shadow-float) backdrop-blur-2xl hover:border-[#f05d49]/35 hover:bg-white/65 focus-visible:border-[#f05d49]/35 focus-visible:bg-white/65 dark:border-white/10 dark:bg-black/40 dark:hover:border-[#ff8b77]/30 dark:hover:bg-black/55 dark:focus-visible:border-[#ff8b77]/30 dark:focus-visible:bg-black/55"
         }`}
       >
         <Image
@@ -237,36 +277,7 @@ export function SiteHeader() {
       </button>
 
       <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            key="expanded"
-            id="site-nav-expanded"
-            initial={{ opacity: 0, x: 16, scale: 0.96 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 12, scale: 0.98 }}
-            transition={SPRING.panel}
-            className="pointer-events-auto -mr-12 flex h-12 min-w-0 origin-right items-center gap-1 rounded-full border border-black/10 bg-white/60 py-1 pl-2 pr-[3.25rem] shadow-[0_18px_60px_rgba(20,18,26,0.18)] backdrop-blur-2xl dark:border-white/10 dark:bg-[#0b0b12]/70 dark:shadow-[0_18px_60px_rgba(0,0,0,0.6)] sm:gap-2 sm:pl-2.5"
-          >
-            <Link
-              href="/"
-              prefetch={false}
-              onClick={navigate}
-              aria-label="strikehike.com — home"
-              className="hidden shrink-0 items-baseline rounded-full px-2 py-1.5 text-[#14121a] transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] min-[460px]:inline-flex dark:text-[#f2ede4] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
-            >
-              <span className="text-strong font-semibold tracking-[-0.03em]">
-                strikehike
-              </span>
-              <span className="text-micro font-medium tracking-[0.02em] text-[#c0442f] dark:text-[#ff8b77]">
-                .com
-              </span>
-            </Link>
-
-            <div className="min-w-0">
-              <ModeSwitch onNavigate={navigate} variant="bare" />
-            </div>
-          </motion.div>
-        ) : null}
+        {open ? <NavPill key="expanded" onNavigate={navigate} /> : null}
       </AnimatePresence>
     </header>
   );

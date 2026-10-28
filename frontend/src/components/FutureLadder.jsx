@@ -81,11 +81,12 @@ export function FutureLadder() {
         id="chrono-ladder-sheet"
         className="overflow-hidden rounded-2xl border border-black/10 bg-white/92 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/35 lg:dark:bg-black/25"
       >
-        <div className="flex items-start justify-between gap-2 border-b border-black/10 px-3.5 py-3 dark:border-white/10">
+        <div className="flex items-start justify-between gap-2 border-b border-black/10 px-4 py-3.5 dark:border-white/10">
           <div>
             <h2
               id="chrono-ladder-title"
-              className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60"
+              tabIndex={-1}
+              className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
             >
               Future ladder
             </h2>
@@ -123,7 +124,7 @@ export function FutureLadder() {
           </div>
         </div>
 
-        <div className="max-h-[min(24rem,55dvh)] overflow-y-auto p-1.5 [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-33.25rem)))]">
+        <div className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-33.25rem)))]">
           {error ? (
             <p className="px-2 py-3 text-meta text-black/80 dark:text-white/80">
               <span
@@ -133,7 +134,14 @@ export function FutureLadder() {
               {"Forecast unavailable · "}
               <button
                 type="button"
-                onClick={() => setReloadKey((key) => key + 1)}
+                onClick={() => {
+                  // Retry unmounts with the error line: keep focus on the
+                  // panel heading.
+                  document
+                    .getElementById("chrono-ladder-title")
+                    ?.focus({ preventScroll: true });
+                  setReloadKey((key) => key + 1);
+                }}
                 className="-my-3 inline-block py-3 font-medium underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current lg:-my-1 lg:py-1"
               >
                 Retry
@@ -164,14 +172,14 @@ export function FutureLadder() {
                   setFocusedDate(match.date);
                   if (sheetOpen) dismissSheet({ restoreFocus: true });
                 }}
-                className="group flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-colors duration-[140ms] hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+                className="group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors duration-[140ms] hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
                 <span
                   className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ backgroundColor: tone.color }}
                 />
                 <span className="min-w-0">
-                  <span className="block text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
+                  <span className="block text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                     In {match.days_ahead} days · {match.similarity_percent}%
                   </span>
                   <span className="mt-0.5 block text-body leading-snug text-black/75 group-hover:text-[#14121a] dark:text-white/70 dark:group-hover:text-white">

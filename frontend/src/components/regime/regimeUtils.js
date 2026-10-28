@@ -1,9 +1,6 @@
-const DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
+// Fixed three-letter months ("Sep", never "Sept"), so every date is the same
+// width and the HUD does not shift while scrubbing.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const CRIMSON = "#ef4444";
 
@@ -39,7 +36,8 @@ export function formatDate(value) {
   const timestamp =
     typeof value === "number" ? value : parseIsoDay(value);
   if (timestamp == null || !Number.isFinite(timestamp)) return "—";
-  return DATE_FORMATTER.format(new Date(timestamp));
+  const d = new Date(timestamp);
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 export function formatNumber(value, digits = 0) {

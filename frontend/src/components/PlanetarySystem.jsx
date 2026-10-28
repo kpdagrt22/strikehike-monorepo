@@ -303,6 +303,30 @@ function createPlanetTextures(planet) {
   return { map, bumpMap };
 }
 
+/**
+ * Sun corona and Earth atmosphere: the additive back-face shell fades toward
+ * its silhouette, so it reads as a soft glow instead of a hard-edged disc.
+ * Module-level, so both shells share one program (stable cache key).
+ */
+function rimFade(shader) {
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", "#include <common>\nvarying float vShRim;")
+    .replace(
+      "#include <project_vertex>",
+      "#include <project_vertex>\nvShRim = abs(dot(normalize(normalMatrix * normal), normalize(-mvPosition.xyz)));",
+    );
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", "#include <common>\nvarying float vShRim;")
+    .replace(
+      "#include <opaque_fragment>",
+      "diffuseColor.a *= pow(vShRim, 1.5);\n#include <opaque_fragment>",
+    );
+}
+
+function rimFadeKey() {
+  return "sh-rim-fade";
+}
+
 function OrbitRing({ radius, isDark, regimeColor = null }) {
   const materialRef = useRef(null);
   const invalidate = useThree((state) => state.invalidate);
@@ -500,11 +524,13 @@ function Earth({
         <meshBasicMaterial
           color={isDark ? "#4d9fff" : "#8dc8ff"}
           transparent
-          opacity={0.12}
+          opacity={0.2}
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           toneMapped={false}
+          onBeforeCompile={rimFade}
+          customProgramCacheKey={rimFadeKey}
         />
       </mesh>
 
@@ -558,6 +584,7 @@ function Planet({
   const clearPinnedEntity = useEntityStore(
     (state) => state.clearPinnedEntity,
   );
+  const setReadoutSide = useEntityStore((state) => state.setReadoutSide);
   const isHovered = useEntityStore(
     (state) => state.hoveredEntity?.name === planet.name,
   );
@@ -680,8 +707,13 @@ function Planet({
 
   if (!body || !entity) return null;
 
+  // The readout docks opposite the body (event.pointer is in NDC). It is
+  // chosen once per hover, and never while another readout is pinned.
   const handlePointerOver = (event) => {
     event.stopPropagation();
+    if (!useEntityStore.getState().pinnedEntity) {
+      setReadoutSide(event.pointer.x > 0 ? "left" : "right");
+    }
     setHoveredEntity(entity);
   };
 
@@ -695,8 +727,12 @@ function Planet({
   const handleClick = (event) => {
     event.stopPropagation();
     if (event.delta > TAP_SLOP_PX) return;
-    if (isPinned) clearPinnedEntity();
-    else pinEntity(entity);
+    if (isPinned) {
+      clearPinnedEntity();
+    } else {
+      setReadoutSide(event.pointer.x > 0 ? "left" : "right");
+      pinEntity(entity);
+    }
   };
 
   const isSun = planet.name === "Sun";
@@ -705,16 +741,18 @@ function Planet({
     <group ref={positionRef}>
       <group ref={scaleRef}>
         {isSun ? (
-          <mesh scale={1.24} raycast={() => {}}>
+          <mesh scale={1.3} raycast={() => {}}>
             <sphereGeometry args={[planet.size, 48, 48]} />
             <meshBasicMaterial
               color="#ffb347"
               transparent
-              opacity={isDark ? 0.12 : 0.08}
+              opacity={isDark ? 0.22 : 0.14}
               side={THREE.BackSide}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
               toneMapped={false}
+              onBeforeCompile={rimFade}
+              customProgramCacheKey={rimFadeKey}
             />
           </mesh>
         ) : null}

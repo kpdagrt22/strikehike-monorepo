@@ -13,6 +13,7 @@ export function FeedbackModule() {
   const timerRef = useRef(null);
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
+  const textareaRef = useRef(null);
   const timeControlsExpanded = useChronoStore(
     (state) => state.timeControlsExpanded,
   );
@@ -59,13 +60,16 @@ export function FeedbackModule() {
 
     setThoughts("");
     setSaved(true);
+    // Send is disabled once the field clears; keep focus in the form rather
+    // than letting it drop to <body>.
+    textareaRef.current?.focus({ preventScroll: true });
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setSaved(false), 4000);
   };
 
   return (
     <div
-      className={`pointer-events-auto fixed bottom-32 left-6 z-30 flex flex-col-reverse items-start gap-3 lg:bottom-6 lg:left-6 ${
+      className={`pointer-events-auto fixed bottom-[8.75rem] left-3 z-30 flex flex-col-reverse items-start gap-3 sm:left-5 lg:bottom-5 ${
         timeControlsExpanded || mobileSheet || readoutPinned
           ? "max-lg:hidden"
           : ""
@@ -156,6 +160,7 @@ export function FeedbackModule() {
                 Your thoughts
               </label>
               <textarea
+                ref={textareaRef}
                 id="strikehike-thoughts"
                 value={thoughts}
                 onChange={(event) => setThoughts(event.target.value)}

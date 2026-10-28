@@ -11,7 +11,7 @@ import { PatternSparkline } from "@/components/patterns/PatternSparkline";
 
 function Stat({ label, value, color }) {
   return (
-    <div className="min-w-0">
+    <div className="flex min-w-0 flex-col justify-between">
       <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
         {label}
       </p>
@@ -59,7 +59,7 @@ export function PatternMarketCard({
           : "#0f766e";
 
   return (
-    <article className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
+    <article className="overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/40">
       <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -73,7 +73,7 @@ export function PatternMarketCard({
               {label}
             </h3>
           </div>
-          <span className="font-mono text-micro text-black/60 dark:text-white/60">
+          <span className="shrink-0 whitespace-nowrap font-mono text-micro text-black/60 dark:text-white/60">
             {formatDate(date)}
           </span>
         </div>

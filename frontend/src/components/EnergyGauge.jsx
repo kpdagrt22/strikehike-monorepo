@@ -38,7 +38,7 @@ function SelectedDayParallel({ parallels }) {
               className="h-1.5 w-1.5 shrink-0 rounded-full"
               style={{ backgroundColor: tone.color }}
             />
-            <span className="text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
+            <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
               Most Similar Day
             </span>
           </span>
@@ -88,6 +88,7 @@ export function EnergyGauge({ isDark = true }) {
 
   return (
     <div
+      data-hud="gauge"
       className={`pointer-events-none absolute left-1/2 top-[4.5rem] z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:top-6 sm:w-[min(23rem,calc(100vw-2rem))] ${
         mobileSheet ? "max-lg:opacity-0" : ""
       }`}
@@ -156,7 +157,7 @@ export function EnergyGauge({ isDark = true }) {
           <span className="text-[32px] font-light leading-none tabular-nums tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4]">
             {score === null ? "—" : Math.round(score)}
           </span>
-          <span className="mt-1 text-micro font-medium uppercase tracking-[0.18em] text-black/60 dark:text-white/60">
+          <span className="mt-1 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             Energy
           </span>
         </div>

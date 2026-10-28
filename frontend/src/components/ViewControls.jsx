@@ -84,7 +84,7 @@ export function RegimeOverlayButton({ compact = false }) {
       className={
         compact
           ? `relative grid h-11 w-11 place-items-center rounded-full transition-colors duration-[140ms] ${stateClass}`
-          : `flex h-11 items-center gap-2 rounded-full border border-transparent px-2.5 text-micro font-medium uppercase tracking-[0.12em] transition-colors duration-[140ms] ${stateClass}`
+          : `flex h-11 items-center gap-2 rounded-full border border-transparent px-2.5 text-micro font-medium uppercase tracking-[0.14em] transition-colors duration-[140ms] ${stateClass}`
       }
     >
       {compact ? (

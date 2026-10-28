@@ -92,17 +92,25 @@ async function loadMacroHistory(
   }
 }
 
+// The only parameters the FastAPI endpoint accepts, in a fixed order.
+const UPSTREAM_PARAMS = ["resolution", "start", "end"];
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const atlasRequested = searchParams.get("view") === "atlas";
-  const atlas = atlasRequested && searchParams.get("resolution") === "weekly";
-  if (atlasRequested) searchParams.delete("view");
+  const atlas =
+    searchParams.get("view") === "atlas" &&
+    searchParams.get("resolution") === "weekly";
 
-  const query = searchParams.toString();
-  const keyParams = new URLSearchParams(searchParams);
-  keyParams.sort();
+  // One canonical query is both the upstream request and the cache key, so
+  // unknown parameters can neither reach the backend nor mint new entries.
+  const canonical = new URLSearchParams();
+  for (const name of UPSTREAM_PARAMS) {
+    const value = searchParams.get(name);
+    if (value !== null) canonical.set(name, value);
+  }
+  const query = canonical.toString();
   const result = await cachedRoute(
-    `macro-history:${atlas ? "atlas" : "full"}?${keyParams.toString()}`,
+    `macro-history:${atlas ? "atlas" : "full"}?${query}`,
     CACHE_POLICY,
     () => loadMacroHistory(query, atlas),
   );

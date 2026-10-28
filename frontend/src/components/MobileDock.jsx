@@ -91,7 +91,9 @@ export function MobileDock() {
               aria-pressed={active}
               title={`${button.label} panel`}
               whileTap={{ scale: 0.97 }}
-              className={`relative flex h-11 items-center gap-1.5 rounded-full px-3 text-meta font-medium transition-colors duration-[140ms] ${
+              // Below 340px the labels go to screen readers only and the
+              // buttons become 44px icons, so the whole dock fits.
+              className={`relative flex h-11 items-center gap-1.5 rounded-full px-3 text-meta font-medium transition-colors duration-[140ms] max-[339px]:w-11 max-[339px]:justify-center max-[339px]:px-0 ${
                 active
                   ? SELECTED
                   : "text-black/65 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/65 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
@@ -109,7 +111,7 @@ export function MobileDock() {
               >
                 {button.icon}
               </svg>
-              <span>{button.label}</span>
+              <span className="max-[339px]:sr-only">{button.label}</span>
               {active ? (
                 <span
                   className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-current"

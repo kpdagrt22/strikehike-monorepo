@@ -186,7 +186,7 @@ function PickerDialog({
         tabIndex={-1}
         aria-hidden="true"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[#e3dbcf]/55 backdrop-blur-[2px] dark:bg-black/40"
       />
 
       <motion.section

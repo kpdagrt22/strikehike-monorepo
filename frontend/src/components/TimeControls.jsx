@@ -119,7 +119,7 @@ const FutureLane = memo(function FutureLane({
 
   return (
     <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
-      <div className="flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
+      <div className="flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
         <span>Next 180 days</span>
         <span>
           {error
@@ -382,7 +382,11 @@ export function TimeControls() {
       onMouseLeave={() => {
         if (!scrubbing && !pickerOpen) setExpanded(false);
       }}
-      onFocusCapture={() => setExpanded(true)}
+      // An open dock sheet follows the tray in the DOM: keyboard focus passing
+      // through must not expand the tray, which would close that sheet.
+      onFocusCapture={() => {
+        if (!useChronoStore.getState().mobileSheet) setExpanded(true);
+      }}
       onBlurCapture={(event) => {
         if (
           !event.currentTarget.contains(event.relatedTarget) &&
@@ -409,11 +413,11 @@ export function TimeControls() {
           aria-label={`Focused date: ${
             tithiLine ? `${tithiLine}, ` : ""
           }${dateTimeLabel}. Open timeline.`}
-          // With a tithi line on phones the label takes the row beside the
-          // dot and the date wraps beneath it, instead of squeezing the label.
+          // Expanded on phones, the label takes the row beside the dot and the
+          // date wraps beneath it, so the label never breaks onto two lines.
           // The tray clips overflow, so the focus ring is drawn inset.
           className={`flex min-h-11 flex-1 items-center gap-2.5 rounded-xl px-4 py-2.5 text-left focus-visible:outline-offset-[-3px] ${
-            expanded && tithiLine ? "max-sm:flex-wrap max-sm:gap-y-1" : ""
+            expanded ? "max-sm:flex-wrap max-sm:gap-y-1" : ""
           }`}
         >
           <span
@@ -423,11 +427,7 @@ export function TimeControls() {
           />
 
           {expanded ? (
-            <span
-              className={`text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60 ${
-                tithiLine ? "max-sm:basis-[calc(100%-1rem)]" : ""
-              }`}
-            >
+            <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60 max-sm:basis-[calc(100%-1rem)]">
               Focused date
               {tithiLine ? ` · ${tithiLine}` : null}
             </span>
@@ -461,7 +461,7 @@ export function TimeControls() {
           className="group flex min-h-11 shrink-0 items-center px-1.5 focus-visible:outline-none"
         >
           <span
-            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-micro font-medium uppercase tracking-[0.1em] transition-colors duration-[140ms] group-focus-visible:ring-2 group-focus-visible:ring-[rgb(192_68_47/0.7)] dark:group-focus-visible:ring-[rgb(255_139_119/0.75)] ${
+            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-micro font-medium uppercase tracking-[0.14em] transition-colors duration-[140ms] group-focus-visible:ring-2 group-focus-visible:ring-(--sh-focus) ${
               isToday
                 ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
                 : "text-black/60 group-hover:bg-black/[0.04] group-hover:text-[#14121a] group-focus-visible:bg-black/[0.04] dark:text-white/60 dark:group-hover:bg-white/[0.06] dark:group-hover:text-[#f2ede4] dark:group-focus-visible:bg-white/[0.06]"
@@ -534,7 +534,7 @@ export function TimeControls() {
               </div>
 
               <div className="mt-2 flex items-center gap-2.5">
-                <span className="whitespace-nowrap text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
+                <span className="whitespace-nowrap text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                   Precise UTC
                 </span>
                 <button
@@ -546,7 +546,7 @@ export function TimeControls() {
                   aria-haspopup="dialog"
                   aria-expanded={pickerOpen}
                   aria-label={`Edit precise UTC date and time, ${dateTimeLabel}`}
-                  className="group flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-black/10 bg-black/[0.025] py-1 pl-3 pr-2 text-left text-meta tabular-nums tracking-[-0.01em] text-black/70 outline-none transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-[rgb(192_68_47/0.7)] sm:h-9 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06] dark:focus-visible:ring-[rgb(255_139_119/0.75)]"
+                  className="group flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-black/10 bg-black/[0.025] py-1 pl-3 pr-2 text-left text-meta tabular-nums tracking-[-0.01em] text-black/70 outline-none transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-(--sh-focus) sm:h-9 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
                 >
                   <svg
                     viewBox="0 0 16 16"
@@ -577,7 +577,7 @@ export function TimeControls() {
               {/* Edge of time: at the first or last day an end label extends
                   (200 ms crossfade, instant under reduced motion) while the
                   centre status steps aside, so nothing reflows. */}
-              <div className="relative mt-2.5 flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
+              <div className="relative mt-2.5 flex items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                 <span
                   className={`${EDGE_FADE} ${
                     edgeShown && atStart ? "opacity-0" : ""

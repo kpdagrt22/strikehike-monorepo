@@ -36,7 +36,9 @@ const Canvas3D = dynamic(
 // A date change counts as the visitor's own when it follows a pointer, key or
 // input event this closely. Load, deep links and hover are never announced.
 const USER_INTENT_WINDOW_MS = 1500;
-const ANNOUNCE_SETTLE_MS = 700;
+// Long enough that deliberate one-step-a-second travel is announced once,
+// when it stops.
+const ANNOUNCE_SETTLE_MS = 1500;
 
 const announceDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",

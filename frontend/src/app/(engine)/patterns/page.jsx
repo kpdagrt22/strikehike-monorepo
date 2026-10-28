@@ -104,7 +104,7 @@ function AssetLens({ assetKey, onChange }) {
               type="button"
               onClick={() => onChange(key)}
               aria-pressed={selected}
-              className={`rounded-full px-3 py-1.5 text-micro font-medium transition-colors ${
+              className={`relative rounded-full px-3 py-1.5 text-micro font-medium transition-colors pointer-coarse:before:absolute pointer-coarse:before:inset-x-0 pointer-coarse:before:-inset-y-2.5 pointer-coarse:before:content-[''] ${
                 selected
                   ? "bg-white/80 text-(--lens-light) dark:bg-(--lens-dark)/12 dark:text-(--lens-dark)"
                   : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
@@ -217,12 +217,12 @@ export default function PatternsPage() {
   return (
     <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-3 sm:pt-4">
       <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
-        <header className="flex flex-col gap-4 pr-14 sm:pr-16 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Study of Patterns
             </p>
-            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-6xl">
+            <h1 className="mt-2 pr-16 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:pr-0">
               {assetKey === "nifty"
                 ? "The Indian market mirror."
                 : "The 120-year mirror."}
@@ -239,23 +239,23 @@ export default function PatternsPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/60">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:border-white/5 dark:bg-black/30 dark:text-white/60">
               <span
                 className="h-1.5 w-1.5 rounded-full bg-[#0f766e] dark:bg-[#5eead4]"
                 aria-hidden="true"
               />
               {fallback ? "Earliest mirror" : "120-year study"}
             </span>
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/60">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               {nowDate ? formatDate(nowDate) : "—"} ·{" "}
               {thenDate ? formatDate(thenDate) : "—"}
             </span>
           </div>
         </header>
 
-        <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/40 p-4 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-            <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 dark:border-white/5 dark:bg-white/[0.03]">
+        <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/40 p-4 dark:border-white/5 dark:bg-black/30 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-6">
+            <div className="px-2 py-2 sm:text-right">
               <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                 Today
               </p>
@@ -275,7 +275,7 @@ export default function PatternsPage() {
               </span>
               <span className="h-px w-10 bg-black/10 sm:h-8 sm:w-px dark:bg-white/15" />
             </div>
-            <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 dark:border-white/5 dark:bg-white/[0.03]">
+            <div className="px-2 py-2">
               <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                 {thenLabel}
               </p>
@@ -291,11 +291,11 @@ export default function PatternsPage() {
 
         <section className="mt-8">
           <SectionLabel number="01">Markets · then vs now</SectionLabel>
-          <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mt-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:justify-between">
             <h2
               ref={marketsHeadingRef}
               tabIndex={-1}
-              className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] focus:outline-none dark:text-[#f2ede4] sm:text-3xl"
+              className="text-balance text-2xl font-semibold tracking-[-0.04em] text-[#14121a] focus:outline-none dark:text-[#f2ede4] sm:text-3xl"
             >
               The same market animal.
             </h2>
@@ -375,11 +375,6 @@ export default function PatternsPage() {
               </>
             )}
           </div>
-          {fallback && data?.mirror_note ? (
-            <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
-              {data.mirror_note}
-            </p>
-          ) : null}
 
           {state.status === "ready" && data ? (
             <PeekIntoFuture
@@ -393,8 +388,8 @@ export default function PatternsPage() {
 
         <section className="mt-10">
           <SectionLabel number="02">Geopolitics &amp; science</SectionLabel>
-          <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
+          <div className="mt-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:justify-between">
+            <h2 className="text-balance text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
               Different tools, familiar tensions.
             </h2>
             <p className="max-w-xl text-micro leading-relaxed text-black/60 dark:text-white/60">
@@ -417,7 +412,6 @@ export default function PatternsPage() {
                 "A concentrated market leadership group becomes a political actor.",
               ]}
               accent={accent}
-              isDark={isDark}
             />
             {fallback && assetKey === "nifty" ? (
               <PatternEraPanel
@@ -432,7 +426,6 @@ export default function PatternsPage() {
                   "The 2009 election result becomes a political-risk release valve.",
                 ]}
                 accent={accent}
-                isDark={isDark}
               />
             ) : (
               <PatternEraPanel
@@ -447,7 +440,6 @@ export default function PatternsPage() {
                   "Rapid industrialisation and trust consolidation set up the Panic of 1907.",
                 ]}
                 accent={accent}
-                isDark={isDark}
               />
             )}
           </div>
@@ -455,7 +447,7 @@ export default function PatternsPage() {
 
         <section className="mt-10">
           <SectionLabel number="03">Repeatability index</SectionLabel>
-          <div className="mt-3 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-8">
+          <div className="mt-3 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/40 sm:p-8">
             <div className="grid gap-6 lg:grid-cols-[0.7fr_1.3fr] lg:items-center">
               <div className="relative border-black/5 lg:border-r lg:pr-8 dark:border-white/10">
                 <p className="text-micro font-medium uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
@@ -496,7 +488,7 @@ export default function PatternsPage() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
+                <h2 className="text-pretty text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
                   History does not repeat. It rhymes.
                 </h2>
                 <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70">
@@ -507,7 +499,7 @@ export default function PatternsPage() {
                   attracts capital, leverage amplifies the build-out, and the
                   bill arrives when the story stops compounding.
                 </p>
-                <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <div className="mt-5 grid sm:grid-cols-2">
                   {[
                     ["Emotion", "Fear and greed do not update with the technology."],
                     ["Debt", "Every boom finds a new way to borrow against the future."],
@@ -516,7 +508,7 @@ export default function PatternsPage() {
                   ].map(([label, text]) => (
                     <div
                       key={label}
-                      className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]"
+                      className="border-t border-(--sh-line-1) py-3 sm:odd:border-r sm:odd:pr-4 sm:even:pl-4"
                     >
                       <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                         {label}
@@ -545,13 +537,13 @@ export default function PatternsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/regime"
-              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
+              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
             >
               Open the Core Index atlas
             </Link>
             <Link
               href="/convergence"
-              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
+              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
             >
               Compare two events
             </Link>

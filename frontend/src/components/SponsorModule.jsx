@@ -26,7 +26,7 @@ export function SponsorModule() {
 
   return (
     <div
-      className={`pointer-events-auto fixed bottom-32 right-6 z-30 flex flex-col-reverse items-end gap-3 lg:bottom-6 lg:right-6 ${
+      className={`pointer-events-auto fixed bottom-[8.75rem] right-3 z-30 flex flex-col-reverse items-end gap-3 sm:right-5 lg:bottom-5 ${
         timeControlsExpanded || mobileSheet || readoutPinned
           ? "max-lg:hidden"
           : ""

@@ -86,6 +86,14 @@ export function RightPanel() {
     setOpen(true);
   };
 
+  // Retry unmounts with the error line: keep focus on the panel heading.
+  const retrySky = () => {
+    document
+      .getElementById("chrono-alignment-title")
+      ?.focus({ preventScroll: true });
+    retryPositions();
+  };
+
   const pillRef = useCallback((node) => {
     if (node && focusAfterSwap.current === "pill") {
       focusAfterSwap.current = null;
@@ -117,7 +125,7 @@ export function RightPanel() {
       ref={sheetRef}
       className={`${
         mobileOpen
-          ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block max-h-[70dvh] overflow-y-auto"
+          ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block"
           : "hidden"
       } pointer-events-auto lg:fixed lg:right-5 lg:top-[6.75rem] lg:z-30 lg:block lg:max-h-none lg:overflow-visible`}
     >
@@ -138,7 +146,7 @@ export function RightPanel() {
             }}
             id="chrono-alignment-sheet"
             aria-labelledby="chrono-alignment-title"
-            className="w-full overflow-hidden rounded-2xl border border-black/10 bg-white/92 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl lg:flex lg:max-h-[max(12.5rem,calc(100dvh-17.625rem))] lg:w-[min(20rem,calc(100vw-1.5rem))] lg:flex-col lg:bg-white/45 dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:dark:bg-black/25"
+            className="w-full overflow-hidden rounded-2xl border border-black/10 bg-white/92 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl max-lg:flex max-lg:max-h-[70dvh] max-lg:flex-col lg:flex lg:max-h-[max(12.5rem,calc(100dvh-17.625rem))] lg:w-[min(20rem,calc(100vw-1.5rem))] lg:flex-col lg:bg-white/45 dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:dark:bg-black/25"
           >
             {/* The panel itself is height-capped (ending above the view
                 pill); the list absorbs any extra header lines. */}
@@ -146,7 +154,8 @@ export function RightPanel() {
               <div className="min-w-0">
                 <h2
                   id="chrono-alignment-title"
-                  className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60"
+                  tabIndex={-1}
+                  className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
                 >
                   Current alignment
                 </h2>
@@ -163,7 +172,7 @@ export function RightPanel() {
                       {`Couldn't read the sky for ${momentLabel} · `}
                       <button
                         type="button"
-                        onClick={retryPositions}
+                        onClick={retrySky}
                         className="-my-3 inline-block py-3 font-medium underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current lg:-my-1 lg:py-1"
                       >
                         Retry
@@ -206,7 +215,7 @@ export function RightPanel() {
               </button>
             </div>
 
-            <div className="max-h-[calc(100dvh-13rem)] overflow-y-auto overscroll-contain px-2 py-2 [scrollbar-width:thin] lg:max-h-[max(8rem,calc(100dvh-22rem))] lg:min-h-0">
+            <div className="max-lg:min-h-0 max-lg:flex-1 overflow-y-auto overscroll-contain px-2 pt-2 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(8rem,calc(100dvh-22rem))] lg:min-h-0">
               {status === "loading" && !positions ? (
                 <p className="px-2 py-4 text-meta text-black/60 dark:text-white/60">
                   Reading sky…
@@ -253,7 +262,7 @@ export function RightPanel() {
                                     current === name ? null : name,
                                   )
                                 }
-                                className="text-left outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[rgb(192_68_47/0.7)] dark:focus-visible:after:ring-[rgb(255_139_119/0.75)]"
+                                className="text-left outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-(--sh-focus)"
                               >
                                 {name}
                               </button>
@@ -269,7 +278,7 @@ export function RightPanel() {
                             <span
                               className={`shrink-0 rounded-full border px-1.5 py-0.5 text-micro font-medium uppercase tracking-[0.06em] ${
                                 retro
-                                  ? "border-[#f05d49]/25 text-[#c0442f] dark:border-[#ff8b77]/25 dark:text-[#ff8b77]"
+                                  ? "border-transparent text-[#c0442f] dark:text-[#ff8b77]"
                                   : "border-transparent text-black/60 dark:text-white/60"
                               }`}
                             >
@@ -288,7 +297,7 @@ export function RightPanel() {
                               id={insightId}
                               className="mt-1.5 text-meta leading-relaxed text-black/70 dark:text-white/70"
                             >
-                              <span className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
+                              <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                                 ML index insight
                               </span>
                               {" · "}

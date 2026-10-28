@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Off the timeline",
+};
 
 const VIEWS = [
   { href: "/", label: "Orrery" },
@@ -11,7 +16,7 @@ const VIEWS = [
 export default function NotFound() {
   return (
     <main className="relative grid h-[100dvh] w-screen place-items-center overflow-hidden bg-[radial-gradient(ellipse_at_50%_28%,#ffffff_0%,#faf7f2_30%,#f1ebe2_62%,#e3dbcf_100%)] px-4 dark:bg-[radial-gradient(ellipse_at_50%_28%,#232330_0%,#141420_30%,#090910_62%,#020204_100%)]">
-      <div className="flex max-w-md flex-col items-center text-center">
+      <div className="flex max-w-xl flex-col items-center text-center">
         <Image
           src="/icon.png"
           alt=""
@@ -29,14 +34,14 @@ export default function NotFound() {
         </p>
         <nav
           aria-label="Engine views"
-          className="mt-8 flex flex-wrap justify-center gap-2"
+          className="mt-8 grid w-full max-w-64 gap-2 sm:flex sm:w-auto sm:max-w-none sm:justify-center"
         >
           {VIEWS.map((view) => (
             <Link
               key={view.href}
               href={view.href}
               prefetch={false}
-              className="inline-flex h-11 items-center rounded-full border border-black/10 bg-white/45 px-4 text-micro font-medium uppercase tracking-[0.14em] text-black/70 transition-colors duration-(--sh-dur-micro) hover:bg-white/75 hover:text-black/90 focus-visible:bg-white/75 focus-visible:text-black/90 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:bg-white/[0.08] dark:hover:text-white/90 dark:focus-visible:bg-white/[0.08] dark:focus-visible:text-white/90"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-white/45 px-4 text-micro font-medium uppercase tracking-[0.14em] text-black/70 transition-colors duration-(--sh-dur-micro) hover:bg-white/75 hover:text-black/90 focus-visible:bg-white/75 focus-visible:text-black/90 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:bg-white/[0.08] dark:hover:text-white/90 dark:focus-visible:bg-white/[0.08] dark:focus-visible:text-white/90"
             >
               {view.label}
             </Link>

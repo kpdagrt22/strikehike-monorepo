@@ -50,7 +50,7 @@ function StatusBadge({ status }) {
           };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/60">
+    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:border-white/5 dark:bg-black/30 dark:text-white/60">
       <span
         className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
           config.pulse ? "animate-pulse" : ""
@@ -104,7 +104,6 @@ function CoreIndexScale({ peak, trough, isDark }) {
             style={{
               left: `${position(peak)}%`,
               backgroundColor: peakTone.color,
-              boxShadow: `0 0 12px ${peakTone.color}88`,
             }}
             title={`Peak Core Index ${formatSigned(peak)}`}
           />
@@ -115,7 +114,6 @@ function CoreIndexScale({ peak, trough, isDark }) {
             style={{
               left: `${position(trough)}%`,
               backgroundColor: troughTone.color,
-              boxShadow: `0 0 10px ${troughTone.color}66`,
             }}
             title={`Trough Core Index ${formatSigned(trough)}`}
           />
@@ -162,14 +160,14 @@ function EventPanel({
   };
 
   return (
-    <article className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
+    <article className="overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/40">
       <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <p className="text-micro font-medium uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
             {side} · {event?.category ?? "event"}
           </p>
           <span className="shrink-0 whitespace-nowrap font-mono text-micro text-black/60 dark:text-white/60">
-            {event?.window?.start} → {event?.window?.end}
+            {formatDate(event?.window?.start)} → {formatDate(event?.window?.end)}
           </span>
         </div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -249,18 +247,9 @@ function EventPanel({
               <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                 {asset.metricLabel} · event tape
               </p>
-              <span
-                className="rounded-full bg-white/80 px-2 py-0.5 font-mono text-micro text-(--asset-light) dark:bg-(--asset-dark)/8 dark:text-(--asset-dark)"
-                style={{
-                  "--asset-light": asset.light,
-                  "--asset-dark": asset.dark,
-                }}
-              >
-                {asset.label}
-              </span>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-black/5 bg-white/35 px-3 py-2 dark:border-white/5 dark:bg-black/20">
+            <div className="mt-2 grid grid-cols-2 border-y border-(--sh-line-1) py-2.5">
+              <div className="min-w-0 pr-3">
                 <p className="text-micro uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
                   Window return
                 </p>
@@ -282,7 +271,7 @@ function EventPanel({
                   {hasAsset ? formatPercent(stats.return_pct, 1) : "—"}
                 </p>
               </div>
-              <div className="rounded-xl border border-black/5 bg-white/35 px-3 py-2 dark:border-white/5 dark:bg-black/20">
+              <div className="min-w-0 border-l border-(--sh-line-1) pl-3">
                 <p className="text-micro uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
                   Peak-to-trough
                 </p>
@@ -372,7 +361,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
   );
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 sm:p-6">
+    <section className="mt-4 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 dark:border-white/5 dark:bg-black/30 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
@@ -390,8 +379,8 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
         </p>
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-4">
-        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+      <div className="mt-4 grid divide-(--sh-line-1) border-t border-(--sh-line-1) max-sm:divide-y sm:grid-cols-4 sm:divide-x">
+        <div className="py-3 sm:px-4 sm:first:pl-0">
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Trough Core Index gap
           </p>
@@ -399,7 +388,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
             {scoreGap == null ? "—" : `${scoreGap.toFixed(1)} pts`}
           </p>
         </div>
-        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+        <div className="py-3 sm:px-4 sm:first:pl-0">
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Trough readings
           </p>
@@ -413,7 +402,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
             </span>
           </p>
         </div>
-        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+        <div className="py-3 sm:px-4 sm:first:pl-0">
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             {asset.label} drawdown gap
           </p>
@@ -421,7 +410,7 @@ function ComparisonRead({ left, right, assetKey, asset, isDark }) {
             {drawdownGap == null ? "—" : `${drawdownGap.toFixed(1)} pts`}
           </p>
         </div>
-        <div className="rounded-xl border border-black/5 bg-white/50 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+        <div className="py-3 sm:px-4 sm:first:pl-0">
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Window lengths
           </p>
@@ -615,12 +604,12 @@ export default function ConvergencePage() {
   return (
     <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-3 sm:pt-4">
       <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
-        <header className="flex flex-col gap-4 pr-14 sm:pr-16 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Convergence
             </p>
-            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-6xl">
+            <h1 className="mt-2 pr-16 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:pr-0">
               Two events. One macro lens.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70 sm:text-body">
@@ -632,7 +621,7 @@ export default function ConvergencePage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={state.status} />
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/60">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               {state.data?.events?.length ?? 7} curated windows ·{" "}
               {state.data?.as_of ?? "—"}
             </span>
@@ -664,7 +653,7 @@ export default function ConvergencePage() {
             <button
               type="button"
               onClick={handleRetry}
-              className="mt-4 rounded-full border border-black/5 px-3.5 py-2 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
+              className="mt-4 rounded-full border border-black/14 px-3.5 py-1.5 text-micro font-medium text-black/70 transition-colors hover:bg-black/4 focus-visible:bg-black/4 pointer-coarse:min-h-11 dark:border-white/14 dark:text-white/70 dark:hover:bg-white/6 dark:focus-visible:bg-white/6"
             >
               Retry event archive
             </button>
@@ -673,7 +662,7 @@ export default function ConvergencePage() {
 
         {state.status === "ready" && state.data ? (
           <>
-            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-black/5 bg-white/45 p-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-black/5 bg-white/45 p-3 dark:border-white/5 dark:bg-black/30 sm:flex-row sm:items-center sm:justify-between sm:p-4">
               <div>
                 <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                   Compare through
@@ -692,7 +681,7 @@ export default function ConvergencePage() {
                         type="button"
                         onClick={() => setAssetKey(key)}
                         aria-pressed={selected}
-                        className={`rounded-full px-2.5 py-1 text-micro font-medium transition-colors ${
+                        className={`relative rounded-full px-2.5 py-1 text-micro font-medium transition-colors pointer-coarse:before:absolute pointer-coarse:before:inset-x-0 pointer-coarse:before:-inset-y-2.5 pointer-coarse:before:content-[''] ${
                           selected
                             ? "bg-white/80 text-(--asset-light) dark:bg-(--asset-dark)/12 dark:text-(--asset-dark)"
                             : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
@@ -778,8 +767,8 @@ export default function ConvergencePage() {
               isDark={isDark}
             />
 
-            <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 sm:p-6">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
+            <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 dark:border-white/5 dark:bg-black/25 sm:p-6">
+              <summary className="-m-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
                 Method & limits
                 <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60">
                   +
@@ -816,7 +805,7 @@ export default function ConvergencePage() {
                 new Event("strikehike:show-onboarding"),
               )
             }
-            className="text-micro text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
+            className="text-micro text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
           >
             How it works
           </button>

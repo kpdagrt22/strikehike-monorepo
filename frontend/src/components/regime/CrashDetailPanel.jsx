@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { panel } from "@/lib/motion";
 import { RegimeDetailChart } from "@/components/regime/RegimeDetailChart";
 import { SkyStrip } from "@/components/regime/SkyStrip";
 import {
@@ -34,7 +35,7 @@ function PreCrashCard({ label, data, isDark }) {
   const tone = coreIndexTone(data?.core_index_bucket, isDark);
 
   return (
-    <div className="rounded-2xl border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.03]">
+    <div className="rounded-2xl border border-black/5 p-4 dark:border-white/5">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
           {label}
@@ -136,25 +137,25 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
 
   return (
     <motion.section
-      layout
-      initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.985 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={reduceMotion ? false : panel.initial}
+      animate={panel.animate}
       exit={
-        reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.99 }
-      }
-      transition={
         reduceMotion
-          ? { duration: 0 }
-          : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }
+          ? { opacity: 0, transition: { duration: 0 } }
+          : panel.exit
       }
       aria-label={`${crash.name} crash detail`}
-      className="mt-4 scroll-mt-24 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/55 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/70 dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
+      className="mt-4 scroll-mt-24 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/25"
     >
       <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-micro uppercase tracking-[0.16em] text-[#c0442f] dark:text-[#ff8b77]">
-              NBER recession · {crash.start_month} → {crash.end_month}
+              NBER recession ·{" "}
+              {/* The range wraps as one piece, never inside "2009-06". */}
+              <span className="whitespace-nowrap">
+                {crash.start_month} → {crash.end_month}
+              </span>
             </p>
             <h2 className="mt-1 text-2xl font-semibold tracking-[-0.035em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
               {crash.name}
@@ -174,7 +175,7 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
             type="button"
             onClick={onClose}
             aria-label="Close crash detail"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-black/5 text-black/60 transition-colors hover:bg-black/[0.04] hover:text-black/70 focus-visible:bg-black/[0.04] focus-visible:text-black/70 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/70 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/70"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/5 text-black/60 transition-colors hover:bg-black/[0.04] hover:text-black/70 focus-visible:bg-black/[0.04] focus-visible:text-black/70 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/70 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/70 sm:h-9 sm:w-9"
           >
             <svg
               viewBox="0 0 24 24"
@@ -219,7 +220,7 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
               <button
                 type="button"
                 onClick={handleRetry}
-                className="mt-3 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06]"
+                className="mt-3 rounded-full border border-black/5 px-3 py-1.5 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
                 Retry daily window
               </button>

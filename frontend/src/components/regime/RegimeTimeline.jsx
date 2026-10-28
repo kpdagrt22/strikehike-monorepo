@@ -146,6 +146,26 @@ function applyCrashZoom(chart, crash) {
   }
 }
 
+// The resting frame: the latest 30 years (12 on phones), up to the last week.
+function applyOverview(chart, container) {
+  if (!chart) return;
+  const viewportWidth = container?.clientWidth || 1200;
+  const targetYears = viewportWidth < 640 ? 12 : 30;
+  chart.timeScale().applyOptions({
+    barSpacing: Math.max(0.02, viewportWidth / (52 * targetYears)),
+    rightOffset: 1,
+  });
+  chart.timeScale().scrollToRealTime();
+}
+
+// The snapshot card sits at the chart's top left (about 28-272 px). Once the
+// point being read comes under it, the card moves to the right; the 300/380
+// gap keeps it from flickering at the boundary.
+function legendSideFor(side, x) {
+  if (side === "left") return x < 300 ? "right" : "left";
+  return x > 380 ? "left" : "right";
+}
+
 function buildChartSeries(timeline, target) {
   if (target.key !== "sp500") {
     return timeline
@@ -356,10 +376,12 @@ export function RegimeTimeline({
   const primitiveRef = useRef(null);
   const selectedIdRef = useRef(selectedId);
   const previousSelectedIdRef = useRef(selectedId);
+  const zoomedIdRef = useRef(selectedId);
   const openerRef = useRef(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [hoveredCrashId, setHoveredCrashId] = useState(null);
   const [crosshairActive, setCrosshairActive] = useState(false);
+  const [legendSide, setLegendSide] = useState("left");
   const [equityScaleWidth, setEquityScaleWidth] = useState(0);
   const [timeScaleHeight, setTimeScaleHeight] = useState(26);
 
@@ -507,6 +529,17 @@ export function RegimeTimeline({
   const drawCrosshairAt = (time) => {
     const chart = chartRef.current;
     if (!chart || !time) return;
+    const place = () => {
+      for (const key of [assetKey, ...seriesKeys]) {
+        const items = seriesData[key] ?? [];
+        const item = items[lowerBoundByTime(items, time)];
+        const series = lineSeriesRef.current[key];
+        if (series && item?.time === time) {
+          chart.setCrosshairPosition(item.value, time, series);
+          return;
+        }
+      }
+    };
     try {
       const timeScale = chart.timeScale();
       const logical = timeScale.timeToIndex(time, true);
@@ -521,21 +554,27 @@ export function RegimeTimeline({
               ? logical - (range.from + pad)
               : 0;
         if (shift) {
+          // The library applies a new range on its next frame. Clear the
+          // crosshair first (silently, so no stray "left the chart" event
+          // hides the snapshot) and place it once the range is in, so it
+          // lands on the date rather than on the old pixel.
+          chart.clearCrosshairPosition();
           timeScale.setVisibleLogicalRange({
             from: range.from + shift,
             to: range.to + shift,
           });
-        }
-      }
-      for (const key of [assetKey, ...seriesKeys]) {
-        const items = seriesData[key] ?? [];
-        const item = items[lowerBoundByTime(items, time)];
-        const series = lineSeriesRef.current[key];
-        if (series && item?.time === time) {
-          chart.setCrosshairPosition(item.value, time, series);
+          requestAnimationFrame(() => {
+            if (chartRef.current !== chart) return;
+            try {
+              place();
+            } catch {
+              // The chart may have been rebuilt in the meantime.
+            }
+          });
           return;
         }
       }
+      place();
     } catch {
       // If the library rejects the position, the HUD and legend still update.
     }
@@ -548,6 +587,8 @@ export function RegimeTimeline({
     const point =
       timeline[pointIndex]?.date === time ? timeline[pointIndex] : null;
     drawCrosshairAt(time);
+    const x = chartRef.current?.timeScale().timeToCoordinate(time);
+    if (x != null) setLegendSide((side) => legendSideFor(side, x));
     setHoveredPoint(point);
     setHoveredCrashId(crashAt(crashes, time)?.id ?? null);
     setCrosshairActive(true);
@@ -603,8 +644,14 @@ export function RegimeTimeline({
     moveSliderTo(Math.max(0, Math.min(last, next)));
   };
 
+  // Keyboard focus reveals what hover reveals: the crosshair and the snapshot.
   const handleSliderFocus = () => {
-    drawCrosshairAt(navTimes[navIndex]);
+    const time = navTimes[navIndex];
+    if (!time) return;
+    drawCrosshairAt(time);
+    const x = chartRef.current?.timeScale().timeToCoordinate(time);
+    if (x != null) setLegendSide((side) => legendSideFor(side, x));
+    setCrosshairActive(true);
   };
 
   const handleSliderBlur = () => {
@@ -727,13 +774,7 @@ export function RegimeTimeline({
       entireTextOnly: true,
     });
 
-    const viewportWidth = container.clientWidth || 1200;
-    const targetYears = viewportWidth < 640 ? 12 : 30;
-    chart.timeScale().applyOptions({
-      barSpacing: Math.max(0.02, viewportWidth / (52 * targetYears)),
-      rightOffset: 1,
-    });
-    chart.timeScale().scrollToRealTime();
+    applyOverview(chart, container);
 
     const syncScaleWidth = () => {
       const width = chart.priceScale("right").width() ?? 0;
@@ -775,6 +816,8 @@ export function RegimeTimeline({
         setCrosshairActive(false);
         return;
       }
+      const x = param?.point?.x;
+      if (x != null) setLegendSide((side) => legendSideFor(side, x));
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
       const crash = crashForTime(key);
@@ -840,6 +883,19 @@ export function RegimeTimeline({
     if (chartRef.current && selectedCrash) {
       applyCrashZoom(chartRef.current, selectedCrash);
     }
+
+    // Closing the detail returns the chart to its resting frame and drops the
+    // closed window's snapshot, so the HUD reads the latest week again.
+    const previous = zoomedIdRef.current;
+    zoomedIdRef.current = selectedId;
+    if (previous && !selectedId) {
+      applyOverview(chartRef.current, containerRef.current);
+      chartRef.current?.clearCrosshairPosition();
+      setCrosshairActive(false);
+      setHoveredPoint(null);
+      setHoveredCrashId(null);
+      onHoverPointRef.current?.(null);
+    }
   }, [selectedCrash, selectedId]);
 
   useEffect(() => {
@@ -868,7 +924,9 @@ export function RegimeTimeline({
         Core Index score; click it to zoom to the event.
       </p>
 
-      <div className="sticky top-0 z-30 border-b border-black/5 bg-[#f5f0e8]/85 backdrop-blur-2xl dark:border-white/5 dark:bg-[#06060a]/80">
+      {/* Sticky from sm up; on phones the HUD scrolls away so the chart gets
+          the screen, and the snapshot card is the scrub readout. */}
+      <div className="relative z-30 border-b border-black/5 bg-[#f5f0e8]/85 dark:border-white/5 dark:bg-[#06060a]/80 sm:sticky sm:top-0 sm:backdrop-blur-2xl">
         <MacroHUD
           point={displayPoint}
           isDark={isDark}
@@ -898,11 +956,13 @@ export function RegimeTimeline({
           className={`pointer-events-none absolute inset-0 z-[15] rounded-2xl ${FOCUS_RING_INSET}`}
         />
         {/* The TradingView attribution (licence) sits above the edge fades so
-            it stays legible and its focus ring is not covered. */}
+            it stays legible and its focus ring is not covered. The right
+            price-axis cell fades out where the Core Index band begins
+            (scaleMargins.bottom 0.32), so no % labels sit beside the bars. */}
         <div
           ref={containerRef}
           data-testid="regime-terminal-chart"
-          className="absolute inset-0 [&_#tv-attr-logo]:z-20!"
+          className="absolute inset-0 [&_#tv-attr-logo]:z-20! [&_tr:first-child>td:last-child]:[mask-image:linear-gradient(to_bottom,#000_64%,transparent_69%)]"
         />
 
         <ChartCrosshairLegend
@@ -910,6 +970,8 @@ export function RegimeTimeline({
           asset={asset}
           isDark={isDark}
           active={crosshairActive}
+          side={legendSide}
+          style={{ "--legend-right": `${equityScaleWidth + 28}px` }}
         />
 
         {hoveredMetric ? (
@@ -979,13 +1041,25 @@ export function RegimeTimeline({
               /
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#fb7185]" />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: coreIndexTone("strong_bullish", isDark).color }}
+              />
               trim risk
-              <span className="h-1.5 w-1.5 rounded-full bg-[#facc15]" />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: coreIndexTone("calm_bullish", isDark).color }}
+              />
               balanced
-              <span className="h-1.5 w-1.5 rounded-full bg-[#fb923c]" />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: coreIndexTone("bearish_warning", isDark).color }}
+              />
               preserve
-              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: coreIndexTone("extreme_bearish", isDark).color }}
+              />
               accumulate
             </span>
           </div>

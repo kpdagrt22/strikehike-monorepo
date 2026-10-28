@@ -269,17 +269,20 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
   return (
     <section
       aria-labelledby="peek-future-title"
-      className="mt-5 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
+      className="mt-5 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/40"
     >
       <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
-              Forward echo · {forward?.start} → {forward?.end}
+              Forward echo{" "}
+              <span className="whitespace-nowrap">
+                · {formatDate(forward?.start)} → {formatDate(forward?.end)}
+              </span>
             </p>
             <h2
               id="peek-future-title"
-              className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl"
+              className="mt-1 text-balance text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl"
             >
               A Peek Into The Future: What Happened Next?
             </h2>
@@ -321,8 +324,8 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
             <ForwardChart forward={forward} accent={accent} isDark={isDark} />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-black/5 bg-black/[0.02] px-3 py-2 dark:border-white/5 dark:bg-white/[0.03]">
+          <div className="mt-3 grid grid-cols-2 border-t border-(--sh-line-1) pt-2.5">
+            <div className="min-w-0 pr-3">
               <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
                 Drawdown peak
               </p>
@@ -333,7 +336,7 @@ export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
                 · {forward?.drawdown_peak?.value ?? "—"}
               </p>
             </div>
-            <div className="rounded-xl border border-[#ef4444]/15 bg-[#ef4444]/[0.035] px-3 py-2 dark:border-[#fb7185]/15 dark:bg-[#fb7185]/[0.055]">
+            <div className="min-w-0 border-l border-(--sh-line-1) pl-4">
               <p className="text-micro uppercase tracking-[0.12em] text-[#c0442f] dark:text-[#ff8b77]">
                 Peak-to-trough
               </p>

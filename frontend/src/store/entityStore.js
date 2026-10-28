@@ -8,4 +8,8 @@ export const useEntityStore = create((set) => ({
   pinnedEntity: null,
   pinEntity: (entity) => set({ pinnedEntity: entity }),
   clearPinnedEntity: () => set({ pinnedEntity: null }),
+  // Desktop side for the readout, chosen once per hover or pin: away from
+  // the body, so the card never covers what it describes.
+  readoutSide: "right",
+  setReadoutSide: (readoutSide) => set({ readoutSide }),
 }));

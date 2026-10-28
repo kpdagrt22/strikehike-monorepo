@@ -84,7 +84,14 @@ export function useDialogFocus(open, { containerRef, initialFocusRef, onClose } 
       const inside = container.contains(current);
 
       if (event.shiftKey) {
-        if (!inside || current === first || current === container) {
+        // From a non-tabbable landing target (a dialog's title), wrap to
+        // the last control instead of leaving and bouncing back.
+        if (
+          !inside ||
+          current === first ||
+          current === container ||
+          !items.includes(current)
+        ) {
           event.preventDefault();
           last.focus();
         }

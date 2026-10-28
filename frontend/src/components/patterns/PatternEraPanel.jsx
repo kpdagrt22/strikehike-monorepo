@@ -1,45 +1,35 @@
 "use client";
 
-function PlaceholderVisual({ era, accent, isDark }) {
+function PlaceholderVisual({ era, accent }) {
   return (
-    <div className="relative h-44 overflow-hidden rounded-2xl border border-black/5 bg-[#111119] dark:border-white/10">
+    <div className="relative h-44 overflow-hidden rounded-2xl border border-(--sh-line-1) bg-[#f2ede4] dark:border-white/10 dark:bg-[#111119]">
+      {/* The plate's base stops are CSS variables, so the server markup is
+          already theme-correct; only the accent comes from JS. */}
       <div
-        className="absolute inset-0 opacity-90"
+        className="absolute inset-0 opacity-90 [--plate-a:#faf7f2] [--plate-b:#f1ebe2] dark:[--plate-a:#090910] dark:[--plate-b:#171722]"
         style={{
-          background: `radial-gradient(circle at 22% 30%, ${accent}55 0%, transparent 38%), radial-gradient(circle at 80% 72%, ${accent}33 0%, transparent 42%), linear-gradient(135deg, ${isDark ? "#090910" : "#171721"} 0%, ${isDark ? "#171722" : "#2a2530"} 100%)`,
+          background: `radial-gradient(circle at 78% 30%, ${accent}55 0%, transparent 38%), radial-gradient(circle at 20% 80%, ${accent}33 0%, transparent 42%), linear-gradient(135deg, var(--plate-a) 0%, var(--plate-b) 100%)`,
         }}
       />
       <div
-        className="absolute inset-0 opacity-[0.18]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.18) 1px, transparent 1px)",
-          backgroundSize: "36px 36px",
-        }}
-      />
-      <div
-        className="absolute left-6 top-6 h-24 w-24 rounded-full border opacity-70"
+        className="absolute right-6 top-6 h-20 w-20 rounded-full border opacity-70"
         style={{ borderColor: accent }}
       />
       <div
-        className="absolute left-12 top-12 h-12 w-12 rounded-full opacity-50"
+        className="absolute right-11 top-11 h-10 w-10 rounded-full opacity-50"
         style={{ backgroundColor: accent }}
-      />
-      <div
-        className="absolute right-7 top-7 h-px w-28 opacity-50"
-        style={{ backgroundColor: accent, transform: "rotate(-28deg)" }}
       />
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
         <div>
-          <p className="text-micro font-medium uppercase tracking-[0.2em] text-white/60">
+          <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/70 dark:text-white/60">
             Editorial visual placeholder
           </p>
-          <p className="mt-1 font-mono text-3xl font-medium tracking-[-0.05em] text-white/80">
+          <p className="mt-1 font-mono text-3xl font-medium tracking-[-0.05em] text-black/80 dark:text-white/80">
             {era}
           </p>
         </div>
         <span
-          className="shrink-0 rounded-full border px-2.5 py-1 font-mono text-micro uppercase tracking-[0.14em] text-white/70"
+          className="shrink-0 rounded-full border px-2.5 py-1 font-mono text-micro uppercase tracking-[0.14em] text-black/70 dark:text-white/70"
           style={{ borderColor: `${accent}66`, backgroundColor: `${accent}18` }}
         >
           Field note
@@ -56,11 +46,10 @@ export function PatternEraPanel({
   summary,
   bullets,
   accent,
-  isDark,
 }) {
   return (
-    <article className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-4 shadow-[0_18px_60px_rgba(20,18,26,0.1)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/35 sm:p-5">
-      <PlaceholderVisual era={era} accent={accent} isDark={isDark} />
+    <article className="overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-4 dark:bg-black/35 sm:p-5">
+      <PlaceholderVisual era={era} accent={accent} />
       <div className="mt-4">
         <p
           className="text-micro font-medium uppercase tracking-[0.16em]"

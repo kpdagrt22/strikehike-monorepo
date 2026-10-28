@@ -85,15 +85,15 @@ export function AstroLens({ asOf, contextLabel }) {
 
       {state.status === "ready" ? (
         // Phones: hairline rows (name and degree on one line, Nakshatra under
-        // it). From sm: the three cards. Nakshatra names wrap, never truncate.
-        <div className="mt-3 divide-black/[0.06] max-sm:divide-y sm:grid sm:grid-cols-3 sm:gap-2 dark:divide-white/[0.08]">
+        // it). From sm: three columns on hairlines. Nakshatra names wrap, never truncate.
+        <div className="mt-3 divide-(--sh-line-1) max-sm:divide-y sm:grid sm:grid-cols-3 sm:divide-x">
           {BODIES.map((name) => {
             const body = state.bodies?.[name];
             const retrograde = body?.retro ?? body?.retrograde;
             return (
               <div
                 key={name}
-                className="max-sm:py-2.5 max-sm:first:pt-0 max-sm:last:pb-0 sm:rounded-xl sm:border sm:border-black/[0.05] sm:bg-white/45 sm:px-3 sm:py-2.5 sm:dark:border-white/[0.06] sm:dark:bg-black/20"
+                className="max-sm:py-2.5 max-sm:first:pt-0 max-sm:last:pb-0 sm:px-4 sm:first:pl-0 sm:last:pr-0"
               >
                 <div className="flex items-baseline justify-between gap-3 sm:block">
                   <div className="flex items-center gap-1 sm:justify-between">

@@ -8,6 +8,8 @@
  * - Concurrent requests for a missing key share one upstream load.
  * - Bodies above 4 MB are never stored (the full 11 MB weekly history passes
  *   straight through); the total is capped at 48 MB, least recently used first.
+ *   The total counts two bytes per character of body and key: V8 stores any
+ *   string with a non-Latin-1 character (an em dash will do) as UTF-16.
  *
  * State is per server process and starts empty after a restart or deploy.
  */
@@ -28,7 +30,7 @@ export type RouteCacheResult = RouteLoadResult & {
   cache: "hit" | "stale" | "miss";
 };
 
-type Entry = { body: string; bytes: number; storedAt: number };
+type Entry = { body: string; cost: number; storedAt: number };
 
 const MAX_ENTRY_BYTES = 4 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 48 * 1024 * 1024;
@@ -41,15 +43,16 @@ function remove(key: string) {
   const entry = entries.get(key);
   if (!entry) return;
   entries.delete(key);
-  totalBytes -= entry.bytes;
+  totalBytes -= entry.cost;
 }
 
 function store(key: string, body: string) {
   remove(key);
-  const bytes = Buffer.byteLength(body, "utf8");
-  if (bytes > MAX_ENTRY_BYTES) return;
-  entries.set(key, { body, bytes, storedAt: Date.now() });
-  totalBytes += bytes;
+  if (Buffer.byteLength(body, "utf8") > MAX_ENTRY_BYTES) return;
+  // Heap cost, not wire size; remove() subtracts the same amount.
+  const cost = 2 * (body.length + key.length);
+  entries.set(key, { body, cost, storedAt: Date.now() });
+  totalBytes += cost;
   // Map iteration follows insertion order, so the first keys are the least
   // recently used ones.
   for (const oldestKey of entries.keys()) {

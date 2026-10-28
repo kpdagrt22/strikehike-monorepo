@@ -301,7 +301,7 @@ export function PhasePlane({
   return (
     <section
       aria-labelledby="phase-plane-title"
-      className="overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)]"
+      className="overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/40"
     >
       <div className="flex flex-col gap-2 border-b border-black/5 p-5 dark:border-white/5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div>

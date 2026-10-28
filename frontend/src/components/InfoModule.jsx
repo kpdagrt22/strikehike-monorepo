@@ -60,15 +60,18 @@ export function InfoModule() {
     const handlePointerDown = (event) => {
       if (!rootRef.current?.contains(event.target)) hide();
     };
+    // On document, so it runs before window listeners (the planet readout);
+    // marking Escape as handled means one press closes one layer.
     const handleKeyDown = (event) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       hide(Boolean(rootRef.current?.contains(document.activeElement)));
+      event.preventDefault();
     };
     document.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, hide]);
 
@@ -141,15 +144,26 @@ export function InfoModule() {
         aria-controls="strikehike-info-panel"
         onClick={handleTriggerClick}
         onKeyUp={handleTriggerKeyUp}
-        className="group grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white/45 text-black/60 shadow-[0_10px_30px_rgba(20,18,26,0.12)] backdrop-blur-xl transition-colors hover:border-[#f05d49]/40 hover:text-[#c0442f] focus-visible:border-[#f05d49]/40 focus-visible:text-[#c0442f] dark:border-white/15 dark:bg-black/30 dark:text-white/60 dark:hover:border-[#ff8b77]/40 dark:hover:text-[#ff8b77] dark:focus-visible:border-[#ff8b77]/40 dark:focus-visible:text-[#ff8b77]"
+        className="group grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white/45 text-black/60 shadow-(--sh-shadow-float) backdrop-blur-2xl transition-[color,border-color,opacity] hover:border-[#f05d49]/40 hover:text-[#c0442f] focus-visible:border-[#f05d49]/40 focus-visible:text-[#c0442f] dark:border-white/10 dark:bg-black/40 dark:text-white/60 dark:hover:border-[#ff8b77]/40 dark:hover:text-[#ff8b77] dark:focus-visible:border-[#ff8b77]/40 dark:focus-visible:text-[#ff8b77]"
       >
-        <span className="relative grid h-5 w-5 place-items-center">
-          <span className="absolute inset-0 rounded-full border border-current opacity-30 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60" />
-          <span className="h-1 w-1 rounded-full bg-[#f05d49]" />
-          <span className="absolute -bottom-0.5 right-0.5 text-micro font-medium leading-none">
-            i
-          </span>
-        </span>
+        <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
+          <circle
+            cx="10"
+            cy="10"
+            r="9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.25"
+            className="opacity-30 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60"
+          />
+          <circle cx="10" cy="6.3" r="1.6" fill="#f05d49" />
+          <path
+            d="M10 9.4v5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
       </button>
 
       <AnimatePresence>
@@ -165,7 +179,7 @@ export function InfoModule() {
             className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-left overflow-hidden rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4]"
           >
             <div className="flex items-start justify-between gap-4">
-              <p className="text-micro font-medium uppercase tracking-[0.18em] text-black/60 dark:text-white/60">
+              <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                 About the engine
               </p>
               <button
@@ -197,7 +211,7 @@ export function InfoModule() {
             </p>
 
             <div className="mt-5 border-t border-black/10 pt-5 dark:border-white/10">
-              <p className="text-micro font-medium uppercase tracking-[0.18em] text-black/60 dark:text-white/60">
+              <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                 Enquiry
               </p>
               <a
@@ -205,7 +219,7 @@ export function InfoModule() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-describedby="info-enquiry-note"
-                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#f05d49]/40 px-5 text-micro font-medium uppercase tracking-[0.16em] text-[#c0442f] transition-colors hover:border-[#f05d49]/70 hover:bg-[#f05d49]/10 focus-visible:border-[#f05d49]/70 focus-visible:bg-[#f05d49]/10 dark:text-[#ff8b77]"
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#f05d49]/40 px-5 text-micro font-medium uppercase tracking-[0.16em] text-[#c0442f] transition-colors hover:border-[#f05d49]/70 hover:bg-black/[0.04] focus-visible:border-[#f05d49]/70 focus-visible:bg-black/[0.04] dark:text-[#ff8b77] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
                 Write to KP
                 <svg

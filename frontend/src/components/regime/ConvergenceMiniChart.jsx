@@ -106,7 +106,7 @@ export function ConvergenceMiniChart({
   const { startMs, endMs, x, segments, markers } = geometry;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-black/5 bg-white/35 dark:border-white/5 dark:bg-black/20">
+    <div className="overflow-hidden">
       <div className="relative">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

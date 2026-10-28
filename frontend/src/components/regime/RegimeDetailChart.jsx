@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import {
-  areaFromSegment,
   buildSegments,
   clamp,
   formatDate,
@@ -11,6 +10,8 @@ import {
   pathFromSegment,
 } from "@/components/regime/regimeUtils";
 
+const FOCUS_RING_INSET =
+  "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
 const WIDTH = 920;
 const HEIGHT = 250;
 const PAD = { top: 28, right: 52, bottom: 34, left: 54 };
@@ -33,7 +34,7 @@ function Legend({ tone }) {
       <span className="inline-flex items-center gap-1.5">
         <span
           className="h-0.5 w-3 rounded-full"
-          style={{ backgroundColor: tone.strength }}
+          style={{ backgroundColor: tone.axisStrong }}
         />
         Core Index
       </span>
@@ -186,7 +187,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
     equitySegments.length > 0 || coreIndexSegments.length > 0;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/45 dark:border-white/5 dark:bg-black/25">
+    <div className="overflow-hidden rounded-2xl border border-black/5 dark:border-white/5">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
         <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
           Daily window · {timeline.length} observations
@@ -194,34 +195,18 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
         <Legend tone={tone} />
       </div>
 
-      <div className="overflow-x-auto p-2 sm:p-3">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Crash detail chart, scrollable"
+        className={`overflow-x-auto p-2 sm:p-3 ${FOCUS_RING_INSET}`}
+      >
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[620px]"
           role="img"
           aria-label={`Daily equity proxy and Core Index score around ${crash?.name ?? "the selected recession"}`}
         >
-          <defs>
-            <linearGradient
-              id="regime-detail-core-index-fill"
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <stop
-                offset="0%"
-                stopColor={tone.strength}
-                stopOpacity="0.24"
-              />
-              <stop
-                offset="100%"
-                stopColor={tone.strength}
-                stopOpacity="0"
-              />
-            </linearGradient>
-          </defs>
-
           {CORE_INDEX_TICKS.map((tick) => {
             const y = yCoreIndex(tick);
             return (
@@ -270,7 +255,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             width={Math.max(2, x(shadeEnd) - x(shadeStart))}
             height={PLOT_H}
             fill={tone.crimson}
-            fillOpacity="0.18"
+            fillOpacity="0.10"
           />
 
           {equitySegments.map((segment, index) => (
@@ -287,18 +272,10 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
 
           {coreIndexSegments.map((segment, index) => (
             <path
-              key={`detail-core-index-area-${index}`}
-              d={areaFromSegment(segment, baseline)}
-              fill="url(#regime-detail-core-index-fill)"
-            />
-          ))}
-
-          {coreIndexSegments.map((segment, index) => (
-            <path
               key={`detail-core-index-line-${index}`}
               d={pathFromSegment(segment)}
               fill="none"
-              stroke={tone.strength}
+              stroke={tone.axisStrong}
               strokeWidth="1.4"
               strokeLinecap="round"
               strokeLinejoin="round"

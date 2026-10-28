@@ -41,21 +41,36 @@ export const useChronoStore = create((set) => ({
   positionsDateTime: null,
   positionsRetryKey: 0,
 
+  // Re-selecting the focused moment is a no-op: returning the same state
+  // notifies nobody, so nothing waits on a request that never runs.
   setFocusedDate: (focusedDate) =>
-    set({
-      focusedDate,
-      focusedTime: "00:00",
-      parallels: NO_PARALLELS,
-      status: "loading",
-    }),
+    set((s) =>
+      s.focusedDate === focusedDate && s.focusedTime === "00:00"
+        ? s
+        : {
+            focusedDate,
+            focusedTime: "00:00",
+            parallels: NO_PARALLELS,
+            status: "loading",
+          },
+    ),
   setFocusedTime: (focusedTime) =>
-    set({ focusedTime, parallels: NO_PARALLELS, status: "loading" }),
+    set((s) =>
+      s.focusedTime === focusedTime
+        ? s
+        : { focusedTime, parallels: NO_PARALLELS, status: "loading" },
+    ),
   setFocusedDateTime: (focusedDate, focusedTime) =>
-    set({
-      focusedDate,
-      focusedTime: focusedTime || "00:00",
-      parallels: NO_PARALLELS,
-      status: "loading",
+    set((s) => {
+      const time = focusedTime || "00:00";
+      return s.focusedDate === focusedDate && s.focusedTime === time
+        ? s
+        : {
+            focusedDate,
+            focusedTime: time,
+            parallels: NO_PARALLELS,
+            status: "loading",
+          };
     }),
   setCameraView: (cameraView) =>
     set((state) => ({

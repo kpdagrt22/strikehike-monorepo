@@ -21,6 +21,13 @@ export function Tooltip() {
   const clearPinnedEntity = useEntityStore(
     (state) => state.clearPinnedEntity,
   );
+  // Desktop: the readout docks on the side away from the body it describes.
+  // An open archive flyout holds the left side, so the readout keeps right.
+  const readoutSide = useEntityStore((state) => state.readoutSide);
+  const flyoutOpen = useChronoStore((state) =>
+    Boolean(state.activeEventCategory),
+  );
+  const dockLeft = readoutSide === "left" && !flyoutOpen;
   const energy = useChronoStore((state) => state.energy);
   const marketEnergy = useChronoStore((state) => state.marketEnergy);
   const { resolvedTheme } = useTheme();
@@ -86,16 +93,21 @@ export function Tooltip() {
             transition: { duration: 0.2, ease: EASE_OUT },
           }}
           exit={{ ...hidden, transition: { duration: 0.14, ease: EASE_EXIT } }}
+          // Below lg a hovered readout shares the band above the dock with the
+          // Feedback and Support buttons (they step aside only for a pinned
+          // one), so it floats over them rather than under them.
           className={`${
-            pinned ? "pointer-events-auto" : "pointer-events-none"
-          } absolute right-3 bottom-40 z-20 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-white/80 p-4 font-sans text-[#14121a] shadow-[0_24px_80px_rgb(20_18_26/0.18)] backdrop-blur-md backdrop-saturate-150 lg:bottom-auto lg:right-[22rem] lg:top-[15.5rem] dark:border-white/15 dark:bg-[rgb(11_11_18/0.8)] dark:text-[#f2ede4] dark:shadow-[0_24px_80px_rgb(0_0_0/0.55)]`}
+            pinned ? "pointer-events-auto" : "pointer-events-none max-lg:z-40"
+          } absolute left-3 right-3 bottom-[8.5rem] z-20 overflow-hidden rounded-2xl border border-black/10 bg-white/80 p-4 font-sans text-[#14121a] shadow-[0_24px_80px_rgb(20_18_26/0.18)] backdrop-blur-md backdrop-saturate-150 sm:left-auto sm:right-3 sm:w-[20rem] lg:bottom-auto lg:top-[15.5rem] ${
+            dockLeft ? "lg:left-[20rem] lg:right-auto" : "lg:right-[22rem]"
+          } dark:border-white/15 dark:bg-[rgb(11_11_18/0.8)] dark:text-[#f2ede4] dark:shadow-[0_24px_80px_rgb(0_0_0/0.55)]`}
         >
           {pinned ? (
             <button
               type="button"
               onClick={closeReadout}
               aria-label="Close planet readout"
-              className="absolute right-1.5 top-1.5 grid h-11 w-11 place-items-center rounded-full text-black/60 transition-[background-color,color,transform] duration-[140ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-black/[0.04] hover:text-black/85 focus-visible:bg-black/[0.04] focus-visible:text-black/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(192_68_47/0.7)] active:scale-[0.97] dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/90 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/90 dark:focus-visible:outline-[rgb(255_139_119/0.75)]"
+              className="absolute right-1.5 top-1.5 grid h-11 w-11 place-items-center rounded-full text-black/60 transition-[background-color,color,transform] duration-[140ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-black/[0.04] hover:text-black/85 focus-visible:bg-black/[0.04] focus-visible:text-black/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus) active:scale-[0.97] dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/90 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/90"
             >
               <svg
                 aria-hidden="true"
@@ -130,9 +142,6 @@ export function Tooltip() {
                 <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
                   Planet
                 </p>
-                <p className="text-strong font-medium tabular-nums tracking-[-0.01em]">
-                  {entity.degree.toFixed(2)}°
-                </p>
               </div>
               <h2 className="mt-0.5 truncate text-[16px] font-semibold tracking-[-0.02em]">
                 {entity.name}
@@ -153,7 +162,9 @@ export function Tooltip() {
               <p className="text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
                 Nakshatra · Pada
               </p>
-              <p className="mt-0.5 truncate text-body text-black/75 dark:text-white/75">
+              {/* Balanced, so a long name wraps whole ("Uttara" over
+                  "Bhadrapada · 4") instead of orphaning the pada. */}
+              <p className="mt-0.5 text-balance text-body text-black/75 dark:text-white/75">
                 {entity.nakshatra ?? "—"}
               </p>
             </div>

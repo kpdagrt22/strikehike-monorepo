@@ -45,6 +45,9 @@ export function FilterControls() {
   const [activeCategory, setActiveCategory] = useState(null);
   const sheetRef = useRef(null);
   const regionRef = useRef(null);
+  // Set when the keyboard opens a category's flyout on desktop, so focus can
+  // follow into its first event.
+  const focusFirstEvent = useRef(false);
   const isDesktop = useSyncExternalStore(
     subscribeDesktop,
     getDesktop,
@@ -106,6 +109,14 @@ export function FilterControls() {
     regionRef.current?.scrollIntoView({ block: "nearest" });
   }, [activeCategory, isDesktop]);
 
+  // The desktop flyout sits apart from its category: move keyboard focus into
+  // it. Esc hands focus back to the category.
+  useEffect(() => {
+    if (!focusFirstEvent.current) return;
+    focusFirstEvent.current = false;
+    regionRef.current?.querySelector("button")?.focus({ preventScroll: true });
+  }, [activeCategory]);
+
   useEffect(() => {
     setActiveEventCategory(activeCategory);
   }, [activeCategory, setActiveEventCategory]);
@@ -146,6 +157,10 @@ export function FilterControls() {
   };
 
   const retryRoster = () => {
+    // Retry unmounts with the error line: keep focus on the panel heading.
+    document
+      .getElementById("chrono-archive-title")
+      ?.focus({ preventScroll: true });
     setError(false);
     setReloadKey((key) => key + 1);
   };
@@ -169,7 +184,7 @@ export function FilterControls() {
       }}
       className={
         inline
-          ? "mx-1 mb-1 mt-1 overflow-hidden rounded-2xl border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.04]"
+          ? "mx-1 mb-1 mt-1 scroll-mt-2.5 overflow-hidden rounded-2xl border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.04]"
           : "absolute left-0 top-full mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-black/10 bg-white/92 shadow-[0_20px_70px_rgba(20,18,26,0.18)] backdrop-blur-2xl lg:left-full lg:top-0 lg:ml-2 lg:mt-0 dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_20px_70px_rgba(0,0,0,0.6)]"
       }
       id="chrono-category-events"
@@ -178,7 +193,7 @@ export function FilterControls() {
     >
       <div className="flex items-center justify-between border-b border-black/10 px-4 py-3 dark:border-white/10">
         <div>
-          <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
+          <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             {activeCategory}
           </p>
           <p className="mt-0.5 text-meta text-black/60 dark:text-white/60">
@@ -190,10 +205,14 @@ export function FilterControls() {
         </span>
       </div>
 
+      {/* Inline (below lg) the sheet card is the one scroller; the desktop
+          list scrolls itself and ends in a soft fade. */}
       <div
-        className={`${
-          inline ? "max-h-[min(24rem,45dvh)]" : "max-h-[min(24rem,55vh)]"
-        } overflow-y-auto overscroll-contain p-1.5 [scrollbar-width:thin]`}
+        className={
+          inline
+            ? "p-1.5"
+            : "max-h-[min(24rem,55vh)] overflow-y-auto overscroll-contain px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin]"
+        }
       >
         {activeEvents.map((event) => {
           const isFocused = focusedDate === event.date;
@@ -214,7 +233,7 @@ export function FilterControls() {
                 }}
               />
               <span className="min-w-0">
-                <span className="block text-micro font-medium tabular-nums uppercase tracking-[0.1em] text-black/60 dark:text-white/60">
+                <span className="block text-micro font-medium tabular-nums uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
                   {event.date}
                 </span>
                 <span className="mt-0.5 block text-body leading-snug text-black/75 transition-colors group-hover:text-[#14121a] dark:text-white/70 dark:group-hover:text-white">
@@ -233,20 +252,21 @@ export function FilterControls() {
       ref={sheetRef}
       className={`${
         mobileSheet === "archive"
-          ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block max-h-[70dvh] overflow-y-auto"
+          ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block"
           : "hidden"
-      } pointer-events-auto lg:fixed lg:left-5 lg:top-[6.75rem] lg:z-30 lg:block lg:max-h-none lg:overflow-visible`}
+      } pointer-events-auto lg:fixed lg:left-5 lg:top-[6.75rem] lg:z-30 lg:block lg:w-[min(18rem,calc(100vw-1.5rem))] lg:max-h-none lg:overflow-visible`}
     >
       <div className="relative">
         <div
           id="chrono-events-sheet"
-          className="rounded-[1.6rem] border border-black/10 bg-white/92 p-2 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
+          className="rounded-2xl border border-black/10 bg-white/92 p-1.5 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
         >
-          <div className="flex items-start justify-between gap-2 px-2 pb-1.5 pt-1">
+          <div className="flex items-start justify-between gap-2 px-2.5 pb-2 pt-2">
             <div>
               <h2
                 id="chrono-archive-title"
-                className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60"
+                tabIndex={-1}
+                className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
               >
                 Event archive
               </h2>
@@ -296,10 +316,16 @@ export function FilterControls() {
                   <button
                     id={categoryButtonId(category)}
                     type="button"
-                    onClick={() => toggleCategory(category)}
+                    onClick={(event) => {
+                      // detail 0: Enter or Space, not a pointer click.
+                      if (event.detail === 0 && isDesktop && !isActive) {
+                        focusFirstEvent.current = true;
+                      }
+                      toggleCategory(category);
+                    }}
                     aria-expanded={isActive}
                     aria-controls={isActive ? "chrono-category-events" : undefined}
-                    className={`flex min-h-11 w-full items-center gap-2 rounded-full border border-transparent px-3 py-2 text-left text-meta font-medium tracking-[-0.01em] transition-colors duration-[140ms] lg:min-h-0 lg:py-1.5 ${
+                    className={`flex min-h-11 w-full items-center gap-2 rounded-xl border border-transparent px-2.5 py-2 text-left text-meta font-medium tracking-[-0.01em] transition-colors duration-[140ms] lg:min-h-0 lg:py-1.5 ${
                       isActive
                         ? `${SELECTED_ROW} text-[#14121a] dark:text-[#f2ede4]`
                         : `${HOVER_ROW} text-black/60 hover:text-[#14121a] dark:text-white/60 dark:hover:text-[#f2ede4]`

@@ -47,7 +47,7 @@ function StatusBadge({ status }) {
           };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30 dark:text-white/60">
+    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:border-white/5 dark:bg-black/30 dark:text-white/60">
       <span
         className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
           config.pulse ? "animate-pulse" : ""
@@ -61,14 +61,11 @@ function StatusBadge({ status }) {
 
 function Stat({ label, value, suffix, detail, accent }) {
   return (
-    <div className="rounded-2xl border border-black/5 bg-white/45 px-4 py-3 backdrop-blur-2xl dark:border-white/5 dark:bg-black/30">
+    <div className="py-3 sm:px-5 sm:first:pl-0">
       <p className="text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
         {label}
       </p>
-      <p
-        className="mt-1 font-mono text-xl font-medium tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4]"
-        style={accent ? { color: accent } : undefined}
-      >
+      <p className="mt-1 font-mono text-xl font-medium tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4]">
         {value}
         {suffix ? (
           <span className="ml-1 text-micro font-normal tracking-normal text-black/60 dark:text-white/60">
@@ -77,6 +74,13 @@ function Stat({ label, value, suffix, detail, accent }) {
         ) : null}
       </p>
       <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
+        {accent ? (
+          <span
+            aria-hidden="true"
+            className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle"
+            style={{ backgroundColor: accent }}
+          />
+        ) : null}
         {detail}
       </p>
     </div>
@@ -85,7 +89,7 @@ function Stat({ label, value, suffix, detail, accent }) {
 
 function LoadingState() {
   return (
-    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-white/5 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
+    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/40 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-micro uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
           Loading 170 years of macro history
@@ -100,7 +104,7 @@ function LoadingState() {
 
 function ErrorState({ message, onRetry }) {
   return (
-    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#ef4444]/20 bg-white/45 p-5 shadow-[0_18px_60px_rgba(20,18,26,0.12)] backdrop-blur-2xl dark:border-[#ef4444]/25 dark:bg-black/40 dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)] sm:p-6">
+    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#ef4444]/20 bg-white/45 p-5 dark:border-[#ef4444]/25 dark:bg-black/40 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-2xl">
           <p className="text-micro uppercase tracking-[0.16em] text-[#c0442f] dark:text-[#ff8b77]">
@@ -157,8 +161,8 @@ function MethodDetails({ meta }) {
   ];
 
   return (
-    <details className="group mt-4 rounded-[1.4rem] border border-black/5 bg-white/45 p-5 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 sm:p-6">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
+    <details className="group mt-4 rounded-[1.4rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/25 sm:p-6">
+      <summary className="-m-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
         Method & limits
         <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60" aria-hidden="true">
           +
@@ -329,14 +333,16 @@ export default function RegimePage() {
   }, []);
 
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24 pt-3 sm:pt-4">
-      <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
-        <header className="flex flex-col gap-4 pr-14 sm:pr-16 lg:flex-row lg:items-end lg:justify-between">
+    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24">
+      {/* The top padding lives here, not on the scroll container, so the HUD
+          sticks flush at 0 with no slit above it. */}
+      <div className="mx-auto w-full max-w-[1600px] px-3 pt-3 sm:px-5 sm:pt-4 lg:px-8">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
               Regime Intelligence
             </p>
-            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:text-5xl">
+            <h1 className="mt-2 pr-16 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl lg:pr-0">
               The −50 to +50 macro atlas.
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/60 dark:text-white/60 sm:text-body">
@@ -351,7 +357,7 @@ export default function RegimePage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={state.status} />
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 backdrop-blur-2xl dark:border-white/5 dark:bg-black/25 dark:text-white/60">
+            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               FRED ·{" "}
               {data?.coverage?.start?.slice(0, 4) ?? "1854"}–
               {data?.coverage?.end?.slice(0, 4) ?? "2026"}
@@ -367,7 +373,7 @@ export default function RegimePage() {
 
         {state.status === "ready" && data ? (
           <>
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-x-4 border-y border-(--sh-line-1) sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-(--sh-line-1)">
               <Stat
                 label="Latest Core Index"
                 value={formatSigned(latestCoreIndex?.score)}
@@ -383,7 +389,7 @@ export default function RegimePage() {
               <Stat
                 label="Coverage"
                 value={`${data.coverage.years.toFixed(0)} yrs`}
-                detail={`${data.coverage.start} → ${data.coverage.end}`}
+                detail={`${formatDate(data.coverage.start)} → ${formatDate(data.coverage.end)}`}
               />
               <Stat
                 label="NBER windows"
@@ -452,7 +458,7 @@ export default function RegimePage() {
                       new Event("strikehike:show-onboarding"),
                     )
                   }
-                  className="text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
+                  className="text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
                 >
                   How it works
                 </button>
@@ -462,7 +468,7 @@ export default function RegimePage() {
                       ? `/?d=${encodeURIComponent(orreryDate)}`
                       : "/"
                   }
-                  className="text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#c0442f] focus-visible:text-[#c0442f] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#ff8b77] dark:focus-visible:text-[#ff8b77]"
+                  className="text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
                 >
                   Open the Orrery at this date
                 </Link>
