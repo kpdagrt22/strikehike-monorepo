@@ -23,6 +23,9 @@ Method notes
 * The trend warning (``core_index_trend_warning``) is a separate, more
   sensitive flag beside the Core Index: the same Friday S&P close below the
   average of the last 40 Friday closes. It changes nothing in the Core Index.
+* The fast warning (``core_index_fast_warning``) is a separate daily flag:
+  the S&P close 7% or more below the close 14 days earlier. It reacts to a
+  sharp fall, is not a forecast, and changes nothing in the Core Index.
 """
 
 from __future__ import annotations
@@ -106,6 +109,7 @@ CORE_INDEX_V2_COLUMNS: tuple[str, ...] = (
     "core_index_severity",
     "core_index_warning",
     "core_index_trend_warning",
+    "core_index_fast_warning",
 )
 # Trend warning: a separate, more sensitive early-warning flag shown beside
 # the calm Core Index. It is the standard 40-week moving-average rule (the
@@ -215,6 +219,135 @@ CORE_INDEX_TREND_RECORD: dict[str, Any] = {
         "false_alarm": (
             "a warning that starts outside every window from 26 weeks before a "
             "10%+ fall's peak to its low"
+        ),
+    },
+}
+# Fast warning: a separate daily flag beside the Core Index and the trend
+# warning. It reacts to a sharp fall of the S&P 500; it is not a forecast.
+# Pre-registered as "10-session return <= -7%", chosen after its record on this
+# same history was seen, and computed on calendar days because the artifact does
+# not carry the session calendar (14 calendar days = 10 sessions unless a holiday
+# falls inside). It changes nothing in the Core Index or the trend warning.
+CORE_INDEX_FAST_VERSION = "fast-warning-14d-7pct-v1"
+CORE_INDEX_FAST_DAYS = 14
+CORE_INDEX_FAST_DROP = 0.07
+CORE_INDEX_FAST_RULE = (
+    "on when the daily S&P 500 close is 7% or more below the close 14 calendar "
+    "days earlier; decided at each close; a reaction to a sharp fall, not a "
+    "forecast"
+)
+# Measured from the stored column of the artifact named in ``measured_on``
+# with the judge's evaluator (the harness's fall definitions on the raw ^GSPC
+# sessions), and generated from its output, not typed. Hits, misses and false
+# alarms are all part of the record; historical, not a forecast. Shares are
+# fractions; the eras are the trend record's. Re-measure after any
+# re-ingestion that changes prices.
+_CORE_INDEX_FAST_FALL_FIELDS: tuple[str, ...] = (
+    "name",
+    "peak",
+    "low",
+    "size",
+    "first_warning",
+    "warning_during_fall",
+    "down_then",
+    "within_first_20pct",
+    "during_the_fall",
+    "before_the_peak_only",
+    "first_after_peak",
+    "down_at_first_after_peak",
+)
+# Every S&P 500 fall of 20% or more since 1929, in the order of the fields.
+_CORE_INDEX_FAST_FALLS: tuple[tuple[Any, ...], ...] = (
+    ("1929 crash / Great Depression", "1929-09-16", "1932-06-01", 0.86,
+     "1929-10-03", "1929-10-03", 0.09, True, True, False, "1929-10-03", 0.09),
+    ("1932-33 relapse", "1932-09-07", "1933-02-27", 0.41,
+     "1932-09-13", None, 0.16, False, False, False, "1932-09-13", 0.16),
+    ("1933-35 bear", "1933-07-18", "1935-03-14", 0.34,
+     "1933-07-20", None, 0.13, False, False, False, "1933-07-20", 0.13),
+    ("1937-42 bear", "1937-03-10", "1942-04-28", 0.6,
+     "1937-03-22", "1937-03-22", 0.08, True, True, False, "1937-03-22", 0.08),
+    ("1946-49 post-war bear", "1946-05-29", "1949-06-13", 0.3,
+     "1946-03-04", None, 0.0, True, False, True, "1946-08-27", 0.12),
+    ("1956-57 bear", "1956-08-02", "1957-10-22", 0.21,
+     "1957-10-21", None, 0.21, False, False, False, "1957-10-21", 0.21),
+    ("1962 Kennedy slide", "1961-12-12", "1962-06-26", 0.28,
+     "1962-05-28", None, 0.24, False, False, False, "1962-05-28", 0.24),
+    ("1966 credit crunch", "1966-02-09", "1966-10-07", 0.22,
+     "1966-05-16", None, 0.1, False, False, False, "1966-05-16", 0.1),
+    ("1968-70 bear", "1968-11-29", "1970-05-26", 0.36,
+     "1970-04-27", None, 0.25, False, False, False, "1970-04-27", 0.25),
+    ("1973-74 oil shock", "1973-01-11", "1974-10-03", 0.48,
+     "1973-05-21", None, 0.15, False, False, False, "1973-05-21", 0.15),
+    ("1980-82 Volcker bear", "1980-11-28", "1982-08-12", 0.27,
+     "1980-12-10", None, 0.09, False, False, False, "1980-12-10", 0.09),
+    ("1987 crash", "1987-08-25", "1987-12-04", 0.34,
+     "1987-10-15", None, 0.11, False, False, False, "1987-10-15", 0.11),
+    ("2000-02 dot-com", "2000-03-24", "2002-10-09", 0.49,
+     "2000-01-28", None, 0.0, True, False, True, "2000-04-14", 0.11),
+    ("2007-09 GFC", "2007-10-09", "2009-03-09", 0.57,
+     "2008-01-08", "2008-01-08", 0.11, True, True, False, "2008-01-08", 0.11),
+    ("2020 COVID", "2020-02-19", "2020-03-23", 0.34,
+     "2020-02-26", None, 0.08, False, False, False, "2020-02-26", 0.08),
+    ("2022 inflation bear", "2022-01-03", "2022-10-12", 0.25,
+     "2022-01-25", None, 0.09, False, False, False, "2022-01-25", 0.09),
+)
+CORE_INDEX_FAST_RECORD: dict[str, Any] = {
+    "measured_on": {
+        "data_version": "59192d5aa731",
+        "first_day": "1928-01-13",
+        "last_day": "2026-10-27",
+        "harness": "cih-1.1-gspc (definitions, daily sessions)",
+        "evaluator": "fast-warning/judge/scripts/measure_fast_record.py",
+        "measured": "2026-10-28",
+    },
+    "falls_of_20pct_or_more": {
+        "count": 16,
+        "within_first_20pct": 5,
+        "during_the_fall": 3,
+        "before_the_peak_only": 2,
+        "left_on_from_the_decline_before": 0,
+        "not_within_first_20pct": 11,
+        "falls": [
+            dict(zip(_CORE_INDEX_FAST_FALL_FIELDS, fall))
+            for fall in _CORE_INDEX_FAST_FALLS
+        ],
+    },
+    "false_alarms": dict(zip(_CORE_INDEX_TREND_PERIODS, (1, 4, 2, 7))),
+    "false_alarms_per_decade": dict(
+        zip(_CORE_INDEX_TREND_PERIODS, (0.2, 2.1, 0.5, 0.7))
+    ),
+    "share_of_days_on": dict(
+        zip(_CORE_INDEX_TREND_PERIODS, (0.039, 0.014, 0.018, 0.027))
+    ),
+    "spells_per_year": dict(zip(_CORE_INDEX_TREND_PERIODS, (2.8, 1.3, 1.6, 2.1))),
+    # The combined view: the trend warning OR the fast warning.
+    "with_trend_warning": {
+        "within_first_20pct": 10,
+        "during_the_fall": 5,
+        "trend_warning_alone_during_the_fall": 4,
+        "newly_during_the_fall": ["1929 crash / Great Depression"],
+        "false_alarms_per_decade": dict(
+            zip(_CORE_INDEX_TREND_PERIODS, (1.9, 3.7, 7.6, 4.4))
+        ),
+        "extra_false_alarms_vs_trend_alone": dict(
+            zip(_CORE_INDEX_TREND_PERIODS, (1, 2, 0, 3))
+        ),
+    },
+    "definitions": {
+        "fall": (
+            "the daily S&P 500 close 20% or more below a running peak; a new fall "
+            "inside a long recovery counts separately"
+        ),
+        "within_first_20pct": (
+            "on at a close before the first close that has done 20% of the eventual "
+            "fall, counting from 26 weeks before the peak"
+        ),
+        "during_the_fall": (
+            "on at a close from the peak to the session before that 20% mark"
+        ),
+        "false_alarm": (
+            "a warning that starts outside every window from 26 weeks before a 10%+ "
+            "fall's peak to its low"
         ),
     },
 }
@@ -1143,13 +1276,54 @@ def _core_index_trend_warning(spx: pd.Series) -> pd.Series:
     )
 
 
+def _core_index_fast_warning(frame: pd.DataFrame) -> pd.Series:
+    """Fast warning on the daily calendar: the S&P close is 7% or more below
+    the close known 14 calendar days earlier.
+
+    The close is the source-chained equity proxy kept only on daily-close
+    segments (``CORE_INDEX_DAILY_EQUITY_SOURCES``), the same input as the Core
+    Index and the trend warning, known the same day. Missing where that close
+    or the close 14 days earlier is missing, or where any day between them has
+    no daily close (the warm-up restarts after a gap). The change is rounded to
+    10 decimals so float noise cannot flip an exact -7% (which is a warning).
+    Reads nothing else, so it never depends on the Core Index or FRED inputs.
+    """
+    frame = frame.sort_index()
+    index = frame.index
+    close = pd.Series(np.nan, index=index, dtype="float64")
+    if {"sp500_proxy", "sp500_proxy_source"}.issubset(frame.columns):
+        chained = _continuous_proxy(frame)
+        source = frame["sp500_proxy_source"].astype("string")
+        daily = source.isin(list(CORE_INDEX_DAILY_EQUITY_SOURCES)).fillna(False).astype(bool)
+        close = chained.where(daily).astype("float64")
+    days = int(CORE_INDEX_FAST_DAYS)
+    # the value of the latest row on or before d - 14 days (its NaN kept), i.e. the close known on that day
+    base = close.reindex(index - pd.Timedelta(days=days), method="ffill").to_numpy(dtype=float)
+    now = close.to_numpy(dtype=float)
+    # no missing close anywhere in [d - 14, d]: a window across a gap gives no reading (warm-up restarts)
+    gap_free = (
+        close.isna().astype("float64").rolling(f"{days + 1}D").sum().eq(0.0).to_numpy(dtype=bool)
+    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        change = np.round(now / base - 1.0, 10)
+    known = np.isfinite(change) & gap_free
+    warn = change <= -float(CORE_INDEX_FAST_DROP)
+    return pd.Series(
+        pd.array([bool(w) if k else None for w, k in zip(warn, known)], dtype="boolean"),
+        index=index,
+        name="core_index_fast_warning",
+    )
+
+
 def calculate_core_index_v2_weekly(frame: pd.DataFrame) -> pd.DataFrame:
     """Core Index v2 on the Fridays of ``frame``'s daily calendar.
 
     ``frame`` is the daily calendar with native series forward-filled and raw
     FRED stamps; publication lags are applied here. The trend warning is
     computed from the same Friday equity input but has its own warm-up, so
-    it can be known on Fridays where the Core Index is not.
+    it can be known on Fridays where the Core Index is not. The fast warning
+    is daily, not weekly, so it is not here: ``calculate_core_index_v2`` adds
+    it on the daily calendar.
     """
     frame = frame.sort_index()
     inputs = _core_index_v2_inputs(frame)
@@ -1188,12 +1362,16 @@ def calculate_core_index_v2(frame: pd.DataFrame) -> pd.DataFrame:
     the Friday-close value holds Saturday to Thursday. Days before the first
     scored Friday are missing (before the first trend-warning Friday for
     ``core_index_trend_warning``, which needs 40 Friday closes, not 53).
+    The exception is ``core_index_fast_warning``, which is daily: decided at
+    each day's close, known from the 14th day of daily closes.
     """
     frame = frame.sort_index()
     weekly = calculate_core_index_v2_weekly(frame)
     # reindex(method="ffill") takes the row of the latest Friday on or before
     # each day and keeps that row's missing values.
     daily = weekly.reindex(frame.index, method="ffill")
+    # The fast warning is decided every day on the daily calendar, not on Fridays.
+    daily["core_index_fast_warning"] = _core_index_fast_warning(frame)
     return daily[list(CORE_INDEX_V2_COLUMNS)]
 
 
@@ -1202,8 +1380,9 @@ def calculate_core_index(frame: pd.DataFrame) -> pd.DataFrame:
 
     Returns the 16 v1 diagnostic columns (unchanged values; descriptive only,
     not v2 inputs), then ``core_index_composite``, ``core_index``,
-    ``core_index_bucket``, ``core_index_severity``, ``core_index_warning``
-    and ``core_index_trend_warning`` from ``calculate_core_index_v2``.
+    ``core_index_bucket``, ``core_index_severity``, ``core_index_warning``,
+    ``core_index_trend_warning`` and ``core_index_fast_warning`` from
+    ``calculate_core_index_v2``.
 
     v2 is a weekly trend-and-stress state machine decided at each Friday
     close: the daily-sourced equity proxy against its 40-week average and its
@@ -1212,7 +1391,9 @@ def calculate_core_index(frame: pd.DataFrame) -> pd.DataFrame:
     their allocation meaning; severity describes the decline under way. The
     trend warning is a separate, more sensitive flag (Friday close below the
     average of the last 40 Friday closes) that changes nothing in the index.
-    Neither is a forecast.
+    The fast warning is a separate daily flag (the S&P close 7% or more below
+    the close 14 days earlier), a reaction to a sharp fall that also changes
+    nothing in the index. None of them is a forecast.
     """
     out = calculate_core_index_v1(frame).drop(
         columns=["core_index_composite", "core_index", "core_index_bucket"]
@@ -1225,6 +1406,7 @@ def calculate_core_index(frame: pd.DataFrame) -> pd.DataFrame:
         "core_index_severity",
         "core_index_warning",
         "core_index_trend_warning",
+        "core_index_fast_warning",
     ):
         out[column] = v2[column]
     return out
@@ -1252,6 +1434,31 @@ def core_index_trend_metadata(frame: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def core_index_fast_metadata(frame: pd.DataFrame) -> dict[str, Any]:
+    """The ``core_index.fast_warning`` metadata block: the definition, the
+    first day it is known and the measured record."""
+    first = None
+    if "core_index_fast_warning" in frame.columns:
+        known = frame["core_index_fast_warning"].dropna()
+        if not known.empty:
+            first = known.index.min().date().isoformat()
+    return {
+        "version": CORE_INDEX_FAST_VERSION,
+        "column": "core_index_fast_warning",
+        "rule": CORE_INDEX_FAST_RULE,
+        "days": int(CORE_INDEX_FAST_DAYS),
+        "drop": float(CORE_INDEX_FAST_DROP),
+        "input": "sp500_proxy (chained, daily sources only), the Core Index's daily close",
+        "cadence": "daily",
+        "fitted": False,
+        "chosen_after_seeing_history": True,
+        "forecast": False,
+        "changes_core_index": False,
+        "first_value": first,
+        "record": copy.deepcopy(CORE_INDEX_FAST_RECORD),
+    }
+
+
 def core_index_metadata(frame: pd.DataFrame) -> dict[str, Any]:
     """The artifact metadata ``core_index`` block for a frame holding the v2
     columns (the ingestion pipeline and the recompute script share it)."""
@@ -1271,6 +1478,7 @@ def core_index_metadata(frame: pd.DataFrame) -> dict[str, Any]:
         "severities": list(CORE_INDEX_SEVERITIES),
         "legacy_v1_columns": list(CORE_INDEX_V1_LEGACY_COLUMNS),
         "trend_warning": core_index_trend_metadata(frame),
+        "fast_warning": core_index_fast_metadata(frame),
         "latest": None,
     }
     if "core_index" not in frame.columns:
@@ -1297,6 +1505,8 @@ def core_index_metadata(frame: pd.DataFrame) -> dict[str, Any]:
         "severity": _as_str(_value("core_index_severity")),
         "warning": _as_bool(_value("core_index_warning")),
         "trend_warning": _as_bool(_value("core_index_trend_warning")),
+        # Decided at the close of ``date`` itself (daily), not at signal_date.
+        "fast_warning": _as_bool(_value("core_index_fast_warning")),
     }
     return block
 

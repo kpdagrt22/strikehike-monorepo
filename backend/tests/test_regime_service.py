@@ -63,6 +63,16 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
     )
     trend[index < pd.Timestamp("2019-03-01", tz="UTC")] = pd.NA
     frame["core_index_trend_warning"] = trend
+    # The fast warning (nullable boolean, daily): unknown during a 14-day
+    # warm-up that ends on 2019-01-15, on only on Wednesday 2020-02-26 and
+    # Thursday 2020-02-27 (a mid-week spell), off otherwise.
+    fast = pd.array(
+        (index >= pd.Timestamp("2020-02-26", tz="UTC"))
+        & (index <= pd.Timestamp("2020-02-27", tz="UTC")),
+        dtype="boolean",
+    )
+    fast[index < pd.Timestamp("2019-01-15", tz="UTC")] = pd.NA
+    frame["core_index_fast_warning"] = fast
     frame["macro_score"] = 55.0
     frame["credit_score"] = 70.0
     frame["core_volatility_score"] = 60.0
@@ -125,6 +135,19 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
                 "first_value": "2019-03-01",
                 "record": {"falls_of_20pct_or_more": {"count": 1, "on_within_first_20pct": 1}},
             },
+            "fast_warning": {
+                "version": "fast-warning-14d-7pct-v1",
+                "column": "core_index_fast_warning",
+                "rule": "on when the daily S&P 500 close is 7% or more below the close 14 calendar days earlier",
+                "days": 14,
+                "drop": 0.07,
+                "cadence": "daily",
+                "first_value": "2019-01-15",
+                "record": {
+                    "falls_of_20pct_or_more": {"count": 1, "within_first_20pct": 0},
+                    "false_alarms": {"all": 0},
+                },
+            },
             "latest": {
                 "date": "2020-12-31",
                 "signal_date": "2020-12-25",
@@ -134,6 +157,7 @@ def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
                 "severity": "none",
                 "warning": False,
                 "trend_warning": False,
+                "fast_warning": False,
             },
         },
         "nber": {"source": "USREC"},
@@ -250,6 +274,53 @@ def test_macro_history_exposes_core_index_trend_warning(tmp_path):
     assert meta["core_index_trend_warning"]["weeks"] == 40
     assert meta["core_index_trend_warning"]["first_value"] == "2019-03-01"
     assert meta["core_index_trend_warning"]["record"]["falls_of_20pct_or_more"]["count"] == 1
+
+
+def test_macro_history_exposes_core_index_fast_warning(tmp_path):
+    artifact, meta_path = _write_artifact(tmp_path)
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+
+    # Daily points carry each day's value; null during the warm-up.
+    daily = service.macro_history(resolution="daily", start="2020-02-24", end="2020-03-01")
+    assert [p["core_index_fast_warning"] for p in daily["timeline"]] == [
+        False, False, True, True, False, False, False
+    ]
+    early = service.macro_history(resolution="daily", start="2019-01-13", end="2019-01-16")
+    assert [p["core_index_fast_warning"] for p in early["timeline"]] == [None, None, False, False]
+
+    # Weekly and monthly points are on if the flag was on any day of the
+    # bucket, off if it was known and never on, null if it was never known.
+    weekly = {p["date"]: p for p in service.macro_history(resolution="weekly")["timeline"]}
+    assert weekly["2019-01-04"]["core_index_fast_warning"] is None
+    assert weekly["2019-01-11"]["core_index_fast_warning"] is None
+    assert weekly["2019-01-18"]["core_index_fast_warning"] is False
+    assert weekly["2020-02-21"]["core_index_fast_warning"] is False
+    # The mid-week spell shows although Friday 2020-02-28 itself is off.
+    assert weekly["2020-02-28"]["core_index_fast_warning"] is True
+    assert weekly["2020-03-06"]["core_index_fast_warning"] is False
+    # The weekly flags keep their Friday value.
+    assert weekly["2020-02-21"]["core_index_trend_warning"] is False
+    assert weekly["2020-02-28"]["core_index_trend_warning"] is True
+
+    monthly = {p["date"]: p for p in service.macro_history(resolution="monthly")["timeline"]}
+    assert monthly["2019-01-31"]["core_index_fast_warning"] is False
+    assert monthly["2020-01-31"]["core_index_fast_warning"] is False
+    assert monthly["2020-02-29"]["core_index_fast_warning"] is True
+    assert monthly["2020-03-31"]["core_index_fast_warning"] is False
+
+    # The field, the latest value and the meta block survive the response model.
+    payload = service.macro_history(resolution="weekly")
+    dumped = MacroHistoryResponse.model_validate(payload).model_dump(by_alias=True)
+    for raw, kept in zip(payload["timeline"], dumped["timeline"]):
+        assert kept["core_index_fast_warning"] == raw["core_index_fast_warning"]
+    assert any(p["core_index_fast_warning"] for p in dumped["timeline"])
+    meta = dumped["meta"]
+    assert meta["latest_core_index"]["fast_warning"] is False
+    block = meta["core_index_fast_warning"]
+    assert block["cadence"] == "daily" and block["days"] == 14 and block["drop"] == 0.07
+    assert block["rule"].startswith("on when the daily S&P 500 close is 7% or more below")
+    assert block["first_value"] == "2019-01-15"
+    assert block["record"]["falls_of_20pct_or_more"]["count"] == 1
 
 
 def test_macro_history_payload_survives_response_model(tmp_path):

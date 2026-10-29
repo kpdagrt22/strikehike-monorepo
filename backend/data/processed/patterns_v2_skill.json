@@ -1,352 +1,143 @@
 {
- "schema_version": 1,
+ "schema_version": 2,
  "engine_version": "patterns-v2",
- "generated_at": "2026-10-28T11:28:28+00:00",
- "data_version": "8c3b382a9b5b",
+ "generated_at": "2026-10-28T12:56:50+00:00",
+ "config": {
+  "sp500": {
+   "resolution": "W",
+   "window": 52,
+   "horizon": 52,
+   "k": 10,
+   "sep": 52
+  },
+  "nifty": {
+   "resolution": "W",
+   "window": 52,
+   "horizon": 52,
+   "k": 10,
+   "sep": 52
+  },
+  "gold": {
+   "resolution": "M",
+   "window": 12,
+   "horizon": 12,
+   "k": 10,
+   "sep": 12
+  },
+  "bonds": {
+   "resolution": "W",
+   "window": 52,
+   "horizon": 52,
+   "k": 10,
+   "sep": 52
+  },
+  "bitcoin": {
+   "resolution": "W",
+   "window": 52,
+   "horizon": 52,
+   "k": 10,
+   "sep": 52
+  },
+  "sp500_mirror": {
+   "resolution": "M",
+   "window": 12,
+   "horizon": 12
+  }
+ },
+ "inputs_fingerprint": {
+  "sp500": "3c6cfd7bef6716c1",
+  "nifty": "336d448f8928a62f",
+  "gold": "24ea97033c24967c",
+  "bonds": "38a1c6319f673d7a",
+  "bitcoin": "9c1e05d3fc4f2120"
+ },
  "assets": {
   "sp500": {
    "available": true,
+   "inputs_fingerprint": "3c6cfd7bef6716c1",
    "period": [
-    "1892-12-31",
-    "2025-10-31"
+    "1949-12-02",
+    "2025-10-24"
    ],
-   "forecasts": 1595,
-   "independent_years": 132.9,
+   "cadence": "every_4_weeks",
+   "forecasts": 991,
+   "independent_years": 76.2,
    "direction": {
     "horizon_months": 12,
-    "hit_pct": 61.4,
-    "base_hit_pct": 65.5,
+    "hit_pct": 67.7,
+    "base_hit_pct": 74.9,
     "edge_ci95_pp": [
-     -9.6,
-     1.3
+     -11.6,
+     -3.0
     ],
-    "verdict": "no_edge"
+    "verdict": "worse",
+    "base_call": "up"
    },
    "falls_20": {
     "threshold_pct": 20,
-    "realised_pct": 14.0,
-    "brier_skill": -0.04,
+    "realised_pct": 13.5,
+    "brier_skill": 0.014,
     "ci95": [
-     -0.075,
-     -0.003
+     -0.069,
+     0.097
     ],
-    "auc": 0.468,
-    "verdict": "worse"
+    "auc": 0.463,
+    "verdict": "no_edge"
    },
    "falls_10": {
     "threshold_pct": 10,
-    "realised_pct": 38.7,
-    "brier_skill": -0.041,
+    "realised_pct": 45.9,
+    "brier_skill": -0.026,
     "ci95": [
-     -0.09,
-     0.009
+     -0.06,
+     0.005
     ],
-    "auc": 0.496,
+    "auc": 0.452,
     "verdict": "no_edge"
    },
    "ranking": {
     "horizon_months": 3,
-    "rank_corr": 0.114,
+    "rank_corr": -0.024,
     "ci95": [
-     0.04,
-     0.188
+     -0.098,
+     0.052
     ],
-    "recent_from": "1959-01-01",
-    "recent_rank_corr": 0.028,
+    "recent_from": "1987-11-13",
+    "recent_rank_corr": 0.03,
     "recent_ci95": [
-     -0.067,
-     0.11
+     -0.062,
+     0.142
     ],
-    "verdict": "unstable"
+    "verdict": "none"
    },
-   "episodes": [
-    {
-     "peak": "1892-08-31",
-     "trough": "1896-08-31",
-     "depth_pct": -32.1,
-     "source": "cowles",
-     "read_on": "1893-05-31",
-     "drawdown_at_read_pct": -14.3,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 11.3,
-     "further_fall_20": false,
-     "remaining_fall_pct": -20.8
-    },
-    {
-     "peak": "1902-09-30",
-     "trough": "1903-10-31",
-     "depth_pct": -29.1,
-     "source": "cowles",
-     "read_on": "1902-11-30",
-     "drawdown_at_read_pct": -6.9,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 11.1,
-     "further_fall_20": true,
-     "remaining_fall_pct": -23.9
-    },
-    {
-     "peak": "1906-09-30",
-     "trough": "1907-11-30",
-     "depth_pct": -37.6,
-     "source": "cowles",
-     "read_on": "1907-03-31",
-     "drawdown_at_read_pct": -16.6,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 11.8,
-     "further_fall_20": true,
-     "remaining_fall_pct": -25.2
-    },
-    {
-     "peak": "1909-12-31",
-     "trough": "1914-12-31",
-     "depth_pct": -29.0,
-     "source": "cowles",
-     "read_on": "1910-02-28",
-     "drawdown_at_read_pct": -5.8,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 14.0,
-     "further_fall_20": false,
-     "remaining_fall_pct": -24.6
-    },
-    {
-     "peak": "1916-11-30",
-     "trough": "1917-12-31",
-     "depth_pct": -33.4,
-     "source": "cowles",
-     "read_on": "1917-02-28",
-     "drawdown_at_read_pct": -11.6,
-     "setups_fell_20": 3,
-     "of": 10,
-     "base_share_20_pct": 11.8,
-     "further_fall_20": true,
-     "remaining_fall_pct": -24.6
-    },
-    {
-     "peak": "1919-07-31",
-     "trough": "1921-08-31",
-     "depth_pct": -32.2,
-     "source": "cowles",
-     "read_on": "1919-08-31",
-     "drawdown_at_read_pct": -6.7,
-     "setups_fell_20": 0,
-     "of": 10,
-     "base_share_20_pct": 13.3,
-     "further_fall_20": false,
-     "remaining_fall_pct": -27.3
-    },
-    {
-     "peak": "1929-09-30",
-     "trough": "1929-11-29",
-     "depth_pct": -33.3,
-     "source": "sp90",
-     "read_on": "1929-10-31",
-     "drawdown_at_read_pct": -10.6,
-     "setups_fell_20": 0,
-     "of": 10,
-     "base_share_20_pct": 11.7,
-     "further_fall_20": true,
-     "remaining_fall_pct": -25.4
-    },
-    {
-     "peak": "1930-04-30",
-     "trough": "1932-06-30",
-     "depth_pct": -81.4,
-     "source": "sp90",
-     "read_on": "1930-07-31",
-     "drawdown_at_read_pct": -17.5,
-     "setups_fell_20": 0,
-     "of": 10,
-     "base_share_20_pct": 12.8,
-     "further_fall_20": true,
-     "remaining_fall_pct": -77.4
-    },
-    {
-     "peak": "1932-09-30",
-     "trough": "1933-03-31",
-     "depth_pct": -26.2,
-     "source": "sp90",
-     "read_on": "1932-10-31",
-     "drawdown_at_read_pct": -14.0,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 16.0,
-     "further_fall_20": false,
-     "remaining_fall_pct": -14.1
-    },
-    {
-     "peak": "1934-02-28",
-     "trough": "1935-03-29",
-     "depth_pct": -25.9,
-     "source": "sp90",
-     "read_on": "1934-03-30",
-     "drawdown_at_read_pct": -5.3,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 17.1,
-     "further_fall_20": true,
-     "remaining_fall_pct": -21.7
-    },
-    {
-     "peak": "1937-02-26",
-     "trough": "1938-04-29",
-     "depth_pct": -45.5,
-     "source": "sp90",
-     "read_on": "1937-05-31",
-     "drawdown_at_read_pct": -10.4,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 17.3,
-     "further_fall_20": true,
-     "remaining_fall_pct": -39.2
-    },
-    {
-     "peak": "1938-11-30",
-     "trough": "1942-04-30",
-     "depth_pct": -40.0,
-     "source": "sp90",
-     "read_on": "1939-04-28",
-     "drawdown_at_read_pct": -17.4,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 18.4,
-     "further_fall_20": false,
-     "remaining_fall_pct": -27.4
-    },
-    {
-     "peak": "1946-05-31",
-     "trough": "1949-06-30",
-     "depth_pct": -25.5,
-     "source": "sp90",
-     "read_on": "1946-08-30",
-     "drawdown_at_read_pct": -5.5,
-     "setups_fell_20": 3,
-     "of": 10,
-     "base_share_20_pct": 18.8,
-     "further_fall_20": false,
-     "remaining_fall_pct": -21.1
-    },
-    {
-     "peak": "1961-12-29",
-     "trough": "1962-06-29",
-     "depth_pct": -22.4,
-     "source": "sp500",
-     "read_on": "1962-04-30",
-     "drawdown_at_read_pct": -5.0,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 16.4,
-     "further_fall_20": false,
-     "remaining_fall_pct": -18.3
-    },
-    {
-     "peak": "1968-12-31",
-     "trough": "1970-06-30",
-     "depth_pct": -29.0,
-     "source": "sp500",
-     "read_on": "1969-03-31",
-     "drawdown_at_read_pct": -6.7,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 16.1,
-     "further_fall_20": false,
-     "remaining_fall_pct": -24.0
-    },
-    {
-     "peak": "1973-01-31",
-     "trough": "1974-12-31",
-     "depth_pct": -43.3,
-     "source": "sp500",
-     "read_on": "1973-05-31",
-     "drawdown_at_read_pct": -9.4,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 16.0,
-     "further_fall_20": false,
-     "remaining_fall_pct": -37.5
-    },
-    {
-     "peak": "1987-08-31",
-     "trough": "1987-12-31",
-     "depth_pct": -26.7,
-     "source": "sp500",
-     "read_on": "1987-10-30",
-     "drawdown_at_read_pct": -14.9,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 14.9,
-     "further_fall_20": false,
-     "remaining_fall_pct": -13.8
-    },
-    {
-     "peak": "2000-08-31",
-     "trough": "2003-02-28",
-     "depth_pct": -43.6,
-     "source": "sp500",
-     "read_on": "2000-12-29",
-     "drawdown_at_read_pct": -10.5,
-     "setups_fell_20": 3,
-     "of": 10,
-     "base_share_20_pct": 14.1,
-     "further_fall_20": true,
-     "remaining_fall_pct": -37.0
-    },
-    {
-     "peak": "2007-10-31",
-     "trough": "2009-03-31",
-     "depth_pct": -50.8,
-     "source": "sp500",
-     "read_on": "2008-01-31",
-     "drawdown_at_read_pct": -10.3,
-     "setups_fell_20": 3,
-     "of": 10,
-     "base_share_20_pct": 14.7,
-     "further_fall_20": true,
-     "remaining_fall_pct": -45.1
-    },
-    {
-     "peak": "2021-12-31",
-     "trough": "2022-10-31",
-     "depth_pct": -20.3,
-     "source": "sp500",
-     "read_on": "2022-02-28",
-     "drawdown_at_read_pct": -5.2,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 14.1,
-     "further_fall_20": false,
-     "remaining_fall_pct": -15.9
-    }
-   ],
-   "episodes_before_record": [
-    {
-     "peak": "1872-04-30",
-     "trough": "1877-06-30",
-     "depth_pct": -47.1,
-     "source": "cowles"
-    },
-    {
-     "peak": "1881-06-30",
-     "trough": "1885-01-31",
-     "depth_pct": -35.5,
-     "source": "cowles"
-    },
-    {
-     "peak": "1887-05-31",
-     "trough": "1890-12-31",
-     "depth_pct": -22.2,
-     "source": "cowles"
-    }
-   ],
-   "episodes_summary": {
-    "with_reading": 20,
-    "above_usual": 11,
-    "above_usual_followed": 5,
-    "not_above_usual": 9,
-    "not_above_usual_followed": 4
+   "placebo": {
+    "seeds": 20,
+    "direction_gap_pp_mean": -5.57,
+    "direction_gap_pp_p05": -7.477,
+    "direction_gap_pp_p95": -4.036,
+    "falls_20_brier_skill_mean": -0.067,
+    "verdict": "same"
+   },
+   "warnings": {
+    "threshold_pct": 20,
+    "flagged_share_pct": 38.0,
+    "flagged_followed_pct": 14.3,
+    "other_followed_pct": 13.0
+   },
+   "declines": {
+    "read_at_pct": 10,
+    "period": [
+     "1950-07-14",
+     "2025-04-04"
+    ],
+    "declines": 31,
+    "became_20": 12,
+    "flagged": 21,
+    "flagged_became_20": 7,
+    "not_flagged": 10,
+    "not_flagged_became_20": 5,
+    "auc": 0.237,
+    "before_record": 14
    },
    "mirror_evidence": {
     "months_tested": 418,
@@ -374,268 +165,172 @@
   },
   "nifty": {
    "available": true,
+   "inputs_fingerprint": "336d448f8928a62f",
    "period": [
-    "2014-09-12",
+    "2015-07-17",
     "2025-10-24"
    ],
-   "forecasts": 146,
-   "independent_years": 11.2,
+   "cadence": "every_4_weeks",
+   "forecasts": 124,
+   "independent_years": 9.5,
    "direction": {
     "horizon_months": 12,
-    "hit_pct": 78.8,
-    "base_hit_pct": 78.8,
+    "hit_pct": 83.1,
+    "base_hit_pct": 83.1,
     "edge_ci95_pp": [
      0.0,
      0.0
     ],
-    "verdict": "no_edge"
+    "verdict": "no_edge",
+    "base_call": "up"
    },
    "falls_20": {
     "threshold_pct": 20,
-    "realised_pct": 10.3,
-    "brier_skill": -0.044,
+    "realised_pct": 10.5,
+    "brier_skill": -0.08,
     "ci95": [
-     -0.149,
-     0.213
+     -0.193,
+     -0.042
     ],
-    "auc": 0.145,
-    "verdict": "no_edge"
+    "auc": 0.148,
+    "verdict": "worse"
    },
    "falls_10": {
     "threshold_pct": 10,
-    "realised_pct": 56.2,
-    "brier_skill": 0.1,
+    "realised_pct": 53.2,
+    "brier_skill": 0.058,
     "ci95": [
-     0.008,
-     0.197
+     -0.013,
+     0.15
     ],
-    "auc": 0.66,
-    "verdict": "better"
+    "auc": 0.541,
+    "verdict": "no_edge"
    },
    "ranking": {
     "horizon_months": 3,
-    "rank_corr": 0.253,
+    "rank_corr": 0.25,
     "ci95": [
-     0.022,
-     0.462
+     0.016,
+     0.458
     ],
-    "recent_from": "2020-04-17",
-    "recent_rank_corr": 0.139,
+    "recent_from": "2021-02-19",
+    "recent_rank_corr": 0.036,
     "recent_ci95": [
-     -0.18,
-     0.415
+     -0.16,
+     0.266
     ],
     "verdict": "unstable"
    },
-   "episodes": [
-    {
-     "peak": "2015-03-06",
-     "trough": "2016-02-12",
-     "depth_pct": -21.9,
-     "source": null,
-     "read_on": "2015-03-27",
-     "drawdown_at_read_pct": -6.7,
-     "setups_fell_20": 1,
-     "of": 7,
-     "base_share_20_pct": 27.0,
-     "further_fall_20": true,
-     "remaining_fall_pct": -16.3
-    },
-    {
-     "peak": "2020-01-17",
-     "trough": "2020-04-03",
-     "depth_pct": -34.6,
-     "source": null,
-     "read_on": "2020-02-21",
-     "drawdown_at_read_pct": -2.2,
-     "setups_fell_20": 0,
-     "of": 10,
-     "base_share_20_pct": 16.9,
-     "further_fall_20": true,
-     "remaining_fall_pct": -33.1
-    }
-   ],
-   "episodes_before_record": [
-    {
-     "peak": "2008-01-04",
-     "trough": "2008-10-24",
-     "depth_pct": -58.8,
-     "source": null
-    },
-    {
-     "peak": "2010-11-05",
-     "trough": "2011-12-30",
-     "depth_pct": -26.4,
-     "source": null
-    }
-   ],
-   "episodes_summary": {
-    "with_reading": 2,
-    "above_usual": 0,
-    "above_usual_followed": 0,
-    "not_above_usual": 2,
-    "not_above_usual_followed": 2
-   }
+   "placebo": {
+    "seeds": 20,
+    "direction_gap_pp_mean": 0.0,
+    "direction_gap_pp_p05": 0.0,
+    "direction_gap_pp_p95": 0.0,
+    "falls_20_brier_skill_mean": 0.031,
+    "verdict": "same"
+   },
+   "warnings": {
+    "threshold_pct": 20,
+    "flagged_share_pct": 54.0,
+    "flagged_followed_pct": 0.0,
+    "other_followed_pct": 22.8
+   },
+   "declines": null
   },
   "gold": {
    "available": true,
+   "inputs_fingerprint": "24ea97033c24967c",
    "period": [
     "1988-12-31",
     "2025-09-30"
    ],
+   "cadence": "monthly",
    "forecasts": 442,
    "independent_years": 36.8,
    "direction": {
     "horizon_months": 12,
     "hit_pct": 55.2,
-    "base_hit_pct": 55.7,
+    "base_hit_pct": 61.8,
     "edge_ci95_pp": [
-     -13.8,
-     14.3
+     -16.1,
+     2.7
     ],
-    "verdict": "no_edge"
+    "verdict": "no_edge",
+    "base_call": "up"
    },
    "falls_20": {
     "threshold_pct": 20,
     "realised_pct": 3.6,
-    "brier_skill": -0.061,
+    "brier_skill": 0.01,
     "ci95": [
-     -0.163,
-     0.115
+     -0.092,
+     0.205
     ],
-    "auc": 0.236,
+    "auc": 0.23,
     "verdict": "no_edge"
    },
    "falls_10": {
     "threshold_pct": 10,
     "realised_pct": 36.0,
-    "brier_skill": -0.058,
+    "brier_skill": -0.028,
     "ci95": [
-     -0.156,
-     0.02
+     -0.095,
+     0.036
     ],
-    "auc": 0.443,
+    "auc": 0.427,
     "verdict": "no_edge"
    },
    "ranking": {
     "horizon_months": 3,
-    "rank_corr": 0.148,
+    "rank_corr": 0.094,
     "ci95": [
-     -0.009,
-     0.284
+     -0.042,
+     0.215
     ],
     "recent_from": "2007-05-31",
-    "recent_rank_corr": 0.146,
+    "recent_rank_corr": 0.143,
     "recent_ci95": [
-     -0.076,
-     0.342
+     -0.053,
+     0.312
     ],
     "verdict": "none"
    },
-   "episodes": [
-    {
-     "peak": "1996-02-29",
-     "trough": "1999-07-31",
-     "depth_pct": -36.8,
-     "source": null,
-     "read_on": "1996-12-31",
-     "drawdown_at_read_pct": -8.9,
-     "setups_fell_20": 0,
-     "of": 10,
-     "base_share_20_pct": 15.7,
-     "further_fall_20": true,
-     "remaining_fall_pct": -30.6
-    },
-    {
-     "peak": "2008-03-31",
-     "trough": "2008-11-30",
-     "depth_pct": -21.4,
-     "source": null,
-     "read_on": "2008-04-30",
-     "drawdown_at_read_pct": -6.0,
-     "setups_fell_20": 1,
-     "of": 10,
-     "base_share_20_pct": 12.1,
-     "further_fall_20": false,
-     "remaining_fall_pct": -16.4
-    },
-    {
-     "peak": "2011-09-30",
-     "trough": "2015-12-31",
-     "depth_pct": -39.3,
-     "source": null,
-     "read_on": "2012-05-31",
-     "drawdown_at_read_pct": -10.3,
-     "setups_fell_20": 2,
-     "of": 10,
-     "base_share_20_pct": 12.0,
-     "further_fall_20": false,
-     "remaining_fall_pct": -32.3
-    }
-   ],
-   "episodes_before_record": [
-    {
-     "peak": "1973-06-30",
-     "trough": "1973-11-30",
-     "depth_pct": -20.8,
-     "source": null
-    },
-    {
-     "peak": "1974-12-31",
-     "trough": "1976-08-31",
-     "depth_pct": -40.2,
-     "source": null
-    },
-    {
-     "peak": "1980-01-31",
-     "trough": "1980-05-31",
-     "depth_pct": -23.9,
-     "source": null
-    },
-    {
-     "peak": "1980-09-30",
-     "trough": "1982-06-30",
-     "depth_pct": -53.3,
-     "source": null
-    },
-    {
-     "peak": "1983-02-28",
-     "trough": "1985-02-28",
-     "depth_pct": -39.1,
-     "source": null
-    },
-    {
-     "peak": "1987-12-31",
-     "trough": "1993-01-31",
-     "depth_pct": -32.3,
-     "source": null
-    }
-   ],
-   "episodes_summary": {
-    "with_reading": 3,
-    "above_usual": 1,
-    "above_usual_followed": 0,
-    "not_above_usual": 2,
-    "not_above_usual_followed": 1
-   }
+   "placebo": {
+    "seeds": 20,
+    "direction_gap_pp_mean": -6.063,
+    "direction_gap_pp_p05": -8.416,
+    "direction_gap_pp_p95": -4.05,
+    "falls_20_brier_skill_mean": -0.118,
+    "verdict": "same"
+   },
+   "warnings": {
+    "threshold_pct": 20,
+    "flagged_share_pct": 35.1,
+    "flagged_followed_pct": 1.3,
+    "other_followed_pct": 4.9
+   },
+   "declines": null
   },
   "bonds": {
    "available": true,
+   "inputs_fingerprint": "38a1c6319f673d7a",
    "period": [
-    "1984-07-20",
+    "1985-03-01",
     "2025-10-17"
    ],
-   "forecasts": 539,
-   "independent_years": 41.5,
+   "cadence": "every_4_weeks",
+   "forecasts": 531,
+   "independent_years": 40.8,
    "direction": {
     "horizon_months": 12,
-    "hit_pct": 80.7,
-    "base_hit_pct": 80.7,
+    "hit_pct": 80.4,
+    "base_hit_pct": 80.4,
     "edge_ci95_pp": [
      0.0,
      0.0
     ],
-    "verdict": "no_edge"
+    "verdict": "no_edge",
+    "base_call": "up"
    },
    "falls_20": {
     "threshold_pct": 20,
@@ -647,94 +342,71 @@
    },
    "falls_10": {
     "threshold_pct": 10,
-    "realised_pct": 7.6,
-    "brier_skill": -0.073,
+    "realised_pct": 7.7,
+    "brier_skill": -0.021,
     "ci95": [
-     -0.118,
-     0.018
+     -0.074,
+     0.076
     ],
-    "auc": 0.268,
+    "auc": 0.389,
     "verdict": "no_edge"
    },
    "ranking": {
     "horizon_months": 3,
-    "rank_corr": -0.098,
+    "rank_corr": -0.102,
     "ci95": [
-     -0.239,
-     0.059
+     -0.23,
+     0.044
     ],
-    "recent_from": "2005-03-04",
-    "recent_rank_corr": 0.038,
+    "recent_from": "2005-06-24",
+    "recent_rank_corr": 0.012,
     "recent_ci95": [
-     -0.128,
-     0.183
+     -0.194,
+     0.197
     ],
     "verdict": "none"
    },
-   "episodes": [
-    {
-     "peak": "2020-07-31",
-     "trough": "2023-10-20",
-     "depth_pct": -20.1,
-     "source": null,
-     "read_on": "2021-01-15",
-     "drawdown_at_read_pct": -3.6,
-     "setups_fell_20": 0,
-     "of": 10,
-     "base_share_20_pct": 1.0,
-     "further_fall_20": false,
-     "remaining_fall_pct": -17.1
-    }
-   ],
-   "episodes_before_record": [
-    {
-     "peak": "1979-08-03",
-     "trough": "1980-02-22",
-     "depth_pct": -20.8,
-     "source": null
-    },
-    {
-     "peak": "1980-06-20",
-     "trough": "1981-09-25",
-     "depth_pct": -22.2,
-     "source": null
-    }
-   ],
-   "episodes_summary": {
-    "with_reading": 1,
-    "above_usual": 0,
-    "above_usual_followed": 0,
-    "not_above_usual": 1,
-    "not_above_usual_followed": 0
-   }
+   "placebo": {
+    "seeds": 20,
+    "direction_gap_pp_mean": -0.009,
+    "direction_gap_pp_p05": -0.009,
+    "direction_gap_pp_p95": 0.0,
+    "falls_20_brier_skill_mean": -2.34,
+    "verdict": "same"
+   },
+   "warnings": null,
+   "declines": null
   },
   "bitcoin": {
    "available": true,
+   "inputs_fingerprint": "9c1e05d3fc4f2120",
    "period": [
-    "2017-08-11",
+    "2018-11-30",
     "2025-10-24"
    ],
-   "forecasts": 108,
-   "independent_years": 8.3,
+   "cadence": "every_4_weeks",
+   "forecasts": 87,
+   "independent_years": 6.7,
    "direction": {
     "horizon_months": 12,
-    "hit_pct": 61.1,
-    "base_hit_pct": 61.1,
+    "hit_pct": 60.9,
+    "base_hit_pct": 60.9,
     "edge_ci95_pp": [
      0.0,
      0.0
     ],
-    "verdict": "no_edge"
+    "verdict": "no_edge",
+    "base_call": "up"
    },
    "falls_20": {
     "threshold_pct": 20,
-    "realised_pct": 89.8,
-    "brier_skill": -0.019,
+    "realised_pct": 87.4,
+    "brier_skill": -0.029,
     "ci95": [
-     -1.875,
-     -0.002
+     -0.91,
+     -0.022
     ],
-    "auc": 0.117,
+    "auc": 0.049,
     "verdict": "worse"
    },
    "falls_10": {
@@ -747,328 +419,34 @@
    },
    "ranking": {
     "horizon_months": 3,
-    "rank_corr": -0.012,
+    "rank_corr": 0.087,
     "ci95": [
-     -0.228,
-     0.202
+     -0.108,
+     0.305
     ],
-    "recent_from": "2021-10-01",
-    "recent_rank_corr": -0.085,
+    "recent_from": "2022-07-08",
+    "recent_rank_corr": 0.093,
     "recent_ci95": [
-     -0.42,
-     0.339
+     -0.122,
+     0.344
     ],
     "verdict": "none"
    },
-   "episodes": [
-    {
-     "peak": "2017-09-01",
-     "trough": "2017-09-15",
-     "depth_pct": -32.0,
-     "source": null,
-     "read_on": "2017-09-08",
-     "drawdown_at_read_pct": -2.5,
-     "setups_fell_20": 7,
-     "of": 7,
-     "base_share_20_pct": 96.2,
-     "further_fall_20": true,
-     "remaining_fall_pct": -30.3
-    },
-    {
-     "peak": "2017-12-08",
-     "trough": "2018-02-09",
-     "depth_pct": -51.1,
-     "source": null,
-     "read_on": "2017-12-29",
-     "drawdown_at_read_pct": -15.7,
-     "setups_fell_20": 8,
-     "of": 8,
-     "base_share_20_pct": 96.4,
-     "further_fall_20": true,
-     "remaining_fall_pct": -42.0
-    },
-    {
-     "peak": "2018-03-02",
-     "trough": "2018-04-06",
-     "depth_pct": -37.9,
-     "source": null,
-     "read_on": "2018-02-23",
-     "drawdown_at_read_pct": -9.9,
-     "setups_fell_20": 8,
-     "of": 8,
-     "base_share_20_pct": 96.5,
-     "further_fall_20": true,
-     "remaining_fall_pct": -31.1
-    },
-    {
-     "peak": "2018-05-04",
-     "trough": "2018-06-29",
-     "depth_pct": -39.7,
-     "source": null,
-     "read_on": "2018-05-18",
-     "drawdown_at_read_pct": -17.3,
-     "setups_fell_20": 7,
-     "of": 7,
-     "base_share_20_pct": 96.6,
-     "further_fall_20": true,
-     "remaining_fall_pct": -27.1
-    },
-    {
-     "peak": "2018-07-27",
-     "trough": "2018-12-14",
-     "depth_pct": -58.3,
-     "source": null,
-     "read_on": "2018-08-10",
-     "drawdown_at_read_pct": -17.7,
-     "setups_fell_20": 7,
-     "of": 8,
-     "base_share_20_pct": 96.7,
-     "further_fall_20": true,
-     "remaining_fall_pct": -49.4
-    },
-    {
-     "peak": "2019-08-09",
-     "trough": "2019-10-25",
-     "depth_pct": -38.0,
-     "source": null,
-     "read_on": "2019-08-09",
-     "drawdown_at_read_pct": 0.0,
-     "setups_fell_20": 8,
-     "of": 9,
-     "base_share_20_pct": 97.1,
-     "further_fall_20": true,
-     "remaining_fall_pct": -38.0
-    },
-    {
-     "peak": "2019-11-08",
-     "trough": "2020-01-03",
-     "depth_pct": -24.6,
-     "source": null,
-     "read_on": "2019-11-01",
-     "drawdown_at_read_pct": -0.6,
-     "setups_fell_20": 9,
-     "of": 10,
-     "base_share_20_pct": 97.2,
-     "further_fall_20": true,
-     "remaining_fall_pct": -24.1
-    },
-    {
-     "peak": "2020-02-14",
-     "trough": "2020-03-13",
-     "depth_pct": -52.8,
-     "source": null,
-     "read_on": "2020-02-21",
-     "drawdown_at_read_pct": -6.2,
-     "setups_fell_20": 8,
-     "of": 9,
-     "base_share_20_pct": 97.3,
-     "further_fall_20": true,
-     "remaining_fall_pct": -49.7
-    },
-    {
-     "peak": "2021-01-08",
-     "trough": "2021-01-22",
-     "depth_pct": -22.0,
-     "source": null,
-     "read_on": "2021-01-22",
-     "drawdown_at_read_pct": -22.0,
-     "setups_fell_20": 9,
-     "of": 10,
-     "base_share_20_pct": 97.6,
-     "further_fall_20": true,
-     "remaining_fall_pct": 0.0
-    },
-    {
-     "peak": "2021-04-16",
-     "trough": "2021-07-16",
-     "depth_pct": -49.8,
-     "source": null,
-     "read_on": "2021-04-16",
-     "drawdown_at_read_pct": 0.0,
-     "setups_fell_20": 10,
-     "of": 10,
-     "base_share_20_pct": 97.6,
-     "further_fall_20": true,
-     "remaining_fall_pct": -49.8
-    },
-    {
-     "peak": "2021-11-12",
-     "trough": "2022-02-04",
-     "depth_pct": -42.8,
-     "source": null,
-     "read_on": "2021-10-29",
-     "drawdown_at_read_pct": -6.6,
-     "setups_fell_20": 9,
-     "of": 10,
-     "base_share_20_pct": 97.7,
-     "further_fall_20": true,
-     "remaining_fall_pct": -38.8
-    },
-    {
-     "peak": "2022-04-01",
-     "trough": "2022-07-01",
-     "depth_pct": -56.4,
-     "source": null,
-     "read_on": "2022-04-15",
-     "drawdown_at_read_pct": -12.3,
-     "setups_fell_20": 10,
-     "of": 10,
-     "base_share_20_pct": 97.8,
-     "further_fall_20": true,
-     "remaining_fall_pct": -50.3
-    },
-    {
-     "peak": "2022-08-12",
-     "trough": "2022-11-25",
-     "depth_pct": -30.7,
-     "source": null,
-     "read_on": "2022-08-05",
-     "drawdown_at_read_pct": -5.6,
-     "setups_fell_20": 10,
-     "of": 10,
-     "base_share_20_pct": 97.9,
-     "further_fall_20": true,
-     "remaining_fall_pct": -26.6
-    },
-    {
-     "peak": "2024-03-15",
-     "trough": "2024-09-06",
-     "depth_pct": -21.3,
-     "source": null,
-     "read_on": "2024-03-15",
-     "drawdown_at_read_pct": 0.0,
-     "setups_fell_20": 10,
-     "of": 10,
-     "base_share_20_pct": 93.8,
-     "further_fall_20": true,
-     "remaining_fall_pct": -21.3
-    },
-    {
-     "peak": "2025-01-31",
-     "trough": "2025-04-11",
-     "depth_pct": -24.0,
-     "source": null,
-     "read_on": "2025-01-17",
-     "drawdown_at_read_pct": -4.6,
-     "setups_fell_20": 10,
-     "of": 10,
-     "base_share_20_pct": 92.0,
-     "further_fall_20": true,
-     "remaining_fall_pct": -20.4
-    },
-    {
-     "peak": "2025-10-10",
-     "trough": "2026-02-06",
-     "depth_pct": -48.4,
-     "source": null,
-     "read_on": "2025-09-26",
-     "drawdown_at_read_pct": -10.4,
-     "setups_fell_20": 10,
-     "of": 10,
-     "base_share_20_pct": 92.4,
-     "further_fall_20": true,
-     "remaining_fall_pct": -42.4
-    }
-   ],
-   "episodes_before_record": [
-    {
-     "peak": "2010-11-19",
-     "trough": "2010-12-10",
-     "depth_pct": -20.7,
-     "source": null
-    },
-    {
-     "peak": "2011-02-11",
-     "trough": "2011-04-08",
-     "depth_pct": -27.8,
-     "source": null
-    },
-    {
-     "peak": "2011-06-10",
-     "trough": "2011-10-21",
-     "depth_pct": -92.3,
-     "source": null
-    },
-    {
-     "peak": "2011-11-04",
-     "trough": "2011-11-25",
-     "depth_pct": -24.4,
-     "source": null
-    },
-    {
-     "peak": "2012-01-13",
-     "trough": "2012-02-17",
-     "depth_pct": -31.9,
-     "source": null
-    },
-    {
-     "peak": "2012-08-17",
-     "trough": "2012-08-24",
-     "depth_pct": -27.9,
-     "source": null
-    },
-    {
-     "peak": "2013-04-26",
-     "trough": "2013-05-03",
-     "depth_pct": -27.2,
-     "source": null
-    },
-    {
-     "peak": "2013-05-31",
-     "trough": "2013-07-05",
-     "depth_pct": -37.9,
-     "source": null
-    },
-    {
-     "peak": "2013-12-06",
-     "trough": "2013-12-20",
-     "depth_pct": -33.8,
-     "source": null
-    },
-    {
-     "peak": "2014-01-10",
-     "trough": "2014-04-11",
-     "depth_pct": -55.3,
-     "source": null
-    },
-    {
-     "peak": "2014-06-06",
-     "trough": "2014-10-31",
-     "depth_pct": -47.8,
-     "source": null
-    },
-    {
-     "peak": "2014-11-14",
-     "trough": "2015-01-16",
-     "depth_pct": -49.9,
-     "source": null
-    },
-    {
-     "peak": "2015-03-13",
-     "trough": "2015-06-05",
-     "depth_pct": -24.4,
-     "source": null
-    },
-    {
-     "peak": "2015-07-31",
-     "trough": "2015-08-28",
-     "depth_pct": -22.0,
-     "source": null
-    },
-    {
-     "peak": "2016-06-17",
-     "trough": "2016-08-19",
-     "depth_pct": -25.5,
-     "source": null
-    }
-   ],
-   "episodes_summary": {
-    "with_reading": 16,
-    "above_usual": 10,
-    "above_usual_followed": 10,
-    "not_above_usual": 6,
-    "not_above_usual_followed": 6
-   }
+   "placebo": {
+    "seeds": 20,
+    "direction_gap_pp_mean": 0.057,
+    "direction_gap_pp_p05": -0.057,
+    "direction_gap_pp_p95": 1.149,
+    "falls_20_brier_skill_mean": -0.013,
+    "verdict": "same"
+   },
+   "warnings": {
+    "threshold_pct": 20,
+    "flagged_share_pct": 73.6,
+    "flagged_followed_pct": 82.8,
+    "other_followed_pct": 100.0
+   },
+   "declines": null
   }
  }
 }

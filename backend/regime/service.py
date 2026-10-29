@@ -40,7 +40,6 @@ DEFAULT_META = BACKEND_DIR / "data" / "processed" / "macro_regime_history.meta.j
 DEFAULT_CRYPTO_MILESTONES = (
     BACKEND_DIR / "data" / "processed" / "crypto_milestones.json"
 )
-PATTERNS_EVENTS_PATH = Path(__file__).with_name("patterns_events.json")
 
 Resolution = Literal["auto", "daily", "weekly", "monthly"]
 REGIME_STATES = ("favorable", "neutral", "disruptive")
@@ -137,6 +136,7 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "core_index_severity",
             "core_index_warning",
             "core_index_trend_warning",
+            "core_index_fast_warning",
             "macro_score",
             "credit_score",
             "core_volatility_score",
@@ -192,6 +192,11 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
     aggregation: dict[str, str] = {column: "last" for column in columns}
     if "nber_recession" in aggregation:
         aggregation["nber_recession"] = "max"
+    # The fast warning is daily: a bucket is on if it was on any day of it
+    # ("last" would hide a mid-week spell), off if known and never on, and
+    # null if never known. The weekly flags keep "last" (the Friday value).
+    if "core_index_fast_warning" in aggregation:
+        aggregation["core_index_fast_warning"] = "max"
     resampled = subset.resample(rule).agg(aggregation)
     if resampled.empty:
         return subset.copy()
@@ -238,6 +243,9 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                 ),
                 "core_index_trend_warning": _as_bool(
                     row.get("core_index_trend_warning")
+                ),
+                "core_index_fast_warning": _as_bool(
+                    row.get("core_index_fast_warning")
                 ),
                 "macro_score": _as_float(row.get("macro_score"), 2),
                 "credit_score": _as_float(row.get("credit_score"), 2),
@@ -437,12 +445,10 @@ class MacroRegimeService:
         self._cache: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._forecast_cache: dict[str, Any] | None = None
         # Study of Patterns v2: one engine block per asset, kept until the
-        # parquet, its metadata or the skill artifact changes.
+        # parquet or the skill artifact changes.
         self._patterns_engine_cache: dict[
             str, tuple[tuple[Any, ...], dict[str, Any]]
         ] = {}
-        self._patterns_skill: tuple[Any, dict[str, Any] | None] | None = None
-        self._patterns_events: list[dict[str, Any]] | None = None
         self._lock = threading.RLock()
 
     def _load(self) -> pd.DataFrame:
@@ -501,6 +507,7 @@ class MacroRegimeService:
             "core_index_first_scored": core_index.get("first_scored"),
             "core_index_cadence": core_index.get("cadence"),
             "core_index_trend_warning": core_index.get("trend_warning"),
+            "core_index_fast_warning": core_index.get("fast_warning"),
             "latest_core_index": core_index.get("latest"),
             "proxy_sources": proxy_sources,
             "nber_source": self._meta.get("nber", {}).get("source", "USREC"),
@@ -822,31 +829,6 @@ class MacroRegimeService:
         payload["engine"] = self._patterns_engine(asset, frame)
         return payload
 
-    def _patterns_skill_doc(self) -> tuple[Any, dict[str, Any] | None]:
-        """(stamp, doc) of the skill artifact, re-read when its mtime or size changes."""
-        try:
-            stat = self.patterns_skill_path.stat()
-            stamp: Any = (stat.st_mtime_ns, stat.st_size)
-        except OSError:
-            stamp = None
-        with self._lock:
-            cached = self._patterns_skill
-        if cached is not None and cached[0] == stamp:
-            return cached
-        doc = (
-            patterns_v2.load_skill_doc(self.patterns_skill_path)
-            if stamp is not None
-            else None
-        )
-        with self._lock:
-            self._patterns_skill = (stamp, doc)
-        return stamp, doc
-
-    def _patterns_event_list(self) -> list[dict[str, Any]]:
-        if self._patterns_events is None:
-            self._patterns_events = patterns_v2.load_events(PATTERNS_EVENTS_PATH)
-        return self._patterns_events
-
     def _patterns_engine(
         self,
         asset: str,
@@ -855,27 +837,29 @@ class MacroRegimeService:
         """The validated v2 engine block for ``asset``; None (logged) on any failure.
 
         Built outside the lock and stored under it, once per (asset, parquet
-        mtime, metadata mtime, skill artifact stamp); ``_load()`` clears the
-        cache when the parquet changes.
+        mtime, skill artifact stamp); ``_load()`` clears the cache when the
+        parquet changes. Concurrent cold builds are idempotent. A failure is
+        not cached, so the next request retries.
         """
         try:
-            skill_stamp, skill_doc = self._patterns_skill_doc()
+            skill_stamp = patterns_v2.skill_stamp(self.patterns_skill_path)
             with self._lock:
-                key = (self._mtime, self._meta_mtime, skill_stamp)
+                key = (self._mtime, skill_stamp)
                 current = self._frame is frame
-                data_version = self._meta.get("data_version")
                 cached = self._patterns_engine_cache.get(asset)
             if current and cached is not None and cached[0] == key:
                 return cached[1]
-            engine = patterns_v2.build_engine_payload(
+            # Loads the mtime-cached skill artifact and events, builds,
+            # validates and never raises (None on failure).
+            engine = patterns_v2.engine_for(
                 frame,
                 asset,
-                skill_doc=skill_doc,
-                events=self._patterns_event_list(),
-                data_version=data_version,
+                skill_path=self.patterns_skill_path,
             )
-            # Validate here: a contract break must degrade to engine: null,
-            # not fail response validation (a 500) in the router.
+            if engine is None:
+                return None
+            # Validate here too: a contract break must degrade to engine:
+            # null, not fail response validation (a 500) in the router.
             PatternEngineV2.model_validate(engine)
             json.dumps(engine, allow_nan=False)
         except Exception:  # noqa: BLE001 - the v2 block must never fail the request

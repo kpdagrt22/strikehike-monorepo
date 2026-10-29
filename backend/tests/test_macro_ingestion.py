@@ -14,6 +14,11 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 from regime.analytics import (  # noqa: E402
+    CORE_INDEX_FAST_DAYS,
+    CORE_INDEX_FAST_DROP,
+    CORE_INDEX_FAST_RECORD,
+    CORE_INDEX_FAST_RULE,
+    CORE_INDEX_FAST_VERSION,
     CORE_INDEX_INPUT_LAGS,
     CORE_INDEX_NOTE,
     CORE_INDEX_SEVERITIES,
@@ -27,6 +32,7 @@ from regime.analytics import (  # noqa: E402
     STRENGTH_VERSION,
     STRENGTH_WEIGHTS,
     _core_index_bucket,
+    _core_index_fast_warning,
     _core_index_trend_warning,
     _core_index_v2_inputs,
     _core_index_v2_state,
@@ -35,8 +41,10 @@ from regime.analytics import (  # noqa: E402
     build_sp500_proxy,
     calculate_core_index,
     calculate_core_index_v2,
+    calculate_core_index_v2_weekly,
     calculate_macro_strength,
     calculate_macro_strength_components,
+    core_index_fast_metadata,
     nber_episodes,
 )
 from scripts.flows.macro_ingestion import (  # noqa: E402
@@ -568,6 +576,7 @@ def test_core_index_composite_is_bounded_and_bucketed():
         "core_index_severity",
         "core_index_warning",
         "core_index_trend_warning",
+        "core_index_fast_warning",
     ]
 
 
@@ -1161,8 +1170,10 @@ ARTIFACT_META = ARTIFACT_DIR / "macro_regime_history.meta.json"
 V2_INPUTS = ["sp500_proxy", "sp500_proxy_source", *CORE_INDEX_INPUT_LAGS]
 # The calm Core Index columns share one availability; the trend warning has
 # its own (40 Friday closes instead of 53) and reads only the equity close.
+# The fast warning is daily, with its own availability (14 days of closes).
 TREND = "core_index_trend_warning"
-V2_STATE_COLUMNS = [column for column in CORE_INDEX_V2_COLUMNS if column != TREND]
+FAST = "core_index_fast_warning"
+V2_STATE_COLUMNS = [column for column in CORE_INDEX_V2_COLUMNS if column not in (TREND, FAST)]
 V2_BANDS = {
     "strong_bullish": (25.0, 50.0),
     "calm_bullish": (0.0, 24.0),
@@ -1424,7 +1435,10 @@ def test_core_index_v2_weekly_cadence_and_start():
     assert set(out[TREND].dropna().astype(bool)) == {False, True}
 
     # Values change only on Fridays: Saturday to Thursday repeat the Friday.
+    # The fast warning is daily and has its own cadence (below).
     for column in CORE_INDEX_V2_COLUMNS:
+        if column == FAST:
+            continue
         values = out.loc[first_trend if column == TREND else first :, column].astype(object)
         not_friday = values.index.dayofweek != 4
         assert (values[not_friday] == values.shift(1)[not_friday]).all(), column
@@ -1434,6 +1448,21 @@ def test_core_index_v2_weekly_cadence_and_start():
     trend = out.loc[first_trend:, TREND].astype(bool)
     flips = trend.ne(trend.shift(1, fill_value=bool(trend.iloc[0])))
     assert flips.any() and set(trend.index[flips].dayofweek) == {4}
+
+    # The fast warning is known 14 days after the first daily close, then on
+    # every day; Saturday and Sunday repeat Friday (the close is carried over
+    # the weekend), and it can change on any weekday, not only on Fridays.
+    first_fast = out[FAST].first_valid_index()
+    assert first_fast == first_daily + pd.Timedelta(days=CORE_INDEX_FAST_DAYS)
+    assert str(out[FAST].dtype) == "boolean"
+    fast = out.loc[first_fast:, FAST]
+    assert fast.notna().all()
+    fast = fast.astype(bool)
+    weekend = fast.index.dayofweek >= 5
+    assert (fast[weekend] == fast.shift(1)[weekend]).all()
+    flips = fast.ne(fast.shift(1, fill_value=bool(fast.iloc[0])))
+    flip_days = set(fast.index[flips].dayofweek)
+    assert flip_days and flip_days <= {0, 1, 2, 3, 4} and flip_days != {4}
 
     # A proxy from a monthly series is never scored.
     monthly = frame.copy()
@@ -1645,6 +1674,8 @@ def test_committed_artifact_core_index_in_sync():
     assert set(meta["frame"]["columns_list"]) >= set(CORE_INDEX_V2_COLUMNS)
     columns = meta["frame"]["columns_list"]
     assert columns.index(TREND) == columns.index("core_index_warning") + 1
+    assert columns.index(FAST) == columns.index(TREND) + 1
+    assert latest["fast_warning"] == bool(stored[FAST].iloc[-1])
 
     # The trend warning: stored as a nullable boolean, known from the 40th
     # daily S&P Friday, described and measured in the metadata.
@@ -1730,6 +1761,8 @@ def test_core_index_v2_known_readings():
         assert row["core_index"] == pytest.approx(score, abs=0.005), day
         week = frame.loc[friday : friday + pd.Timedelta(days=6)]
         for column in CORE_INDEX_V2_COLUMNS:
+            if column == FAST:  # daily, not held for the week (its own readings below)
+                continue
             assert _labels(week[column]) == [row[column]] * len(week), (day, column)
 
 
@@ -1767,13 +1800,299 @@ def test_core_index_trend_warning_known_readings():
         assert _labels(week) == [expected] * len(week), day
 
 
+# ---------------------------------------------------------------------------
+# Fast warning: the daily S&P close 7% or more below the close 14 days earlier
+# ---------------------------------------------------------------------------
+
+_FAST_HOLIDAYS = ("1928-01-02", "1928-02-13")  # weekday market holidays (Mondays)
+_FAST_GAP = ("1928-02-20", "1928-02-22")  # no daily source label and no close
+# _continuous_proxy calls pct_change() without fill_method: pandas 2 warns
+# (only) when a close series has missing values after its start, which the
+# two tests below build on purpose (a gap, a leaky control). The values are
+# the same under pandas 2 and 3; the committed artifact has no such gap.
+_PCT_CHANGE_FILL_WARNING = (
+    "ignore:The default fill_method='pad' in Series.pct_change is deprecated:FutureWarning"
+)
+
+
+def _fast_session_close(day: str) -> Fraction:
+    """The engineered close of a session, exact."""
+    if day < "1928-01-26":
+        return Fraction(100)
+    if day == "1928-01-26":
+        return Fraction(9301, 100)  # -6.99% against 100 on 1928-01-12
+    if day < "1928-02-16":
+        return Fraction(93)  # exactly -7% against 100 on 1928-01-13
+    if day < "1928-02-20":
+        return Fraction(80)
+    return Fraction(85)
+
+
+def _fast_frame() -> tuple[pd.DataFrame, list]:
+    """Daily calendar 1927-11-01..1928-03-31 shaped like the artifact: the
+    monthly Cowles label (on another scale) up to 1927-12-29, then daily ^GSPC
+    closes from Friday 1927-12-30, carried over weekends and two weekday
+    holidays, with a gap in the daily source from 1928-02-20 to 1928-02-22.
+    Returns the frame and the exact close known on each day (None where the
+    day has no daily close)."""
+    index = pd.date_range("1927-11-01", "1928-03-31", freq="D", tz="UTC", name="date")
+    known: list = []
+    labels: list = []
+    proxy: list = []
+    last = None
+    for day in index:
+        key = day.date().isoformat()
+        if key < "1927-12-30":
+            known.append(None)
+            labels.append("M1125AUSM343NNBR")
+            proxy.append(50.0)
+        elif _FAST_GAP[0] <= key <= _FAST_GAP[1]:
+            known.append(None)
+            labels.append(None)
+            proxy.append(np.nan)
+        else:
+            if day.dayofweek < 5 and key not in _FAST_HOLIDAYS:
+                last = _fast_session_close(key)
+            known.append(last)
+            labels.append(SP500_DAILY_SOURCE)
+            proxy.append(float(last))
+    frame = pd.DataFrame(
+        {"sp500_proxy": proxy, "sp500_proxy_source": pd.array(labels, dtype="string")},
+        index=index,
+    )
+    return frame, known
+
+
+def _expected_fast(known: list) -> list:
+    """The rule by hand, in exact arithmetic: the close known on d against the
+    close known on d - 14 days, unknown if any day in [d - 14, d] has no daily
+    close; an exact -7% is a warning."""
+    days = CORE_INDEX_FAST_DAYS
+    drop = Fraction(str(CORE_INDEX_FAST_DROP))
+    expected = []
+    for i in range(len(known)):
+        window = known[i - days : i + 1] if i >= days else [None]
+        if any(value is None for value in window):
+            expected.append(None)
+        else:
+            expected.append(window[-1] / window[0] - 1 <= -drop)
+    return expected
+
+
+@pytest.mark.filterwarnings(_PCT_CHANGE_FILL_WARNING)
+def test_core_index_fast_warning_exact_definition_on_a_synthetic_series():
+    assert CORE_INDEX_FAST_DAYS == 14 and CORE_INDEX_FAST_DROP == 0.07
+    frame, known = _fast_frame()
+    expected = _expected_fast(known)
+    out = calculate_core_index_v2(frame)
+    fast = out[FAST]
+    assert str(fast.dtype) == "boolean"
+    assert _labels(fast) == expected
+    assert _labels(_core_index_fast_warning(frame)) == expected
+
+    def at(day: str):
+        value = fast.loc[pd.Timestamp(day, tz="UTC")]
+        return None if pd.isna(value) else bool(value)
+
+    # The monthly segment is never read: the first value comes 14 days after
+    # the first daily close.
+    assert fast.loc[:"1927-12-29"].isna().all()
+    assert fast.first_valid_index() == pd.Timestamp("1928-01-13", tz="UTC")
+    assert at("1928-01-12") is None and at("1928-01-13") is False
+    # -6.99% is not a warning; exactly -7% is.
+    assert at("1928-01-26") is False and at("1928-01-27") is True
+    # Saturday and Sunday repeat Friday (the close is carried over the weekend).
+    labels = pd.Series(_labels(fast), index=frame.index, dtype=object)
+    weekend = frame.index[frame.index.dayofweek >= 5]
+    for day in weekend:
+        friday = day - pd.Timedelta(days=int(day.dayofweek) - 4)
+        if friday >= frame.index[0]:
+            assert labels[day] == labels[friday], day
+    assert at("1928-01-28") is True and at("1928-01-29") is True
+    # A weekday holiday is read like any other day: 93 against 93 two weeks
+    # earlier; the session after it, 80 against 93, is a warning.
+    assert at("1928-02-13") is False and at("1928-02-16") is True
+    # The gap and every window that reaches into it have no reading; the
+    # reading comes back with the first window after it.
+    assert fast.loc["1928-02-20":"1928-03-07"].isna().all()
+    assert at("1928-03-08") is False
+
+
+@pytest.mark.filterwarnings(_PCT_CHANGE_FILL_WARNING)
+def test_core_index_fast_warning_no_look_ahead_on_truncated_data():
+    frame = _v2_synthetic_frame()
+    full = _core_index_fast_warning(frame)
+    labels = _labels(full)
+    assert _labels(calculate_core_index_v2(frame)[FAST]) == labels
+    on = full.fillna(False).astype(bool)
+    assert on.any() and full.notna().sum() > 8000
+    # every day of the warm-up, every day of a 30-day window around the first
+    # spell of the 2008 decline, then 20 random days
+    spell = on.loc["2008-01-01":]
+    first_on = spell.index[spell.to_numpy()][0]
+    cuts = list(frame.index[:20])
+    cuts += list(frame.loc[first_on - pd.Timedelta(days=15) : first_on + pd.Timedelta(days=15)].index)
+    rng = np.random.default_rng(19)
+    cuts += list(frame.index[np.sort(rng.choice(len(frame) - 1, size=20, replace=False))])
+    for cut in cuts:
+        part = _core_index_fast_warning(frame.loc[:cut])
+        assert _labels(part) == labels[: len(part)], cut
+
+    # A leaky control fails the same check: the rule on tomorrow's close is
+    # caught at every cut where it has a reading.
+    def leaky_rule(data: pd.DataFrame) -> pd.Series:
+        ahead = data.copy()
+        ahead["sp500_proxy"] = ahead["sp500_proxy"].shift(-1)
+        return _core_index_fast_warning(ahead)
+
+    leaky_full = _labels(leaky_rule(frame))
+    caught = readable = 0
+    for cut in cuts:
+        part = _labels(leaky_rule(frame.loc[:cut]))
+        caught += part != leaky_full[: len(part)]
+        readable += leaky_full[len(part) - 1] is not None
+    assert caught == readable > 30
+
+
+def test_core_index_fast_warning_reads_only_the_equity_close():
+    frame = annotate_nber(_v2_synthetic_frame())
+    base = calculate_core_index_v2(frame)
+    flag = _labels(base[FAST])
+    assert base[FAST].fillna(False).astype(bool).any()
+    rng = np.random.default_rng(23)
+
+    # Garbage in every other numeric column (FRED inputs, the NBER label) and
+    # in derived columns a pipeline frame carries, or dropping them all,
+    # leaves the flag unchanged.
+    garbage = frame.copy()
+    for column in garbage.columns:
+        if column in ("sp500_proxy", "sp500_proxy_source"):
+            continue
+        values = garbage[column]
+        if pd.api.types.is_numeric_dtype(values) and not pd.api.types.is_bool_dtype(values):
+            garbage[column] = rng.uniform(-1e3, 1e3, len(garbage))
+    for column in ("fed_score", "curve_score", "macro_strength", "core_index", TREND):
+        garbage[column] = rng.uniform(-50.0, 50.0, len(garbage))
+    assert _labels(_core_index_fast_warning(garbage)) == flag
+    assert _labels(_core_index_fast_warning(frame[["sp500_proxy", "sp500_proxy_source"]])) == flag
+
+    # Through the pipeline: stress inputs that do move the Core Index leave
+    # the flag alone.
+    noisy = frame.copy()
+    for column in CORE_INDEX_INPUT_LAGS:
+        noisy[column] = noisy[column] * rng.uniform(0.5, 2.0, len(noisy))
+    changed = calculate_core_index_v2(noisy)
+    assert _labels(changed[FAST]) == flag
+    assert any(
+        _labels(changed[column]) != _labels(base[column])
+        for column in ("core_index_severity", "core_index_warning")
+    )
+
+    # The other five v2 columns are the weekly decisions held through the
+    # week, identical with and without the fast path.
+    without = calculate_core_index_v2_weekly(frame).reindex(frame.index, method="ffill")
+    for column in CORE_INDEX_V2_COLUMNS:
+        if column != FAST:
+            assert _labels(base[column]) == _labels(without[column]), column
+
+
+def test_committed_artifact_fast_warning_is_the_14_day_rule():
+    # Checked on the raw stored closes with numpy, not on the chained series
+    # the production code reads: the close on the daily ^GSPC source against
+    # the calendar row 14 days earlier, unknown if any day of the window has
+    # no daily close (none in this artifact).
+    stored = pd.read_parquet(ARTIFACT, columns=["sp500_proxy", "sp500_proxy_source", TREND, FAST])
+    assert str(stored[FAST].dtype) == "boolean"
+    steps = stored.index[1:] - stored.index[:-1]
+    assert (steps == pd.Timedelta(days=1)).all()  # a complete daily calendar
+    days = CORE_INDEX_FAST_DAYS
+    source = stored["sp500_proxy_source"].astype(object)
+    daily = np.array(
+        [isinstance(value, str) and value == SP500_DAILY_SOURCE for value in source], dtype=bool
+    )
+    close = np.where(daily, stored["sp500_proxy"].to_numpy(dtype=float), np.nan)
+    base = np.r_[np.full(days, np.nan), close[:-days]]
+    missing = pd.Series(np.isnan(close).astype(float)).rolling(days + 1, min_periods=1).sum()
+    with np.errstate(divide="ignore", invalid="ignore"):
+        change = np.round(close / base - 1.0, 10)
+    known = np.isfinite(change) & missing.eq(0.0).to_numpy()
+    expected = [bool(c <= -CORE_INDEX_FAST_DROP) if k else None for c, k in zip(change, known)]
+    assert _labels(stored[FAST]) == expected
+
+    first = stored[FAST].first_valid_index()
+    assert first == pd.Timestamp("1928-01-13", tz="UTC")
+    on = stored[FAST].dropna().astype(bool)
+    assert 0.015 < on.mean() < 0.040
+
+    meta = json.loads(ARTIFACT_META.read_text(encoding="utf-8"))
+    block = meta["core_index"]["fast_warning"]
+    assert block == core_index_fast_metadata(stored)
+    assert block["record"] == CORE_INDEX_FAST_RECORD
+    assert block["version"] == CORE_INDEX_FAST_VERSION == "fast-warning-14d-7pct-v1"
+    assert block["column"] == FAST and block["rule"] == CORE_INDEX_FAST_RULE
+    assert block["days"] == 14 and block["drop"] == 0.07 and block["cadence"] == "daily"
+    assert block["first_value"] == "1928-01-13"
+    assert block["fitted"] is False and block["forecast"] is False
+    assert block["changes_core_index"] is False and block["chosen_after_seeing_history"] is True
+    assert meta["core_index"]["latest"]["fast_warning"] == bool(stored[FAST].iloc[-1])
+    columns = meta["frame"]["columns_list"]
+    assert columns.index(FAST) == columns.index(TREND) + 1 == len(columns) - 1
+
+    # The record names the artifact it was measured on and keeps hits, misses
+    # and false alarms together (a dated record until it is measured again).
+    record = block["record"]
+    measured = record["measured_on"]
+    assert len(measured["data_version"]) == 12 and measured["first_day"] == "1928-01-13"
+    falls = record["falls_of_20pct_or_more"]
+    assert falls["count"] == len(falls["falls"]) == 16
+    assert falls["count"] == falls["within_first_20pct"] + falls["not_within_first_20pct"]
+    assert falls["within_first_20pct"] == (
+        falls["during_the_fall"]
+        + falls["before_the_peak_only"]
+        + falls["left_on_from_the_decline_before"]
+    )
+    periods = {"1928-1971", "1971-1989", "1990-2026", "all"}
+    for key in ("false_alarms", "false_alarms_per_decade", "share_of_days_on", "spells_per_year"):
+        assert set(record[key]) == periods, key
+    assert set(record["with_trend_warning"]["false_alarms_per_decade"]) == periods
+
+
+# Daily fast-warning readings of the committed artifact (data_version
+# 59192d5aa731). Re-derive after any re-ingestion, like the readings above.
+CORE_INDEX_FAST_KNOWN_READINGS = (
+    # date, fast warning (None = not known yet)
+    ("1928-01-12", None),  # the window still reaches the monthly segment
+    ("1928-01-13", False),  # first known day
+    ("1929-10-02", False),
+    ("1929-10-03", True),  # on during the 1929 fall, at -9%
+    ("1937-03-19", False),
+    ("1937-03-22", True),
+    ("1987-10-14", False),
+    ("1987-10-15", True),  # two sessions before Black Monday
+    ("2008-01-07", False),
+    ("2008-01-08", True),  # a holiday window: 9 sessions in 14 days
+    ("2020-02-25", False),
+    ("2020-02-26", True),
+    ("2022-01-24", False),
+    ("2022-01-25", True),
+    ("2025-04-08", True),
+    ("2026-10-27", False),  # the last day of this artifact
+)
+
+
+def test_core_index_fast_warning_known_readings():
+    frame = pd.read_parquet(ARTIFACT, columns=[FAST])
+    for day, expected in CORE_INDEX_FAST_KNOWN_READINGS:
+        assert _labels(frame.loc[[pd.Timestamp(day, tz="UTC")], FAST]) == [expected], day
+
+
 def _write_v1_style_artifact(directory: Path) -> tuple[pd.DataFrame, bytes]:
     """A small artifact as the pipeline wrote it before v2 (v1 Core Index
     columns, CRLF metadata with the v1 note)."""
     frame = _v2_synthetic_frame().loc[:"1996-12-31"]
     frame["macro_strength"] = 55.0
     v1 = calculate_core_index(frame).drop(
-        columns=["core_index_severity", "core_index_warning", TREND]
+        columns=["core_index_severity", "core_index_warning", TREND, FAST]
     )
     v1["core_index"] = 10.0
     v1["core_index_composite"] = 60.0
@@ -1802,7 +2121,7 @@ def test_recompute_core_index_rewrites_only_the_v2_columns(tmp_path):
     report = recompute(tmp_path)
     assert report["written"] is True and report["parquet_written"] is True
     assert report["stale_columns"] == [] and report["in_sync"] is True
-    assert report["added"] == ["core_index_severity", "core_index_warning", TREND]
+    assert report["added"] == ["core_index_severity", "core_index_warning", TREND, FAST]
     assert report["replaced"] == ["core_index", "core_index_composite", "core_index_bucket"]
     assert report["untouched_columns_arrow_equal"] == len(frame.columns) - 3 + 1  # + index
     assert sorted(report["existing_columns_changed"]) == sorted(report["replaced"])
@@ -1810,9 +2129,15 @@ def test_recompute_core_index_rewrites_only_the_v2_columns(tmp_path):
     new = pd.read_parquet(tmp_path / "macro_regime_history.parquet")
     columns = list(new.columns)
     bucket = columns.index("core_index_bucket")
-    assert columns[bucket + 1 : bucket + 4] == ["core_index_severity", "core_index_warning", TREND]
+    assert columns[bucket + 1 : bucket + 5] == [
+        "core_index_severity",
+        "core_index_warning",
+        TREND,
+        FAST,
+    ]
     assert str(new["core_index_warning"].dtype) == "boolean"
     assert str(new[TREND].dtype) == "boolean"
+    assert str(new[FAST].dtype) == "boolean"
     for column in frame.columns:
         if column not in CORE_INDEX_V2_COLUMNS:
             pd.testing.assert_series_equal(
@@ -1830,11 +2155,13 @@ def test_recompute_core_index_rewrites_only_the_v2_columns(tmp_path):
     assert meta["pipeline_version"] == PIPELINE_VERSION == "phase12-v2"
     assert meta["generated_at"] == "2026-01-01T00:00:00+00:00"
     assert meta["notes"] == ["First note.", CORE_INDEX_NOTE, "Last note."]
-    assert meta["frame"]["columns"] == len(frame.columns) + 3
+    assert meta["frame"]["columns"] == len(frame.columns) + 4
     assert meta["core_index"]["version"] == "core-index-v2"
     assert meta["core_index"]["recomputed_from_data_version"] == report["previous_data_version"]
     assert meta["core_index"]["trend_warning"]["rule"] == CORE_INDEX_TREND_RULE
     assert meta["core_index"]["latest"]["trend_warning"] == bool(new[TREND].iloc[-1])
+    assert meta["core_index"]["fast_warning"]["rule"] == CORE_INDEX_FAST_RULE
+    assert meta["core_index"]["latest"]["fast_warning"] == bool(new[FAST].iloc[-1])
 
     # In sync now: --check passes and a second run changes nothing.
     assert main(["--artifact-dir", str(tmp_path), "--check"]) == 0
@@ -1846,10 +2173,11 @@ def test_recompute_core_index_rewrites_only_the_v2_columns(tmp_path):
 def test_recompute_core_index_adds_the_trend_warning_and_keeps_every_other_byte(tmp_path):
     from scripts.recompute_core_index import main, recompute
 
-    # An artifact as the v2 pipeline wrote it before the trend warning.
+    # An artifact as the v2 pipeline wrote it before the trend warning (and so
+    # before the fast warning too).
     frame = _v2_synthetic_frame().loc[:"1999-12-31"]
     frame["macro_strength"] = 55.0
-    frame = frame.join(calculate_core_index(frame).drop(columns=[TREND]))
+    frame = frame.join(calculate_core_index(frame).drop(columns=[TREND, FAST]))
     parquet = tmp_path / "macro_regime_history.parquet"
     frame.to_parquet(parquet, engine="pyarrow", compression="snappy", index=True)
     old_bytes = parquet.read_bytes()
@@ -1869,7 +2197,7 @@ def test_recompute_core_index_adds_the_trend_warning_and_keeps_every_other_byte(
 
     report = recompute(tmp_path)
     assert report["stale_columns"] == [] and report["parquet_written"] is True
-    assert report["added"] == [TREND] and report["replaced"] == []
+    assert report["added"] == [TREND, FAST] and report["replaced"] == []
     # Every column the artifact already had (the five v2 columns included)
     # keeps its values and its encoded bytes.
     assert report["existing_columns"] == len(frame.columns) + 1  # + index
@@ -1878,12 +2206,13 @@ def test_recompute_core_index_adds_the_trend_warning_and_keeps_every_other_byte(
 
     new = pd.read_parquet(parquet)
     columns = list(new.columns)
-    assert columns == [*frame.columns, TREND]
+    assert columns == [*frame.columns, TREND, FAST]
     assert str(new[TREND].dtype) == "boolean"
+    assert str(new[FAST].dtype) == "boolean"
     _assert_v2_equal(new, calculate_core_index_v2(frame))
     written = json.loads(meta_path.read_bytes())
     assert written["data_version"] == hashlib.sha256(parquet.read_bytes()).hexdigest()[:12] != old_version
-    assert written["frame"]["columns"] == len(frame.columns) + 1
+    assert written["frame"]["columns"] == len(frame.columns) + 2
     assert written["core_index"]["recomputed_from_data_version"] == old_version
     assert written["core_index"]["trend_warning"]["first_value"] == (
         new[TREND].first_valid_index().date().isoformat()
@@ -1900,6 +2229,76 @@ def test_recompute_core_index_adds_the_trend_warning_and_keeps_every_other_byte(
     assert parquet.read_bytes() == parquet_bytes
     repaired = json.loads(meta_path.read_bytes())
     assert repaired["core_index"]["trend_warning"]["rule"] == CORE_INDEX_TREND_RULE
+    assert repaired["core_index"]["recomputed_at"] == written["core_index"]["recomputed_at"]
+    assert repaired["data_version"] == written["data_version"]
+    assert main(["--artifact-dir", str(tmp_path), "--check"]) == 0
+
+
+def test_recompute_core_index_adds_the_fast_warning_and_keeps_every_other_byte(tmp_path):
+    import pyarrow.parquet as pq
+
+    from scripts.recompute_core_index import main, recompute
+
+    # The committed artifact as it was before the fast warning: the same
+    # table without the column and its pandas entry, written the way the
+    # recompute writes, with that version's metadata.
+    committed = pq.read_table(ARTIFACT)
+    pandas_meta = json.loads(committed.schema.metadata[b"pandas"])
+    pandas_meta["columns"] = [entry for entry in pandas_meta["columns"] if entry["name"] != FAST]
+    old = committed.drop_columns([FAST]).replace_schema_metadata(
+        {**committed.schema.metadata, b"pandas": json.dumps(pandas_meta).encode("utf-8")}
+    )
+    parquet = tmp_path / "macro_regime_history.parquet"
+    pq.write_table(old, parquet, compression="snappy")
+    old_version = hashlib.sha256(parquet.read_bytes()).hexdigest()[:12]
+    committed_meta = json.loads(ARTIFACT_META.read_text(encoding="utf-8"))
+    meta = json.loads(json.dumps(committed_meta))
+    meta["data_version"] = old_version
+    meta["frame"]["columns"] -= 1
+    meta["frame"]["columns_list"].remove(FAST)
+    meta["core_index"].pop("fast_warning")
+    meta["core_index"]["latest"].pop("fast_warning")
+    meta_path = tmp_path / "macro_regime_history.meta.json"
+    meta_path.write_bytes(json.dumps(meta, indent=2, sort_keys=True).replace("\n", "\r\n").encode("utf-8"))
+    assert main(["--artifact-dir", str(tmp_path), "--check"]) == 1
+
+    report = recompute(tmp_path)
+    assert report["parquet_written"] is True and report["in_sync"] is True
+    assert report["added"] == [FAST] and report["replaced"] == []
+    # Every column the artifact had (the six other v2 columns and the date
+    # index included) keeps its values and its encoded bytes.
+    assert report["existing_columns"] == old.num_columns == committed.num_columns - 1
+    assert report["existing_columns_changed"] == []
+    assert report["existing_columns_reencoded"] == []
+    new_bytes = parquet.read_bytes()
+    new = pq.read_table(parquet)
+    # The result is the committed artifact: the same columns, order and values,
+    # with the fast warning the last frame column (the date index follows it).
+    assert new.equals(committed)
+    assert new.schema.names[-2:] == [FAST, "date"]
+    assert json.loads(new.schema.metadata[b"pandas"])["index_columns"] == ["date"]
+
+    written = json.loads(meta_path.read_bytes())
+    assert written["data_version"] == hashlib.sha256(new_bytes).hexdigest()[:12] != old_version
+    assert written["frame"]["columns"] == meta["frame"]["columns"] + 1
+    assert written["frame"]["columns_list"] == [*meta["frame"]["columns_list"], FAST]
+    assert written["core_index"]["fast_warning"] == committed_meta["core_index"]["fast_warning"]
+    assert written["core_index"]["latest"] == committed_meta["core_index"]["latest"]
+    assert written["core_index"]["recomputed_from_data_version"] == old_version
+    for key in set(meta) | set(written):
+        if key not in ("data_version", "frame", "core_index"):
+            assert written.get(key) == meta.get(key), key
+
+    # A stale metadata block alone is rewritten without touching the parquet.
+    written["core_index"].pop("fast_warning")
+    meta_path.write_bytes(json.dumps(written, indent=2, sort_keys=True).replace("\n", "\r\n").encode("utf-8"))
+    assert main(["--artifact-dir", str(tmp_path), "--check"]) == 1
+    report = recompute(tmp_path)
+    assert report["written"] is True and report["parquet_written"] is False
+    assert report["updated_meta_keys"] == ["core_index"]
+    assert parquet.read_bytes() == new_bytes
+    repaired = json.loads(meta_path.read_bytes())
+    assert repaired["core_index"]["fast_warning"] == committed_meta["core_index"]["fast_warning"]
     assert repaired["core_index"]["recomputed_at"] == written["core_index"]["recomputed_at"]
     assert repaired["data_version"] == written["data_version"]
     assert main(["--artifact-dir", str(tmp_path), "--check"]) == 0

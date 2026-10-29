@@ -2414,8 +2414,10 @@ def write_patterns_skill_artifact(
     """Regenerate the Study of Patterns v2 skill artifact for this parquet.
 
     Never fatal: on failure the artifact is left as it was and a warning is
-    logged; the CI check that its data_version matches the metadata then
-    flags the stale file before a deploy.
+    logged; the CI check that its per-asset fingerprints of the price inputs
+    match the parquet (tests/test_patterns.py) then flags the stale file
+    before a deploy. ``data_version`` is accepted but no longer used: the
+    artifact is pinned to those fingerprints, not to the parquet's version.
     """
     try:
         from scripts.patterns_v2_evidence import write_skill_artifact
@@ -2423,7 +2425,6 @@ def write_patterns_skill_artifact(
         return write_skill_artifact(
             frame,
             Path(output_dir) / PATTERNS_V2_SKILL_FILENAME,
-            data_version=data_version,
         )
     except Exception as exc:  # noqa: BLE001 - supplemental artifact must not kill the run
         logger.warning(

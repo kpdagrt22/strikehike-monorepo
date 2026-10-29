@@ -148,18 +148,21 @@ def get_regime_forecast() -> dict:
     "",
     response_model=PatternsResponse,
     summary=(
-        "Closest historical setups to the trailing 12 months, what followed "
-        "them, the usual year, and the measured track record"
+        "Closest historical setups, what followed them, the usual year and "
+        "the measured track record"
     ),
     description=(
         "The engine block (version patterns-v2) lists the past 12-month "
-        "windows that most resemble the latest 12 months, using only setups "
-        "whose following 12 months ended before today's window began, and what "
-        "followed each one. Counts sit beside the usual rate across all years; "
-        "there are no blended probabilities. It adds the 120-year mirror where "
-        "the history reaches back that far, and the walk-forward track record "
-        "precomputed offline. engine is null if it cannot be built. The older "
-        "top-level fields are unchanged for compatibility."
+        "windows that most resemble the latest 12 months (weekly closes; "
+        "monthly averages for gold), each at least one window apart, using "
+        "only setups whose following 12 months ended before today's window "
+        "began, and what followed each one. Counts sit beside the usual rate "
+        "across all past years, never blended into a single figure. For the "
+        "S&P 500 it adds the 120-year mirror on monthly averages since 1871. "
+        "The walk-forward track record is precomputed offline and marked "
+        "stale when the price inputs it was measured on change. engine is "
+        "null if it cannot be built. The older top-level fields are unchanged "
+        "for compatibility."
     ),
 )
 def get_patterns(

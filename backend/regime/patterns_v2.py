@@ -1,6 +1,6 @@
 """Study of Patterns v2: closest historical setups and what followed them.
 
-Port of the judge's reference implementation (design review, "patterns-v2").
+Port of the judge's r2 reference (design review, "patterns-v2", judge r2).
 pandas/numpy only: CI and the ingestion workflow install
 requirements-minimal.txt, and nothing here may need scipy at runtime.
 
@@ -16,42 +16,51 @@ Causality contract (enforced by tests):
   ``scripts/patterns_v2_evidence.py`` with the same functions, never per
   request.
 
-The configuration (``PRIMARY``) was fixed before any skill was measured and
-must not be tuned. The payload reports frequencies ("8 of 10") beside the
-usual rate, never blended probabilities.
+The configuration (``PRIMARY`` for the setups, ``MIRROR`` for the 120-year
+mirror) was fixed before any skill was measured and must not be tuned. Setups
+are separated by a full window, so no two of them share a trailing year and
+their outcomes are distinct years. The payload reports frequencies ("6 of 10")
+beside the usual rate, never blended probabilities.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import math
+import threading
 import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
 from numpy.lib.stride_tricks import sliding_window_view
 
+from regime.patterns_v2_schemas import PatternEngineV2
+
+logger = logging.getLogger(__name__)
+
 PATTERNS_V2_VERSION = "patterns-v2"
-SKILL_SCHEMA_VERSION = 1
+SKILL_SCHEMA_VERSION = 2
 MIRROR_YEARS = 120
 MIRROR_BAND_YEARS = (110, 130)
 SKILL_FILENAME = "patterns_v2_skill.json"
+DEFAULT_SKILL_PATH = Path(__file__).resolve().parents[1] / "data" / "processed" / SKILL_FILENAME
+EVENTS_PATH = Path(__file__).with_name("patterns_events.json")
 
 MONTHLY_NATIVE_SOURCES = {
     "M1125AUSM343NNBR",  # NBER/Cowles common-stock index, monthly
-    "M1109BUSM293NNBR",  # Dow-Jones industrials, monthly
+    "M1109BUSM293NNBR",  # Dow-Jones industrials, monthly (older artifacts)
     "WORLD_BANK_LBMA_GOLD",  # World Bank Pink Sheet, monthly average
 }
 
-# Raw source -> stable display code (the UI whitelists these codes).
+# Raw source -> stable display code (the UI whitelists these codes). Any other
+# source has no code.
 SOURCE_CODES = {
     "M1125AUSM343NNBR": "cowles",
-    "M1109BUSM293NNBR": "dow_jones",
-    "NASDAQCOM": "nasdaq",
-    "SP500": "sp500",
     # Yahoo Finance ^GSPC daily closes (regime.analytics.SP500_DAILY_SOURCE).
     "YAHOO_FINANCE_GSPC": "sp500",
 }
@@ -91,12 +100,12 @@ class Config:
     horizons: tuple[int, ...] = (13, 26, 52)  # 3, 6, 12 months
     k: int = 10
     k_min: int = 5
-    sep: int = 26  # min distance between setup end points
+    sep: int = 52  # min distance between setup end points: one full window
     shape_points: int = 13
     shrink_m: float = 5.0  # evidence only (blended probabilities are never shown)
     ref_years: float = 10.0
     daily_native_only: bool = False
-    min_sigma_ann: float = 0.01  # drops pegged/flat windows (gold before 1968)
+    min_sigma_ann: float = 0.01  # drops pegged/flat windows and years (gold before 1968)
 
     @property
     def periods_per_year(self) -> int:
@@ -104,20 +113,27 @@ class Config:
 
 
 def weekly_config(**kw: Any) -> Config:
-    return replace(Config(resolution="W", window=52, horizon=52, horizons=(13, 26, 52), sep=26, shape_points=13, daily_native_only=True), **kw)
+    return replace(Config(resolution="W", window=52, horizon=52, horizons=(13, 26, 52), sep=52, shape_points=13, daily_native_only=True), **kw)
 
 
 def monthly_config(**kw: Any) -> Config:
-    return replace(Config(resolution="M", window=12, horizon=12, horizons=(3, 6, 12), sep=6, shape_points=12), **kw)
+    return replace(Config(resolution="M", window=12, horizon=12, horizons=(3, 6, 12), sep=12, shape_points=12), **kw)
 
 
+# The setups' banks. The S&P setups use weekly closes of the daily index
+# (from 1927-12-30; the S&P 90 until 1957-03-04): outcomes on real closes, and
+# the smoothed Cowles monthly index stays out of the setup library.
 PRIMARY: dict[str, Config] = {
-    "sp500": monthly_config(),
+    "sp500": weekly_config(),
     "nifty": weekly_config(),
     "gold": monthly_config(),
     "bonds": weekly_config(),
     "bitcoin": weekly_config(),
 }
+
+# The 120-year mirror's bank: only monthly averages reach back to 1871 (Cowles
+# monthly to 1927). 1,440 rows of the full monthly calendar = 120 years.
+MIRROR: dict[str, Config] = {"sp500": monthly_config()}
 
 
 # --------------------------------------------------------------------------
@@ -287,6 +303,7 @@ def build_bank(resampled: pd.DataFrame, cfg: Config) -> WindowBank:
 
     valid_fwd = np.zeros(n, dtype=bool)
     fwd_path = np.full((n, H + 1), np.nan)
+    fwd_sigma_ann = nan_n()
     if n > H:
         Fv = sliding_window_view(x, H + 1)
         FSv = sliding_window_view(seg, H + 1)
@@ -294,6 +311,10 @@ def build_bank(resampled: pd.DataFrame, cfg: Config) -> WindowBank:
         starts = np.arange(0, n - H)
         valid_fwd[starts] = okf
         fwd_path[starts] = Fv - Fv[:, :1]
+        fwd_sigma_ann[starts] = np.diff(Fv, axis=1).std(axis=1, ddof=1) * math.sqrt(P)
+    # A flat forward year (the gold peg) is no outcome: it never enters the
+    # usual rate or the setups.
+    valid_fwd &= np.nan_to_num(fwd_sigma_ann) > cfg.min_sigma_ann
     run_max = np.maximum.accumulate(np.nan_to_num(fwd_path, nan=-np.inf), axis=1)
     with np.errstate(invalid="ignore"), warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN rows (invalid forward windows)
@@ -320,8 +341,7 @@ def eligible(bank: WindowBank, i: int) -> np.ndarray:
     the START of today's window (j + H <= i - L).
 
     Ending by i alone would already be causal; ending by i - L also keeps a
-    setup's "next 12 months" from being today's own trailing year (judge rule,
-    measured both ways: same conclusions).
+    setup's "next 12 months" from being today's own trailing year.
     """
     j = np.arange(bank.n)
     return np.flatnonzero(bank.valid_win & bank.valid_fwd & (j + bank.cfg.horizon <= i - bank.cfg.window))
@@ -423,6 +443,33 @@ def json_safe(value: Any) -> Any:
     return value
 
 
+def inputs_fingerprint(frame: pd.DataFrame, asset: str) -> str:
+    """A 16-hex fingerprint of the asset's price inputs (value and source columns).
+
+    SHA-256 over the non-null rows' UTC timestamps in ns, their float64 values
+    rounded to 8 decimals and their source strings joined by U+001F. Shared by
+    this module (the skill record's ``stale`` flag) and the evidence generator,
+    so a parquet rewrite that leaves the prices alone (a Core Index recompute)
+    does not mark the record stale.
+    """
+    spec = ASSETS[asset]
+    if spec["field"] not in frame.columns:
+        raise ValueError(f"No {asset} history is available")
+    values = pd.to_numeric(frame[spec["field"]], errors="coerce")
+    ok = values.notna().to_numpy()
+    if spec["source_field"] in frame.columns:
+        sources = frame[spec["source_field"]].astype("string").fillna("")
+    else:
+        sources = pd.Series("", index=frame.index, dtype="string")
+    index = pd.DatetimeIndex(frame.index)
+    index = index.tz_localize("UTC") if index.tz is None else index.tz_convert("UTC")
+    digest = hashlib.sha256()
+    digest.update(np.asarray(index[ok].as_unit("ns").asi8, dtype=np.int64).tobytes())
+    digest.update(np.round(values.to_numpy(dtype=float)[ok], 8).tobytes())
+    digest.update("\x1f".join(sources.to_numpy(dtype=object)[ok].tolist()).encode("utf-8"))
+    return digest.hexdigest()[:16]
+
+
 def _pct(log_value: float) -> float | None:
     if log_value is None or not np.isfinite(log_value):
         return None
@@ -431,6 +478,11 @@ def _pct(log_value: float) -> float | None:
 
 def _iso(ts: pd.Timestamp) -> str:
     return ts.date().isoformat()
+
+
+def _label_year(ts: pd.Timestamp) -> int:
+    """The calendar year a forward window starting at ts describes (a December start reads as the next year)."""
+    return int(ts.year + (1 if ts.month == 12 else 0))
 
 
 def _rebased(path_log: np.ndarray, dates: pd.DatetimeIndex | list[pd.Timestamp]) -> list[dict[str, Any]]:
@@ -480,10 +532,13 @@ def _source_code(bank: WindowBank, j: int) -> str | None:
 def _rank_fields(dist_sorted: np.ndarray, d: float) -> dict[str, Any]:
     of = int(len(dist_sorted))
     position = int(np.searchsorted(dist_sorted, d, side="left")) + 1
-    return {"position": position, "of": of, "closer_than_pct": round(100.0 * (of - position) / of, 1)}
+    # Always < 100: rounding must not turn the closest of 5,002 (99.98) into 100.0.
+    closer = min(round(100.0 * (of - position) / of, 1), 99.9)
+    return {"position": position, "of": of, "closer_than_pct": closer}
 
 
 def load_events(path: Path) -> list[dict[str, Any]]:
+    """The editorial events; an optional ``assets`` list limits an event to those assets."""
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -494,6 +549,11 @@ def load_events(path: Path) -> list[dict[str, Any]]:
     for item in payload:
         if not isinstance(item, dict) or not isinstance(item.get("date"), str) or not item.get("title"):
             continue
+        tags = item.get("assets")
+        if isinstance(tags, str):
+            tags = [tags]
+        if tags is not None and not (isinstance(tags, list) and all(isinstance(t, str) for t in tags)):
+            continue  # a malformed tag must not attach the event everywhere
         try:
             d = pd.Timestamp(item["date"], tz="UTC")
         except (TypeError, ValueError):
@@ -505,25 +565,34 @@ def load_events(path: Path) -> list[dict[str, Any]]:
             "summary": str(item.get("summary") or ""),
             "source": str(item.get("source") or "Editorial dictionary"),
             "_ts": d,
+            "_assets": None if tags is None else frozenset(tags),
         })
     return out
 
 
-def _events_between(events: list[dict[str, Any]], start: pd.Timestamp, end: pd.Timestamp) -> list[dict[str, Any]]:
-    hits = [{k: v for k, v in e.items() if k != "_ts"} for e in events if start <= e["_ts"] <= end]
+def _events_between(events: list[dict[str, Any]], asset: str, start: pd.Timestamp, end: pd.Timestamp) -> list[dict[str, Any]]:
+    hits = [
+        {k: v for k, v in e.items() if not k.startswith("_")}
+        for e in events
+        if start <= e["_ts"] <= end and (e["_assets"] is None or asset in e["_assets"])
+    ]
     return sorted(hits, key=lambda e: e["date"])
 
 
-def _skill_block(asset: str, skill_doc: dict[str, Any] | None, data_version: str | None) -> dict[str, Any]:
-    if not isinstance(skill_doc, dict):
+def _skill_block(asset: str, skill_doc: dict[str, Any] | None, fingerprint: str) -> dict[str, Any]:
+    """The artifact's record for ``asset``; stale when it was measured on other price inputs."""
+    if not isinstance(skill_doc, dict) or not isinstance(skill_doc.get("assets"), dict):
         return {"available": False}
-    block = (skill_doc.get("assets") or {}).get(asset)
+    block = skill_doc["assets"].get(asset)
     if not isinstance(block, dict) or not block.get("available"):
         return {"available": False}
-    out = {k: v for k, v in block.items() if k != "mirror_evidence"}
+    out = {k: v for k, v in block.items() if k not in ("mirror_evidence", "error")}
+    recorded = skill_doc.get("inputs_fingerprint")
+    recorded = recorded.get(asset) if isinstance(recorded, dict) else None
+    recorded = recorded if isinstance(recorded, str) else block.get("inputs_fingerprint")
     out["generated_at"] = skill_doc.get("generated_at")
-    out["data_version"] = skill_doc.get("data_version")
-    out["stale"] = bool(data_version and skill_doc.get("data_version") and data_version != skill_doc.get("data_version"))
+    out["inputs_fingerprint"] = recorded if isinstance(recorded, str) else None
+    out["stale"] = out["inputs_fingerprint"] != fingerprint
     return out
 
 
@@ -538,16 +607,15 @@ def build_engine_payload(
     *,
     skill_doc: dict[str, Any] | None = None,
     events: list[dict[str, Any]] | None = None,
-    data_version: str | None = None,
 ) -> dict[str, Any]:
-    """The ``engine`` block of /api/v1/patterns for the latest data.
+    """The ``engine`` block of /api/v1/patterns for the latest data (NaN-free).
 
     Raises ValueError for an unknown asset or a series without one complete
-    window; the service turns any exception into ``engine: null``.
+    window; ``engine_for`` turns any exception into None.
     """
     if asset not in ASSETS:
         raise ValueError(f"Unknown pattern asset: {asset}")
-    payload = _engine_payload(frame, asset, skill_doc=skill_doc, events=events or [], data_version=data_version)
+    payload = _engine_payload(frame, asset, skill_doc=skill_doc, events=events or [])
     return json_safe(payload)
 
 
@@ -557,16 +625,15 @@ def _engine_payload(
     *,
     skill_doc: dict[str, Any] | None,
     events: list[dict[str, Any]],
-    data_version: str | None,
 ) -> dict[str, Any]:
     cfg = PRIMARY[asset]
-    bank = bank_for(frame, asset, cfg)
+    daily = chained_daily(frame, asset)
+    bank = build_bank(resample(daily, cfg), cfg)
     valid_idx = np.flatnonzero(bank.valid_win)
     if len(valid_idx) == 0:
         raise ValueError(f"No complete {asset} window is available")
     i = int(valid_idx[-1])
     P, L, H = cfg.periods_per_year, cfg.window, cfg.horizon
-    first_point = int(np.flatnonzero(np.isfinite(bank.x))[0])
     unit = "week" if cfg.resolution == "W" else "month"
     current = _window(bank, i)
     current["vol_vs_10y"] = None if not np.isfinite(bank.sigma_ref[i]) else round(float(bank.sigma_ann[i] / bank.sigma_ref[i]), 2)
@@ -575,17 +642,17 @@ def _engine_payload(
         "status": "ok",
         "asset": asset,
         "as_of": _iso(bank.dates[i]),
-        "history_start": _iso(bank.dates[first_point]),
+        "history_start": _iso(daily.index[0]),  # first real observation, any basis
         "resolution": cfg.resolution,
         "basis": "weekly_close" if cfg.resolution == "W" else "monthly_average",
         "window": {"periods": L, "unit": unit},
         "horizon": {"periods": H, "unit": unit},
+        "separation": {"periods": cfg.sep, "unit": unit},
         "current": current,
         "analogs": [],
         "outlook": None,
-        "mirror": {"available": False, "reason": "history_too_short", "offset_years": MIRROR_YEARS,
-                   "exact": None, "aligned": None, "evidence": None},
-        "skill": _skill_block(asset, skill_doc, data_version),
+        "mirror": _mirror(daily, asset, skill_doc=skill_doc, events=events),
+        "skill": _skill_block(asset, skill_doc, inputs_fingerprint(frame, asset)),
     }
 
     fc = analog_forecast(bank, i)
@@ -598,21 +665,24 @@ def _engine_payload(
             dsorted = np.sort(dist)
             pos = {int(c): p for p, c in enumerate(cand)}
             for rank, j in enumerate(chosen, start=1):
-                payload["analogs"].append(_analog(bank, int(j), rank, dsorted, dist[pos[int(j)]], events))
+                payload["analogs"].append(_analog(bank, asset, int(j), rank, dsorted, float(dist[pos[int(j)]]), events))
         return payload
 
     cand, dist = fc["cand"], fc["dist"]
     dsorted = np.sort(dist)
     for rank, (j, d) in enumerate(zip(fc["chosen"], fc["chosen_dist"]), start=1):
-        payload["analogs"].append(_analog(bank, int(j), rank, dsorted, float(d), events))
+        payload["analogs"].append(_analog(bank, asset, int(j), rank, dsorted, float(d), events))
 
     base = fc["base"]
+    usual = np.flatnonzero(bank.valid_fwd & (np.arange(bank.n) + H <= i))
     step_days = 365.25 / P
     future = [bank.dates[i] + pd.Timedelta(days=step_days * s) for s in range(H + 1)]
     payload["outlook"] = {
         "k": fc["k"],
         "library_windows": int(len(cand)),
         "library_span": [_iso(bank.dates[int(cand[0]) - L]), _iso(bank.dates[int(cand[-1])])],
+        "usual_windows": int(base["n"]),
+        "usual_since_year": _label_year(bank.dates[int(usual[0])]),
         "horizons": [
             {
                 "months": months,
@@ -641,45 +711,88 @@ def _engine_payload(
             "base_median_pct": _pct(base["median_mdd"]),
         },
     }
-
-    # The 120-year mirror: only where the series reaches back far enough.
-    offset = MIRROR_YEARS * P
-    j = i - offset
-    if j >= first_point and j >= L:
-        mirror = payload["mirror"]
-        if bank.valid_win[j] and j + H <= i and bank.valid_fwd[j]:
-            dj = float(distances(bank, i, np.array([j]), scale_idx=cand)[0])
-            mirror["exact"] = {
-                **_rank_fields(dsorted, dj),
-                "window": _window(bank, j),
-                "forward": _forward(bank, j),
-                "events": _events_between(events, bank.dates[j - L], bank.dates[j + H]),
-            }
-            mirror["available"] = True
-            mirror["reason"] = None
-        else:
-            mirror["reason"] = "window_unavailable"
-        lo, hi = i - MIRROR_BAND_YEARS[1] * P, i - MIRROR_BAND_YEARS[0] * P
-        band = cand[(cand >= lo) & (cand <= hi)]
-        if len(band):
-            db = distances(bank, i, band, scale_idx=cand)
-            ja = int(band[int(np.argmin(db))])
-            mirror["aligned"] = {
-                **_rank_fields(dsorted, float(db.min())),
-                "offset_years": round((i - ja) / P, 2),
-                "band_years": list(MIRROR_BAND_YEARS),
-                "windows_in_band": int(len(band)),
-                "window": _window(bank, ja),
-                "forward": _forward(bank, ja),
-                "events": _events_between(events, bank.dates[ja - L], bank.dates[ja + H]),
-            }
-        if mirror["available"] and isinstance(skill_doc, dict):
-            ev = ((skill_doc.get("assets") or {}).get(asset) or {}).get("mirror_evidence")
-            mirror["evidence"] = ev if isinstance(ev, dict) else None
     return payload
 
 
-def _analog(bank: WindowBank, j: int, rank: int, dsorted: np.ndarray, d: float, events: list[dict[str, Any]]) -> dict[str, Any]:
+def _mirror(
+    daily: pd.DataFrame,
+    asset: str,
+    *,
+    skill_doc: dict[str, Any] | None,
+    events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """The 120-year mirror on the asset's own mirror bank (monthly averages for the S&P).
+
+    Only where the series reaches back far enough: no fallback window.
+    """
+    mirror: dict[str, Any] = {
+        "available": False,
+        "reason": "history_too_short",
+        "offset_years": MIRROR_YEARS,
+        "basis": None,
+        "exact": None,
+        "aligned": None,
+        "evidence": None,
+    }
+    cfg = MIRROR.get(asset)
+    if cfg is None:
+        return mirror
+    mirror["basis"] = "weekly_close" if cfg.resolution == "W" else "monthly_average"
+    bank = build_bank(resample(daily, cfg), cfg)
+    valid_idx = np.flatnonzero(bank.valid_win)
+    if len(valid_idx) == 0:
+        return mirror
+    i = int(valid_idx[-1])
+    cand = eligible(bank, i)
+    if len(cand) < cfg.k_min:
+        return mirror
+    P, L, H = cfg.periods_per_year, cfg.window, cfg.horizon
+    dsorted = np.sort(distances(bank, i, cand))
+    first_point = int(np.flatnonzero(np.isfinite(bank.x))[0])
+    j = i - MIRROR_YEARS * P
+    if j < first_point or j < L:
+        return mirror
+    if bank.valid_win[j] and j + H <= i and bank.valid_fwd[j]:
+        dj = float(distances(bank, i, np.array([j]), scale_idx=cand)[0])
+        mirror["exact"] = {
+            **_rank_fields(dsorted, dj),
+            "window": _window(bank, j),
+            "forward": _forward(bank, j),
+            "events": _events_between(events, asset, bank.dates[j - L], bank.dates[j + H]),
+        }
+        mirror["available"] = True
+        mirror["reason"] = None
+    else:
+        mirror["reason"] = "window_unavailable"
+    lo, hi = i - MIRROR_BAND_YEARS[1] * P, i - MIRROR_BAND_YEARS[0] * P
+    band = cand[(cand >= lo) & (cand <= hi)]
+    if len(band):
+        db = distances(bank, i, band, scale_idx=cand)
+        ja = int(band[int(np.argmin(db))])
+        mirror["aligned"] = {
+            **_rank_fields(dsorted, float(db.min())),
+            "offset_years": round((i - ja) / P, 2),
+            "band_years": list(MIRROR_BAND_YEARS),
+            "windows_in_band": int(len(band)),
+            "window": _window(bank, ja),
+            "forward": _forward(bank, ja),
+            "events": _events_between(events, asset, bank.dates[ja - L], bank.dates[ja + H]),
+        }
+    if mirror["available"] and isinstance(skill_doc, dict) and isinstance(skill_doc.get("assets"), dict):
+        ev = (skill_doc["assets"].get(asset) or {}).get("mirror_evidence")
+        mirror["evidence"] = ev if isinstance(ev, dict) else None
+    return mirror
+
+
+def _analog(
+    bank: WindowBank,
+    asset: str,
+    j: int,
+    rank: int,
+    dsorted: np.ndarray,
+    d: float,
+    events: list[dict[str, Any]],
+) -> dict[str, Any]:
     cfg = bank.cfg
     return {
         "rank": rank,
@@ -687,8 +800,13 @@ def _analog(bank: WindowBank, j: int, rank: int, dsorted: np.ndarray, d: float, 
         "source": _source_code(bank, j),
         "window": _window(bank, j),
         "forward": _forward(bank, j),
-        "events": _events_between(events, bank.dates[j - cfg.window], bank.dates[j + cfg.horizon]),
+        "events": _events_between(events, asset, bank.dates[j - cfg.window], bank.dates[j + cfg.horizon]),
     }
+
+
+# --------------------------------------------------------------------------
+# Skill artifact and the cached, never-raising entry point
+# --------------------------------------------------------------------------
 
 
 def load_skill_doc(path: Path) -> dict[str, Any] | None:
@@ -699,6 +817,62 @@ def load_skill_doc(path: Path) -> dict[str, Any] | None:
         return None
     if not isinstance(doc, dict) or doc.get("engine_version") != PATTERNS_V2_VERSION:
         return None
-    if doc.get("schema_version") != SKILL_SCHEMA_VERSION:
+    if doc.get("schema_version") != SKILL_SCHEMA_VERSION or not isinstance(doc.get("assets"), dict):
         return None
     return doc
+
+
+def _file_stamp(path: Path) -> str:
+    try:
+        stat = Path(path).stat()
+    except OSError:
+        return "none"
+    return f"{stat.st_mtime_ns}-{stat.st_size}"
+
+
+def skill_stamp(path: Path | str | None = None) -> str:
+    """mtime_ns and size of the skill artifact, or "none" when it is missing."""
+    return _file_stamp(Path(path) if path is not None else DEFAULT_SKILL_PATH)
+
+
+_file_cache: dict[tuple[str, str], tuple[str, Any]] = {}
+_file_cache_lock = threading.Lock()
+
+
+def _cached_file(kind: str, path: Path, loader: Callable[[Path], Any]) -> Any:
+    """``loader(path)``, re-read only when the file's stamp changes (loaders never raise)."""
+    stamp = _file_stamp(path)
+    key = (kind, str(path))
+    with _file_cache_lock:
+        hit = _file_cache.get(key)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    value = loader(path)
+    with _file_cache_lock:
+        _file_cache[key] = (stamp, value)
+    return value
+
+
+def engine_for(
+    frame: pd.DataFrame,
+    asset: str,
+    *,
+    skill_path: Path | str | None = None,
+    events_path: Path | str | None = None,
+) -> dict[str, Any] | None:
+    """The validated, NaN-free engine block for ``asset``; None (logged) on any failure.
+
+    Loads the mtime-cached skill artifact and events, builds, validates with
+    ``PatternEngineV2`` and checks strict JSON. Never raises: the v2 block must
+    never fail a /patterns request.
+    """
+    try:
+        skill_doc = _cached_file("skill", Path(skill_path) if skill_path is not None else DEFAULT_SKILL_PATH, load_skill_doc)
+        events = _cached_file("events", Path(events_path) if events_path is not None else EVENTS_PATH, load_events)
+        payload = build_engine_payload(frame, asset, skill_doc=skill_doc, events=events)
+        PatternEngineV2.model_validate(payload)
+        json.dumps(payload, allow_nan=False)
+    except Exception:  # noqa: BLE001 - the v2 block must never fail the request
+        logger.exception("Study of Patterns v2 engine unavailable for %s", asset)
+        return None
+    return payload

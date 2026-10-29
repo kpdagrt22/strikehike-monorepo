@@ -46,20 +46,23 @@
     "title": "The Mumbai attacks",
     "category": "Geopolitics",
     "summary": "A coordinated attack on India's financial capital raises security and sovereign-risk premiums across the region.",
-    "source": "Static editorial dictionary"
+    "source": "Static editorial dictionary",
+    "assets": ["nifty"]
   },
   {
     "date": "2009-01-07",
     "title": "The Satyam accounting scandal",
     "category": "Financial",
     "summary": "India's fourth-largest IT services firm reveals a billion-dollar accounting fraud, testing corporate-governance confidence.",
-    "source": "Static editorial dictionary"
+    "source": "Static editorial dictionary",
+    "assets": ["nifty"]
   },
   {
     "date": "2009-05-16",
     "title": "India's national election result",
     "category": "Geopolitics",
     "summary": "A decisive mandate lifts political-risk discounts and helps trigger a sharp re-rating in Indian equities.",
-    "source": "Static editorial dictionary"
+    "source": "Static editorial dictionary",
+    "assets": ["nifty"]
   }
 ]

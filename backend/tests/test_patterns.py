@@ -99,10 +99,11 @@ def test_unknown_pattern_asset_raises_value_error():
 
 
 # ---------------------------------------------------------------------------
-# Study of Patterns v2: regime/patterns_v2.py and scripts/patterns_v2_evidence.py
+# Study of Patterns v2 (judge r2): regime/patterns_v2.py and
+# scripts/patterns_v2_evidence.py
 #
 # Synthetic frames only, except test_committed_skill_artifact_matches_the_parquet,
-# which checks the committed skill artifact against the committed metadata.
+# which checks the committed skill artifact against the committed parquet.
 # ---------------------------------------------------------------------------
 
 import json  # noqa: E402
@@ -115,7 +116,8 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from regime import patterns_v2 as P2  # noqa: E402
-from regime.schemas import (  # noqa: E402
+from regime.patterns_v2_schemas import (  # noqa: E402
+    PatternDeclinesV2,
     PatternEngineV2,
     PatternMirrorEvidenceV2,
     PatternSkillV2,
@@ -123,18 +125,18 @@ from regime.schemas import (  # noqa: E402
 from scripts import patterns_v2_evidence as EV  # noqa: E402
 
 UTC = "UTC"
+V2_ASSETS = ("sp500", "nifty", "gold", "bonds", "bitcoin")
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 SKILL_COMMAND = (
     'cd backend && PYTHONPATH="src;." python -m scripts.patterns_v2_evidence '
     "--parquet data/processed/macro_regime_history.parquet "
-    "--meta data/processed/macro_regime_history.meta.json "
     "--out data/processed/patterns_v2_skill.json"
 )
 
 
-def _walk(index: pd.DatetimeIndex, seed: int, vol: float = 0.17) -> pd.Series:
+def _walk(index: pd.DatetimeIndex, seed: int, vol: float = 0.17, every_day: bool = False) -> pd.Series:
     rng = np.random.default_rng(seed)
-    trading = index.dayofweek < 5
+    trading = np.ones(len(index), dtype=bool) if every_day else index.dayofweek < 5
     r = np.where(trading, 0.05 / 252 + vol / math.sqrt(252) * rng.standard_normal(len(index)), 0.0)
     return pd.Series(np.exp(np.cumsum(r)), index=index)
 
@@ -147,40 +149,22 @@ def _monthly_native(price: pd.Series, mask: np.ndarray) -> pd.Series:
     return pd.Series(np.where(mask, mavg.reindex(month).to_numpy(), np.nan), index=price.index)
 
 
+def _closes(price: pd.Series, mask: np.ndarray, last: pd.Timestamp, every_day: bool = False) -> pd.Series:
+    """Daily closes inside ``mask`` up to ``last``, forward-filled over the calendar like the parquet."""
+    idx = price.index
+    trading = np.ones(len(idx), dtype=bool) if every_day else idx.dayofweek < 5
+    return price.where(mask & trading & (idx <= last)).ffill().where(mask)
+
+
 def engine_frame(seed: int = 7, end: str = "2026-10-23", ffill_to: str = "2026-10-27") -> pd.DataFrame:
-    """An S&P-shaped splice (Cowles/DJIA monthly, a 1969-71 gap, Nasdaq then S&P
-    daily, each on its own level scale), a Nifty-like daily series from 2007 and
-    a gold-like monthly series (peg until 1968, October not yet published)."""
-    idx = pd.date_range("1870-12-01", ffill_to, freq="D", tz=UTC)
-    last = pd.Timestamp(end, tz=UTC)
-    base = _walk(idx, seed) * 37.0
-    sp = pd.Series(np.nan, index=idx)
-    src = pd.Series(pd.NA, index=idx, dtype="string")
-    eras = [("1871-01-01", "1956-12-01", "M1125AUSM343NNBR", True, 1.0), ("1956-12-02", "1968-12-01", "M1109BUSM293NNBR", True, 1.4),
-            ("1971-02-05", "2016-10-26", "NASDAQCOM", False, 0.2), ("2016-10-27", ffill_to, "SP500", False, 0.08)]
-    for a, b, name, monthly, scale in eras:  # different level scales: the splice must be chained
-        m = (idx >= pd.Timestamp(a, tz=UTC)) & (idx <= pd.Timestamp(b, tz=UTC))
-        vals = _monthly_native(base, m) if monthly else base.where(m & (idx.dayofweek < 5) & (idx <= last)).ffill().where(m)
-        sp[m] = (vals * scale)[m]
-        src[m] = name
-    frame = pd.DataFrame({"sp500_proxy": sp, "sp500_proxy_source": src})
-    nf = _walk(idx, seed + 1, 0.2) * 5000.0
-    nmask = (idx >= pd.Timestamp("2007-09-17", tz=UTC))
-    frame["nifty_proxy"] = nf.where(nmask & (idx.dayofweek < 5) & (idx <= last)).ffill().where(nmask)
-    frame["nifty_proxy_source"] = pd.Series("YAHOO_FINANCE_NSEI", index=idx, dtype="string").where(nmask)
-    g = _walk(idx, seed + 2, 0.15) * 35.0
-    gmask = idx >= pd.Timestamp("1960-01-01", tz=UTC)
-    gold = _monthly_native(g, gmask)
-    gold[idx < pd.Timestamp("1968-04-01", tz=UTC)] = 35.0  # the peg: flat windows are dropped
-    gold[gmask & (idx >= pd.Timestamp("2026-10-01", tz=UTC))] = np.nan  # October not published yet
-    frame["gold_proxy"] = gold.where(gmask).ffill().where(gmask)  # parquet-style trailing fill
-    frame["gold_proxy_source"] = pd.Series("WORLD_BANK_LBMA_GOLD", index=idx, dtype="string").where(gmask)
-    return frame
+    """Today's lens on a UTC daily calendar forward-filled past the last close.
 
-
-def gspc_frame(seed: int = 11, end: str = "2026-10-27", ffill_to: str = "2026-10-28") -> pd.DataFrame:
-    """Today's S&P lens: Cowles monthly values to 1927-12-29, then daily
-    YAHOO_FINANCE_GSPC closes on another level scale (the S&P 90 until 1957-03-04)."""
+    S&P: Cowles-like monthly values 1871-01 to 1927-12-29, then daily
+    YAHOO_FINANCE_GSPC closes from 1927-12-30 on another level scale (the S&P
+    90 until 1957-03-04). Nifty daily from 2007-09-17, bonds daily from 1962,
+    bitcoin every day from 2010-08-18, and gold monthly from 1960, pegged flat
+    until March 1968, its October 2026 not yet published.
+    """
     idx = pd.date_range("1870-12-01", ffill_to, freq="D", tz=UTC)
     last = pd.Timestamp(end, tz=UTC)
     base = _walk(idx, seed) * 37.0
@@ -188,11 +172,76 @@ def gspc_frame(seed: int = 11, end: str = "2026-10-27", ffill_to: str = "2026-10
     daily = idx >= pd.Timestamp("1927-12-30", tz=UTC)
     sp = pd.Series(np.nan, index=idx)
     sp[cowles] = _monthly_native(base, cowles)[cowles]
-    sp[daily] = (base.where(daily & (idx.dayofweek < 5) & (idx <= last)).ffill() * 0.5)[daily]
+    sp[daily] = (_closes(base, daily, last) * 0.5)[daily]  # another level scale: the splice must be chained
     src = pd.Series(pd.NA, index=idx, dtype="string")
     src[cowles] = "M1125AUSM343NNBR"
     src[daily] = "YAHOO_FINANCE_GSPC"
-    return pd.DataFrame({"sp500_proxy": sp, "sp500_proxy_source": src})
+    frame = pd.DataFrame({"sp500_proxy": sp, "sp500_proxy_source": src})
+
+    def add(asset: str, values: pd.Series, mask: np.ndarray, source: str) -> None:
+        spec = P2.ASSETS[asset]
+        frame[spec["field"]] = values
+        frame[spec["source_field"]] = pd.Series(source, index=idx, dtype="string").where(mask)
+
+    nmask = idx >= pd.Timestamp("2007-09-17", tz=UTC)
+    add("nifty", _closes(_walk(idx, seed + 1, 0.2) * 5000.0, nmask, last), nmask, "YAHOO_FINANCE_NSEI")
+    bmask = idx >= pd.Timestamp("1962-01-02", tz=UTC)
+    add("bonds", _closes(_walk(idx, seed + 3, 0.07) * 100.0, bmask, last), bmask, "UST10Y_TOTAL_RETURN_PROXY")
+    cmask = idx >= pd.Timestamp("2010-08-18", tz=UTC)
+    add("bitcoin", _closes(_walk(idx, seed + 4, 0.6, every_day=True) * 0.07, cmask, last, every_day=True), cmask, "BLOCKCHAIN_COM_MARKET_PRICE")
+    gmask = idx >= pd.Timestamp("1960-01-01", tz=UTC)
+    gold = _monthly_native(_walk(idx, seed + 2, 0.15) * 35.0, gmask)
+    gold[idx < pd.Timestamp("1968-04-01", tz=UTC)] = 35.0  # the peg: flat windows and years are dropped
+    gold[gmask & (idx >= pd.Timestamp("2026-10-01", tz=UTC))] = np.nan  # October not published yet
+    add("gold", gold.where(gmask).ffill().where(gmask), gmask, "WORLD_BANK_LBMA_GOLD")  # parquet-style trailing fill
+    return frame
+
+
+def _bank_index(bank: P2.WindowBank, iso_date: str) -> int:
+    return int(np.flatnonzero(bank.dates.strftime("%Y-%m-%d") == iso_date)[0])
+
+
+def _months_between(a: str, b: str) -> int:
+    pa, pb = pd.Timestamp(a), pd.Timestamp(b)
+    return (pb.year - pa.year) * 12 + (pb.month - pa.month)
+
+
+def _skill_doc(fingerprints: dict[str, str] | None, **sp500: object) -> dict:
+    """An r2-shaped skill artifact with every block, for the sp500 asset."""
+    block = {
+        "available": True,
+        "inputs_fingerprint": (fingerprints or {}).get("sp500"),
+        "period": ["1949-12-02", "2025-10-24"],
+        "cadence": "every_4_weeks",
+        "forecasts": 991,
+        "independent_years": 76.2,
+        "direction": {"horizon_months": 12, "hit_pct": 67.7, "base_hit_pct": 74.9, "edge_ci95_pp": [-11.6, -3.0],
+                      "verdict": "worse", "base_call": "up"},
+        "falls_20": {"threshold_pct": 20, "realised_pct": 13.5, "brier_skill": 0.014, "ci95": [-0.069, 0.097],
+                     "auc": 0.463, "verdict": "no_edge"},
+        "falls_10": {"threshold_pct": 10, "realised_pct": 45.9, "brier_skill": -0.026, "ci95": [-0.06, 0.005],
+                     "auc": 0.452, "verdict": "no_edge"},
+        "ranking": {"horizon_months": 3, "rank_corr": -0.024, "ci95": [-0.098, 0.052], "recent_from": "1987-11-13",
+                    "recent_rank_corr": 0.03, "recent_ci95": [-0.062, 0.142], "verdict": "none"},
+        "placebo": {"seeds": 20, "direction_gap_pp_mean": -5.57, "direction_gap_pp_p05": -7.477,
+                    "direction_gap_pp_p95": -4.036, "falls_20_brier_skill_mean": -0.067, "verdict": "same"},
+        "warnings": {"threshold_pct": 20, "flagged_share_pct": 38.0, "flagged_followed_pct": 14.3, "other_followed_pct": 13.0},
+        "declines": {"read_at_pct": 10, "period": ["1950-07-14", "2025-04-04"], "declines": 31, "became_20": 12,
+                     "flagged": 21, "flagged_became_20": 7, "not_flagged": 10, "not_flagged_became_20": 5,
+                     "auc": 0.237, "before_record": 14},
+        "mirror_evidence": {
+            "months_tested": 418, "period": ["1992-01-31", "2026-10-27"], "mean_rank_pct": 52.4, "chance_rank_pct": 50.0,
+            "z": 0.49, "share_in_closest_10pct": 5.3, "rank_among_offsets": [59, 91], "offsets_years": [60, 150],
+            "forward_12m_rank_corr": -0.064, "direction_hit_12m_pct": 50.7, "base_hit_12m_pct": 80.0,
+            "verdict": "no_information",
+        },
+    }
+    block.update(sp500)
+    doc = {"schema_version": 2, "engine_version": "patterns-v2", "generated_at": "2026-10-28T00:00:00+00:00",
+           "config": {}, "assets": {"sp500": block}}
+    if fingerprints is not None:
+        doc["inputs_fingerprint"] = fingerprints
+    return doc
 
 
 @pytest.fixture(scope="module")
@@ -201,174 +250,237 @@ def v2_frame() -> pd.DataFrame:
 
 
 @pytest.fixture(scope="module")
-def gspc_df() -> pd.DataFrame:
-    return gspc_frame()
+def payloads(v2_frame) -> dict[str, dict]:
+    events = P2.load_events(P2.EVENTS_PATH)
+    doc = _skill_doc({a: P2.inputs_fingerprint(v2_frame, a) for a in V2_ASSETS})
+    return {a: P2.build_engine_payload(v2_frame, a, skill_doc=doc, events=events) for a in V2_ASSETS}
 
 
-@pytest.fixture(scope="module")
-def sp_payload(v2_frame) -> dict:
-    return P2.build_engine_payload(v2_frame, "sp500")
-
-
-@pytest.fixture(scope="module")
-def gspc_payload(gspc_df) -> dict:
-    return P2.build_engine_payload(gspc_df, "sp500")
-
-
-def _months_between(a: str, b: str) -> int:
-    pa, pb = pd.Timestamp(a), pd.Timestamp(b)
-    return (pb.year - pa.year) * 12 + (pb.month - pa.month)
-
-
-def _assert_truncation_invariant(frame: pd.DataFrame, asset: str, months: list[str]) -> None:
+def _assert_truncation_invariant(frame: pd.DataFrame, asset: str, months: list[str], cfg: P2.Config | None = None) -> None:
     """The forecast at a past date equals the one built on data cut at that date."""
-    cfg = P2.PRIMARY[asset]
+    cfg = cfg or P2.PRIMARY[asset]
     full = P2.bank_for(frame, asset, cfg)
     for month in months:
         i = next(k for k in range(full.n) if full.valid_win[k] and full.dates[k].strftime("%Y-%m") == month)
         fc = P2.analog_forecast(full, i)
         assert fc is not None, (asset, month)
-        payload = P2.build_engine_payload(frame.loc[: full.dates[i]], asset)
-        assert payload["as_of"] == full.dates[i].date().isoformat()
-        # Same eligible library: nothing whose outcome ends after the cut was usable.
-        assert payload["outlook"]["library_windows"] == len(fc["cand"])
+        cut_frame = frame.loc[: full.dates[i]]
+        cut = P2.bank_for(cut_frame, asset, cfg)
+        i_cut = int(np.flatnonzero(cut.valid_win)[-1])
+        assert cut.dates[i_cut] == full.dates[i], (asset, month)
+        fc_cut = P2.analog_forecast(cut, i_cut)
+        assert fc_cut is not None, (asset, month)
+        # Same library: nothing whose outcome ends after the cut was usable.
+        assert list(full.dates[fc["cand"]]) == list(cut.dates[fc_cut["cand"]]), (asset, month)
         assert all(int(c) + cfg.horizon <= i - cfg.window for c in fc["cand"])
-        assert [a["window"]["end"] for a in payload["analogs"]] == [full.dates[c].date().isoformat() for c in fc["chosen"]]
-        assert [h["higher"] for h in payload["outlook"]["horizons"]] == [fc[f"higher_{h}"] for h in cfg.horizons]
-        assert payload["outlook"]["drawdown"]["base_share_20_pct"] == round(fc["base"]["p_dd20"] * 100, 1)
+        assert list(full.dates[fc["chosen"]]) == list(cut.dates[fc_cut["chosen"]]), (asset, month)
+        np.testing.assert_allclose(fc["chosen_dist"], fc_cut["chosen_dist"], rtol=1e-9, atol=1e-12)
+        for key in [f"higher_{h}" for h in cfg.horizons] + ["fell_10", "fell_20"]:
+            assert fc[key] == fc_cut[key], (asset, month, key)
+        for key in ["n", "p_dd10", "p_dd20"] + [f"p_up_{h}" for h in cfg.horizons]:
+            assert fc["base"][key] == pytest.approx(fc_cut["base"][key], abs=1e-12), (asset, month, key)
+        if cfg == P2.PRIMARY[asset]:
+            payload = P2.build_engine_payload(cut_frame, asset)
+            assert payload["as_of"] == full.dates[i].date().isoformat()
+            assert payload["outlook"]["library_windows"] == len(fc["cand"])
+            assert payload["outlook"]["usual_windows"] == fc["base"]["n"]
+            assert [a["window"]["end"] for a in payload["analogs"]] == [full.dates[c].date().isoformat() for c in fc["chosen"]]
+            assert [h["higher"] for h in payload["outlook"]["horizons"]] == [fc[f"higher_{h}"] for h in cfg.horizons]
+            assert payload["outlook"]["drawdown"]["base_share_20_pct"] == round(fc["base"]["p_dd20"] * 100, 1)
+
+
+TRUNCATION_DATES = (
+    ("sp500", ["1937-03", "1974-09", "2009-02"], None),
+    ("sp500", ["1935-06", "1987-09", "2020-01"], P2.MIRROR["sp500"]),
+    ("nifty", ["2016-02", "2020-03"], None),
+    ("gold", ["1999-09", "2013-04"], None),
+)
 
 
 def test_no_lookahead_truncation_invariance(v2_frame):
-    _assert_truncation_invariant(v2_frame, "sp500", ["1935-06", "1987-09", "2008-08", "2020-01"])
+    for asset, months, cfg in TRUNCATION_DATES:
+        _assert_truncation_invariant(v2_frame, asset, months, cfg)
 
 
-def test_no_lookahead_on_daily_sp500_nifty_and_gold(v2_frame, gspc_df):
-    _assert_truncation_invariant(gspc_df, "sp500", ["1932-06", "1974-09", "2009-02"])
-    _assert_truncation_invariant(v2_frame, "nifty", ["2016-02", "2020-03"])
-    _assert_truncation_invariant(v2_frame, "gold", ["1999-09", "2013-04"])
-
-
-def test_truncation_check_catches_injected_lookahead(v2_frame, monkeypatch):
+def test_truncation_test_catches_injected_leaks(v2_frame, monkeypatch):
     """The no-look-ahead check has teeth: it fails when a leak is injected."""
-    real_distances = P2.distances
+    real_distances, real_base_rates = P2.distances, P2.base_rates
 
     def full_sample_scale(bank, i, cand, scale_idx=None):
         return real_distances(bank, i, cand, scale_idx=np.flatnonzero(bank.valid_win))
 
-    def future_outcomes(bank, i):
+    def outcomes_past_t(bank, i):
         j = np.arange(bank.n)
-        return np.flatnonzero(bank.valid_win & bank.valid_fwd & (j + bank.cfg.horizon <= i + 3))
+        return np.flatnonzero(bank.valid_win & bank.valid_fwd & (j + bank.cfg.horizon <= i + 4))
 
-    for name, leak in (("distances", full_sample_scale), ("eligible", future_outcomes)):
+    def usual_past_t(bank, i):
+        return real_base_rates(bank, i + 8)
+
+    for name, leak in (("distances", full_sample_scale), ("eligible", outcomes_past_t), ("base_rates", usual_past_t)):
         with monkeypatch.context() as patch:
             patch.setattr(P2, name, leak)
-            with pytest.raises(AssertionError):
-                _assert_truncation_invariant(v2_frame, "sp500", ["1935-06", "1987-09", "2008-08", "2020-01"])
+            for asset, months, cfg in TRUNCATION_DATES:
+                with pytest.raises(AssertionError):
+                    _assert_truncation_invariant(v2_frame, asset, months, cfg)
 
 
-def test_every_outcome_shown_ends_by_as_of(sp_payload, gspc_payload):
-    for payload in (sp_payload, gspc_payload):
-        as_of, today_start = payload["as_of"], payload["current"]["start"]
+def test_every_setup_outcome_ends_before_todays_window(v2_frame, payloads):
+    for asset, payload in payloads.items():
+        bank = P2.bank_for(v2_frame, asset)
+        i = _bank_index(bank, payload["current"]["end"])
+        assert payload["as_of"] == payload["current"]["end"]
         for a in payload["analogs"]:
-            assert a["window"]["end"] <= as_of and a["forward"]["end"] <= as_of
-            assert a["forward"]["end"] <= today_start  # never today's own trailing year
+            j = _bank_index(bank, a["window"]["end"])
+            assert j + bank.cfg.horizon <= i - bank.cfg.window  # the rule: j + H <= i - L
+            assert a["forward"]["end"] <= payload["current"]["start"]  # never today's own trailing year
             assert a["forward"]["start"] == a["window"]["end"]
         for key in ("exact", "aligned"):
             block = payload["mirror"][key]
-            assert block is not None and block["forward"]["end"] <= as_of
+            if block is not None:
+                assert block["forward"]["end"] <= payload["as_of"]
+    assert payloads["sp500"]["mirror"]["exact"] is not None
 
 
-def test_setups_are_at_least_six_months_apart_and_ranked(sp_payload):
-    ends = sorted(a["window"]["end"] for a in sp_payload["analogs"])
-    assert len(ends) == 10
-    assert all(_months_between(x, y) >= 6 for x, y in zip(ends, ends[1:]))
-    positions = [a["position"] for a in sp_payload["analogs"]]
-    assert positions == sorted(positions) and positions[0] == 1
-    assert all(a["closer_than_pct"] < 100.0 for a in sp_payload["analogs"])
+def test_setups_do_not_overlap(v2_frame, payloads):
+    for asset, payload in payloads.items():
+        bank = P2.bank_for(v2_frame, asset)
+        sep = payload["separation"]["periods"]
+        assert sep == payload["window"]["periods"] == bank.cfg.sep and payload["separation"]["unit"] == payload["window"]["unit"]
+        ends = sorted(_bank_index(bank, a["window"]["end"]) for a in payload["analogs"])
+        assert 5 <= len(ends) <= 10
+        assert all(b - a >= sep for a, b in zip(ends, ends[1:]))  # no two setups share a trailing year
+        positions = [a["position"] for a in payload["analogs"]]
+        assert positions == sorted(positions) and positions[0] == 1
+        assert [a["rank"] for a in payload["analogs"]] == list(range(1, len(positions) + 1))
+        assert all(a["closer_than_pct"] < 100.0 and a["of"] == payload["outlook"]["library_windows"] for a in payload["analogs"])
 
 
-def test_mirror_is_exactly_120_calendar_years_back_across_the_gap(sp_payload, gspc_payload):
-    for payload in (sp_payload, gspc_payload):
-        exact = payload["mirror"]["exact"]
-        assert payload["mirror"]["available"] is True
-        assert _months_between(exact["window"]["end"], payload["as_of"]) == 120 * 12
-        aligned = payload["mirror"]["aligned"]
-        assert 110 <= aligned["offset_years"] <= 130 and aligned["windows_in_band"] > 200
-
-
-def test_monthly_source_trailing_fill_is_cut(v2_frame):
-    gold = P2.build_engine_payload(v2_frame, "gold")
-    assert gold["as_of"] == "2026-09-30"  # not the forward-filled October
-    assert gold["current"]["end"] == "2026-09-30"
-
-
-def test_pegged_flat_windows_are_never_analogs(v2_frame):
-    gold = P2.build_engine_payload(v2_frame, "gold")
-    assert all(a["window"]["start"] >= "1968-04-01" for a in gold["analogs"])
-
-
-def test_splices_are_chained_not_jumps(v2_frame, gspc_df):
+def test_scales_come_from_the_library_only(v2_frame, payloads):
     bank = P2.bank_for(v2_frame, "sp500")
-    dates = [d.strftime("%Y-%m") for d in bank.dates]
-    for month in ("1956-12", "2016-10", "2016-11"):
-        k = dates.index(month)
-        assert abs(bank.x[k] - bank.x[k - 1]) < 0.15  # raw levels differ by 40-60%
-    daily = P2.bank_for(gspc_df, "sp500")
-    months = [d.strftime("%Y-%m") for d in daily.dates]
-    for month in ("1927-12", "1928-01"):
-        k = months.index(month)
-        assert abs(daily.x[k] - daily.x[k - 1]) < 0.15  # the daily closes sit at half the Cowles level
+    i = int(np.flatnonzero(bank.valid_win)[-1])
+    cand = P2.eligible(bank, i)
+    F, w = bank.features, bank.weights
+    sd = np.nanstd(F[cand], axis=0)
+    sd = np.where(sd > 1e-12, sd, 1.0)
+    manual = np.sqrt(np.nansum(w * ((F[cand] - F[i]) / sd) ** 2, axis=1))
+    np.testing.assert_allclose(P2.distances(bank, i, cand), manual, rtol=1e-12)
+    every = np.flatnonzero(bank.valid_win)
+    sd_all = np.nanstd(F[every], axis=0)
+    full_sample = np.sqrt(np.nansum(w * ((F[cand] - F[i]) / np.where(sd_all > 1e-12, sd_all, 1.0)) ** 2, axis=1))
+    assert not np.allclose(manual, full_sample)  # the check above can tell the two apart
+    closest = cand[int(np.argmin(manual))]
+    assert payloads["sp500"]["analogs"][0]["window"]["end"] == bank.dates[closest].date().isoformat()
 
 
-def test_sp500_source_codes_follow_the_daily_history(gspc_df, gspc_payload):
+def test_sp500_setups_use_daily_closes_and_tags(v2_frame, payloads):
     from regime.analytics import SP500_DAILY_SOURCE
 
     assert P2.SP90_SOURCE == SP500_DAILY_SOURCE and P2.SOURCE_CODES[SP500_DAILY_SOURCE] == "sp500"
-    bank = P2.bank_for(gspc_df, "sp500")
+    weekly = P2.bank_for(v2_frame, "sp500")
+    assert weekly.cfg.resolution == "W" and weekly.dates[0] == pd.Timestamp("1927-12-30", tz=UTC)
     codes: dict[str | None, list[pd.Timestamp]] = {}
-    for j in np.flatnonzero(bank.valid_win):
-        codes.setdefault(P2._source_code(bank, int(j)), []).append(bank.dates[int(j)])
-    assert set(codes) == {"cowles", "sp90", "sp500"}  # no nasdaq or dow_jones in today's lens
-    assert max(codes["cowles"]) < pd.Timestamp("1927-12-30", tz=UTC)
-    assert pd.Timestamp("1927-12-30", tz=UTC) <= min(codes["sp90"]) and max(codes["sp90"]) < P2.SP500_LAUNCH
-    assert min(codes["sp500"]) >= P2.SP500_LAUNCH
-    assert {a["source"] for a in gspc_payload["analogs"]} <= {"cowles", "sp90", "sp500"}
-    PatternEngineV2(**gspc_payload)
+    for j in np.flatnonzero(weekly.valid_win):
+        codes.setdefault(P2._source_code(weekly, int(j)), []).append(weekly.dates[int(j)])
+    assert set(codes) == {"sp90", "sp500"}  # the Cowles index never enters the setup library
+    assert max(codes["sp90"]) < P2.SP500_LAUNCH <= min(codes["sp500"])
+    payload = payloads["sp500"]
+    assert payload["basis"] == "weekly_close" and payload["outlook"]["usual_since_year"] == 1928
+    assert payload["history_start"] == "1871-01-01"  # the first real observation, not the first week
+    for a in payload["analogs"]:
+        assert a["window"]["start"] >= "1927-12-30"
+        assert a["source"] == ("sp90" if a["window"]["end"] < "1957-03-04" else "sp500")
+    monthly = P2.bank_for(v2_frame, "sp500", P2.MIRROR["sp500"])
+    mirror_codes = {P2._source_code(monthly, int(j)) for j in np.flatnonzero(monthly.valid_win)}
+    assert mirror_codes == {"cowles", "sp90", "sp500"}  # Cowles only on the mirror's monthly bank
+    assert payload["mirror"]["exact"]["window"]["end"] < "1927-12-30"
+    for other in ("nifty", "gold", "bonds", "bitcoin"):
+        assert {a["source"] for a in payloads[other]["analogs"]} == {None}
+
+
+def test_splices_are_chained_not_jumps(v2_frame):
+    monthly = P2.bank_for(v2_frame, "sp500", P2.MIRROR["sp500"])
+    months = [d.strftime("%Y-%m") for d in monthly.dates]
+    for month in ("1927-12", "1928-01"):
+        k = months.index(month)
+        assert abs(monthly.x[k] - monthly.x[k - 1]) < 0.15  # the daily closes sit at half the Cowles level
 
 
 def test_gap_is_a_break_not_a_window(v2_frame):
-    bank = P2.bank_for(v2_frame, "sp500")
+    gap_start, gap_end = pd.Timestamp("1990-01-01", tz=UTC), pd.Timestamp("1991-12-31", tz=UTC)
+    holed = v2_frame.copy()
+    holed.loc[(holed.index >= gap_start) & (holed.index <= gap_end), "bond_proxy"] = np.nan  # a hole, not filled
+    bank = P2.bank_for(holed, "bonds")
+    L, H = bank.cfg.window, bank.cfg.horizon
+    assert len(np.unique(bank.seg[np.isfinite(bank.seg)])) == 2  # a new segment after the hole
     for k in range(bank.n):
         if bank.valid_win[k]:
-            start, end = bank.dates[k - 12], bank.dates[k]
-            assert not (start < pd.Timestamp("1971-02-01", tz=UTC) and end > pd.Timestamp("1968-12-31", tz=UTC))
+            assert not (bank.dates[k - L] < gap_start and bank.dates[k] > gap_end)
+        if bank.valid_fwd[k]:
+            assert not (bank.dates[k] < gap_start and bank.dates[k + H] > gap_end)
+    payload = P2.build_engine_payload(holed, "bonds")
+    for a in payload["analogs"]:
+        assert not (a["window"]["start"] < "1990-01-01" and a["forward"]["end"] > "1991-12-31")
+    PatternEngineV2.model_validate(payload)
 
 
-def test_short_history_has_no_mirror_and_no_fallback(v2_frame):
-    nifty = P2.build_engine_payload(v2_frame, "nifty")
-    assert nifty["mirror"]["available"] is False
-    assert nifty["mirror"]["reason"] == "history_too_short"
+def test_mirror_is_1440_months_back_on_the_monthly_bank(v2_frame, payloads):
+    mirror = payloads["sp500"]["mirror"]
+    assert mirror["available"] is True and mirror["reason"] is None and mirror["basis"] == "monthly_average"
+    monthly = P2.bank_for(v2_frame, "sp500", P2.MIRROR["sp500"])
+    i = int(np.flatnonzero(monthly.valid_win)[-1])
+    exact_end = _bank_index(monthly, mirror["exact"]["window"]["end"])
+    assert i - exact_end == 1440 and _months_between(mirror["exact"]["window"]["end"], payloads["sp500"]["as_of"]) == 1440
+    assert mirror["exact"]["of"] == len(P2.eligible(monthly, i))
+    aligned = mirror["aligned"]
+    assert 110 <= aligned["offset_years"] <= 130 and aligned["band_years"] == [110, 130] and aligned["windows_in_band"] > 200
+    assert mirror["evidence"]["verdict"] == "no_information"  # from the skill artifact
+    early = P2.build_engine_payload(v2_frame.loc[: pd.Timestamp("1961-06-30", tz=UTC)], "sp500")  # empty band
+    assert early["status"] == "ok" and early["mirror"]["available"] is False
+    assert early["mirror"]["aligned"] is None and early["mirror"]["exact"] is None
+    PatternEngineV2.model_validate(early)
+
+
+def test_short_history_has_no_mirror_and_no_fallback(payloads):
+    nifty = payloads["nifty"]
+    assert nifty["mirror"]["available"] is False and nifty["mirror"]["reason"] == "history_too_short"
     assert nifty["mirror"]["exact"] is None and nifty["mirror"]["aligned"] is None
-    assert nifty["history_start"] >= "2007-09-17"
+    assert nifty["mirror"]["basis"] is None and nifty["mirror"]["evidence"] is None
+    assert nifty["history_start"] == "2007-09-17"
 
 
-def test_early_as_of_with_empty_mirror_band_does_not_raise(v2_frame):
-    cut = v2_frame.loc[: pd.Timestamp("1961-06-30", tz=UTC)]
-    payload = P2.build_engine_payload(cut, "sp500")
-    assert payload["status"] == "ok"
-    assert payload["mirror"]["available"] is False and payload["mirror"]["aligned"] is None
+def test_trailing_fill_is_cut(payloads):
+    for asset in ("sp500", "nifty", "bonds", "bitcoin"):
+        assert payloads[asset]["as_of"] == "2026-10-23"  # the frame is forward-filled to 2026-10-27
+    gold = payloads["gold"]
+    assert gold["as_of"] == "2026-09-30" and gold["current"]["end"] == "2026-09-30"  # last published month
 
 
-def test_insufficient_history_status(v2_frame):
+def test_flat_windows_never_setups_or_usual(v2_frame, payloads):
+    bank = P2.bank_for(v2_frame, "gold")
+    peg_end = pd.Timestamp("1968-03-31", tz=UTC)
+    H, L = bank.cfg.horizon, bank.cfg.window
+    for j in range(bank.n):
+        if j + H < bank.n and bank.dates[j + H] <= peg_end:
+            assert not bank.valid_fwd[j]  # a pegged forward year is no outcome
+        if L <= j and bank.dates[j] <= peg_end:
+            assert not bank.valid_win[j]  # a pegged trailing year is no setup
+    gold = payloads["gold"]
+    assert gold["outlook"]["usual_since_year"] >= 1967  # 1960 if the pegged years counted
+    usual = np.flatnonzero(bank.valid_fwd & (np.arange(bank.n) + H <= _bank_index(bank, gold["as_of"])))
+    assert gold["outlook"]["usual_windows"] == len(usual)
+    assert all(a["window"]["volatility_pct"] > 1.0 for a in gold["analogs"])
+
+
+def test_insufficient_status(v2_frame):
     short = v2_frame.loc[: pd.Timestamp("2010-12-31", tz=UTC)]
     payload = P2.build_engine_payload(short, "nifty")
-    assert payload["status"] == "insufficient"
-    assert payload["outlook"] is None
-    assert len(payload["analogs"]) < 5
-    PatternEngineV2(**payload)
+    assert payload["status"] == "insufficient" and payload["outlook"] is None
+    assert 1 <= len(payload["analogs"]) < 5  # the few setups are still listed
+    PatternEngineV2.model_validate(payload)
+    json.dumps(payload, allow_nan=False)
 
 
-def test_unknown_v2_asset_raises_value_error(v2_frame):
+def test_unknown_asset_raises_value_error(v2_frame):
     with pytest.raises(ValueError, match="Unknown pattern asset"):
         P2.build_engine_payload(v2_frame, "not-an-asset")
 
@@ -382,66 +494,109 @@ def _dropped_keys(raw: object, kept: object, path: str = "engine") -> list[str]:
     return []
 
 
-def test_payload_validates_keeps_every_field_and_has_no_probabilities(sp_payload, gspc_payload):
-    for payload in (sp_payload, gspc_payload):
+def test_payload_validates_drops_nothing_and_has_no_probabilities(payloads):
+    for asset, payload in payloads.items():
         dumped = PatternEngineV2.model_validate(payload).model_dump()
         assert _dropped_keys(payload, dumped) == []  # the response model drops nothing
         text = json.dumps(payload, allow_nan=False)
-        for banned in ('"p_up', '"p_ge_', '"p_dd', '"similarity', '"novelty', '"distance'):
-            assert banned not in text
-    usual = sp_payload["outlook"]["usual_paths"]
-    assert len(usual["q25"]) == len(usual["q50"]) == len(usual["q75"]) == 13
-    assert all(lo["value"] <= mid["value"] <= hi["value"] for lo, mid, hi in zip(usual["q25"], usual["q50"], usual["q75"]))
+        for banned in ('"p_up', '"p_ge_', '"p_dd', '"similarity', '"novelty', '"distance', '"_ts', '"_assets', '"assets'):
+            assert banned not in text, (asset, banned)
+        usual = payload["outlook"]["usual_paths"]
+        n = payload["horizon"]["periods"] + 1
+        assert len(usual["q25"]) == len(usual["q50"]) == len(usual["q75"]) == len(payload["outlook"]["median_path"]) == n
+        assert all(lo["value"] <= mid["value"] <= hi["value"] for lo, mid, hi in zip(usual["q25"], usual["q50"], usual["q75"]))
+        assert {h["months"] for h in payload["outlook"]["horizons"]} == {3, 6, 12}
+    skill = payloads["sp500"]["skill"]
+    assert skill["available"] is True and skill["stale"] is False
+    assert {"placebo", "warnings", "declines", "cadence", "inputs_fingerprint", "generated_at"} <= set(skill)
+    assert "mirror_evidence" not in skill and payloads["nifty"]["skill"] == {"available": False}
 
 
-def _skill_doc(data_version: str, **sp500: object) -> dict:
-    block = {
-        "available": True,
-        "period": ["1892-12-31", "2025-10-31"],
-        "forecasts": 1500,
-        "independent_years": 125.0,
-        "direction": {"horizon_months": 12, "hit_pct": 60.0, "base_hit_pct": 65.0, "edge_ci95_pp": [-9.0, 1.0], "verdict": "no_edge"},
-        "mirror_evidence": {
-            "months_tested": 400, "period": ["1992-01-31", "2026-10-23"], "mean_rank_pct": 51.0, "chance_rank_pct": 50.0,
-            "z": 0.2, "share_in_closest_10pct": 9.0, "rank_among_offsets": [40, 91], "offsets_years": [60, 150],
-            "forward_12m_rank_corr": 0.01, "direction_hit_12m_pct": 52.0, "base_hit_12m_pct": 79.0, "verdict": "no_information",
-        },
-    }
-    block.update(sp500)
-    return {"schema_version": 1, "engine_version": "patterns-v2", "generated_at": "2026-10-28T00:00:00+00:00",
-            "data_version": data_version, "assets": {"sp500": block}}
+def test_events_respect_asset_tags(v2_frame, tmp_path):
+    months = pd.date_range("1871-01-15", "2026-09-15", freq="MS", tz=UTC) + pd.Timedelta(days=14)
+    items = []
+    for d in months:
+        items.append({"date": d.date().isoformat(), "title": "India only", "category": "Geopolitics", "assets": ["nifty"]})
+        items.append({"date": d.date().isoformat(), "title": "Everywhere", "category": "Financial"})
+    items.append({"date": "2001-01-01", "title": "Malformed tag", "assets": 7})
+    path = tmp_path / "events.json"
+    path.write_text(json.dumps(items), encoding="utf-8")
+    events = P2.load_events(path)
+    assert len(events) == 2 * len(months)  # the malformed tag is skipped, never attached everywhere
+
+    def titles(payload: dict) -> set[str]:
+        blocks = list(payload["analogs"]) + [b for b in (payload["mirror"]["exact"], payload["mirror"]["aligned"]) if b]
+        return {e["title"] for b in blocks for e in b["events"]}
+
+    for asset in ("sp500", "gold", "bonds"):
+        assert titles(P2.build_engine_payload(v2_frame, asset, events=events)) == {"Everywhere"}, asset
+    assert titles(P2.build_engine_payload(v2_frame, "nifty", events=events)) == {"Everywhere", "India only"}
+    tagged = {e["title"]: e["_assets"] for e in P2.load_events(P2.EVENTS_PATH)}
+    for title in ("The Mumbai attacks", "The Satyam accounting scandal", "India's national election result"):
+        assert tagged[title] == frozenset({"nifty"})
+    assert tagged["Lehman Brothers files for bankruptcy"] is None
 
 
-def test_skill_doc_missing_or_corrupt_degrades_quietly(v2_frame, tmp_path):
+def test_skill_doc_missing_corrupt_or_stale_degrades(v2_frame, tmp_path):
     payload = P2.build_engine_payload(v2_frame, "sp500", skill_doc=None)
-    assert payload["skill"] == {"available": False}
-    assert payload["mirror"]["evidence"] is None
+    assert payload["skill"] == {"available": False} and payload["mirror"]["evidence"] is None
     bad = tmp_path / "skill.json"
-    for text in ("{not json", "[]", json.dumps({"engine_version": "patterns-v1", "schema_version": 1}),
-                 json.dumps({"engine_version": "patterns-v2", "schema_version": 2})):
+    for text in ("{not json", "[]", json.dumps({"engine_version": "patterns-v1", "schema_version": 2, "assets": {}}),
+                 json.dumps({"engine_version": "patterns-v2", "schema_version": 1, "assets": {}}),  # round 1
+                 json.dumps({"engine_version": "patterns-v2", "schema_version": 2, "assets": []})):
         bad.write_text(text, encoding="utf-8")
         assert P2.load_skill_doc(bad) is None
     assert P2.load_skill_doc(tmp_path / "missing.json") is None
 
-
-def test_skill_block_is_marked_stale_and_never_carries_nan(v2_frame):
+    fingerprint = P2.inputs_fingerprint(v2_frame, "sp500")
     nan = float("nan")
-    doc = _skill_doc("abc", ranking={"horizon_months": 3, "rank_corr": nan, "ci95": [nan, 0.1],
-                                     "recent_from": "1959-01-01", "verdict": "none"})
-    fresh = P2.build_engine_payload(v2_frame, "sp500", skill_doc=doc, data_version="abc")
-    stale = P2.build_engine_payload(v2_frame, "sp500", skill_doc=doc, data_version="def")
-    assert fresh["skill"]["available"] is True and fresh["skill"]["stale"] is False
-    assert stale["skill"]["stale"] is True
-    assert "mirror_evidence" not in fresh["skill"] and fresh["mirror"]["evidence"]["verdict"] == "no_information"
-    assert fresh["skill"]["ranking"]["rank_corr"] is None and fresh["skill"]["ranking"]["ci95"] == [None, 0.1]
-    json.dumps(fresh, allow_nan=False)  # FastAPI refuses NaN: one would turn the response into a 500
-    PatternEngineV2(**fresh)
+    doc = _skill_doc({"sp500": fingerprint}, ranking={"horizon_months": 3, "rank_corr": nan, "ci95": None,
+                                                     "recent_from": "1987-11-13", "verdict": "none"})
+    fresh = P2.build_engine_payload(v2_frame, "sp500", skill_doc=doc)["skill"]
+    assert fresh["available"] is True and fresh["stale"] is False and fresh["inputs_fingerprint"] == fingerprint
+    assert fresh["ranking"]["rank_corr"] is None  # NaN never reaches the response
+    assert P2.build_engine_payload(v2_frame, "sp500", skill_doc=_skill_doc({"sp500": "0" * 16}))["skill"]["stale"] is True
+    assert P2.build_engine_payload(v2_frame, "sp500", skill_doc=_skill_doc(None))["skill"]["stale"] is True  # cannot vouch
+
+    # A rewrite that leaves the prices alone (a Core Index recompute) keeps the record fresh ...
+    recomputed = v2_frame.assign(core_index=12.0, core_index_bucket="calm_bullish")
+    assert P2.inputs_fingerprint(recomputed, "sp500") == fingerprint
+    assert P2.build_engine_payload(recomputed, "sp500", skill_doc=doc)["skill"]["stale"] is False
+    # ... any change to the price inputs marks it stale.
+    moved = v2_frame.copy()
+    moved.loc[pd.Timestamp("1990-03-01", tz=UTC), "sp500_proxy"] *= 1.001
+    relabelled = v2_frame.copy()
+    relabelled.loc[pd.Timestamp("1990-03-01", tz=UTC), "sp500_proxy_source"] = "OTHER"
+    for changed in (moved, relabelled, v2_frame.iloc[:-1]):
+        assert P2.inputs_fingerprint(changed, "sp500") != fingerprint
+    assert P2.build_engine_payload(moved, "sp500", skill_doc=doc)["skill"]["stale"] is True
+    us_index = v2_frame.copy()
+    us_index.index = us_index.index.as_unit("us")
+    assert P2.inputs_fingerprint(us_index, "sp500") == fingerprint  # the parquet stores microseconds
+
+
+def test_engine_for_caches_files_and_never_raises(v2_frame, tmp_path, monkeypatch, caplog):
+    skill = tmp_path / P2.SKILL_FILENAME
+    assert P2.skill_stamp(skill) == "none"
+    first = P2.engine_for(v2_frame, "sp500", skill_path=skill)
+    assert first is not None and first["skill"] == {"available": False}
+    skill.write_text(json.dumps(_skill_doc({"sp500": P2.inputs_fingerprint(v2_frame, "sp500")})), encoding="utf-8")
+    assert P2.skill_stamp(skill) != "none"
+    second = P2.engine_for(v2_frame, "sp500", skill_path=skill)
+    assert second["skill"]["available"] is True and second["skill"]["stale"] is False
+    assert second["mirror"]["evidence"]["months_tested"] == 418
+
+    monkeypatch.setattr(P2, "build_engine_payload", lambda *args, **kwargs: {"version": "patterns-v2"})
+    with caplog.at_level("ERROR"):
+        assert P2.engine_for(v2_frame, "sp500", skill_path=skill) is None  # breaks the contract: None, logged
+    assert "Study of Patterns v2 engine unavailable for sp500" in caplog.text
 
 
 def test_runtime_budget(v2_frame):
-    t = time.perf_counter()
-    P2.build_engine_payload(v2_frame, "sp500")
-    assert time.perf_counter() - t < 2.0  # measured ~0.1 s; generous for CI runners
+    for asset in V2_ASSETS:
+        t = time.perf_counter()
+        P2.build_engine_payload(v2_frame, asset)
+        assert time.perf_counter() - t < 2.0, asset  # measured 0.05-0.4 s; generous for CI runners
 
 
 def test_evidence_statistics_are_numpy_only_and_correct():
@@ -453,19 +608,37 @@ def test_evidence_statistics_are_numpy_only_and_correct():
     assert EV.auc(np.array([0.2, 0.3]), np.array([1, 1])) is None
     assert EV.brier_skill(np.array([0.5]), np.array([0.5]), np.array([1.0])) == pytest.approx(0.0)
     assert EV.brier_skill(np.array([1.0, 0.0]), np.array([0.5, 0.5]), np.array([1.0, 0.0])) == pytest.approx(1.0)
+    assert EV.brier_skill(np.array([0.3]), np.array([0.0]), np.array([0.0])) is None
+    assert list(EV.greedy_sep(np.array([10, 12, 30, 31, 50]), 3, 10)) == [10, 30, 50]
+    # Falls read at their first -10% close; a fall ends at a new peak or a 20% rally off the trough.
+    v = np.array([1.0, 0.95, 0.89, 0.85, 0.95, 1.01, 0.90, 0.79, 0.80, 0.97, 0.99, 0.85])
+    found = [(d["peak"], d["hit"], d["trough"], d["end"], round(d["depth"], 4)) for d in EV.declines(v)]
+    assert found == [(0, 2, 3, 5, -0.15), (5, 6, 7, 9, round(0.79 / 1.01 - 1, 4)), (10, 11, 11, None, round(0.85 / 0.99 - 1, 4))]
     for module in (P2, EV):
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert not re.search(r"^\s*(import|from)\s+scipy", source, re.MULTILINE)
 
 
-def test_evidence_walk_forward_is_causal_on_synthetic_nifty(v2_frame):
+def test_evidence_walk_forward_is_causal_and_writes_no_nan(v2_frame):
     bank = P2.bank_for(v2_frame, "nifty")
-    df = EV.walk_forward(bank, "nifty")  # asserts max(setup) + H <= i - L on every forecast
+    df = EV.walk_forward(bank, "nifty")  # asserts max(setup) + H <= i - L on every test
     assert len(df) > 50
-    doc = EV.score(df, bank, "nifty")
-    assert doc["direction"]["verdict"] in {"no_edge", "worse", "better"}
-    PatternSkillV2(**doc)
-    json.dumps(P2.json_safe(doc), allow_nan=False)
+    for row in df.itertuples():
+        fc = P2.analog_forecast(bank, row.i)
+        assert int(fc["chosen"].max()) + bank.cfg.horizon <= row.i - bank.cfg.window
+    block = EV.score(df, bank, "nifty")
+    assert block["cadence"] == "every_4_weeks" and block["direction"]["base_call"] in {"up", "down", "mixed"}
+    assert block["placebo"]["seeds"] == 20 and block["placebo"]["verdict"] in {"same", "setups_worse", "setups_better"}
+    assert block["declines"] is None  # only the S&P's weekly bank has a 20-year library for declines
+    PatternSkillV2(**block)
+    json.dumps(P2.json_safe(block), allow_nan=False)
+
+    sp = P2.bank_for(v2_frame, "sp500")
+    record = EV.declines_record(sp, "sp500")
+    PatternDeclinesV2(**record)
+    assert record["declines"] == record["flagged"] + record["not_flagged"] > 0
+    assert record["became_20"] == record["flagged_became_20"] + record["not_flagged_became_20"]
+    assert record["before_record"] > 0 and record["period"][0] >= "1949-01-01"  # a 20-year library first
 
 
 def _strict_json(path: Path) -> dict:
@@ -477,12 +650,13 @@ def _strict_json(path: Path) -> dict:
 
 def test_skill_artifact_is_strict_json_and_one_asset_cannot_sink_it(v2_frame, tmp_path):
     nifty_only = v2_frame[["nifty_proxy", "nifty_proxy_source"]]
-    path = EV.write_skill_artifact(nifty_only, tmp_path / P2.SKILL_FILENAME, data_version="abc123")
+    path = EV.write_skill_artifact(nifty_only, tmp_path / P2.SKILL_FILENAME)
     doc = _strict_json(path)
-    assert doc["schema_version"] == 1 and doc["engine_version"] == "patterns-v2"
-    assert doc["data_version"] == "abc123"
+    assert doc["schema_version"] == 2 and doc["engine_version"] == "patterns-v2"
+    assert doc["inputs_fingerprint"] == {"nifty": P2.inputs_fingerprint(v2_frame, "nifty")}
+    assert doc["config"]["sp500"]["sep"] == 52 and doc["config"]["gold"]["sep"] == 12 and "sp500_mirror" in doc["config"]
     assert doc["assets"]["sp500"]["available"] is False and "error" in doc["assets"]["sp500"]
-    assert doc["assets"]["nifty"]["available"] is True
+    assert doc["assets"]["nifty"]["available"] is True and doc["assets"]["nifty"]["inputs_fingerprint"] == doc["inputs_fingerprint"]["nifty"]
     PatternSkillV2(**doc["assets"]["nifty"])
     assert P2.load_skill_doc(path) == doc
     assert not path.with_name(path.name + ".tmp").exists()
@@ -493,14 +667,14 @@ def test_ingestion_hook_is_never_fatal(v2_frame, tmp_path, monkeypatch):
 
     calls = []
 
-    def fake_writer(frame, path, *, data_version):
-        calls.append((Path(path), data_version))
+    def fake_writer(frame, path):
+        calls.append(Path(path))
         Path(path).write_text("{}", encoding="utf-8")
         return Path(path)
 
     monkeypatch.setattr(EV, "write_skill_artifact", fake_writer)
     written = macro_ingestion.write_patterns_skill_artifact(v2_frame, tmp_path, data_version="abc123")
-    assert written == tmp_path / P2.SKILL_FILENAME and calls == [(written, "abc123")]
+    assert written == tmp_path / P2.SKILL_FILENAME and calls == [written]
 
     def broken(*args, **kwargs):
         raise RuntimeError("simulated evidence failure")
@@ -510,22 +684,35 @@ def test_ingestion_hook_is_never_fatal(v2_frame, tmp_path, monkeypatch):
 
 
 def test_committed_skill_artifact_matches_the_parquet():
-    """A refreshed parquet without a regenerated skill artifact fails CI."""
-    meta_path = PROCESSED_DIR / "macro_regime_history.meta.json"
+    """A parquet whose price inputs changed without a regenerated skill artifact fails CI.
+
+    Pinned to fingerprints of each asset's price inputs, not to the parquet's
+    data_version, so a Core Index recompute does not fail this test.
+    """
+    parquet = PROCESSED_DIR / "macro_regime_history.parquet"
     skill_path = PROCESSED_DIR / P2.SKILL_FILENAME
-    if not meta_path.exists():
+    if not parquet.exists():
         pytest.skip("no committed macro artifact in this checkout")
     assert skill_path.exists(), f"{skill_path.name} is missing; regenerate it: {SKILL_COMMAND}"
     doc = _strict_json(skill_path)
-    assert P2.load_skill_doc(skill_path) == doc and doc["schema_version"] == 1
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    assert doc["data_version"] == meta["data_version"], f"{skill_path.name} is stale; regenerate it: {SKILL_COMMAND}"
+    assert P2.load_skill_doc(skill_path) == doc, f"{skill_path.name} is not a patterns-v2 schema 2 artifact; regenerate it: {SKILL_COMMAND}"
+    frame = pd.read_parquet(parquet, columns=P2.asset_columns())
+    frame.index = pd.to_datetime(frame.index, utc=True)
+    frame = frame.sort_index()
     assert set(doc["assets"]) == set(P2.PRIMARY)
-    for block in doc["assets"].values():
+    for asset in P2.PRIMARY:
+        assert doc["inputs_fingerprint"].get(asset) == P2.inputs_fingerprint(frame, asset), (
+            f"{skill_path.name} is stale for {asset}; regenerate it: {SKILL_COMMAND}"
+        )
+        block = doc["assets"][asset]
+        assert block["available"] is True, asset
         PatternSkillV2(**{k: v for k, v in block.items() if k != "mirror_evidence"})
+    expected = {a: {"resolution": c.resolution, "window": c.window, "horizon": c.horizon, "k": c.k, "sep": c.sep}
+                for a, c in P2.PRIMARY.items()}
+    assert {a: doc["config"][a] for a in P2.PRIMARY} == expected, f"configuration changed; regenerate it: {SKILL_COMMAND}"
     sp = doc["assets"]["sp500"]
-    assert sp["available"] is True
     PatternMirrorEvidenceV2(**sp["mirror_evidence"])
+    PatternDeclinesV2(**sp["declines"])
 
 
 # Service and route (the tmp-parquet pattern of test_regime_service.py).
@@ -554,7 +741,7 @@ def test_service_patterns_returns_v1_fields_plus_validated_engine(engine_service
     assert PatternsResponse(**{k: v for k, v in payload.items() if k != "engine"}).engine is None
 
 
-def test_service_engine_is_cached_until_an_input_changes(engine_service, monkeypatch):
+def test_service_engine_is_cached_until_an_input_changes(engine_service, v2_frame, monkeypatch):
     calls: list[str] = []
     real = P2.build_engine_payload
 
@@ -569,19 +756,27 @@ def test_service_engine_is_cached_until_an_input_changes(engine_service, monkeyp
     engine_service.patterns(asset="nifty", today="2026-10-27")
     assert calls == ["sp500", "nifty"]
 
-    # A new skill artifact: rebuilt, and stale because its data_version
-    # differs from the metadata's.
-    engine_service.patterns_skill_path.write_text(json.dumps(_skill_doc("other-version")), encoding="utf-8")
+    # A new skill artifact: rebuilt and fresh, since the parquet's price
+    # inputs are the ones it was measured on (the parquet round trip keeps
+    # the fingerprint).
+    fingerprint = P2.inputs_fingerprint(v2_frame, "sp500")
+    engine_service.patterns_skill_path.write_text(json.dumps(_skill_doc({"sp500": fingerprint})), encoding="utf-8")
     with_skill = engine_service.patterns(asset="sp500", today="2026-10-27")["engine"]
     assert calls == ["sp500", "nifty", "sp500"]
-    assert with_skill["skill"]["available"] is True and with_skill["skill"]["stale"] is True
+    assert with_skill["skill"]["available"] is True and with_skill["skill"]["stale"] is False
+    assert with_skill["mirror"]["evidence"]["verdict"] == "no_information"
+
+    # A skill artifact measured on other price inputs is served, marked stale.
+    engine_service.patterns_skill_path.write_text(json.dumps(_skill_doc({"sp500": "f" * 16}), indent=1), encoding="utf-8")
+    assert engine_service.patterns(asset="sp500", today="2026-10-27")["engine"]["skill"]["stale"] is True
+    assert calls == ["sp500", "nifty", "sp500", "sp500"]
 
     # A rewritten parquet (new mtime) clears the cache.
     artifact = engine_service.artifact_path
     later = artifact.stat().st_mtime + 60
     os.utime(artifact, (later, later))
     engine_service.patterns(asset="sp500", today="2026-10-27")
-    assert calls == ["sp500", "nifty", "sp500", "sp500"]
+    assert calls == ["sp500", "nifty", "sp500", "sp500", "sp500"]
     assert set(engine_service._patterns_engine_cache) == {"sp500"}
 
 
@@ -590,15 +785,19 @@ def test_service_engine_failure_degrades_to_null_and_never_raises(engine_service
         raise RuntimeError("simulated engine failure")
 
     monkeypatch.setattr(P2, "build_engine_payload", broken)
-    with caplog.at_level("ERROR", logger="regime.service"):
+    with caplog.at_level("ERROR"):
         payload = engine_service.patterns(asset="sp500", today="2026-10-27")
     assert payload["engine"] is None and payload["historical_date"]
     assert "Study of Patterns v2 engine unavailable for sp500" in caplog.text
     assert PatternsResponse(**payload).engine is None
 
-    # A payload that breaks the contract also degrades to null.
+    # A payload that breaks the contract also degrades to null, in the
+    # engine and again in the service.
     monkeypatch.setattr(P2, "build_engine_payload", lambda *args, **kwargs: {"version": "patterns-v2"})
     assert engine_service.patterns(asset="sp500", today="2026-10-27")["engine"] is None
+    monkeypatch.setattr(P2, "engine_for", lambda *args, **kwargs: {"version": "patterns-v2", "note": float("nan")})
+    assert engine_service.patterns(asset="sp500", today="2026-10-27")["engine"] is None
+    assert engine_service._patterns_engine_cache == {}  # failures are not cached
 
 
 def test_patterns_route_answers_200_with_or_without_engine(engine_service, monkeypatch):
@@ -609,7 +808,10 @@ def test_patterns_route_answers_200_with_or_without_engine(engine_service, monke
     app.include_router(router_module.patterns_router, prefix="/api/v1")
     client = TestClient(app)
     ok = client.get("/api/v1/patterns", params={"asset": "sp500"})
-    assert ok.status_code == 200 and ok.json()["engine"]["version"] == "patterns-v2"
+    assert ok.status_code == 200
+    engine = ok.json()["engine"]
+    assert engine["version"] == "patterns-v2" and engine["separation"] == {"periods": 52, "unit": "week"}
+    assert engine["outlook"]["usual_windows"] > 0 and engine["mirror"]["basis"] == "monthly_average"
     assert client.get("/api/v1/patterns", params={"asset": "dax"}).status_code == 422
 
     def broken(*args, **kwargs):

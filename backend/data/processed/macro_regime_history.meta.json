@@ -96,6 +96,314 @@
       "strong_bullish": ">= 25"
     },
     "cadence": "weekly",
+    "fast_warning": {
+      "cadence": "daily",
+      "changes_core_index": false,
+      "chosen_after_seeing_history": true,
+      "column": "core_index_fast_warning",
+      "days": 14,
+      "drop": 0.07,
+      "first_value": "1928-01-13",
+      "fitted": false,
+      "forecast": false,
+      "input": "sp500_proxy (chained, daily sources only), the Core Index's daily close",
+      "record": {
+        "definitions": {
+          "during_the_fall": "on at a close from the peak to the session before that 20% mark",
+          "fall": "the daily S&P 500 close 20% or more below a running peak; a new fall inside a long recovery counts separately",
+          "false_alarm": "a warning that starts outside every window from 26 weeks before a 10%+ fall's peak to its low",
+          "within_first_20pct": "on at a close before the first close that has done 20% of the eventual fall, counting from 26 weeks before the peak"
+        },
+        "falls_of_20pct_or_more": {
+          "before_the_peak_only": 2,
+          "count": 16,
+          "during_the_fall": 3,
+          "falls": [
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.09,
+              "down_then": 0.09,
+              "during_the_fall": true,
+              "first_after_peak": "1929-10-03",
+              "first_warning": "1929-10-03",
+              "low": "1932-06-01",
+              "name": "1929 crash / Great Depression",
+              "peak": "1929-09-16",
+              "size": 0.86,
+              "warning_during_fall": "1929-10-03",
+              "within_first_20pct": true
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.16,
+              "down_then": 0.16,
+              "during_the_fall": false,
+              "first_after_peak": "1932-09-13",
+              "first_warning": "1932-09-13",
+              "low": "1933-02-27",
+              "name": "1932-33 relapse",
+              "peak": "1932-09-07",
+              "size": 0.41,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.13,
+              "down_then": 0.13,
+              "during_the_fall": false,
+              "first_after_peak": "1933-07-20",
+              "first_warning": "1933-07-20",
+              "low": "1935-03-14",
+              "name": "1933-35 bear",
+              "peak": "1933-07-18",
+              "size": 0.34,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.08,
+              "down_then": 0.08,
+              "during_the_fall": true,
+              "first_after_peak": "1937-03-22",
+              "first_warning": "1937-03-22",
+              "low": "1942-04-28",
+              "name": "1937-42 bear",
+              "peak": "1937-03-10",
+              "size": 0.6,
+              "warning_during_fall": "1937-03-22",
+              "within_first_20pct": true
+            },
+            {
+              "before_the_peak_only": true,
+              "down_at_first_after_peak": 0.12,
+              "down_then": 0.0,
+              "during_the_fall": false,
+              "first_after_peak": "1946-08-27",
+              "first_warning": "1946-03-04",
+              "low": "1949-06-13",
+              "name": "1946-49 post-war bear",
+              "peak": "1946-05-29",
+              "size": 0.3,
+              "warning_during_fall": null,
+              "within_first_20pct": true
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.21,
+              "down_then": 0.21,
+              "during_the_fall": false,
+              "first_after_peak": "1957-10-21",
+              "first_warning": "1957-10-21",
+              "low": "1957-10-22",
+              "name": "1956-57 bear",
+              "peak": "1956-08-02",
+              "size": 0.21,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.24,
+              "down_then": 0.24,
+              "during_the_fall": false,
+              "first_after_peak": "1962-05-28",
+              "first_warning": "1962-05-28",
+              "low": "1962-06-26",
+              "name": "1962 Kennedy slide",
+              "peak": "1961-12-12",
+              "size": 0.28,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.1,
+              "down_then": 0.1,
+              "during_the_fall": false,
+              "first_after_peak": "1966-05-16",
+              "first_warning": "1966-05-16",
+              "low": "1966-10-07",
+              "name": "1966 credit crunch",
+              "peak": "1966-02-09",
+              "size": 0.22,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.25,
+              "down_then": 0.25,
+              "during_the_fall": false,
+              "first_after_peak": "1970-04-27",
+              "first_warning": "1970-04-27",
+              "low": "1970-05-26",
+              "name": "1968-70 bear",
+              "peak": "1968-11-29",
+              "size": 0.36,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.15,
+              "down_then": 0.15,
+              "during_the_fall": false,
+              "first_after_peak": "1973-05-21",
+              "first_warning": "1973-05-21",
+              "low": "1974-10-03",
+              "name": "1973-74 oil shock",
+              "peak": "1973-01-11",
+              "size": 0.48,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.09,
+              "down_then": 0.09,
+              "during_the_fall": false,
+              "first_after_peak": "1980-12-10",
+              "first_warning": "1980-12-10",
+              "low": "1982-08-12",
+              "name": "1980-82 Volcker bear",
+              "peak": "1980-11-28",
+              "size": 0.27,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.11,
+              "down_then": 0.11,
+              "during_the_fall": false,
+              "first_after_peak": "1987-10-15",
+              "first_warning": "1987-10-15",
+              "low": "1987-12-04",
+              "name": "1987 crash",
+              "peak": "1987-08-25",
+              "size": 0.34,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": true,
+              "down_at_first_after_peak": 0.11,
+              "down_then": 0.0,
+              "during_the_fall": false,
+              "first_after_peak": "2000-04-14",
+              "first_warning": "2000-01-28",
+              "low": "2002-10-09",
+              "name": "2000-02 dot-com",
+              "peak": "2000-03-24",
+              "size": 0.49,
+              "warning_during_fall": null,
+              "within_first_20pct": true
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.11,
+              "down_then": 0.11,
+              "during_the_fall": true,
+              "first_after_peak": "2008-01-08",
+              "first_warning": "2008-01-08",
+              "low": "2009-03-09",
+              "name": "2007-09 GFC",
+              "peak": "2007-10-09",
+              "size": 0.57,
+              "warning_during_fall": "2008-01-08",
+              "within_first_20pct": true
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.08,
+              "down_then": 0.08,
+              "during_the_fall": false,
+              "first_after_peak": "2020-02-26",
+              "first_warning": "2020-02-26",
+              "low": "2020-03-23",
+              "name": "2020 COVID",
+              "peak": "2020-02-19",
+              "size": 0.34,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            },
+            {
+              "before_the_peak_only": false,
+              "down_at_first_after_peak": 0.09,
+              "down_then": 0.09,
+              "during_the_fall": false,
+              "first_after_peak": "2022-01-25",
+              "first_warning": "2022-01-25",
+              "low": "2022-10-12",
+              "name": "2022 inflation bear",
+              "peak": "2022-01-03",
+              "size": 0.25,
+              "warning_during_fall": null,
+              "within_first_20pct": false
+            }
+          ],
+          "left_on_from_the_decline_before": 0,
+          "not_within_first_20pct": 11,
+          "within_first_20pct": 5
+        },
+        "false_alarms": {
+          "1928-1971": 1,
+          "1971-1989": 4,
+          "1990-2026": 2,
+          "all": 7
+        },
+        "false_alarms_per_decade": {
+          "1928-1971": 0.2,
+          "1971-1989": 2.1,
+          "1990-2026": 0.5,
+          "all": 0.7
+        },
+        "measured_on": {
+          "data_version": "59192d5aa731",
+          "evaluator": "fast-warning/judge/scripts/measure_fast_record.py",
+          "first_day": "1928-01-13",
+          "harness": "cih-1.1-gspc (definitions, daily sessions)",
+          "last_day": "2026-10-27",
+          "measured": "2026-10-28"
+        },
+        "share_of_days_on": {
+          "1928-1971": 0.039,
+          "1971-1989": 0.014,
+          "1990-2026": 0.018,
+          "all": 0.027
+        },
+        "spells_per_year": {
+          "1928-1971": 2.8,
+          "1971-1989": 1.3,
+          "1990-2026": 1.6,
+          "all": 2.1
+        },
+        "with_trend_warning": {
+          "during_the_fall": 5,
+          "extra_false_alarms_vs_trend_alone": {
+            "1928-1971": 1,
+            "1971-1989": 2,
+            "1990-2026": 0,
+            "all": 3
+          },
+          "false_alarms_per_decade": {
+            "1928-1971": 1.9,
+            "1971-1989": 3.7,
+            "1990-2026": 7.6,
+            "all": 4.4
+          },
+          "newly_during_the_fall": [
+            "1929 crash / Great Depression"
+          ],
+          "trend_warning_alone_during_the_fall": 4,
+          "within_first_20pct": 10
+        }
+      },
+      "rule": "on when the daily S&P 500 close is 7% or more below the close 14 calendar days earlier; decided at each close; a reaction to a sharp fall, not a forecast",
+      "version": "fast-warning-14d-7pct-v1"
+    },
     "features": [
       "sp500_proxy (chained, daily sources only)",
       "BAMLH0A0HYM2",
@@ -147,6 +455,7 @@
       "bucket": "calm_bullish",
       "composite": 65.76,
       "date": "2026-10-27",
+      "fast_warning": false,
       "score": 15.76,
       "severity": "none",
       "signal_date": "2026-10-23",
@@ -199,8 +508,8 @@
       "vol_long": 52,
       "vol_short": 13
     },
-    "recomputed_at": "2026-10-28T11:02:17.388051+00:00",
-    "recomputed_from_data_version": "403e16a6f64d",
+    "recomputed_at": "2026-10-28T13:27:29.606063+00:00",
+    "recomputed_from_data_version": "8c3b382a9b5b",
     "severities": [
       "none",
       "correction",
@@ -473,9 +782,9 @@
     "start": "1854-12-01",
     "years": 171.9
   },
-  "data_version": "8c3b382a9b5b",
+  "data_version": "59192d5aa731",
   "frame": {
-    "columns": 163,
+    "columns": 164,
     "columns_list": [
       "USREC",
       "T10Y2Y",
@@ -639,7 +948,8 @@
       "core_index_bucket",
       "core_index_severity",
       "core_index_warning",
-      "core_index_trend_warning"
+      "core_index_trend_warning",
+      "core_index_fast_warning"
     ],
     "rows": 62788
   },

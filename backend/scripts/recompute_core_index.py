@@ -1,10 +1,11 @@
 """Recompute the Core Index v2 columns of the committed macro artifact.
 
 Recomputes only ``core_index``, ``core_index_composite``,
-``core_index_bucket``, ``core_index_severity``, ``core_index_warning`` and
-``core_index_trend_warning`` of ``macro_regime_history.parquet`` from the
-artifact's own stored inputs (no network, no re-ingestion). Only stale or
-missing v2 columns are written; every other column, including v2 columns
+``core_index_bucket``, ``core_index_severity``, ``core_index_warning``,
+``core_index_trend_warning`` and ``core_index_fast_warning`` of
+``macro_regime_history.parquet`` from the artifact's own stored inputs (no
+network, no re-ingestion). Only stale or missing v2 columns are written;
+every other column, including v2 columns
 already in sync, keeps its exact Arrow array, so it stays byte-identical when
 the same pyarrow version writes the file. The script proves that before and
 after writing, then updates the metadata. When the columns are in sync and
@@ -55,7 +56,12 @@ META_NAME = "macro_regime_history.meta.json"
 # Columns v1 already wrote, replaced in place; columns v2 adds after the
 # bucket, in this order.
 REPLACED = ("core_index", "core_index_composite", "core_index_bucket")
-ADDED = ("core_index_severity", "core_index_warning", "core_index_trend_warning")
+ADDED = (
+    "core_index_severity",
+    "core_index_warning",
+    "core_index_trend_warning",
+    "core_index_fast_warning",
+)
 CORE_INDEX_NOTE_PREFIXES = (CORE_INDEX_V1_NOTE_PREFIX, "Core Index v2 ")
 FLOAT_TOLERANCE = 1e-9
 
@@ -133,6 +139,11 @@ def _arrow_arrays(core: pd.DataFrame) -> dict[str, pa.Array]:
         ),
         "core_index_trend_warning": pa.array(
             _labels(core["core_index_trend_warning"]), type=pa.bool_()
+        ),
+        # Same Arrow type and pandas metadata as the trend warning (nullable
+        # boolean under pandas 2 and 3); see _pandas_entry.
+        "core_index_fast_warning": pa.array(
+            _labels(core["core_index_fast_warning"]), type=pa.bool_()
         ),
     }
 
