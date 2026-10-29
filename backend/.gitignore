@@ -60,3 +60,6 @@ data/historical_events.db
 
 # FRED per-series ingestion cache (generated; the parquet artifact is tracked)
 data/raw/fred/
+
+# Local runtime copies (e.g. HISTORICAL_EVENTS_DB=data/runtime/historical_events.db)
+data/runtime/

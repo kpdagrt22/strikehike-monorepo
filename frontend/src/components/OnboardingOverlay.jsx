@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { DUR, EASE } from "@/lib/motion";
 
 const STORAGE_KEY = "hasSeenIntro";
 
 const GUIDE = [
   {
-    label: "Hover over planets to reveal data",
+    label: "Hover or tap a planet to reveal its data",
     icon: (
       <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
     ),
@@ -40,6 +42,8 @@ export function OnboardingOverlay({ introComplete = false }) {
   });
 
   const visible = introComplete && !hasSeenIntro;
+  const dialogRef = useRef(null);
+  const enterRef = useRef(null);
 
   const enter = () => {
     try {
@@ -50,27 +54,35 @@ export function OnboardingOverlay({ introComplete = false }) {
     setHasSeenIntro(true);
   };
 
+  // Escape is the same as Enter: the visitor has seen the note.
+  useDialogFocus(visible, {
+    containerRef: dialogRef,
+    initialFocusRef: enterRef,
+    onClose: enter,
+  });
+
   return (
     <AnimatePresence>
       {visible ? (
         <motion.div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/25 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[90] grid place-items-center bg-[#e3dbcf]/45 p-4 backdrop-blur-[2px] dark:bg-black/25"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: DUR.backdrop, ease: EASE.out }}
         >
           <motion.section
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="onboarding-title"
             initial={{ opacity: 0, y: 18, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/20 bg-white/65 p-7 text-[#14121a] shadow-[0_30px_100px_rgba(20,18,26,0.22)] backdrop-blur-2xl dark:border-white/15 dark:bg-black/45 dark:text-[#f2ede4] dark:shadow-[0_30px_100px_rgba(0,0,0,0.6)]"
+            transition={{ duration: DUR.modal, ease: EASE.out }}
+            className="w-full max-w-md overflow-hidden rounded-[1.75rem] border border-black/[0.08] bg-white/85 p-7 text-[#14121a] shadow-[0_30px_100px_rgba(20,18,26,0.22)] backdrop-blur-2xl dark:border-white/15 dark:bg-black/45 dark:text-[#f2ede4] dark:shadow-[0_30px_100px_rgba(0,0,0,0.6)]"
           >
-            <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/55 dark:text-white/50">
+            <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
               StrikeHike · First Contact
             </p>
             <h2
@@ -105,10 +117,11 @@ export function OnboardingOverlay({ introComplete = false }) {
             </div>
 
             <button
+              ref={enterRef}
               type="button"
               autoFocus
               onClick={enter}
-              className="mt-8 min-h-11 w-full rounded-full border border-black/10 bg-[#14121a] px-5 py-3 text-meta font-medium uppercase tracking-[0.18em] text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f05d49]/60 dark:border-white/10 dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-white"
+              className="mt-8 min-h-11 w-full rounded-full border border-black/10 bg-[#14121a] px-5 py-3 text-meta font-medium uppercase tracking-[0.18em] text-white transition-colors hover:bg-black dark:border-white/10 dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-white"
             >
               Enter
             </button>

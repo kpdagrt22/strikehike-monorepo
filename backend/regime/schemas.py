@@ -6,6 +6,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Study of Patterns v2: the ``engine`` block of /api/v1/patterns lives in its
+# own module (the judge's r2 contract, ported verbatim).
+from regime.patterns_v2_schemas import PatternEngineV2
+
 
 class TimelinePoint(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -16,6 +20,17 @@ class TimelinePoint(BaseModel):
     core_index: float | None = None
     core_index_composite: float | None = None
     core_index_bucket: str | None = None
+    # Core Index v2: the class of the decline under way (none, correction,
+    # bear, crash) and the warning flag. Null before the first scored Friday.
+    core_index_severity: str | None = None
+    core_index_warning: bool | None = None
+    # Trend warning: Friday S&P close below its 40-Friday average, a separate
+    # and more sensitive flag. Null until 40 Friday closes exist (1928-09-28).
+    core_index_trend_warning: bool | None = None
+    # Fast warning: the S&P close 7% or more below the close 14 days earlier,
+    # decided daily (weekly and monthly points: on if it was on any day of the
+    # bucket). Null before 1928-01-13 and where the window lacks a daily close.
+    core_index_fast_warning: bool | None = None
     macro_score: float | None = None
     credit_score: float | None = None
     core_volatility_score: float | None = None
@@ -91,6 +106,8 @@ class PreCrashState(BaseModel):
     macro_strength: float | None = None
     core_index: float | None = None
     core_index_bucket: str | None = None
+    core_index_severity: str | None = None
+    core_index_warning: bool | None = None
     sp500_proxy: float | None = None
     phase: str | None = None
 
@@ -152,6 +169,18 @@ class LatestStrength(BaseModel):
     coverage: float | None = None
 
 
+class LatestCoreIndex(LatestStrength):
+    composite: float | None = None
+    severity: str | None = None
+    warning: bool | None = None
+    trend_warning: bool | None = None
+    # The fast warning on ``date`` itself, decided at that day's close (a
+    # weekend or holiday carries the last close), not at ``signal_date``.
+    fast_warning: bool | None = None
+    # The Friday whose close decided the value carried on ``date``.
+    signal_date: str | None = None
+
+
 class ResponseMeta(BaseModel):
     generated_at: str | None = None
     data_version: str | None = None
@@ -163,7 +192,16 @@ class ResponseMeta(BaseModel):
     core_index_version: str | None = None
     core_index_weights: dict[str, float] | None = None
     core_index_buckets: dict[str, str] | None = None
-    latest_core_index: LatestStrength | None = None
+    core_index_severities: list[str] | None = None
+    core_index_first_scored: str | None = None
+    core_index_cadence: str | None = None
+    # The trend warning's definition and measured record (misses and false
+    # alarms included), as stored in the artifact metadata.
+    core_index_trend_warning: dict[str, Any] | None = None
+    # The fast warning's definition and measured record (hits, misses and
+    # false alarms), ``core_index.fast_warning`` of the artifact metadata.
+    core_index_fast_warning: dict[str, Any] | None = None
+    latest_core_index: LatestCoreIndex | None = None
     proxy_sources: list[ProxySource]
     nber_source: str
     transport: str | None = None
@@ -370,3 +408,6 @@ class PatternsResponse(BaseModel):
     forward: PatternForwardWindow
     events: list[PatternEvent]
     notes: list[str]
+    # Study of Patterns v2 (closest historical setups). Null when it could
+    # not be built; the v1 fields above are unchanged for compatibility.
+    engine: PatternEngineV2 | None = None

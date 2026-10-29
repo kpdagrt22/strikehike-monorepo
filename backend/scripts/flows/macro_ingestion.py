@@ -36,7 +36,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -49,14 +49,16 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from regime.analytics import (  # noqa: E402
-    CORE_INDEX_WEIGHTS,
-    CORE_INDEX_VERSION,
+    CORE_INDEX_NOTE,
+    SP500_DAILY_COLUMN,
+    SP500_DAILY_SOURCE,
     STRENGTH_VERSION,
     STRENGTH_WEIGHTS,
     annotate_nber,
     build_sp500_proxy,
     calculate_core_index,
     calculate_macro_strength_components,
+    core_index_metadata,
     nber_episodes,
 )
 from regime.crypto_milestones import (  # noqa: E402
@@ -69,7 +71,7 @@ DEFAULT_OUTPUT_DIR = BACKEND_DIR / "data" / "processed"
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 USER_AGENT = "strikehike-regime-intelligence/phase1 (+https://strikehike.com)"
-PIPELINE_VERSION = "phase12-v1"
+PIPELINE_VERSION = "phase12-v2"
 WORLD_BANK_COMMODITY_PAGE = "https://www.worldbank.org/en/research/commodity-markets"
 WORLD_BANK_CMO_FALLBACK = (
     "https://thedocs.worldbank.org/en/doc/"
@@ -87,11 +89,91 @@ BITCOIN_URL = (
 NIFTY_SERIES_ID = "NIFTY50"
 NIFTY_SOURCE = "YAHOO_FINANCE_NSEI"
 NIFTY_URL = "https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI"
+SP500_DAILY_SERIES_ID = SP500_DAILY_COLUMN
+SP500_DAILY_URL = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC"
+# ^GSPC starts on 1927-12-30, before the Unix epoch, so period1=0 (the Nifty
+# request) would cut it at 1970.
+SP500_DAILY_PERIOD1 = int(pd.Timestamp("1927-01-01", tz="UTC").timestamp())
+# S&P closes are published to two decimals; a larger Yahoo-vs-FRED gap is a
+# vendor print error, not float noise (see reconcile_sp500_daily).
+SP500_RECONCILE_TOLERANCE = 0.005
+# Shape the ^GSPC history must have before an artifact is written (see
+# check_sp500_daily_shape). Yahoo's first close is 1927-12-30, it held 24,823
+# closes on 2026-10-27, and its longest gap is the 12-day 1933 bank holiday.
+SP500_DAILY_LATEST_FIRST_CLOSE = "1928-01-03"
+SP500_DAILY_MIN_CLOSES = 24_000
+SP500_DAILY_MAX_GAP_DAYS = 15
+# Official S&P 500 closes (S&P Dow Jones Indices, via FRED SP500) for the dates
+# where Yahoo's ^GSPC close was off by more than half a cent when FRED's
+# ten-year window covered them (checked 2026-10-28 against 2016-10-27 to
+# 2026-10-23). They are committed here so a correction does not revert once
+# its date leaves FRED's rolling window. date: (Yahoo print, official close).
+SP500_OFFICIAL_CORRECTIONS: dict[str, tuple[float, float]] = {
+    "2018-11-29": (2737.80, 2737.76),
+    "2019-08-12": (2882.70, 2883.75),
+    "2020-05-11": (2930.19, 2930.32),
+    "2020-10-02": (3348.42, 3348.44),
+    "2020-10-05": (3408.60, 3408.63),
+    "2020-10-06": (3360.97, 3360.95),
+    "2020-10-07": (3419.44, 3419.45),
+    "2020-10-09": (3477.14, 3477.13),
+    "2021-08-11": (4442.41, 4447.70),
+}
+# Isolated bad prints in Yahoo's ^GSPC history. Each is a one-session move of
+# 3.5-10%, five to nine times the typical daily move around it, that fully
+# reverses at the next close, and each print is one digit away from a value in
+# line with its neighbours. No market event explains them: an 8-10% day, as
+# three of these would be, ranks among the largest in US index history, and
+# these dates are not among those on record. The print is dropped, so the
+# daily frame carries the previous close forward; no replacement value is
+# invented. A print is dropped only while Yahoo still serves the recorded
+# value. This is a reviewed list, not a spike filter: real reversals
+# (1929-10-29, 1931-10-05, 2011-08-09/10, March 2020) must stay.
+# date: (Yahoo print, reason).
+SP500_BAD_PRINTS: dict[str, tuple[float, str]] = {
+    "1935-04-16": (
+        8.22,
+        "-10.0% close, about 7x the typical daily move around it, fully "
+        "reversed at the next close (+9.6%); 8.22 is one digit from 9.22, "
+        "1.0% above the previous close",
+    ),
+    "1935-05-16": (
+        9.15,
+        "-6.8% close, about 6x the typical daily move around it, fully "
+        "reversed at the next close (+9.4%); 9.15 is one digit from 9.85 or "
+        "9.95, both between the neighbours",
+    ),
+    "1935-08-16": (
+        10.62,
+        "-8.0% close, about 7x the typical daily move around it, fully "
+        "reversed at the next close (+7.5%); 10.62 is one digit from 11.62, "
+        "0.7% above the previous close",
+    ),
+    "1936-09-16": (
+        15.00,
+        "-5.8% close, about 8x the typical daily move around it, fully "
+        "reversed at the next close (+5.8%); 15.00 is one digit from 15.90, "
+        "between the neighbours",
+    ),
+    "1938-10-10": (
+        13.91,
+        "+8.2% close, about 5x the typical daily move around it, fully "
+        "reversed at the next close (-7.7%); 13.91 is one digit from 12.91, "
+        "0.5% above both neighbours",
+    ),
+    "1961-04-17": (
+        68.68,
+        "+3.5% close, about 9x the typical daily move around it, fully "
+        "reversed at the next close (-3.6%); 68.68 is one digit from 66.68, "
+        "0.5% above the previous close",
+    ),
+}
 HY_OAS_ARCHIVE_URL = (
     "https://gist.githubusercontent.com/jcopeland23451/"
     "75cf1a099fffbfb0d400a8af60072ee3/raw"
 )
 CRYPTO_MILESTONES_FILENAME = "crypto_milestones.json"
+PATTERNS_V2_SKILL_FILENAME = "patterns_v2_skill.json"
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +193,10 @@ class FredAuthError(FredAPIError):
     """The FRED API key is missing or rejected."""
 
 
+class SeriesShapeError(FredAPIError):
+    """A required input is missing or truncated; the artifact is not written."""
+
+
 def load_environment() -> None:
     """Load backend/.env and repo-root .env without overriding real env vars."""
     for path in (BACKEND_DIR / ".env", REPO_DIR / ".env"):
@@ -122,6 +208,18 @@ def get_api_key() -> str | None:
     load_environment()
     key = os.getenv("FRED_API_KEY", "").strip()
     return key or None
+
+
+_SECRET_QUERY_RE = re.compile(r"(?i)(api_key=)[^&\s'\"<>)]+")
+
+
+def redact_secrets(text: object) -> str:
+    """Hide credential query values (FRED's api_key) in text that may be logged or published.
+
+    requests exceptions quote the full request URL, which carries the key as a
+    query parameter; warnings end up in the committed meta.json and the API.
+    """
+    return _SECRET_QUERY_RE.sub(r"\1REDACTED", str(text))
 
 
 def _configure_logging(verbose: bool = False) -> None:
@@ -161,7 +259,8 @@ def _spec(
 
 # Phase 1 universe: 75 series. The requested M1333MACD156NNBR is not a valid
 # FRED ID (HTTP 404), so the long-run equity proxy uses the valid NBER/Cowles
-# and Dow-Jones series instead. Add a SeriesSpec to grow toward the 60+ target.
+# series before the daily Yahoo ^GSPC history begins (see build_sp500_proxy).
+# Add a SeriesSpec to grow toward the 60+ target.
 SERIES_REGISTRY: tuple[SeriesSpec, ...] = (
     # Core requested series.
     _spec("USREC", "NBER based recession indicator", "M", "Index (0/1)", "cycle", "core"),
@@ -169,11 +268,12 @@ SERIES_REGISTRY: tuple[SeriesSpec, ...] = (
     _spec("FEDFUNDS", "Effective federal funds rate", "M", "Percent", "rates", "core"),
     _spec("CPIAUCSL", "CPI for all urban consumers", "M", "Index 1982-84=100", "inflation", "core"),
     _spec("PPIACO", "PPI for all commodities", "M", "Index 1982=100", "inflation", "core"),
-    # Long-run equity proxy (see build_sp500_proxy).
+    # Long-run equity proxy inputs (see build_sp500_proxy). Dow-Jones and Nasdaq
+    # stay as raw context columns; they are not S&P levels and are not spliced.
     _spec("M1125AUSM343NNBR", "Cowles/S&P common stock price index", "M", "Index 1935-39=100", "markets", "proxy"),
-    _spec("M1109BUSM293NNBR", "Dow-Jones industrial stock price index", "M", "USD per share", "markets", "proxy"),
+    _spec("M1109BUSM293NNBR", "Dow-Jones industrial stock price index", "M", "USD per share", "markets", "context"),
     _spec("SP500", "S&P 500", "D", "Index", "markets", "proxy"),
-    _spec("NASDAQCOM", "Nasdaq composite", "D", "Index", "markets", "proxy"),
+    _spec("NASDAQCOM", "Nasdaq composite", "D", "Index", "markets", "context"),
     # Rates and credit.
     _spec("DGS10", "10-year Treasury constant maturity", "D", "Percent", "rates"),
     _spec("DGS2", "2-year Treasury constant maturity", "D", "Percent", "rates"),
@@ -390,7 +490,7 @@ class FredClient:
                 time.sleep(self.delay)
                 return data
 
-            message = _fred_error_message(response)
+            message = redact_secrets(_fred_error_message(response))
             if response.status_code in {429, 500, 502, 503, 504}:
                 if attempt < self.max_retries:
                     logger.warning(
@@ -404,7 +504,9 @@ class FredClient:
                 )
             raise FredAPIError(f"FRED HTTP {response.status_code}: {message}")
 
-        raise FredAPIError(f"FRED request failed after retries: {last_error}")
+        raise FredAPIError(
+            "FRED request failed after retries: " + redact_secrets(last_error)
+        )
 
     def fetch_series(
         self,
@@ -665,7 +767,9 @@ def fetch_universe(
             except FredAuthError:
                 raise
             except Exception as exc:
-                message = f"{series_id}: fetch failed ({type(exc).__name__}: {exc})"
+                message = (
+                    f"{series_id}: fetch failed ({type(exc).__name__}: {redact_secrets(exc)})"
+                )
                 if cached is not None:
                     logger.warning("{}; using stale cache", message)
                     warnings.append(message + "; stale cache used")
@@ -932,47 +1036,125 @@ def fetch_bitcoin_series(
         ) from exc
 
 
-def _parse_yahoo_nifty(content: bytes) -> pd.Series:
-    """Parse Yahoo Finance's daily chart payload into a Nifty 50 series."""
+def _unfinished_session_mask(
+    timestamps: Sequence[Any],
+    meta: Any,
+    now: pd.Timestamp,
+) -> np.ndarray:
+    """Flag the bars of a regular session that has not closed yet.
+
+    During a session Yahoo's daily chart ends with a live bar priced at the
+    latest trade. ``meta.currentTradingPeriod.regular`` gives the current (or
+    next) session's start and end. Until that end has passed, bars dated on the
+    session's exchange-local day or later are provisional. Bars of earlier
+    sessions are final, so a fetch before the open keeps yesterday's close.
+    """
+    stamps = pd.to_numeric(pd.Series(list(timestamps)), errors="coerce").to_numpy(
+        dtype="float64"
+    )
+    keep_all = np.zeros(len(stamps), dtype=bool)
+    if not isinstance(meta, dict):
+        return keep_all
+    current = meta.get("currentTradingPeriod")
+    period = current.get("regular") if isinstance(current, dict) else None
+    if not isinstance(period, dict):
+        return keep_all
+    try:
+        start = float(period["start"])
+        end = float(period["end"])
+        offset = float(period.get("gmtoffset", meta.get("gmtoffset", 0)) or 0)
+    except (KeyError, TypeError, ValueError):
+        return keep_all
+    if now.timestamp() >= end:
+        return keep_all
+    session_day = np.floor((start + offset) / 86400.0)
+    with np.errstate(invalid="ignore"):
+        return np.floor((stamps + offset) / 86400.0) >= session_day
+
+
+def _parse_yahoo_chart(
+    content: bytes,
+    series_id: str,
+    label: str,
+    *,
+    now: Any | None = None,
+) -> pd.Series:
+    """Parse Yahoo Finance's daily chart payload into a close-price series.
+
+    The bar of a session still in progress is dropped (see
+    ``_unfinished_session_mask``), so an intraday price is never stored as a
+    close. ``now`` defaults to the current UTC time.
+    """
     payload = json.loads(content)
     chart = payload.get("chart") if isinstance(payload, dict) else None
     results = chart.get("result") if isinstance(chart, dict) else None
     if not isinstance(results, list) or not results:
-        raise ValueError("Yahoo Finance returned no Nifty 50 result")
+        raise ValueError(f"Yahoo Finance returned no {label} result")
     result = results[0]
     timestamps = result.get("timestamp")
     quotes = (result.get("indicators") or {}).get("quote") or []
     closes = quotes[0].get("close") if quotes else None
     if not isinstance(timestamps, list) or not isinstance(closes, list):
-        raise ValueError("Yahoo Finance returned no Nifty 50 prices")
+        raise ValueError(f"Yahoo Finance returned no {label} prices")
     index = pd.to_datetime(timestamps, unit="s", utc=True, errors="coerce")
     prices = pd.to_numeric(closes, errors="coerce")
     series = pd.Series(
         prices,
         index=index.normalize(),
-        name=NIFTY_SERIES_ID,
+        name=series_id,
         dtype="float64",
     )
+    current = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
+    if current.tzinfo is None:
+        current = current.tz_localize("UTC")
+    unfinished = _unfinished_session_mask(timestamps, result.get("meta"), current)
+    if unfinished.any():
+        logger.info(
+            "{}: dropping {} bar(s) from {} (session not closed yet)",
+            series_id,
+            int(unfinished.sum()),
+            series.index[unfinished].min().date(),
+        )
+        series = series[~unfinished]
     series = series[series.index.notna() & series.notna() & (series > 0)]
     series = series.sort_index()
     series = series[~series.index.duplicated(keep="last")]
     if series.empty:
-        raise ValueError("Yahoo Finance returned no positive Nifty 50 prices")
+        raise ValueError(f"Yahoo Finance returned no positive {label} prices")
     return series
 
 
-def fetch_nifty_series(
+def _parse_yahoo_nifty(content: bytes, *, now: Any | None = None) -> pd.Series:
+    """Parse Yahoo Finance's daily chart payload into a Nifty 50 series."""
+    return _parse_yahoo_chart(content, NIFTY_SERIES_ID, "Nifty 50", now=now)
+
+
+def _parse_yahoo_sp500(content: bytes, *, now: Any | None = None) -> pd.Series:
+    """Parse Yahoo Finance's daily ^GSPC chart payload into an S&P series."""
+    return _parse_yahoo_chart(content, SP500_DAILY_SERIES_ID, "S&P 500", now=now)
+
+
+def _fetch_yahoo_chart_series(
     cache_dir: Path,
     *,
+    series_id: str,
+    url: str,
+    period1: int,
+    parser: Callable[[bytes], pd.Series],
     refresh: bool,
     offline: bool,
-    max_age_hours: float = 24.0,
-    timeout: float = 60.0,
+    max_age_hours: float,
+    timeout: float,
+    warnings: list[str] | None = None,
 ) -> pd.Series | None:
-    """Fetch/cache daily Nifty 50 history from Yahoo Finance."""
+    """Fetch/cache a daily close history from Yahoo Finance's chart API.
+
+    A failed fetch falls back to the stale cache and, like ``fetch_universe``,
+    records that in ``warnings`` so it reaches the artifact metadata.
+    """
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_dir / f"{NIFTY_SERIES_ID}.csv"
-    cached = _load_cached_series(cache_path, NIFTY_SERIES_ID)
+    cache_path = cache_dir / f"{series_id}.csv"
+    cached = _load_cached_series(cache_path, series_id)
     cache_age = None
     if cache_path.exists():
         cache_age = (
@@ -983,7 +1165,7 @@ def fetch_nifty_series(
     ):
         logger.info(
             "Using cached {} {} -> {} ({} obs)",
-            NIFTY_SERIES_ID,
+            series_id,
             cached.index.min().date(),
             cached.index.max().date(),
             len(cached),
@@ -993,13 +1175,13 @@ def fetch_nifty_series(
         if cached is not None:
             return cached
         raise MacroConfigError(
-            f"Offline mode: no cached {NIFTY_SERIES_ID} in {cache_dir}"
+            f"Offline mode: no cached {series_id} in {cache_dir}"
         )
     try:
         response = requests.get(
-            NIFTY_URL,
+            url,
             params={
-                "period1": 0,
+                "period1": period1,
                 "period2": int(pd.Timestamp.now(tz="UTC").timestamp()),
                 "interval": "1d",
                 "events": "div%2Csplits",
@@ -1008,11 +1190,11 @@ def fetch_nifty_series(
             timeout=timeout,
         )
         response.raise_for_status()
-        series = _parse_yahoo_nifty(response.content)
+        series = parser(response.content)
         _save_cached_series(cache_path, series)
         logger.info(
             "Fetched {} from Yahoo Finance {} -> {} ({} obs)",
-            NIFTY_SERIES_ID,
+            series_id,
             series.index.min().date(),
             series.index.max().date(),
             len(series),
@@ -1020,17 +1202,366 @@ def fetch_nifty_series(
         return series
     except (requests.RequestException, ValueError, OSError) as exc:
         if cached is not None:
-            logger.warning(
-                "{} fetch failed ({}); using stale cache {} -> {}",
-                NIFTY_SERIES_ID,
-                exc,
-                cached.index.min().date(),
-                cached.index.max().date(),
+            message = (
+                f"{series_id}: Yahoo Finance fetch failed "
+                f"({type(exc).__name__}: {exc}); stale cache used "
+                f"(last close {cached.index.max().date().isoformat()})"
             )
+            logger.warning("{}", message)
+            if warnings is not None:
+                warnings.append(message)
             return cached
         raise FredAPIError(
-            f"{NIFTY_SERIES_ID}: Yahoo Finance fetch failed ({exc})"
+            f"{series_id}: Yahoo Finance fetch failed ({exc})"
         ) from exc
+
+
+def fetch_nifty_series(
+    cache_dir: Path,
+    *,
+    refresh: bool,
+    offline: bool,
+    max_age_hours: float = 24.0,
+    timeout: float = 60.0,
+    warnings: list[str] | None = None,
+) -> pd.Series | None:
+    """Fetch/cache daily Nifty 50 history from Yahoo Finance."""
+    return _fetch_yahoo_chart_series(
+        cache_dir,
+        series_id=NIFTY_SERIES_ID,
+        url=NIFTY_URL,
+        period1=0,
+        parser=_parse_yahoo_nifty,
+        refresh=refresh,
+        offline=offline,
+        max_age_hours=max_age_hours,
+        timeout=timeout,
+        warnings=warnings,
+    )
+
+
+def fetch_sp500_daily_series(
+    cache_dir: Path,
+    *,
+    refresh: bool,
+    offline: bool,
+    max_age_hours: float = 24.0,
+    timeout: float = 60.0,
+    warnings: list[str] | None = None,
+) -> pd.Series | None:
+    """Fetch/cache daily S&P composite history (^GSPC) from Yahoo Finance.
+
+    The history begins on 1927-12-30. Before 1957-03-04 the index is the
+    S&P 90, the S&P 500's predecessor; Saturday sessions before 1952 are absent.
+    """
+    return _fetch_yahoo_chart_series(
+        cache_dir,
+        series_id=SP500_DAILY_SERIES_ID,
+        url=SP500_DAILY_URL,
+        period1=SP500_DAILY_PERIOD1,
+        parser=_parse_yahoo_sp500,
+        refresh=refresh,
+        offline=offline,
+        max_age_hours=max_age_hours,
+        timeout=timeout,
+        warnings=warnings,
+    )
+
+
+def check_sp500_daily_shape(daily: pd.Series | None) -> None:
+    """Refuse a missing or truncated ^GSPC history.
+
+    Without it the S&P series would fall back to Cowles (to 1956) plus FRED's
+    ten-year window, leaving a sixty-year hole and no Core Index (which reads
+    daily closes only) before 2017, so the artifact must not be written.
+    """
+    name = SP500_DAILY_SERIES_ID
+    if daily is None or daily.empty:
+        raise SeriesShapeError(
+            f"{name}: no daily S&P history loaded; the artifact is not written"
+        )
+    first = daily.index.min()
+    if first > pd.Timestamp(SP500_DAILY_LATEST_FIRST_CLOSE, tz="UTC"):
+        raise SeriesShapeError(
+            f"{name}: daily S&P history starts {first.date().isoformat()}, after "
+            f"{SP500_DAILY_LATEST_FIRST_CLOSE}; it looks truncated, so the "
+            "artifact is not written"
+        )
+    if len(daily) < SP500_DAILY_MIN_CLOSES:
+        raise SeriesShapeError(
+            f"{name}: only {len(daily)} daily closes (expected at least "
+            f"{SP500_DAILY_MIN_CLOSES}); it looks truncated, so the artifact "
+            "is not written"
+        )
+    gaps = daily.index.to_series().diff().dt.days
+    widest = gaps.max()
+    if pd.notna(widest) and widest > SP500_DAILY_MAX_GAP_DAYS:
+        hole = gaps.idxmax()
+        raise SeriesShapeError(
+            f"{name}: {int(widest)}-day hole in the daily S&P history before "
+            f"{hole.date().isoformat()} (longest real closure is 12 days); "
+            "the artifact is not written"
+        )
+
+
+def reconcile_sp500_daily(
+    daily: pd.Series,
+    official: pd.Series | None,
+    *,
+    tolerance: float = SP500_RECONCILE_TOLERANCE,
+    committed: Mapping[str, tuple[float, float]] | None = None,
+    warnings: list[str] | None = None,
+) -> tuple[pd.Series, dict[str, Any]]:
+    """Use official S&P 500 closes where the Yahoo ^GSPC close is wrong.
+
+    1. The committed corrections (``SP500_OFFICIAL_CORRECTIONS`` by default)
+       apply on every build, whatever FRED's rolling window covers today. An
+       entry is applied only while Yahoo still serves the recorded print.
+    2. On the dates FRED's SP500 (S&P Dow Jones Indices, ten-year window)
+       covers, any remaining Yahoo close more than ``tolerance`` away from the
+       official close is a vendor print error and is replaced. Such a date is
+       new, so a warning asks for it to be committed.
+
+    Every replacement is returned so the metadata can list it.
+    """
+    committed = SP500_OFFICIAL_CORRECTIONS if committed is None else committed
+    name = SP500_DAILY_SERIES_ID
+    report: dict[str, Any] = {
+        "reference": "SP500",
+        "tolerance": tolerance,
+        "overlap_days": 0,
+        "committed_corrections": len(committed),
+        "replaced": {},
+    }
+    if daily.empty:
+        return daily, report
+
+    def warn(message: str) -> None:
+        logger.warning("{}", message)
+        if warnings is not None:
+            warnings.append(message)
+
+    has_official = official is not None and not official.empty
+    window = official.index if has_official else pd.DatetimeIndex([], tz="UTC")
+    reconciled = daily.copy()
+    replaced: dict[str, dict[str, Any]] = {}
+    for day_text, (vendor_close, official_close) in sorted(committed.items()):
+        day = pd.Timestamp(day_text, tz="UTC")
+        if day not in reconciled.index:
+            warn(
+                f"{name}: committed correction for {day_text} not applied; "
+                "Yahoo's history no longer has that date"
+            )
+            continue
+        value = float(reconciled.loc[day])
+        if abs(value - official_close) <= tolerance:
+            continue  # Yahoo now serves the official close.
+        if abs(value - vendor_close) > tolerance:
+            warn(
+                f"{name}: committed correction for {day_text} not applied; "
+                f"Yahoo now serves {value:.2f}, not the recorded {vendor_close:.2f}"
+            )
+            continue
+        reconciled.loc[day] = official_close
+        replaced[day_text] = {
+            "yahoo": round(value, 4),
+            "fred": official_close,
+            "committed": True,
+            "in_fred_window": bool(day in window),
+        }
+
+    if has_official:
+        common = reconciled.index.intersection(official.index)
+        report["overlap_days"] = int(len(common))
+        gap = (reconciled.loc[common] - official.loc[common]).abs()
+        bad = gap.index[gap > tolerance]
+        for day in bad:
+            day_text = day.date().isoformat()
+            vendor = float(daily.loc[day])
+            fred = float(official.loc[day])
+            replaced[day_text] = {
+                "yahoo": round(vendor, 4),
+                "fred": round(fred, 4),
+                "committed": False,
+                "in_fred_window": True,
+            }
+            if day_text in committed:
+                warn(
+                    f"{name}: FRED's official close for {day_text} ({fred:.2f}) "
+                    "differs from the committed correction "
+                    f"({committed[day_text][1]:.2f}); FRED's close is used. "
+                    "Update SP500_OFFICIAL_CORRECTIONS"
+                )
+            else:
+                warn(
+                    f"{name}: Yahoo close for {day_text} ({vendor:.2f}) differs "
+                    f"from FRED's official close ({fred:.2f}); replaced in this "
+                    "build. Add it to SP500_OFFICIAL_CORRECTIONS so the fix "
+                    "survives FRED's rolling ten-year window"
+                )
+        if len(bad):
+            reconciled.loc[bad] = official.loc[bad].to_numpy()
+
+    report["replaced"] = dict(sorted(replaced.items()))
+    return reconciled, report
+
+
+def drop_sp500_bad_prints(
+    daily: pd.Series,
+    *,
+    bad_prints: Mapping[str, tuple[float, str]] | None = None,
+    tolerance: float = SP500_RECONCILE_TOLERANCE,
+    warnings: list[str] | None = None,
+) -> tuple[pd.Series, list[dict[str, Any]]]:
+    """Drop the reviewed vendor bad prints (``SP500_BAD_PRINTS`` by default).
+
+    A dropped close leaves no observation on that date, so the daily frame
+    carries the previous close forward; no value is invented. A print is
+    dropped only while Yahoo still serves the recorded value. Each entry is
+    returned with its neighbours and reason for the metadata.
+    """
+    bad_prints = SP500_BAD_PRINTS if bad_prints is None else bad_prints
+    name = SP500_DAILY_SERIES_ID
+    entries: list[dict[str, Any]] = []
+    drop: list[pd.Timestamp] = []
+    for day_text, (vendor_close, reason) in sorted(bad_prints.items()):
+        day = pd.Timestamp(day_text, tz="UTC")
+        entry: dict[str, Any] = {
+            "date": day_text,
+            "vendor_close": vendor_close,
+            "previous": None,
+            "next": None,
+            "reason": reason,
+        }
+        if day not in daily.index:
+            entry["status"] = "date absent"
+            message = f"{name}: listed bad print {day_text} is no longer in Yahoo's history"
+        else:
+            position = int(daily.index.get_loc(day))
+            for key, step in (("previous", -1), ("next", 1)):
+                neighbour = position + step
+                if 0 <= neighbour < len(daily):
+                    entry[key] = {
+                        "date": daily.index[neighbour].date().isoformat(),
+                        "close": round(float(daily.iloc[neighbour]), 2),
+                    }
+            value = float(daily.iloc[position])
+            if abs(value - vendor_close) <= tolerance:
+                entry["status"] = "dropped"
+                drop.append(day)
+                message = ""
+            else:
+                entry["status"] = "kept: vendor value changed"
+                entry["vendor_close_now"] = round(value, 4)
+                message = (
+                    f"{name}: listed bad print {day_text} not dropped; Yahoo now "
+                    f"serves {value:.2f}, not the recorded {vendor_close:.2f}"
+                )
+        if message:
+            logger.warning("{}", message)
+            if warnings is not None:
+                warnings.append(message)
+        entries.append(entry)
+    cleaned = daily.drop(index=drop) if drop else daily.copy()
+    return cleaned, entries
+
+
+def append_official_sp500_tail(
+    daily: pd.Series,
+    official: pd.Series | None,
+    *,
+    warnings: list[str] | None = None,
+) -> tuple[pd.Series, dict[str, Any]]:
+    """Extend a stale Yahoo history with FRED's later official closes.
+
+    Normally Yahoo is a day or more ahead of FRED and nothing happens. When the
+    Yahoo fetch failed and an older cache was used, FRED's newer official
+    closes are appended (and listed) instead of the old close being carried
+    forward, and a warning is recorded.
+    """
+    if official is None or official.empty or daily.empty:
+        return daily, {}
+    last = daily.index.max()
+    tail = official.loc[official.index > last].dropna()
+    if tail.empty:
+        return daily, {}
+    extended = pd.concat([daily, tail.rename(daily.name)]).sort_index()
+    report = {
+        "reference": "SP500",
+        "after_last_yahoo_close": last.date().isoformat(),
+        "closes": {
+            day.date().isoformat(): round(float(value), 4)
+            for day, value in tail.items()
+        },
+    }
+    message = (
+        f"{SP500_DAILY_SERIES_ID}: Yahoo's history ends {last.date().isoformat()} "
+        f"but FRED's official S&P 500 has {len(tail)} later close(s) "
+        f"({tail.index.min().date().isoformat()} to "
+        f"{tail.index.max().date().isoformat()}); appended, see "
+        "meta.proxy.official_tail"
+    )
+    logger.warning("{}", message)
+    if warnings is not None:
+        warnings.append(message)
+    return extended, report
+
+
+def find_flat_runs(daily: pd.Series, *, min_sessions: int = 3) -> list[dict[str, Any]]:
+    """Runs of ``min_sessions`` or more identical consecutive closes (cents)."""
+    values = daily.round(2).to_numpy()
+    if not len(values):
+        return []
+    change = np.r_[True, values[1:] != values[:-1]]
+    starts = np.flatnonzero(change)
+    ends = np.r_[starts[1:], len(values)] - 1
+    runs = []
+    for start, end in zip(starts, ends):
+        sessions = int(end - start + 1)
+        if sessions >= min_sessions:
+            runs.append(
+                {
+                    "start": daily.index[start].date().isoformat(),
+                    "end": daily.index[end].date().isoformat(),
+                    "sessions": sessions,
+                    "close": float(values[start]),
+                }
+            )
+    return runs
+
+
+def prepare_sp500_daily(
+    daily: pd.Series | None,
+    official: pd.Series | None,
+    *,
+    warnings: list[str] | None = None,
+) -> tuple[pd.Series, dict[str, Any]]:
+    """Check, correct and document the ^GSPC history before it is merged.
+
+    Raises ``SeriesShapeError`` (nothing is written) for a missing or
+    truncated history; otherwise applies the official corrections, drops the
+    reviewed bad prints, appends FRED's later official closes when Yahoo is
+    stale and lists runs of identical closes, returning a report for the
+    metadata.
+    """
+    check_sp500_daily_shape(daily)
+    assert daily is not None
+    series, reconciliation = reconcile_sp500_daily(
+        daily, official, warnings=warnings
+    )
+    series, bad_prints = drop_sp500_bad_prints(series, warnings=warnings)
+    series, official_tail = append_official_sp500_tail(
+        series, official, warnings=warnings
+    )
+    report = {
+        "first_close": daily.index.min().date().isoformat(),
+        "last_yahoo_close": daily.index.max().date().isoformat(),
+        "reconciliation": reconciliation,
+        "bad_prints": bad_prints,
+        "official_tail": official_tail,
+        "flat_runs": find_flat_runs(series),
+    }
+    return series, report
 
 
 def _parse_high_yield_archive(content: bytes) -> pd.Series:
@@ -1353,11 +1884,12 @@ def _asset_metadata(frame: pd.DataFrame) -> dict[str, dict[str, Any]]:
     definitions = (
         (
             "sp500",
-            "S&P 500 proxy",
+            "S&P 500 — S&P 90 before 1957, Cowles index before 1928",
             "sp500_proxy",
             "sp500_proxy_source",
             "",
-            "Index (spliced, rebased by consumer)",
+            "Index points from 1927-12-30; Cowles 1935-39=100 before "
+            "(spliced, rebased by consumer)",
         ),
         (
             "gold",
@@ -1428,6 +1960,137 @@ def _asset_metadata(frame: pd.DataFrame) -> dict[str, dict[str, Any]]:
     return assets
 
 
+def _sp500_warm_up(frame: pd.DataFrame) -> dict[str, Any] | None:
+    """Where the S&P rolling windows are empty after the daily-segment start.
+
+    The volatility, drawdown and percentile windows restart at a source
+    boundary, so the first months of the ^GSPC segment carry no values.
+    """
+    if "sp500_proxy_source" not in frame.columns:
+        return None
+    daily = frame["sp500_proxy_source"].astype("string").eq(SP500_DAILY_SOURCE)
+    daily_dates = frame.index[daily.fillna(False).to_numpy(dtype=bool)]
+    if not len(daily_dates):
+        return None
+    start = daily_dates.min()
+    warm_up: dict[str, Any] = {"segment_start": start.date().isoformat()}
+    for field in ("volatility_1y", "drawdown_1y", "1y_volatility_percentile"):
+        if field not in frame.columns:
+            continue
+        first = frame.loc[start:, field].first_valid_index()
+        warm_up[field] = {
+            "first_value": first.date().isoformat() if first is not None else None,
+            "empty_until": (first - pd.Timedelta(days=1)).date().isoformat()
+            if first is not None and first > start
+            else None,
+        }
+    return warm_up
+
+
+def _sp500_notes(
+    report: dict[str, Any] | None,
+    warm_up: dict[str, Any] | None,
+) -> tuple[str, str]:
+    """The S&P method note and its data-limits note, from this build's facts."""
+
+    def count(number: int, word: str) -> str:
+        return f"{number} {word}{'' if number == 1 else 's'}"
+
+    def join(items: list[str]) -> str:
+        return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+    report = report or {}
+    first = report.get("first_close") or "1927-12-30"
+    replaced = (report.get("reconciliation") or {}).get("replaced") or {}
+    dropped = [
+        entry
+        for entry in report.get("bad_prints") or []
+        if entry.get("status") == "dropped"
+    ]
+    tail_days = sorted((report.get("official_tail") or {}).get("closes") or {})
+
+    fixes: list[str] = []
+    if replaced:
+        fixes.append(
+            "official S&P 500 closes (S&P Dow Jones Indices, via FRED) replace "
+            f"Yahoo's on {count(len(replaced), 'date')} where Yahoo's close was "
+            "off by more than half a cent"
+        )
+    if dropped:
+        years = sorted({entry["date"][:4] for entry in dropped})
+        span = years[0] if len(years) == 1 else f"{years[0]}-{years[-1]}"
+        fixes.append(
+            f"isolated Yahoo misprints on {count(len(dropped), 'date')} ({span}) "
+            "are dropped, so the previous close carries forward"
+        )
+    if tail_days:
+        fixes.append(
+            f"FRED's official closes fill {tail_days[0]} to {tail_days[-1]}, "
+            "after Yahoo's last close"
+        )
+    method = (
+        "S&P 500 levels are daily S&P composite closes from Yahoo Finance "
+        f"(^GSPC) from {first}."
+    )
+    if fixes:
+        text = "; ".join(fixes)
+        method += (
+            f" {text[0].upper()}{text[1:]}. The artifact metadata lists every "
+            "such date."
+        )
+    method += (
+        " Before 1957-03-04 the index is the S&P 90, the S&P 500's predecessor, "
+        "and pre-1952 Saturday sessions are absent. Before "
+        f"{first} the series is the NBER/Cowles monthly stock index "
+        "(1935-39=100), forward-filled to daily. The two segments are not "
+        "chained, so levels compare only within a segment; prices exclude "
+        "dividends."
+    )
+
+    limits: list[str] = []
+    warm = warm_up or {}
+    empty = []
+    for field, label in (
+        ("volatility_1y", "volatility"),
+        ("drawdown_1y", "drawdown"),
+        ("1y_volatility_percentile", "the volatility percentile"),
+    ):
+        item = warm.get(field)
+        until = item.get("empty_until") if isinstance(item, dict) else None
+        if until:
+            verb = "is empty until" if not empty else "until"
+            empty.append(f"{label} {verb} {until}")
+    if empty:
+        limits.append(
+            "The S&P 1-year volatility, drawdown and volatility-percentile "
+            "windows restart where the daily series begins "
+            f"({warm.get('segment_start', first)}), so {join(empty)}."
+        )
+    runs = report.get("flat_runs") or []
+    if runs:
+        longest = max(runs, key=lambda run: (run["sessions"], run["start"]))
+        latest = max(runs, key=lambda run: run["start"])
+        described = [
+            f"the longest is {count(longest['sessions'], 'session')} at "
+            f"{longest['close']:.2f} ({longest['start']} to {longest['end']})"
+        ]
+        if latest is not longest:
+            described.append(
+                f"the latest {count(latest['sessions'], 'session')} at "
+                f"{latest['close']:.2f} ({latest['start']} to {latest['end']})"
+            )
+        limits.append(
+            f"Yahoo's daily history has {count(len(runs), 'run')} of three or "
+            f"more identical consecutive closes; {join(described)}. Some may be "
+            "stale vendor prints; with no independent daily source to check "
+            "them, they are kept as delivered and listed in the artifact "
+            "metadata."
+        )
+    if not limits:
+        limits.append("No S&P warm-up gaps or repeated-close runs were found.")
+    return method, " ".join(limits)
+
+
 def build_metadata(
     frame: pd.DataFrame,
     series_map: dict[str, pd.Series],
@@ -1436,6 +2099,7 @@ def build_metadata(
     *,
     transport: str,
     api_key_present: bool,
+    sp500_daily_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     series_metadata = _series_metadata(series_map, specs)
     episodes = nber_episodes(frame)
@@ -1472,29 +2136,6 @@ def build_metadata(
     else:
         latest_strength = None
 
-    scored_core_index = (
-        frame["core_index"].dropna()
-        if "core_index" in frame.columns
-        else pd.Series(dtype="float64")
-    )
-    if not scored_core_index.empty:
-        latest_core_index_date = scored_core_index.index.max()
-        latest_core_index = {
-            "date": latest_core_index_date.date().isoformat(),
-            "score": round(float(scored_core_index.loc[latest_core_index_date]), 2),
-            "bucket": str(frame.loc[latest_core_index_date, "core_index_bucket"])
-            if "core_index_bucket" in frame.columns
-            and not pd.isna(frame.loc[latest_core_index_date, "core_index_bucket"])
-            else None,
-            "composite": round(
-                float(frame.loc[latest_core_index_date, "core_index_composite"]), 2
-            )
-            if "core_index_composite" in frame.columns
-            else None,
-        }
-    else:
-        latest_core_index = None
-
     coverage_start = None
     full_coverage_start = None
     if "macro_strength_coverage" in frame.columns:
@@ -1513,15 +2154,20 @@ def build_metadata(
         if item["coverage_years"] < 20
     ]
 
+    warm_up = _sp500_warm_up(frame)
+    sp500_method_note, sp500_limits_note = _sp500_notes(sp500_daily_report, warm_up)
+    report = sp500_daily_report or {}
+
     notes = [
         "NBER recession windows come from USREC and are month-precise, not day-precise.",
         "USREC is retrospective: labels reflect later NBER dating, not real-time announcements.",
         "Macro strength is a V2 coincident heuristic (Fed Funds 21d/126d panic-cut; 10y-2y level and 21d/126d un-inversion; UNRATE Sahm proxy), not a probability or forecast.",
-        "The long-run equity proxy splices NBER/Cowles, Dow-Jones, Nasdaq and S&P 500 levels; it is not chained and gaps are preserved.",
+        sp500_method_note,
+        sp500_limits_note,
         "USREC is excluded from the strength inputs to avoid target leakage.",
         "Gold is the World Bank Pink Sheet London bullion benchmark forward-filled to daily; bonds are a 7.5-duration 10y UST total-return proxy; the dollar target is the broad trade-weighted index; Bitcoin is the Blockchain.com daily market price from 2010-08-18.",
         "Nifty 50 daily prices come from Yahoo Finance (^NSEI). Yahoo's history begins in 2007, so the Nifty series is intentionally unavailable before then.",
-        "Core Index is a descriptive 40/30/30 macro, volatility and momentum composite mapped to -50..+50. It starts when the ICE BofA high-yield spread is available, not before. Zero is neutral, not a forecast.",
+        CORE_INDEX_NOTE,
         "FRED's keyless CSV endpoint exposes only a rolling three-year ICE BofA HY OAS window. The pipeline merges FRED's recent observations with a cached public 1996+ mirror; the official FRED API path retains the full provider history.",
         "Crypto milestone dates are editorial comparison windows, not statistically detected events or NBER recession dates.",
     ]
@@ -1575,27 +2221,15 @@ def build_metadata(
             "latest": latest_strength,
             "notes": notes[2:3],
         },
-        "core_index": {
-            "version": CORE_INDEX_VERSION,
-            "weights": dict(CORE_INDEX_WEIGHTS),
-            "features": [
-                "hy_oas",
-                "atr_14",
-                "bollinger_width",
-                "macd",
-                "rsi_14",
-            ],
-            "latest": latest_core_index,
-            "buckets": {
-                "strong_bullish": ">= 25",
-                "calm_bullish": "0 to 24",
-                "bearish_warning": "-1 to -24",
-                "extreme_bearish": "<= -25",
-            },
-        },
+        "core_index": core_index_metadata(frame),
         "proxy": {
             "sources": _proxy_metadata(frame),
-            "notes": notes[3:4],
+            "notes": notes[3:5],
+            "reconciliation": report.get("reconciliation"),
+            "bad_prints": report.get("bad_prints"),
+            "official_tail": report.get("official_tail"),
+            "flat_runs": report.get("flat_runs"),
+            "warm_up": warm_up,
         },
         "assets": _asset_metadata(frame),
         "alignment": {
@@ -1604,7 +2238,7 @@ def build_metadata(
             "native_frequencies": "preserved until the daily merge",
             "notes": notes[0:2],
         },
-        "warnings": sorted(set(warnings)),
+        "warnings": sorted({redact_secrets(warning) for warning in warnings}),
         "short_series": sorted(short_series),
         "notes": notes,
     }
@@ -1674,11 +2308,34 @@ def run_pipeline(
             cache_dir,
             refresh=refresh,
             offline=offline,
+            warnings=warnings,
         )
         if nifty is not None:
             series_map[NIFTY_SERIES_ID] = nifty
     except Exception as exc:  # noqa: BLE001 - supplemental target must not kill the artifact
         warnings.append(f"{NIFTY_SERIES_ID}: {type(exc).__name__}: {exc}")
+
+    # The daily S&P history is required: without it the S&P series would have a
+    # 1956-2016 hole, so a missing or truncated history stops the build before
+    # anything is written.
+    try:
+        sp500_daily = fetch_sp500_daily_series(
+            cache_dir,
+            refresh=refresh,
+            offline=offline,
+            warnings=warnings,
+        )
+    except Exception as exc:  # noqa: BLE001 - re-raised as a refusal to write
+        raise SeriesShapeError(
+            f"{SP500_DAILY_SERIES_ID}: daily S&P history unavailable "
+            f"({type(exc).__name__}: {exc}); the artifact is not written"
+        ) from exc
+    sp500_daily, sp500_daily_report = prepare_sp500_daily(
+        sp500_daily,
+        series_map.get("SP500"),
+        warnings=warnings,
+    )
+    series_map[SP500_DAILY_SERIES_ID] = sp500_daily
 
     try:
         ensure_high_yield_history(
@@ -1717,11 +2374,15 @@ def run_pipeline(
         warnings,
         transport=transport,
         api_key_present=bool(key),
+        sp500_daily_report=sp500_daily_report,
     )
     metadata["data_version"] = data_version
     _write_json(metadata_path, metadata)
     crypto_path = write_crypto_milestones_artifact(
         output_dir / CRYPTO_MILESTONES_FILENAME
+    )
+    patterns_skill_path = write_patterns_skill_artifact(
+        frame, output_dir, data_version=data_version
     )
 
     return {
@@ -1738,7 +2399,40 @@ def run_pipeline(
         "parquet": str(parquet_path),
         "metadata": str(metadata_path),
         "crypto_milestones": str(crypto_path),
+        "patterns_v2_skill": (
+            str(patterns_skill_path) if patterns_skill_path is not None else None
+        ),
     }
+
+
+def write_patterns_skill_artifact(
+    frame: pd.DataFrame,
+    output_dir: Path,
+    *,
+    data_version: str,
+) -> Path | None:
+    """Regenerate the Study of Patterns v2 skill artifact for this parquet.
+
+    Never fatal: on failure the artifact is left as it was and a warning is
+    logged; the CI check that its per-asset fingerprints of the price inputs
+    match the parquet (tests/test_patterns.py) then flags the stale file
+    before a deploy. ``data_version`` is accepted but no longer used: the
+    artifact is pinned to those fingerprints, not to the parquet's version.
+    """
+    try:
+        from scripts.patterns_v2_evidence import write_skill_artifact
+
+        return write_skill_artifact(
+            frame,
+            Path(output_dir) / PATTERNS_V2_SKILL_FILENAME,
+        )
+    except Exception as exc:  # noqa: BLE001 - supplemental artifact must not kill the run
+        logger.warning(
+            "Patterns v2 skill artifact not written: {}: {}",
+            type(exc).__name__,
+            exc,
+        )
+        return None
 
 
 def check_key(delay: float = 0.0) -> dict[str, Any]:

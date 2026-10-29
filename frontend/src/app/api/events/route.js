@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { cachedRoute, jsonTextResponse } from "@/lib/server/routeCache";
 
 export const dynamic = "force-dynamic";
 
@@ -6,8 +6,11 @@ const BACKEND_URL = (
   process.env.CHRONO_API_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 const BACKEND_TIMEOUT_MS = 4000;
+const CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600";
+const CACHE_POLICY = { ttlMs: 60 * 60_000 };
+const UNAVAILABLE = { error: "Historical events service is unavailable." };
 
-export async function GET() {
+async function loadEvents() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
 
@@ -18,19 +21,18 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      return NextResponse.json(
-        { error: "Historical events service is unavailable." },
-        { status: 503 },
-      );
+      return { status: 503, body: JSON.stringify(UNAVAILABLE) };
     }
 
-    return NextResponse.json(await response.json());
+    return { status: 200, body: JSON.stringify(await response.json()) };
   } catch {
-    return NextResponse.json(
-      { error: "Historical events service is unavailable." },
-      { status: 503 },
-    );
+    return { status: 503, body: JSON.stringify(UNAVAILABLE) };
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function GET() {
+  const result = await cachedRoute("events", CACHE_POLICY, loadEvents);
+  return jsonTextResponse(result, CACHE_CONTROL);
 }

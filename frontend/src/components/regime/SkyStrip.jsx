@@ -25,7 +25,6 @@ export function SkyStrip({ asOf, contextLabel, variant = "default" }) {
     const controller = new AbortController();
     fetch(`/api/chrono/positions?date=${encodeURIComponent(asOf)}`, {
       signal: controller.signal,
-      cache: "no-store",
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -66,13 +65,13 @@ export function SkyStrip({ asOf, contextLabel, variant = "default" }) {
       }
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/40 dark:text-white/40">
+        <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
           {isFootnote ? "Sky at peak · historical footnote" : "Sky at this date"}
         </span>
         <span className="font-mono text-micro text-black/60 dark:text-white/60">
           {formatDate(asOf)}
         </span>
-        <span className="text-micro text-black/35 dark:text-white/35">
+        <span className="text-micro text-black/60 dark:text-white/60">
           · {contextLabel}
         </span>
       </div>
@@ -82,7 +81,7 @@ export function SkyStrip({ asOf, contextLabel, variant = "default" }) {
         aria-live="polite"
       >
         {state.status === "loading" ? (
-          <span className="text-micro text-black/40 dark:text-white/40">
+          <span className="text-micro text-black/60 dark:text-white/60">
             Reading the ephemeris…
           </span>
         ) : null}
@@ -101,13 +100,13 @@ export function SkyStrip({ asOf, contextLabel, variant = "default" }) {
               return (
                 <span
                   key={name}
-                  className="inline-flex items-baseline gap-1.5 font-mono text-micro text-black/55 dark:text-white/55"
+                  className="inline-flex items-baseline gap-1.5 font-mono text-micro text-black/60 dark:text-white/60"
                 >
-                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-black/35 dark:text-white/35">
+                  <span className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
                     {name}
                   </span>
                   <span>{formatDegree(body.lon ?? body.degree)}</span>
-                  <span className="text-black/40 dark:text-white/40">
+                  <span className="text-black/60 dark:text-white/60">
                     {body.nakshatra ?? "—"}
                   </span>
                   {retrograde ? (

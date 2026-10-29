@@ -1,2 +1,0 @@
-NeuralHMM Accuracy: 68.07%
-XGBoost Accuracy: 97.17%

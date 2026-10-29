@@ -3,6 +3,14 @@
 /* next-themes writes `.dark` on <html>; Tailwind 4 needs the class strategy declared. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* From sm with the height to spare (landscape phones are excluded): where the
+   /regime HUD sticks under the header. */
+@custom-variant sm-tall {
+  @media (min-width: 40rem) and (min-height: 40rem) {
+    @slot;
+  }
+}
+
 @theme inline {
   --font-sans: var(--font-onest), "Onest", ui-sans-serif, system-ui, sans-serif;
 }
@@ -29,14 +37,149 @@
   }
 }
 
+/* The engine sky: the (engine) layout's background, which the header's scrim
+   paints again over the top line. */
 :root {
   color-scheme: light;
   --engine-fallback: #e3dbcf;
+  --sh-engine-sky: radial-gradient(ellipse at 50% 28%, #ffffff 0%, #faf7f2 30%, #f1ebe2 62%, #e3dbcf 100%);
 }
 
 .dark {
   color-scheme: dark;
   --engine-fallback: #020204;
+  --sh-engine-sky: radial-gradient(ellipse at 50% 28%, #232330 0%, #141420 30%, #090910 62%, #020204 100%);
+}
+
+/* Refinement tokens. Motion values are mirrored for framer-motion and GSAP in
+   src/lib/motion.js; colour tokens name existing palette values only. */
+:root {
+  --sh-ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* existing signature: enter / settle */
+  --sh-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* scene & camera (≈ GSAP power3.inOut) */
+  --sh-ease-exit: cubic-bezier(0.4, 0, 1, 1); /* exits */
+  --sh-dur-micro: 140ms; /* hover / press colour & opacity */
+  --sh-dur-reveal: 200ms; /* tooltips, popovers, panels' content, the header's views */
+  --sh-dur-reveal-out: 140ms;
+  --sh-dur-panel: 280ms; /* side panels, sheets, tray */
+  --sh-dur-panel-out: 200ms;
+  --sh-dur-modal: 320ms; /* date picker, onboarding (backdrop 200ms) */
+  --sh-dur-data: 600ms; /* energy arc, label crossfades, lane line */
+
+  /* named roots (existing values) */
+  --sh-ink: #14121a;
+  --sh-pearl: #f2ede4;
+  --sh-signal: #f05d49;
+  --sh-signal-hover: #e8533f;
+  --sh-signal-ink: #c0442f;
+  --sh-gold: #d8b47a;
+  /* text steps: step 3 is the minimum for readable text, step 4 is decorative only */
+  --sh-text-1: rgb(20 18 26 / 0.88);
+  --sh-text-2: rgb(20 18 26 / 0.7);
+  --sh-text-3: rgb(20 18 26 / 0.6);
+  --sh-text-4: rgb(20 18 26 / 0.38);
+  --sh-line-1: rgb(20 18 26 / 0.08);
+  --sh-line-2: rgb(20 18 26 / 0.14);
+  --sh-surface-float: rgb(255 255 255 / 0.62); /* floating over the canvas, blur 16px */
+  --sh-surface-card: rgb(255 255 255 / 0.5); /* in-flow cards, no blur */
+  --sh-surface-overlay: rgb(255 255 255 / 0.92); /* sheets, popovers, tooltips, dialogs, chart overlays */
+  --sh-shadow-float: 0 12px 40px rgb(20 18 26 / 0.12);
+  --sh-shadow-overlay: 0 24px 80px rgb(20 18 26 / 0.18);
+  --sh-hover: rgb(20 18 26 / 0.04);
+  --sh-press: rgb(20 18 26 / 0.08);
+  --sh-selected: rgb(20 18 26 / 0.07);
+  --sh-focus: rgb(192 68 47);
+  /* Top clearance for page content under the fixed brand row: corner inset +
+     48 px brand + 16 px gap (0.75rem + 3rem + 1rem below sm, 1.25rem + 3rem
+     + 1rem from sm). Engine pages pad their content by it; /regime's HUD
+     sticks at it and the home gauge starts at it from sm. */
+  --sh-header-clear: 4.75rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --sh-header-clear: 5.25rem;
+  }
+}
+
+.dark {
+  --sh-signal-ink: #ff8b77;
+  --sh-text-1: rgb(242 237 228 / 0.92);
+  --sh-text-2: rgb(242 237 228 / 0.72);
+  --sh-text-3: rgb(242 237 228 / 0.6);
+  --sh-text-4: rgb(242 237 228 / 0.38);
+  --sh-line-1: rgb(255 255 255 / 0.08);
+  --sh-line-2: rgb(255 255 255 / 0.14);
+  --sh-surface-float: rgb(8 8 14 / 0.55);
+  --sh-surface-card: rgb(0 0 0 / 0.3);
+  --sh-surface-overlay: rgb(11 11 18 / 0.92);
+  --sh-shadow-float: 0 12px 40px rgb(0 0 0 / 0.45);
+  --sh-shadow-overlay: 0 24px 80px rgb(0 0 0 / 0.55);
+  --sh-hover: rgb(255 255 255 / 0.06);
+  --sh-press: rgb(255 255 255 / 0.1);
+  --sh-selected: rgb(255 255 255 / 0.08);
+  --sh-focus: rgb(255 139 119 / 0.75);
+}
+
+/* Where the engine views open as a list under the cue (touch, or a window
+   under 720 px) it covers the top of the page. On home the energy gauge steps
+   back beneath it (its own opacity transition fades it) and returns as soon
+   as the list starts its exit (it is inert then). The row opens in the top
+   line, clear of the gauge. These rules sit in the components layer so a
+   mobile sheet's max-lg:opacity-0 still wins. */
+@layer components {
+  body:has(#site-nav-expanded[data-layout="list"]:not([inert])) [data-hud="gauge"] {
+    opacity: 0;
+  }
+
+  /* From lg the planet readout docks 20rem wide at 15.5rem from the top
+     (Tooltip.jsx): up to 1712 px it can reach the gauge's 23rem column, so
+     the "Most Similar Day" line steps back while a readout is up. The ring
+     and the polarity above it stay. */
+  [data-hud="gauge"] [data-hud-part="parallel"] {
+    transition: opacity var(--sh-dur-reveal) var(--sh-ease-out);
+  }
+
+  @media (min-width: 1024px) and (max-width: 1711.98px) {
+    main:has(aside[aria-label^="Planet readout"]) [data-hud="gauge"] [data-hud-part="parallel"] {
+      opacity: 0;
+    }
+  }
+
+  /* Short windows below lg (landscape phones): the gauge starts under the
+     header row, so its "Most Similar Day" line would run under the mobile
+     dock. It steps out there; the score, the ring and the polarity stay. */
+  @media (max-width: 1023.98px) and (max-height: 26rem) {
+    [data-hud="gauge"] [data-hud-part="parallel"] {
+      display: none;
+    }
+  }
+
+  /* The header's scrim: while a page scrolls under the top line, it paints
+     the engine sky over it (positioned like the layout's, so it has no
+     visible edge) and fades out over the 16 px gap above the clearance line,
+     so no content passes beneath the brand or the cue. */
+  .sh-scrim {
+    background: var(--sh-engine-sky) 0 0 / 100vw 100dvh no-repeat;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 1rem), transparent);
+  }
+}
+
+/* The phone sheets rise from the dock (8.5rem up); they stop below the header
+   row instead of sliding under the brand and the cue. Unlayered, so it caps
+   their own max-lg:max-h-[70dvh]. */
+@media (max-width: 1023.98px) {
+  #chrono-alignment-sheet,
+  #chrono-events-sheet,
+  div:has(> #chrono-ladder-sheet) {
+    max-height: min(70dvh, calc(100dvh - 8.5rem - var(--sh-header-clear)));
+  }
+}
+
+/* The row opens over the cue it replaces; while that hidden cue holds
+   keyboard focus, the row carries its focus ring. */
+#site-nav-bubble:has(> button:focus-visible) #site-nav-expanded[data-layout="row"]:not([inert]) {
+  outline: 2px solid var(--sh-focus);
+  outline-offset: 2px;
 }
 
 @layer base {
@@ -62,36 +205,25 @@
   .dark body {
     color: #f2ede4;
   }
-}
 
-/* Info module enquiries: no native chrome, just a lit baseline. */
-.info-input {
-  width: 100%;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 0;
-  background: transparent;
-  padding: 0.5rem 0;
-  color: #ffffff;
-  font-size: var(--text-meta);
-  line-height: 1.5;
-  outline: none;
-  transition: border-color 180ms ease, box-shadow 180ms ease;
-}
+  /* The ring colour is set at rest, so transition-colors (it includes
+     outline-color) never fades the ring in from currentColor on focus. */
+  :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])) {
+    outline-color: var(--sh-focus);
+  }
 
-.info-input::placeholder {
-  color: rgba(255, 255, 255, 0.32);
-}
+  /* One on-brand focus ring. Components that draw their own focus-visible
+     ring keep outline-none; nothing else removes this. */
+  :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--sh-focus);
+    outline-offset: 2px;
+  }
 
-.info-input:focus {
-  border-bottom-color: rgba(240, 93, 73, 0.7);
-  box-shadow: 0 8px 18px -14px rgba(240, 93, 73, 0.9);
-}
-
-.info-input:autofill,
-.info-input:-webkit-autofill {
-  -webkit-text-fill-color: #ffffff;
-  transition: background-color 9999s ease-in-out 0s;
+  /* Headings that only receive focus by script (a dialog's title, main h1
+     after a dialog closes) are never in the Tab order: no UA box on them. */
+  :where(h1, h2)[tabindex="-1"]:focus {
+    outline: none;
+  }
 }
 
 /* Mobile bottom sheets rise from the controls instead of popping in. */
@@ -108,34 +240,24 @@
 
 @media (max-width: 1023.98px) {
   .animate-sheet-up {
-    animation: sheet-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: sheet-up var(--sh-dur-panel) var(--sh-ease-out) both;
   }
 }
 
-/* Recent-manifestation glass edge: a slow, low-contrast pulse. */
-@keyframes recent-glow {
-  0%,
-  100% {
-    border-color: rgba(240, 93, 73, 0.22);
-    box-shadow: 0 0 0 rgba(240, 93, 73, 0);
-  }
-  50% {
-    border-color: rgba(240, 93, 73, 0.52);
-    box-shadow: 0 0 18px rgba(240, 93, 73, 0.16);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .recent-glow {
-    animation: recent-glow 3.8s ease-in-out infinite;
-  }
+/* Nakshatra halo (header Easter egg): drawn over the brand mark; it fades in
+   and out with the views (framer-motion, opacity only) and never moves. */
+.sh-halo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* Timeline scrubber: a hairline track with a small pearl/obsidian thumb. */
 .chrono-range {
   --chrono-thumb: #14121a;
   --chrono-thumb-border: rgba(255, 255, 255, 0.85);
-  --chrono-focus: rgba(240, 93, 73, 0.55);
 }
 
 .dark .chrono-range {
@@ -185,7 +307,20 @@
 }
 
 .chrono-range:focus-visible {
-  outline: 2px solid var(--chrono-focus);
+  outline: 2px solid var(--sh-focus);
   outline-offset: 4px;
   border-radius: 9999px;
+}
+
+/* One switch for DOM motion: honour the OS setting everywhere. framer-motion
+   follows the same preference through <MotionConfig reducedMotion="user">. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

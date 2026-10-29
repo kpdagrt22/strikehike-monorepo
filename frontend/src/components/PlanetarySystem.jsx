@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { animated, useSpring } from "@react-spring/three";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Sphere } from "@react-three/drei";
 import gsap from "gsap";
 import * as THREE from "three";
@@ -15,6 +14,21 @@ const EARTH_SIZE = 0.09;
 const MOON_SIZE = EARTH_SIZE * 0.42;
 const MOON_ORBIT_RADIUS = EARTH_SIZE * 2.8;
 const SATURN_TILT = Math.PI / 2 + 0.47;
+// Time travel keeps its 2 s expo.inOut identity; reduced motion jumps.
+const TRAVEL_DURATION = 2;
+// Hover/pin scale: a damped lerp that requests frames only until it settles.
+const HOVER_SCALE = 1.1;
+const HOVER_DAMPING = 14;
+// A pointer that moved further than this between down and up was orbiting
+// the camera, not tapping a planet.
+const TAP_SLOP_PX = 6;
+// After an on-demand pause the frame delta spans the whole pause.
+const MAX_FRAME_DELTA = 1 / 30;
+// The small procedural bodies are a few pixels wide; a 128x64 map is plenty.
+const PROCEDURAL_WIDTH = 128;
+const PROCEDURAL_HEIGHT = 64;
+// The surface recipe was authored at 512x256; its pixel units scale with it.
+const PROCEDURAL_SCALE = PROCEDURAL_WIDTH / 512;
 const TEXTURE_PATHS = [
   "/textures/sun.webp",
   "/textures/earth-day.webp",
@@ -151,15 +165,17 @@ function hashString(value) {
 }
 
 /**
- * Procedural 512x256 albedo and bump maps. These are intentionally generated
+ * Procedural 128x64 albedo and bump maps. These are intentionally generated
  * in-browser so the shipped bundle stays asset-free while every body gets a
- * distinct, stable surface at retina resolution.
+ * distinct, stable surface. The bodies render only a few pixels wide, so the
+ * small map keeps startup work and GPU memory light.
  */
 function createPlanetTextures(planet) {
   if (typeof document === "undefined") return null;
 
-  const width = 512;
-  const height = 256;
+  const width = PROCEDURAL_WIDTH;
+  const height = PROCEDURAL_HEIGHT;
+  const unit = PROCEDURAL_SCALE;
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -189,8 +205,8 @@ function createPlanetTextures(planet) {
 
   const bandCount = planet.gas ? 26 : 13;
   for (let index = 0; index < bandCount; index += 1) {
-    const y = (index / bandCount) * height + random() * 7;
-    const bandHeight = 2 + random() * (planet.gas ? 9 : 4);
+    const y = (index / bandCount) * height + random() * 7 * unit;
+    const bandHeight = (2 + random() * (planet.gas ? 9 : 4)) * unit;
     const lightness = random() > 0.5 ? 0.24 : -0.2;
     const bandColor = base
       .clone()
@@ -211,8 +227,9 @@ function createPlanetTextures(planet) {
     bumpContext.fillRect(0, y, width, bandHeight);
   }
 
-  // Fine-grain surface variation, strongest on the rocky bodies.
-  const grainCount = planet.gas ? 900 : 1800;
+  // Fine-grain surface variation, strongest on the rocky bodies. Grains stay
+  // texel-sized; their count follows the map area so the coverage is unchanged.
+  const grainCount = Math.round((planet.gas ? 900 : 1800) * unit * unit);
   for (let index = 0; index < grainCount; index += 1) {
     const x = random() * width;
     const y = random() * height;
@@ -230,6 +247,11 @@ function createPlanetTextures(planet) {
   }
 
   if (planet.name === "Jupiter") {
+    // The spot is placed in 512x256 units; scale it onto the smaller map.
+    context.save();
+    context.scale(unit, unit);
+    bumpContext.save();
+    bumpContext.scale(unit, unit);
     const spot = context.createRadialGradient(345, 158, 4, 345, 158, 40);
     spot.addColorStop(0, "rgba(166, 72, 46, 0.95)");
     spot.addColorStop(0.55, "rgba(184, 93, 56, 0.7)");
@@ -251,6 +273,8 @@ function createPlanetTextures(planet) {
     bumpContext.arc(0, 0, 40, 0, Math.PI * 2);
     bumpContext.fill();
     bumpContext.restore();
+    bumpContext.restore();
+    context.restore();
   }
 
   if (planet.name === "Sun") {
@@ -279,8 +303,33 @@ function createPlanetTextures(planet) {
   return { map, bumpMap };
 }
 
+/**
+ * Sun corona and Earth atmosphere: the additive back-face shell fades toward
+ * its silhouette, so it reads as a soft glow instead of a hard-edged disc.
+ * Module-level, so both shells share one program (stable cache key).
+ */
+function rimFade(shader) {
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", "#include <common>\nvarying float vShRim;")
+    .replace(
+      "#include <project_vertex>",
+      "#include <project_vertex>\nvShRim = abs(dot(normalize(normalMatrix * normal), normalize(-mvPosition.xyz)));",
+    );
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", "#include <common>\nvarying float vShRim;")
+    .replace(
+      "#include <opaque_fragment>",
+      "diffuseColor.a *= pow(vShRim, 1.5);\n#include <opaque_fragment>",
+    );
+}
+
+function rimFadeKey() {
+  return "sh-rim-fade";
+}
+
 function OrbitRing({ radius, isDark, regimeColor = null }) {
   const materialRef = useRef(null);
+  const invalidate = useThree((state) => state.invalidate);
   const baseColor = isDark ? "#8b7cff" : "#6f627d";
   const baseOpacity = isDark ? 0.075 : 0.1;
 
@@ -293,8 +342,12 @@ function OrbitRing({ radius, isDark, regimeColor = null }) {
     material.color.set(regimeColor ?? baseColor);
     material.opacity = regimeColor ? (isDark ? 0.28 : 0.3) : baseOpacity;
     material.needsUpdate = true;
-  }, [regimeColor, baseColor, baseOpacity, isDark]);
+    // Imperative change: request a frame when rendering on demand.
+    invalidate();
+  }, [regimeColor, baseColor, baseOpacity, isDark, invalidate]);
 
+  // Front side only: the rings face +Y and OrbitControls keeps the camera
+  // above the plane (maxPolarAngle), so the back side is never seen.
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[radius - 0.0035, radius + 0.0035, 180]} />
@@ -303,7 +356,7 @@ function OrbitRing({ radius, isDark, regimeColor = null }) {
         color={baseColor}
         transparent
         opacity={baseOpacity}
-        side={THREE.DoubleSide}
+        side={THREE.FrontSide}
         depthWrite={false}
       />
     </mesh>
@@ -350,6 +403,7 @@ function SaturnRing({ texture, planetSize }) {
         transparent
         opacity={0.92}
         side={THREE.DoubleSide}
+        forceSinglePass
         depthWrite={false}
         roughness={0.85}
         metalness={0.05}
@@ -369,7 +423,10 @@ function Earth({
   earthNormal,
   earthSpecular,
   moonMap,
+  reducedMotion = false,
+  ambientRef = null,
 }) {
+  const invalidate = useThree((state) => state.invalidate);
   const groupRef = useRef(null);
   const surfaceRef = useRef(null);
   const cloudRef = useRef(null);
@@ -389,27 +446,45 @@ function Earth({
 
   useLayoutEffect(() => {
     if (!groupRef.current) return undefined;
+    const position = groupRef.current.position;
+    const x = Math.cos(angle) * EARTH_RADIUS;
+    const z = Math.sin(angle) * EARTH_RADIUS;
+    if (position.x === x && position.z === z) return undefined;
 
-    const tween = gsap.to(groupRef.current.position, {
-      x: Math.cos(angle) * EARTH_RADIUS,
-      z: Math.sin(angle) * EARTH_RADIUS,
-      duration: 2,
+    if (reducedMotion) {
+      gsap.killTweensOf(position);
+      position.x = x;
+      position.z = z;
+      invalidate();
+      return undefined;
+    }
+
+    const tween = gsap.to(position, {
+      x,
+      z,
+      duration: TRAVEL_DURATION,
       ease: "expo.inOut",
       overwrite: true,
+      onUpdate: () => invalidate(),
     });
 
     return () => tween.kill();
-  }, [angle]);
+  }, [angle, invalidate, reducedMotion]);
 
   useLayoutEffect(() => {
     if (!moonOrbitRef.current) return;
     moonOrbitRef.current.rotation.y = (Number(moonLon) * Math.PI) / 180;
-  }, [moonLon]);
+    invalidate();
+  }, [moonLon, invalidate]);
 
   useFrame((_, delta) => {
-    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.018;
-    if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.045;
-    if (moonOrbitRef.current) moonOrbitRef.current.rotation.y += delta * 0.12;
+    // Spins follow the shared ambient factor: they ease to rest with the sky
+    // and never run under reduced motion.
+    const step = Math.min(delta, MAX_FRAME_DELTA) * (ambientRef?.current ?? 1);
+    if (step === 0) return;
+    if (surfaceRef.current) surfaceRef.current.rotation.y += step * 0.018;
+    if (cloudRef.current) cloudRef.current.rotation.y += step * 0.045;
+    if (moonOrbitRef.current) moonOrbitRef.current.rotation.y += step * 0.12;
   });
 
   return (
@@ -449,11 +524,13 @@ function Earth({
         <meshBasicMaterial
           color={isDark ? "#4d9fff" : "#8dc8ff"}
           transparent
-          opacity={0.12}
+          opacity={0.2}
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           toneMapped={false}
+          onBeforeCompile={rimFade}
+          customProgramCacheKey={rimFadeKey}
         />
       </mesh>
 
@@ -481,7 +558,7 @@ function Earth({
             color={isDark ? "#a8b4d8" : "#7b7088"}
             transparent
             opacity={0.24}
-            side={THREE.DoubleSide}
+            side={THREE.FrontSide}
             depthWrite={false}
           />
         </mesh>
@@ -490,14 +567,31 @@ function Earth({
   );
 }
 
-function Planet({ planet, body, isDark, texture, ringTexture }) {
+function Planet({
+  planet,
+  body,
+  isDark,
+  texture,
+  ringTexture,
+  reducedMotion = false,
+}) {
+  const invalidate = useThree((state) => state.invalidate);
   const setHoveredEntity = useEntityStore((state) => state.setHoveredEntity);
   const clearHoveredEntity = useEntityStore(
     (state) => state.clearHoveredEntity,
   );
+  const pinEntity = useEntityStore((state) => state.pinEntity);
+  const clearPinnedEntity = useEntityStore(
+    (state) => state.clearPinnedEntity,
+  );
+  const setReadoutSide = useEntityStore((state) => state.setReadoutSide);
   const isHovered = useEntityStore(
     (state) => state.hoveredEntity?.name === planet.name,
   );
+  const isPinned = useEntityStore(
+    (state) => state.pinnedEntity?.name === planet.name,
+  );
+  const scaleRef = useRef(null);
 
   const textures = useMemo(
     () => (texture ? null : createPlanetTextures(planet)),
@@ -512,9 +606,28 @@ function Planet({ planet, body, isDark, texture, ringTexture }) {
     [textures],
   );
 
-  const { scale } = useSpring({
-    scale: isHovered ? 1.1 : 1,
-    config: { tension: 300, friction: 26 },
+  // Hover or pin lifts the body slightly. A damped lerp asks for frames only
+  // until it settles, and snaps under reduced motion.
+  const scaleTarget = isHovered || isPinned ? HOVER_SCALE : 1;
+
+  useEffect(() => {
+    invalidate();
+  }, [scaleTarget, invalidate]);
+
+  useFrame((_, delta) => {
+    const group = scaleRef.current;
+    if (!group || group.scale.x === scaleTarget) return;
+    const next = reducedMotion
+      ? scaleTarget
+      : THREE.MathUtils.damp(
+          group.scale.x,
+          scaleTarget,
+          HOVER_DAMPING,
+          Math.min(delta, MAX_FRAME_DELTA),
+        );
+    const settled = Math.abs(next - scaleTarget) < 1e-3;
+    group.scale.setScalar(settled ? scaleTarget : next);
+    if (!settled) invalidate();
   });
 
   const entity = useMemo(() => {
@@ -554,30 +667,53 @@ function Planet({ planet, body, isDark, texture, ringTexture }) {
   useLayoutEffect(() => {
     const group = positionRef.current;
     if (!group) return;
+    const position = group.position;
+    // Already there (first mount): no tween, no frames.
+    if (position.x === targetX && position.z === targetZ) return;
+
+    // Reduced motion: the body is placed, not flown.
+    if (reducedMotion) {
+      gsap.killTweensOf(position);
+      position.x = targetX;
+      position.z = targetZ;
+      invalidate();
+      return;
+    }
 
     // GSAP owns x/z during time travel. The Nakshatra ring and dust have their
     // own useFrame loops and are never touched by this tween.
-    const tween = gsap.to(group.position, {
+    const tween = gsap.to(position, {
       x: targetX,
       z: targetZ,
-      duration: 2,
+      duration: TRAVEL_DURATION,
       ease: "expo.inOut",
       overwrite: true,
+      onUpdate: () => invalidate(),
     });
 
     return () => {
       tween.kill();
     };
-  }, [targetX, targetZ]);
+  }, [targetX, targetZ, invalidate, reducedMotion]);
 
   useEffect(() => {
     if (isHovered && entity) setHoveredEntity(entity);
   }, [entity, isHovered, setHoveredEntity]);
 
+  // Keep a pinned readout current while the date travels.
+  useEffect(() => {
+    if (isPinned && entity) pinEntity(entity);
+  }, [entity, isPinned, pinEntity]);
+
   if (!body || !entity) return null;
 
+  // The readout docks opposite the body (event.pointer is in NDC). It is
+  // chosen once per hover, and never while another readout is pinned.
   const handlePointerOver = (event) => {
     event.stopPropagation();
+    if (!useEntityStore.getState().pinnedEntity) {
+      setReadoutSide(event.pointer.x > 0 ? "left" : "right");
+    }
     setHoveredEntity(entity);
   };
 
@@ -586,67 +722,103 @@ function Planet({ planet, body, isDark, texture, ringTexture }) {
     clearHoveredEntity();
   };
 
+  // Touch has no hover: a tap (or click) pins the readout, a second tap on
+  // the same body closes it. A drag that orbited the camera is ignored.
+  const handleClick = (event) => {
+    event.stopPropagation();
+    if (event.delta > TAP_SLOP_PX) return;
+    if (isPinned) {
+      clearPinnedEntity();
+    } else {
+      setReadoutSide(event.pointer.x > 0 ? "left" : "right");
+      pinEntity(entity);
+    }
+  };
+
   const isSun = planet.name === "Sun";
 
   return (
     <group ref={positionRef}>
-      <animated.group scale={scale}>
+      <group ref={scaleRef}>
         {isSun ? (
-          <mesh scale={1.24} raycast={() => {}}>
+          <mesh scale={1.3} raycast={() => {}}>
             <sphereGeometry args={[planet.size, 48, 48]} />
             <meshBasicMaterial
               color="#ffb347"
               transparent
-              opacity={isDark ? 0.12 : 0.08}
+              opacity={isDark ? 0.22 : 0.14}
               side={THREE.BackSide}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
               toneMapped={false}
+              onBeforeCompile={rimFade}
+              customProgramCacheKey={rimFadeKey}
             />
           </mesh>
         ) : null}
 
         <Sphere args={[planet.size, 64, 64]} raycast={() => {}}>
-          <meshPhysicalMaterial
-            color={texture || textures?.map ? "#ffffff" : planet.color}
-            map={texture ?? textures?.map}
-            bumpMap={texture ? undefined : textures?.bumpMap}
-            bumpScale={texture ? 0 : planet.bumpScale}
-            roughness={planet.roughness}
-            metalness={planet.metalness}
-            clearcoat={planet.clearcoat}
-            clearcoatRoughness={0.18}
-            envMapIntensity={0.45}
-            emissive={isSun ? planet.color : "#000000"}
-            emissiveMap={isSun ? texture ?? textures?.map : undefined}
-            emissiveIntensity={isSun ? (isDark ? 1.35 : 0.28) : 0}
-            toneMapped={!isSun}
-          />
+          {texture ? (
+            // Textured Sun, Jupiter and Saturn keep their identity material.
+            <meshPhysicalMaterial
+              color="#ffffff"
+              map={texture}
+              roughness={planet.roughness}
+              metalness={planet.metalness}
+              clearcoat={planet.clearcoat}
+              clearcoatRoughness={0.18}
+              envMapIntensity={0.45}
+              emissive={isSun ? planet.color : "#000000"}
+              emissiveMap={isSun ? texture : undefined}
+              emissiveIntensity={isSun ? (isDark ? 1.35 : 0.28) : 0}
+              toneMapped={!isSun}
+            />
+          ) : (
+            // The small procedural bodies: map + bump on a standard material.
+            // Clearcoat is invisible at their size and costs a shader variant.
+            <meshStandardMaterial
+              color={textures?.map ? "#ffffff" : planet.color}
+              map={textures?.map}
+              bumpMap={textures?.bumpMap}
+              bumpScale={planet.bumpScale}
+              roughness={planet.roughness}
+              metalness={planet.metalness}
+              envMapIntensity={0.45}
+            />
+          )}
         </Sphere>
 
         {planet.name === "Saturn" && ringTexture ? (
           <SaturnRing texture={ringTexture} planetSize={planet.size} />
         ) : null}
 
-        {/* Larger invisible hit volume: no click is needed to reveal the readout. */}
+        {/* Larger invisible hit volume: hover reveals the readout, a tap or
+            click pins it. Never drawn; raycasting ignores material visibility.
+            `transparent` only lets a shader precompile reuse the orbit-ring
+            program instead of building one for a material that never draws. */}
         <Sphere
           args={[Math.max(planet.size * 2.6, 0.14), 16, 16]}
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
+          onClick={handleClick}
         >
-          <meshBasicMaterial
-            transparent
-            opacity={0}
-            depthWrite={false}
-            colorWrite={false}
-          />
+          <meshBasicMaterial visible={false} transparent />
         </Sphere>
-      </animated.group>
+      </group>
     </group>
   );
 }
 
-export function PlanetarySystem({ isDark = true, regimeTone = null }) {
+export function PlanetarySystem({
+  isDark = true,
+  regimeTone = null,
+  reducedMotion = false,
+  ambientRef = null,
+}) {
+  const gl = useThree((state) => state.gl);
+  const camera = useThree((state) => state.camera);
+  const scene = useThree((state) => state.scene);
+  const invalidate = useThree((state) => state.invalidate);
   const positions = useChronoStore((state) => state.positions);
   const regimeColor = regimeTone
     ? getRegimeToneColor(regimeTone, isDark)
@@ -654,6 +826,14 @@ export function PlanetarySystem({ isDark = true, regimeTone = null }) {
   const clearHoveredEntity = useEntityStore(
     (state) => state.clearHoveredEntity,
   );
+  const clearPinnedEntity = useEntityStore(
+    (state) => state.clearPinnedEntity,
+  );
+  const groupRef = useRef(null);
+  // The bodies stay hidden until their shaders are compiled off the main
+  // thread and their textures are uploaded one per task, so the page never
+  // freezes while the sky appears.
+  const [prepared, setPrepared] = useState(false);
   const [
     sunMap,
     earthMap,
@@ -666,7 +846,9 @@ export function PlanetarySystem({ isDark = true, regimeTone = null }) {
     saturnRing,
   ] = useLoader(THREE.TextureLoader, TEXTURE_PATHS);
 
-  useEffect(() => {
+  // Layout effect: the colour space and anisotropy are set before the first
+  // frame uploads these textures, so each is uploaded once.
+  useLayoutEffect(() => {
     for (const texture of [
       sunMap,
       earthMap,
@@ -685,7 +867,77 @@ export function PlanetarySystem({ isDark = true, regimeTone = null }) {
       texture.anisotropy = 8;
       texture.needsUpdate = true;
     }
+    invalidate();
   }, [
+    sunMap,
+    earthMap,
+    earthClouds,
+    earthNormal,
+    earthSpecular,
+    moonMap,
+    jupiterMap,
+    saturnMap,
+    saturnRing,
+    invalidate,
+  ]);
+
+  useEffect(
+    () => () => {
+      clearHoveredEntity();
+      clearPinnedEntity();
+    },
+    [clearHoveredEntity, clearPinnedEntity],
+  );
+
+  const ready =
+    positions && PLANETS.every((planet) => positions[planet.name]);
+
+  useLayoutEffect(() => {
+    if (!ready || prepared) return undefined;
+    const group = groupRef.current;
+    if (!group) return undefined;
+
+    let cancelled = false;
+    let timer = null;
+    const pending = [
+      sunMap,
+      earthMap,
+      earthClouds,
+      earthNormal,
+      earthSpecular,
+      moonMap,
+      jupiterMap,
+      saturnMap,
+      saturnRing,
+    ];
+    const uploadNext = () => {
+      if (cancelled) return;
+      const texture = pending.shift();
+      if (texture) {
+        gl.initTexture(texture);
+        timer = setTimeout(uploadNext, 0);
+        return;
+      }
+      setPrepared(true);
+      invalidate();
+    };
+
+    // KHR_parallel_shader_compile lets the driver link in the background.
+    Promise.resolve(gl.compileAsync?.(group, camera, scene))
+      .catch(() => {})
+      .then(uploadNext);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    ready,
+    prepared,
+    gl,
+    camera,
+    scene,
+    invalidate,
     sunMap,
     earthMap,
     earthClouds,
@@ -697,18 +949,13 @@ export function PlanetarySystem({ isDark = true, regimeTone = null }) {
     saturnRing,
   ]);
 
-  useEffect(() => () => clearHoveredEntity(), [clearHoveredEntity]);
-
-  const ready =
-    positions && PLANETS.every((planet) => positions[planet.name]);
-
   if (!ready) return null;
 
   const earthAngle =
     (((Number(positions.Sun.lon) + 180) % 360) * Math.PI) / 180;
 
   return (
-    <group>
+    <group ref={groupRef} visible={prepared}>
       {PLANETS.filter((planet) => planet.radius > 0).map((planet) => (
         <OrbitRing
           key={`orbit-${planet.name}`}
@@ -739,6 +986,7 @@ export function PlanetarySystem({ isDark = true, regimeTone = null }) {
                   : null
           }
           ringTexture={planet.name === "Saturn" ? saturnRing : null}
+          reducedMotion={reducedMotion}
         />
       ))}
 
@@ -751,6 +999,8 @@ export function PlanetarySystem({ isDark = true, regimeTone = null }) {
         earthNormal={earthNormal}
         earthSpecular={earthSpecular}
         moonMap={moonMap}
+        reducedMotion={reducedMotion}
+        ambientRef={ambientRef}
       />
     </group>
   );

@@ -1,9 +1,6 @@
-const DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
+// Fixed three-letter months ("Sep", never "Sept"), so every date is the same
+// width and the HUD does not shift while scrubbing.
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const CRIMSON = "#ef4444";
 
@@ -39,7 +36,8 @@ export function formatDate(value) {
   const timestamp =
     typeof value === "number" ? value : parseIsoDay(value);
   if (timestamp == null || !Number.isFinite(timestamp)) return "—";
-  return DATE_FORMATTER.format(new Date(timestamp));
+  const d = new Date(timestamp);
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 export function formatNumber(value, digits = 0) {
@@ -128,7 +126,7 @@ export function coreIndexTone(bucket, isDark) {
       action: "Hold",
       allocation:
         "No contrarian allocation while the Core Index is unavailable.",
-      color: isDark ? "rgba(242,237,228,0.55)" : "rgba(20,18,26,0.55)",
+      color: isDark ? "rgba(242,237,228,0.6)" : "rgba(20,18,26,0.6)",
       soft: isDark
         ? "rgba(242,237,228,0.06)"
         : "rgba(20,18,26,0.05)",
@@ -215,7 +213,17 @@ export function getChartTone(isDark) {
     strengthSoft: isDark ? "rgba(94,234,212,0.22)" : "rgba(15,118,110,0.16)",
     grid: isDark ? "rgba(255,255,255,0.075)" : "rgba(20,18,26,0.075)",
     axis: isDark ? "rgba(242,237,228,0.45)" : "rgba(20,18,26,0.45)",
+    // Readable chart text (axis labels, tick values): the 0.6 text floor.
+    axisText: isDark ? "rgba(242,237,228,0.6)" : "rgba(20,18,26,0.6)",
     axisStrong: isDark ? "rgba(242,237,228,0.72)" : "rgba(20,18,26,0.7)",
     crimson: CRIMSON,
   };
+}
+
+// A short readout padded with no-break spaces to `chars` characters, so in a
+// monospaced face it always has the same width: its digits change in place
+// and nothing beside it moves while scrubbing.
+export function padReadout(text, chars) {
+  const value = String(text);
+  return value.length >= chars ? value : " ".repeat(chars - value.length) + value;
 }

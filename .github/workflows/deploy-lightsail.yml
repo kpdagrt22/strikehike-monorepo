@@ -44,6 +44,7 @@ jobs:
             tests/test_macro_ingestion.py \
             tests/test_patterns.py \
             tests/test_regime_service.py \
+            tests/test_regime_cases.py \
             -q
 
   test-frontend:

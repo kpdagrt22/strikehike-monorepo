@@ -8,6 +8,7 @@ does not call FRED; ingestion is a separate offline pipeline.
 from __future__ import annotations
 
 import json
+import logging
 import statistics
 import threading
 from datetime import date
@@ -27,6 +28,11 @@ from regime.crypto_milestones import (
     CRYPTO_MILESTONES_VERSION,
     milestone_definitions,
 )
+from regime.cases import window_stats
+from regime import patterns_v2
+from regime.schemas import PatternEngineV2
+
+logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_ARTIFACT = BACKEND_DIR / "data" / "processed" / "macro_regime_history.parquet"
@@ -38,7 +44,7 @@ DEFAULT_CRYPTO_MILESTONES = (
 Resolution = Literal["auto", "daily", "weekly", "monthly"]
 REGIME_STATES = ("favorable", "neutral", "disruptive")
 EVENT_ASSETS = {
-    "sp500": ("sp500_proxy", "S&P 500 proxy"),
+    "sp500": ("sp500_proxy", "S&P 500"),
     "gold": ("gold_proxy", "Gold — London bullion"),
     "bonds": ("bond_proxy", "Treasury bonds"),
     "bitcoin": ("btc_proxy", "Bitcoin"),
@@ -83,6 +89,17 @@ def _as_str(value: Any) -> str | None:
     return str(value)
 
 
+def _as_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return bool(value)
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -116,6 +133,10 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
             "core_index",
             "core_index_composite",
             "core_index_bucket",
+            "core_index_severity",
+            "core_index_warning",
+            "core_index_trend_warning",
+            "core_index_fast_warning",
             "macro_score",
             "credit_score",
             "core_volatility_score",
@@ -171,6 +192,11 @@ def _downsample(frame: pd.DataFrame, resolution: str) -> pd.DataFrame:
     aggregation: dict[str, str] = {column: "last" for column in columns}
     if "nber_recession" in aggregation:
         aggregation["nber_recession"] = "max"
+    # The fast warning is daily: a bucket is on if it was on any day of it
+    # ("last" would hide a mid-week spell), off if known and never on, and
+    # null if never known. The weekly flags keep "last" (the Friday value).
+    if "core_index_fast_warning" in aggregation:
+        aggregation["core_index_fast_warning"] = "max"
     resampled = subset.resample(rule).agg(aggregation)
     if resampled.empty:
         return subset.copy()
@@ -209,6 +235,18 @@ def _timeline_points(frame: pd.DataFrame) -> list[dict[str, Any]]:
                     row.get("core_index_composite"), 2
                 ),
                 "core_index_bucket": _as_str(row.get("core_index_bucket")),
+                "core_index_severity": _as_str(
+                    row.get("core_index_severity")
+                ),
+                "core_index_warning": _as_bool(
+                    row.get("core_index_warning")
+                ),
+                "core_index_trend_warning": _as_bool(
+                    row.get("core_index_trend_warning")
+                ),
+                "core_index_fast_warning": _as_bool(
+                    row.get("core_index_fast_warning")
+                ),
                 "macro_score": _as_float(row.get("macro_score"), 2),
                 "credit_score": _as_float(row.get("credit_score"), 2),
                 "core_volatility_score": _as_float(
@@ -333,37 +371,6 @@ def _proxy_sources_from_frame(frame: pd.DataFrame) -> list[dict[str, Any]]:
     return sources
 
 
-def _event_window_stats(
-    frame: pd.DataFrame,
-    start: str,
-    end: str,
-    column: str,
-) -> dict[str, Any] | None:
-    """Peak-to-trough market statistics for one asset inside an event window."""
-    if column not in frame.columns:
-        return None
-    series = pd.to_numeric(frame[column], errors="coerce").loc[start:end].dropna()
-    if series.empty:
-        return None
-    peak = float(series.max())
-    trough = float(series.min())
-    first = float(series.iloc[0])
-    last = float(series.iloc[-1])
-    drawdown = ((trough / peak) - 1.0) * 100.0 if peak > 0 else None
-    total_return = ((last / first) - 1.0) * 100.0 if first > 0 else None
-    return {
-        "start_value": round(first, 4),
-        "peak_value": round(peak, 4),
-        "trough_value": round(trough, 4),
-        "end_value": round(last, 4),
-        "peak_date": series.idxmax().date().isoformat(),
-        "trough_date": series.idxmin().date().isoformat(),
-        "drawdown_pct": round(drawdown, 2) if drawdown is not None else None,
-        "return_pct": round(total_return, 2) if total_return is not None else None,
-        "observations": int(series.size),
-    }
-
-
 def _value_on_or_before(
     frame: pd.DataFrame,
     column: str,
@@ -419,10 +426,17 @@ class MacroRegimeService:
         artifact_path: Path | str = DEFAULT_ARTIFACT,
         meta_path: Path | str = DEFAULT_META,
         crypto_milestones_path: Path | str = DEFAULT_CRYPTO_MILESTONES,
+        patterns_skill_path: Path | str | None = None,
     ) -> None:
         self.artifact_path = Path(artifact_path)
         self.meta_path = Path(meta_path)
         self.crypto_milestones_path = Path(crypto_milestones_path)
+        # The Study of Patterns v2 skill artifact sits next to the parquet.
+        self.patterns_skill_path = (
+            Path(patterns_skill_path)
+            if patterns_skill_path is not None
+            else self.artifact_path.parent / patterns_v2.SKILL_FILENAME
+        )
         self._frame: pd.DataFrame | None = None
         self._meta: dict[str, Any] = {}
         self._crashes: list[dict[str, Any]] = []
@@ -430,6 +444,11 @@ class MacroRegimeService:
         self._meta_mtime: float | None = None
         self._cache: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._forecast_cache: dict[str, Any] | None = None
+        # Study of Patterns v2: one engine block per asset, kept until the
+        # parquet or the skill artifact changes.
+        self._patterns_engine_cache: dict[
+            str, tuple[tuple[Any, ...], dict[str, Any]]
+        ] = {}
         self._lock = threading.RLock()
 
     def _load(self) -> pd.DataFrame:
@@ -459,6 +478,7 @@ class MacroRegimeService:
                 self._meta = _read_json(self.meta_path)
                 self._crashes = build_crashes(frame)
                 self._cache.clear()
+                self._patterns_engine_cache.clear()
                 self._forecast_cache = None
             return self._frame
 
@@ -483,6 +503,11 @@ class MacroRegimeService:
             "core_index_version": core_index.get("version", CORE_INDEX_VERSION),
             "core_index_weights": core_index.get("weights"),
             "core_index_buckets": core_index.get("buckets"),
+            "core_index_severities": core_index.get("severities"),
+            "core_index_first_scored": core_index.get("first_scored"),
+            "core_index_cadence": core_index.get("cadence"),
+            "core_index_trend_warning": core_index.get("trend_warning"),
+            "core_index_fast_warning": core_index.get("fast_warning"),
             "latest_core_index": core_index.get("latest"),
             "proxy_sources": proxy_sources,
             "nber_source": self._meta.get("nber", {}).get("source", "USREC"),
@@ -740,7 +765,7 @@ class MacroRegimeService:
 
             assets: dict[str, Any] = {}
             for key, (column, label) in EVENT_ASSETS.items():
-                stats = _event_window_stats(frame, start, end, column)
+                stats = window_stats(frame, start, end, column)
                 assets[key] = {
                     "label": label,
                     "available": stats is not None,
@@ -774,7 +799,7 @@ class MacroRegimeService:
             "events": events,
             "notes": [
                 "Event windows are hand-curated comparison windows, not statistically detected crash dates.",
-                "Core Index is a macro/volatility/momentum composite from the same long-run artifact; it is not a crypto-specific model.",
+                "Core Index is the weekly S&P 500 trend-and-stress reading from the same long-run artifact; it is not a crypto-specific model.",
                 "Bitcoin prices are Blockchain.com daily market prices from 2010-08-18; Genesis predates a market quote.",
                 "Astrology is a historical lens, not a forecast or causal claim.",
             ],
@@ -786,14 +811,64 @@ class MacroRegimeService:
         today: date | str | None = None,
         asset: str = "sp500",
     ) -> dict[str, Any]:
-        """Rolling 120-year similarity and one-year forward historical echo."""
+        """The v1 rolling 120-year comparison plus the v2 ``engine`` block.
+
+        ``engine`` (closest historical setups, regime/patterns_v2.py) always
+        describes the latest data, whatever ``today`` is. It is cached per
+        asset and is None when it cannot be built, so it never fails the
+        request; an unknown asset still raises ValueError from v1.
+        """
         from regime.patterns import build_patterns_payload
 
-        return build_patterns_payload(
-            self._load(),
+        frame = self._load()
+        payload = build_patterns_payload(
+            frame,
             today=today,
             asset=asset,
         )
+        payload["engine"] = self._patterns_engine(asset, frame)
+        return payload
+
+    def _patterns_engine(
+        self,
+        asset: str,
+        frame: pd.DataFrame,
+    ) -> dict[str, Any] | None:
+        """The validated v2 engine block for ``asset``; None (logged) on any failure.
+
+        Built outside the lock and stored under it, once per (asset, parquet
+        mtime, skill artifact stamp); ``_load()`` clears the cache when the
+        parquet changes. Concurrent cold builds are idempotent. A failure is
+        not cached, so the next request retries.
+        """
+        try:
+            skill_stamp = patterns_v2.skill_stamp(self.patterns_skill_path)
+            with self._lock:
+                key = (self._mtime, skill_stamp)
+                current = self._frame is frame
+                cached = self._patterns_engine_cache.get(asset)
+            if current and cached is not None and cached[0] == key:
+                return cached[1]
+            # Loads the mtime-cached skill artifact and events, builds,
+            # validates and never raises (None on failure).
+            engine = patterns_v2.engine_for(
+                frame,
+                asset,
+                skill_path=self.patterns_skill_path,
+            )
+            if engine is None:
+                return None
+            # Validate here too: a contract break must degrade to engine:
+            # null, not fail response validation (a 500) in the router.
+            PatternEngineV2.model_validate(engine)
+            json.dumps(engine, allow_nan=False)
+        except Exception:  # noqa: BLE001 - the v2 block must never fail the request
+            logger.exception("Study of Patterns v2 engine unavailable for %s", asset)
+            return None
+        if current:
+            with self._lock:
+                self._patterns_engine_cache[asset] = (key, engine)
+        return engine
 
     def forecast(self) -> dict[str, Any]:
         """30-day forward probability of a Disruptive macro regime.

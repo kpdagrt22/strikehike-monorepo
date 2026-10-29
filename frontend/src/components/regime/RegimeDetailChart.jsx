@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { MARKET_FLAGS, sp500SeriesLabel } from "@/components/regime/regimeChart";
 import {
-  areaFromSegment,
   buildSegments,
   clamp,
   formatDate,
@@ -11,6 +11,8 @@ import {
   pathFromSegment,
 } from "@/components/regime/regimeUtils";
 
+const FOCUS_RING_INSET =
+  "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
 const WIDTH = 920;
 const HEIGHT = 250;
 const PAD = { top: 28, right: 52, bottom: 34, left: 54 };
@@ -20,20 +22,20 @@ const CORE_INDEX_TICKS = [-50, 0, 50];
 const EQUITY_TICKS = [100, 1_000, 10_000, 100_000];
 const DAY_MS = 86_400_000;
 
-function Legend({ tone }) {
+function Legend({ tone, equityLabel, lanes }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-black/45 dark:text-white/45">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-black/60 dark:text-white/60">
       <span className="inline-flex items-center gap-1.5">
         <span
           className="h-0.5 w-3 rounded-full"
           style={{ backgroundColor: tone.equity }}
         />
-        Equity proxy
+        {equityLabel}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span
           className="h-0.5 w-3 rounded-full"
-          style={{ backgroundColor: tone.strength }}
+          style={{ backgroundColor: tone.axisStrong }}
         />
         Core Index
       </span>
@@ -44,6 +46,15 @@ function Legend({ tone }) {
         />
         Recession
       </span>
+      {lanes.map((lane) => (
+        <span key={lane.field} className="inline-flex items-center gap-1.5">
+          <span
+            className="h-0.5 w-3 rounded-full"
+            style={{ backgroundColor: lane.color }}
+          />
+          {lane.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -145,6 +156,41 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
       return log >= minLog && log <= maxLog;
     });
 
+    // The index the window's S&P values belong to ("S&P 90 → S&P 500" across
+    // the S&P 500's launch in March 1957).
+    const firstPoint = equityPoints[0];
+    const lastPoint = equityPoints.at(-1);
+    const fromLabel = sp500SeriesLabel(firstPoint?.date, firstPoint?.proxy_source);
+    const toLabel = sp500SeriesLabel(lastPoint?.date, lastPoint?.proxy_source);
+    const equityLabel = fromLabel === toLabel ? fromLabel : `${fromLabel} → ${toLabel}`;
+
+    // Days with a market flag on, as runs along the plot's foot.
+    const lanes = MARKET_FLAGS.filter((flag) =>
+      points.some((point) => typeof point[flag.field] === "boolean"),
+    ).map((flag) => {
+      const runs = [];
+      let open = null;
+      for (const point of points) {
+        if (point[flag.field] !== true) {
+          open = null;
+        } else if (open) {
+          open.end = point.ms;
+        } else {
+          open = { start: point.ms, end: point.ms };
+          runs.push(open);
+        }
+      }
+      return {
+        field: flag.field,
+        label: flag.label,
+        color: isDark ? flag.dark : flag.light,
+        runs: runs.map((run) => ({
+          x0: x(run.start),
+          x1: x(Math.min(endMs, run.end + DAY_MS)),
+        })),
+      };
+    });
+
     return {
       startMs,
       endMs,
@@ -157,12 +203,14 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
       shadeEnd,
       markers,
       equityTicks,
+      equityLabel,
+      lanes,
     };
-  }, [timeline, crash, tone.axis]);
+  }, [timeline, crash, tone.axis, isDark]);
 
   if (!geometry) {
     return (
-      <div className="grid h-[220px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/45 dark:border-white/5 dark:text-white/45">
+      <div className="grid h-[220px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
         No daily observations returned for this window.
       </div>
     );
@@ -180,48 +228,34 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
     shadeEnd,
     markers,
     equityTicks,
+    equityLabel,
+    lanes,
   } = geometry;
   const baseline = PAD.top + PLOT_H;
   const hasSeries =
     equitySegments.length > 0 || coreIndexSegments.length > 0;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/45 dark:border-white/5 dark:bg-black/25">
+    <div className="overflow-hidden rounded-2xl border border-black/5 dark:border-white/5">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 px-4 py-3 dark:border-white/5">
-        <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+        <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
           Daily window · {timeline.length} observations
         </p>
-        <Legend tone={tone} />
+        <Legend tone={tone} equityLabel={equityLabel} lanes={lanes} />
       </div>
 
-      <div className="overflow-x-auto p-2 sm:p-3">
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Crash detail chart, scrollable"
+        className={`overflow-x-auto p-2 sm:p-3 ${FOCUS_RING_INSET}`}
+      >
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[620px]"
           role="img"
-          aria-label={`Daily equity proxy and Core Index score around ${crash?.name ?? "the selected recession"}`}
+          aria-label={`Daily ${equityLabel} and Core Index score around ${crash?.name ?? "the selected recession"}`}
         >
-          <defs>
-            <linearGradient
-              id="regime-detail-core-index-fill"
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <stop
-                offset="0%"
-                stopColor={tone.strength}
-                stopOpacity="0.24"
-              />
-              <stop
-                offset="100%"
-                stopColor={tone.strength}
-                stopOpacity="0"
-              />
-            </linearGradient>
-          </defs>
-
           {CORE_INDEX_TICKS.map((tick) => {
             const y = yCoreIndex(tick);
             return (
@@ -237,8 +271,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
                 <text
                   x={WIDTH - PAD.right + 8}
                   y={y + 3}
-                  fill={tone.axis}
-                  fontSize="9"
+                  fill={tone.axisText}
+                  fontSize="10"
                   className="font-mono"
                 >
                   {tick}
@@ -254,8 +288,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
                 key={`detail-equity-${tick}`}
                 x={PAD.left - 8}
                 y={y + 3}
-                fill={tone.axis}
-                fontSize="9"
+                fill={tone.axisText}
+                fontSize="10"
                 textAnchor="end"
                 className="font-mono"
               >
@@ -270,8 +304,21 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             width={Math.max(2, x(shadeEnd) - x(shadeStart))}
             height={PLOT_H}
             fill={tone.crimson}
-            fillOpacity="0.18"
+            fillOpacity="0.10"
           />
+
+          {lanes.map((lane, index) =>
+            lane.runs.map((run) => (
+              <rect
+                key={`detail-${lane.field}-${run.x0}`}
+                x={run.x0}
+                y={baseline - 2 - index * 4}
+                width={Math.max(1, run.x1 - run.x0)}
+                height={2}
+                fill={lane.color}
+              />
+            )),
+          )}
 
           {equitySegments.map((segment, index) => (
             <path
@@ -287,18 +334,10 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
 
           {coreIndexSegments.map((segment, index) => (
             <path
-              key={`detail-core-index-area-${index}`}
-              d={areaFromSegment(segment, baseline)}
-              fill="url(#regime-detail-core-index-fill)"
-            />
-          ))}
-
-          {coreIndexSegments.map((segment, index) => (
-            <path
               key={`detail-core-index-line-${index}`}
               d={pathFromSegment(segment)}
               fill="none"
-              stroke={tone.strength}
+              stroke={tone.axisStrong}
               strokeWidth="1.4"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -319,8 +358,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
               <text
                 x={marker.x + (marker.key === "6m" ? 3 : 0)}
                 y={PAD.top - 8}
-                fill={marker.colour}
-                fontSize="9"
+                fill={marker.emphasise ? marker.colour : tone.axisText}
+                fontSize="10"
                 textAnchor={marker.key === "6m" ? "start" : "middle"}
                 className="font-mono"
               >
@@ -333,7 +372,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             x={PAD.left}
             y={HEIGHT - 10}
             fill={tone.axisStrong}
-            fontSize="9"
+            fontSize="10"
             className="font-mono"
           >
             {formatDate(startMs)}
@@ -342,7 +381,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             x={WIDTH - PAD.right}
             y={HEIGHT - 10}
             fill={tone.axisStrong}
-            fontSize="9"
+            fontSize="10"
             textAnchor="end"
             className="font-mono"
           >
@@ -353,7 +392,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             <text
               x={WIDTH / 2}
               y={PAD.top + PLOT_H / 2}
-              fill={tone.axis}
+              fill={tone.axisText}
               fontSize="11"
               textAnchor="middle"
               className="font-mono"
