@@ -65,6 +65,11 @@ export function formatSigned(value, digits = 1) {
   return number >= 0 ? `+${formatted}` : formatted;
 }
 
+// The state colours never repeat an asset colour (assetTargets.js): Balanced
+// Growth is a neutral grey, since gold keeps the yellow. Checked with the
+// dataviz palette validator against the chart surfaces (#06060a dark, #f1ebe2
+// light): every state pair and every state-asset pair at least 15 OKLab ΔE
+// apart for normal vision, every colour at least 3:1 on its surface.
 export const CORE_INDEX_BUCKETS = {
   strong_bullish: {
     label: "Risk Elevated",
@@ -72,30 +77,30 @@ export const CORE_INDEX_BUCKETS = {
     action: "Trim risk",
     allocation:
       "Risk Elevated. Trim Equities. 70% Defensive (Gold/Bonds) / 30% Equity.",
-    dark: "#fb7185",
-    light: "#c0442f",
-    darkSoft: "rgba(251, 113, 133, 0.16)",
-    lightSoft: "rgba(192, 68, 47, 0.12)",
+    dark: "#f43f5e",
+    light: "#e11d48",
+    darkSoft: "rgba(244, 63, 94, 0.16)",
+    lightSoft: "rgba(225, 29, 72, 0.12)",
   },
   calm_bullish: {
     label: "Balanced Growth",
     description: "0 to +24",
     action: "Stay balanced",
     allocation: "Balanced Growth. 60% Equity / 40% Defensive.",
-    dark: "#facc15",
-    light: "#a16207",
-    darkSoft: "rgba(250, 204, 21, 0.16)",
-    lightSoft: "rgba(161, 98, 7, 0.12)",
+    dark: "#8a8580",
+    light: "#64748b",
+    darkSoft: "rgba(138, 133, 128, 0.16)",
+    lightSoft: "rgba(100, 116, 139, 0.12)",
   },
   bearish_warning: {
     label: "Capital Preservation",
     description: "-1 to -24",
     action: "Wait for the bottom",
     allocation: "Capital Preservation. Wait for bottom.",
-    dark: "#fb923c",
-    light: "#b45309",
-    darkSoft: "rgba(251, 146, 60, 0.16)",
-    lightSoft: "rgba(180, 83, 9, 0.12)",
+    dark: "#ff8a3d",
+    light: "#7c2d12",
+    darkSoft: "rgba(255, 138, 61, 0.16)",
+    lightSoft: "rgba(124, 45, 18, 0.12)",
   },
   extreme_bearish: {
     label: "Maximum Fear",
@@ -104,9 +109,9 @@ export const CORE_INDEX_BUCKETS = {
     allocation:
       "Maximum Fear. Aggressive Accumulation. 90% Equity / 10% Defensive.",
     dark: "#34d399",
-    light: "#047857",
+    light: "#15803d",
     darkSoft: "rgba(52, 211, 153, 0.16)",
-    lightSoft: "rgba(4, 120, 87, 0.12)",
+    lightSoft: "rgba(21, 128, 61, 0.12)",
   },
 };
 
