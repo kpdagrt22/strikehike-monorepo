@@ -7,13 +7,8 @@ import {
   padReadout,
 } from "@/components/regime/regimeUtils";
 import {
-  ASSET_TARGETS,
-  assetChartColor,
-} from "@/components/regime/assetTargets";
-import {
-  assetLabelAt,
+  contrastRatio,
   coreIndexFlag,
-  formatAssetValue,
   marketFlagText,
 } from "@/components/regime/regimeChart";
 
@@ -23,12 +18,23 @@ export const CARD_LEFT = 28;
 export const CARD_WIDTH = 244;
 // A signed score with one decimal is at most five characters ("+22.4").
 const SCORE_CHARS = 5;
+// The card's surface in each theme: an asset's value keeps its line colour
+// only where that colour reads at 4.5:1 or more on it.
+const CARD_SURFACE = { dark: "#0b0b12", light: "#ffffff" };
 
-function LegendRow({ label, value, color }) {
+// A row: the swatch (an empty slot keeps the Core Index label in line with
+// the asset labels), the label in ink, the value. The label truncates rather
+// than wrap, so a long index name never changes the card's height.
+function LegendRow({ label, value, color, swatch }) {
   return (
     <>
-      <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-        {label}
+      <span className="flex min-w-0 items-center gap-1.5 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={swatch ? { backgroundColor: swatch } : undefined}
+        />
+        <span className="truncate">{label}</span>
       </span>
       <span
         className="text-right font-mono text-micro font-semibold tracking-[-0.02em] text-[#14121a] tabular-nums dark:text-[#f2ede4]"
@@ -42,7 +48,11 @@ function LegendRow({ label, value, color }) {
 
 export function ChartCrosshairLegend({
   point,
-  asset = ASSET_TARGETS.sp500,
+  // One row per drawn asset: { key, label, value, color }, value already in
+  // the chart's mode (ROI or price).
+  rows = [],
+  // "ROI from 01 Jan 2018" or "Price": what the values are.
+  caption = "",
   isDark = true,
   active = false,
   side = "left",
@@ -60,9 +70,10 @@ export function ChartCrosshairLegend({
   // existing one sliding (no layout shift while scrubbing).
   const flagLines = flagsOn.map((item) => marketFlagText(item, point));
   const flagsKey = `${flag ? `${flag.label}|${flag.text}` : "none"}|${flagLines.join("|")}`;
-  // Both figures share one fixed width (padded readouts in a monospaced
+  // All figures share one fixed width (padded readouts in a monospaced
   // face), so the value column never changes width while scrubbing.
   const figureChars = Math.max(SCORE_CHARS, valueChars);
+  const surface = isDark ? CARD_SURFACE.dark : CARD_SURFACE.light;
   // On the right the card ends `rightInset` px from the chart's right edge.
   const shift = Math.max(0, room - rightInset - CARD_LEFT - CARD_WIDTH);
 
@@ -75,6 +86,7 @@ export function ChartCrosshairLegend({
   return (
     <div
       data-regime-card=""
+      data-rows={rows.length}
       className={`pointer-events-none absolute left-4 top-4 z-20 w-[218px] rounded-2xl border border-black/[0.08] bg-white/[0.92] p-3 shadow-[0_24px_80px_rgba(20,18,26,0.18)] backdrop-blur-xl transition-opacity duration-[140ms] starting:opacity-0 sm-tall:translate-y-[var(--regime-card-drop,0px)] dark:border-white/10 dark:bg-[#0b0b12]/[0.92] dark:shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:left-7 ${
         side === "right" ? "sm:translate-x-(--legend-shift)" : ""
       } sm:w-[244px] sm:p-4 ${active ? "block" : "hidden"}`}
@@ -94,16 +106,19 @@ export function ChartCrosshairLegend({
       <p className="mt-1.5 font-mono text-base font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-lg">
         {formatDate(point?.date)}
       </p>
+      {/* What the values are; one line, the same in both modes. */}
+      <p className="truncate text-micro text-black/60 dark:text-white/60">{caption}</p>
 
-      <div className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t border-black/[0.08] pt-2.5 dark:border-white/10">
-        <LegendRow
-          label={assetLabelAt(asset, point)}
-          value={padReadout(
-            formatAssetValue(asset, point?.[asset.valueField]),
-            figureChars,
-          )}
-          color={assetChartColor(asset, isDark)}
-        />
+      <div className="mt-2.5 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t border-black/[0.08] pt-2.5 dark:border-white/10">
+        {rows.map((row) => (
+          <LegendRow
+            key={row.key}
+            label={row.label}
+            value={padReadout(row.value, figureChars)}
+            swatch={row.color}
+            color={contrastRatio(row.color, surface) >= 4.5 ? row.color : null}
+          />
+        ))}
         <LegendRow
           label="Core Index"
           value={padReadout(formatSigned(point?.core_index), figureChars)}

@@ -48,6 +48,50 @@ function CoreIndexScale({ value, color }) {
   );
 }
 
+// The pill's key to its line: a dot in the line's colour (one asset), or a
+// checkbox (compare): filled with the colour and ticked when the line is
+// drawn, a 1.5 px outline when it is not. One 12 px box either way, so the
+// pills keep their width when compare turns on or off. The tick's ink keeps
+// 3:1 or more on every fill (white on the light theme's deep fills, near-black
+// on the dark theme's bright ones).
+function AssetSwatch({ mode }) {
+  if (mode === "dot") {
+    return (
+      <span aria-hidden="true" className="grid h-3 w-3 shrink-0 place-items-center">
+        <span className="h-2 w-2 rounded-full bg-(--asset-light) dark:bg-(--asset-dark)" />
+      </span>
+    );
+  }
+  const checked = mode === "checked";
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid h-3 w-3 shrink-0 place-items-center rounded-[3px] ${
+        checked
+          ? "bg-(--asset-light) text-white dark:bg-(--asset-dark) dark:text-[#0b0b12]"
+          : "border-[1.5px] border-(--asset-light) dark:border-(--asset-dark)"
+      }`}
+    >
+      {checked ? (
+        <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none">
+          <path
+            d="M3.2 6.2l1.9 1.9 3.7-4.1"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </span>
+  );
+}
+
+const VALUE_MODES = [
+  ["roi", "ROI %"],
+  ["price", "Price"],
+];
+
 export function MacroHUD({
   point,
   isDark,
@@ -57,6 +101,10 @@ export function MacroHUD({
   onAssetChange,
   compareAssets = false,
   onCompareToggle,
+  shownAssets = [],
+  onShownToggle,
+  valueMode = "roi",
+  onValueModeChange,
   marketFlags = [],
 }) {
   const tone = coreIndexTone(point?.core_index_bucket, isDark);
@@ -143,15 +191,55 @@ export function MacroHUD({
           </div>
         </div>
 
-        <div className="flex flex-col items-start gap-2 xl:items-end">
+        {/* From xl this column keeps the controls' width and the state
+            column gives way (down to its 18.25rem floor), so the controls
+            stay on one row and the HUD keeps its height at 1280 px. */}
+        <div className="flex flex-col items-start gap-2 xl:shrink-0 xl:items-end">
           <div className="flex flex-wrap items-center gap-1.5">
+            {/* The pills are the chart's key: each carries its line's colour.
+                One asset: a click picks it. Compare: each is a checkbox for
+                its line; the last line drawn stays checked (aria-disabled),
+                with nothing in the layout changing. A label never breaks;
+                below lg the pills (and the values switch) are a little
+                tighter, so the four keep one row on a 390 px phone and the
+                controls keep one row from 640 px. */}
             <div
               role="group"
-              aria-label="Primary asset"
+              aria-label={compareAssets ? "Assets on the chart" : "Primary asset"}
               className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 dark:border-white/5 dark:bg-white/[0.035]"
             >
               {ASSET_ORDER.map((key) => {
                 const target = ASSET_TARGETS[key];
+                const colors = {
+                  "--asset-light": target.light,
+                  "--asset-dark": target.dark,
+                };
+                if (compareAssets) {
+                  const checked = shownAssets.includes(key);
+                  const locked = checked && shownAssets.length === 1;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={checked}
+                      aria-disabled={locked ? "true" : undefined}
+                      title={locked ? "At least one asset stays on the chart" : undefined}
+                      onClick={() => {
+                        if (!locked) onShownToggle?.(key);
+                      }}
+                      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-colors duration-200 aria-disabled:cursor-default lg:gap-1.5 lg:px-2.5 ${
+                        checked
+                          ? "text-black/80 dark:text-white/85"
+                          : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
+                      }`}
+                      style={colors}
+                    >
+                      <AssetSwatch mode={checked ? "checked" : "unchecked"} />
+                      {target.label}
+                    </button>
+                  );
+                }
                 const selected = key === assetKey;
                 return (
                   <button
@@ -159,20 +247,14 @@ export function MacroHUD({
                     type="button"
                     onClick={() => onAssetChange?.(key)}
                     aria-pressed={selected}
-                    className={`rounded-full px-2.5 py-1 text-micro font-medium transition-[background-color,color] duration-200 ${
+                    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-[background-color,color] duration-200 lg:gap-1.5 lg:px-2.5 ${
                       selected
                         ? "bg-white/80 text-(--asset-light) dark:bg-(--asset-dark)/12 dark:text-(--asset-dark)"
                         : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
                     }`}
-                    style={
-                      selected
-                        ? {
-                            "--asset-light": target.light,
-                            "--asset-dark": target.dark,
-                          }
-                        : undefined
-                    }
+                    style={colors}
                   >
+                    <AssetSwatch mode="dot" />
                     {target.label}
                   </button>
                 );
@@ -204,6 +286,33 @@ export function MacroHUD({
               </svg>
               Compare assets
             </button>
+
+            {/* What the lines show: the return since the base week, or each
+                asset's own price. */}
+            <div
+              role="group"
+              aria-label="Chart values"
+              className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 dark:border-white/5 dark:bg-white/[0.035]"
+            >
+              {VALUE_MODES.map(([mode, label]) => {
+                const selected = mode === valueMode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onValueModeChange?.(mode)}
+                    aria-pressed={selected}
+                    className={`whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-[background-color,color] duration-200 lg:px-2.5 ${
+                      selected
+                        ? "bg-white/80 text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
+                        : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 xl:justify-end">

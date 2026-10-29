@@ -2,8 +2,9 @@
 // assetTargets.js so the pages that only need their formatters (/patterns,
 // /convergence) do not ship them: dates in the formatDate grammar, a
 // level-of-detail selection for dense weekly lines, monotone curves that never
-// overshoot a peak or a trough, exact round levels for the log-scaled index
-// axis, the Core Index and market flags, and the S&P series' names by period.
+// overshoot a peak or a trough, exact round levels for the log-scaled ROI and
+// price axes, ROI readouts, the Core Index and market flags, and the S&P
+// series' names by period.
 // Plain functions: nothing here imports the chart library.
 import {
   MONTHS,
@@ -426,14 +427,55 @@ function indexAxisCandidates(low, high) {
   return [...ranks].map(([level, rank]) => ({ level, rank }));
 }
 
-// Round levels for the visible part of a log-scaled index axis: the roundest
-// first, each new one as far as possible from those already placed and never
-// closer than `gap` px to another, inside rows top..bottom; finer ranks are
-// used only until `enough` labels are up, so the rhythm stays even. `toY`
-// maps a level to its row. Returns [{ level, y, text }] from top to bottom.
-export function indexAxisLevels(low, high, toY, { gap, top, bottom, enough = 3 }) {
-  if (!(low > 0) || !(high > low)) return [];
-  const candidates = indexAxisCandidates(low, high)
+// Candidate levels for a log-scaled price axis, ranked by roundness: the
+// powers of ten, then their 2 and 5 multiples (1-2-5 steps), then 2.5, the
+// other whole mantissas, the halves and the tenths of each decade.
+const PRICE_MANTISSAS = (() => {
+  const list = [
+    [1, 0],
+    [2, 1],
+    [5, 1],
+    [2.5, 2],
+  ];
+  for (const mantissa of [3, 4, 6, 7, 8, 9]) list.push([mantissa, 3]);
+  for (let tenths = 15; tenths < 100; tenths += 10) list.push([tenths / 10, 4]);
+  for (let tenths = 11; tenths < 100; tenths += 1) list.push([tenths / 10, 5]);
+  return list;
+})();
+
+function priceAxisCandidates(low, high) {
+  const ranks = new Map();
+  const first = Math.floor(Math.log10(low));
+  const last = Math.floor(Math.log10(high));
+  for (let exponent = first; exponent <= last; exponent += 1) {
+    for (const [mantissa, rank] of PRICE_MANTISSAS) {
+      const level = Number((mantissa * 10 ** exponent).toPrecision(12));
+      if (level >= low && level <= high && !(ranks.get(level) <= rank)) {
+        ranks.set(level, rank);
+      }
+    }
+  }
+  return [...ranks].map(([level, rank]) => ({ level, rank }));
+}
+
+// A round price level as an axis label: thousands separators and only the
+// decimals it needs ("2.5", "1,000"); no unit (the axis caption names it).
+export function formatPriceLevel(level) {
+  const value = Number(level);
+  if (!Number.isFinite(value)) return "—";
+  let digits = 0;
+  while (digits < 4 && Math.abs(Number(value.toFixed(digits)) - value) > 1e-7) {
+    digits += 1;
+  }
+  return formatNumber(value, digits);
+}
+
+// The roundest candidates first, each new one as far as possible from those
+// already placed and never closer than `gap` px to another, inside rows
+// top..bottom; finer ranks are used only until `enough` labels are up, so the
+// rhythm stays even. `toY` maps a level to its row.
+function placeAxisLevels(candidates, toY, { gap, top, bottom, enough = 3 }, format) {
+  const inView = candidates
     .map((candidate) => ({ ...candidate, y: toY(candidate.level) }))
     .filter(
       (candidate) =>
@@ -444,9 +486,9 @@ export function indexAxisLevels(low, high, toY, { gap, top, bottom, enough = 3 }
   const placed = [];
   const clearance = (y) =>
     placed.reduce((nearest, item) => Math.min(nearest, Math.abs(item.y - y)), Infinity);
-  const maxRank = candidates.reduce((max, item) => Math.max(max, item.rank), 0);
+  const maxRank = inView.reduce((max, item) => Math.max(max, item.rank), 0);
   for (let rank = 0; rank <= maxRank; rank += 1) {
-    const pool = candidates.filter((candidate) => candidate.rank === rank);
+    const pool = inView.filter((candidate) => candidate.rank === rank);
     while (pool.length > 0) {
       let best = 0;
       let bestClearance = -1;
@@ -464,7 +506,58 @@ export function indexAxisLevels(low, high, toY, { gap, top, bottom, enough = 3 }
   }
   return placed
     .sort((a, b) => a.y - b.y)
-    .map(({ level, y }) => ({ level, y, text: formatIndexChange(level) }));
+    .map(({ level, y }) => ({ level, y, text: format(level) }));
+}
+
+// Round levels for the visible part of a log-scaled index axis (change since
+// the base week). Returns [{ level, y, text }] from top to bottom.
+export function indexAxisLevels(low, high, toY, options) {
+  if (!(low > 0) || !(high > low)) return [];
+  return placeAxisLevels(indexAxisCandidates(low, high), toY, options, formatIndexChange);
+}
+
+// Round price levels for the visible part of a log-scaled price axis, placed
+// by the same rules: decades and 1-2-5 steps first, finer steps only until
+// enough labels are up. Returns [{ level, y, text }] from top to bottom.
+export function priceAxisLevels(low, high, toY, options) {
+  if (!(low > 0) || !(high > low)) return [];
+  return placeAxisLevels(priceAxisCandidates(low, high), toY, options, formatPriceLevel);
+}
+
+// The price axis's caption, the unit every tick is in: "Index" for the index
+// series, "$/oz" for gold.
+export function priceAxisCaption(asset) {
+  if (asset?.unit === "index") return "Index";
+  return String(asset?.unit ?? "").replace("/troy oz", "/oz");
+}
+
+// A return (0.123 for +12.3%) as a signed readout: "+12.3%", "−45.6%",
+// "+1,234%"; one decimal below 100%, none from 100% up; "0.0%" when it rounds
+// to nothing.
+export function formatReturn(ratio) {
+  const percent = Number(ratio) * 100;
+  if (ratio == null || !Number.isFinite(percent)) return "—";
+  const size = Math.abs(percent);
+  const digits = Number(size.toFixed(1)) < 100 ? 1 : 0;
+  const text = formatNumber(size, digits);
+  if (Number(size.toFixed(digits)) === 0) return `${text}%`;
+  return `${percent > 0 ? "+" : MINUS}${text}%`;
+}
+
+// WCAG contrast between two "#rrggbb" colours (1 to 21).
+function relativeLuminance(hex) {
+  const value = Number.parseInt(String(hex).replace("#", ""), 16);
+  const channel = (shift) => {
+    const c = ((value >> shift) & 255) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0);
+}
+
+export function contrastRatio(a, b) {
+  const first = relativeLuminance(a);
+  const second = relativeLuminance(b);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
 // --- Core Index v2 flags and the S&P market flags ---------------------------
