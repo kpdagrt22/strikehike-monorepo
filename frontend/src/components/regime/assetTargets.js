@@ -3,6 +3,11 @@ export const PATTERN_ASSET_ORDER = ["sp500", "nifty"];
 export const CONVERGENCE_ASSET_ORDER = [...ASSET_ORDER, "bitcoin"];
 export const ALL_ASSET_ORDER = CONVERGENCE_ASSET_ORDER;
 
+// Line colours: gold keeps its yellow; the others avoid the Core Index state
+// colours (regimeUtils.js), so a line never reads as a state. Checked with
+// the dataviz palette validator on the chart surfaces (#06060a, #f1ebe2):
+// every asset pair at least 18 OKLab ΔE apart for normal vision and 8 under
+// simulated colour blindness, every colour at least 3:1 on its surface.
 export const ASSET_TARGETS = {
   sp500: {
     key: "sp500",
@@ -16,10 +21,10 @@ export const ASSET_TARGETS = {
     percentileField: "1y_volatility_percentile",
     precision: 0,
     unit: "index",
-    dark: "#67e8f9",
-    light: "#0e7490",
-    darkSoft: "rgba(103, 232, 249, 0.22)",
-    lightSoft: "rgba(14, 116, 144, 0.16)",
+    dark: "#5b9df9",
+    light: "#0c4a6e",
+    darkSoft: "rgba(91, 157, 249, 0.22)",
+    lightSoft: "rgba(12, 74, 110, 0.16)",
   },
   gold: {
     key: "gold",
@@ -50,10 +55,10 @@ export const ASSET_TARGETS = {
     percentileField: "bond_1y_volatility_percentile",
     precision: 1,
     unit: "index",
-    dark: "#8b5cf6",
-    light: "#5b21b6",
-    darkSoft: "rgba(139, 92, 246, 0.24)",
-    lightSoft: "rgba(91, 33, 182, 0.16)",
+    dark: "#a855f7",
+    light: "#6b21a8",
+    darkSoft: "rgba(168, 85, 247, 0.24)",
+    lightSoft: "rgba(107, 33, 168, 0.16)",
   },
   nifty: {
     key: "nifty",
@@ -67,10 +72,10 @@ export const ASSET_TARGETS = {
     percentileField: "nifty_1y_volatility_percentile",
     precision: 0,
     unit: "index",
-    dark: "#34d399",
-    light: "#047857",
-    darkSoft: "rgba(52, 211, 153, 0.22)",
-    lightSoft: "rgba(4, 120, 87, 0.16)",
+    dark: "#f0abfc",
+    light: "#c026d3",
+    darkSoft: "rgba(240, 171, 252, 0.22)",
+    lightSoft: "rgba(192, 38, 211, 0.16)",
   },
   bitcoin: {
     key: "bitcoin",
@@ -84,10 +89,10 @@ export const ASSET_TARGETS = {
     percentileField: "btc_1y_volatility_percentile",
     precision: 0,
     unit: "$",
-    dark: "#f7931a",
-    light: "#c2410c",
-    darkSoft: "rgba(247, 147, 26, 0.18)",
-    lightSoft: "rgba(194, 65, 12, 0.14)",
+    dark: "#f5f5f4",
+    light: "#1c1917",
+    darkSoft: "rgba(245, 245, 244, 0.18)",
+    lightSoft: "rgba(28, 25, 23, 0.14)",
   },
 };
 
