@@ -7,7 +7,7 @@ export const ASSET_TARGETS = {
   sp500: {
     key: "sp500",
     label: "S&P 500",
-    fullLabel: "S&P 500 proxy",
+    fullLabel: "S&P 500",
     metricLabel: "S&P 500",
     valueField: "sp500_proxy",
     sourceField: "proxy_source",

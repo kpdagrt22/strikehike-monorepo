@@ -304,7 +304,7 @@ export function PhasePlane({
       className="overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/40"
     >
       <div className="flex flex-col gap-2 border-b border-black/5 p-5 dark:border-white/5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
-        <div>
+        <div className="min-w-0">
           <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
             Cycle map · {asset.label}
           </p>
@@ -314,10 +314,16 @@ export function PhasePlane({
           >
             The 90-day path
           </h2>
-          <p className="mt-1 text-micro text-black/60 dark:text-white/60">
-            {formatDate(asOf)} · {contextLabel} ·{" "}
+          {/* The week on one line of its own (the date in fixed-width
+              numerals) and the hint below it, so scrubbing never re-wraps
+              this text or moves what follows. */}
+          <p className="mt-1 truncate text-micro text-black/60 dark:text-white/60">
+            <span className="font-mono tabular-nums">{formatDate(asOf)}</span> ·{" "}
+            {contextLabel}
+          </p>
+          <p className="text-micro text-black/60 dark:text-white/60">
             <span className="[@media(hover:none)]:hidden">
-              move your cursor on the chart to trace the cycle
+              Move your cursor on the chart to trace the cycle
             </span>
             <span className="hidden [@media(hover:none)]:inline">
               Press and hold the chart to scrub
@@ -508,8 +514,9 @@ export function PhasePlane({
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
             Current
           </p>
+          {/* Two lines kept below sm, where the longest zone name wraps. */}
           <p
-            className="mt-0.5 font-mono text-meta uppercase"
+            className="mt-0.5 min-h-[2.9em] font-mono text-meta uppercase sm:min-h-0"
             style={{ color: markerColor }}
           >
             {currentQuadrant
@@ -556,7 +563,11 @@ export function PhasePlane({
         <p className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
           Contrarian playbook
         </p>
-        <p className="mt-1 text-meta leading-relaxed" style={{ color: toneForIndex.color }}>
+        {/* Two lines kept below sm for the longest allocation. */}
+        <p
+          className="mt-1 min-h-[3.25em] text-meta leading-relaxed sm:min-h-0"
+          style={{ color: toneForIndex.color }}
+        >
           {toneForIndex.allocation}
         </p>
       </div>

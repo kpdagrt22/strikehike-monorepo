@@ -5,19 +5,24 @@ import { usePathname } from "next/navigation";
 import { useChronoStore } from "@/store/chronoStore";
 
 // The four engine views in nav order; "short" is the label where room is
-// short (the phone cue, the header's row below lg).
+// short (the phone cue, the header's row below lg). "rowShort" is for the
+// row only: the cue is labelled "{label}, StrikeHike navigation", so the
+// words it shows must be words of its label (WCAG 2.5.3), and "Conv." is not.
 const VIEWS = [
   { href: "/", label: "Orrery", prefetch: false },
   { href: "/regime", label: "Regime" },
-  { href: "/convergence", label: "Convergence", short: "Conv." },
+  { href: "/convergence", label: "Convergence", rowShort: "Conv." },
   { href: "/patterns", label: "Study of Patterns", short: "Patterns" },
 ];
 
-// The view a pathname belongs to; anything outside the three data views is
-// the Orrery.
+// Pages outside the four views: the cue names the page and no view is active.
+const PAGES = [{ href: "/disclaimer", label: "Disclaimer" }];
+
+// The view (or page) a pathname belongs to; anything else outside the three
+// data views is the Orrery.
 export function viewForPath(pathname) {
   return (
-    VIEWS.find(
+    [...VIEWS, ...PAGES].find(
       (view) =>
         view.href !== "/" &&
         (pathname === view.href || pathname?.startsWith(`${view.href}/`)),
@@ -78,10 +83,10 @@ export function ModeSwitch({ layout = "list", onNavigate }) {
             />
             {/* The row shows the short label until lg; the full one stays
                 the link's name. */}
-            {row && view.short ? (
+            {row && (view.rowShort ?? view.short) ? (
               <>
                 <span aria-hidden="true" className="lg:hidden">
-                  {view.short}
+                  {view.rowShort ?? view.short}
                 </span>
                 <span className="sr-only lg:not-sr-only">{view.label}</span>
               </>

@@ -17,11 +17,17 @@ const UNAVAILABLE = { error: "Macro regime service is unavailable." };
 // view=atlas (weekly only): the timeline fields the /regime page reads
 // (RegimeTimeline, MacroHUD, ChartCrosshairLegend, PhasePlane and the asset
 // fields in assetTargets.js). Re-check those consumers before changing this.
-// Daily windows are never projected.
+// Daily windows are never projected. core_index_fast_warning is sent from
+// data 59192d5aa731; an older artifact omits it, which the page reads as no
+// flag.
 const ATLAS_FIELDS = [
   "date",
   "core_index",
   "core_index_bucket",
+  "core_index_severity",
+  "core_index_warning",
+  "core_index_trend_warning",
+  "core_index_fast_warning",
   "sp500_proxy",
   "proxy_source",
   "gold_proxy",

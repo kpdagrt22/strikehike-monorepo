@@ -1,22 +1,64 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { useTheme } from "next-themes";
 import { PeekIntoFuture } from "@/components/patterns/PeekIntoFuture";
-import { PatternEraPanel } from "@/components/patterns/PatternEraPanel";
-import { PatternMarketCard } from "@/components/patterns/PatternMarketCard";
-import { SimilarityBadge } from "@/components/patterns/SimilarityBadge";
+import { PatternMirror } from "@/components/patterns/PatternMirror";
+import {
+  answerText,
+  basisLabel,
+  formatDate,
+  isPatternEngine,
+} from "@/components/patterns/patternFormat";
 import {
   PATTERN_ASSET_ORDER,
   ASSET_TARGETS,
-  assetChartColor,
 } from "@/components/regime/assetTargets";
-import { formatDate } from "@/components/regime/regimeUtils";
+
+function EvidencePlaceholder() {
+  return (
+    <div
+      className="mt-3 rounded-[1.4rem] border border-(--sh-line-1) bg-white/45 px-5 py-1 dark:bg-black/40 sm:px-6"
+      aria-hidden="true"
+    >
+      <div className="h-14" />
+      <div className="h-14 border-t border-(--sh-line-1)" />
+      <div className="h-14 border-t border-(--sh-line-1)" />
+      <div className="h-14 border-t border-(--sh-line-1)" />
+    </div>
+  );
+}
+
+// Section 03 sits below the fold, closed until asked for: its code loads after
+// the page, behind a placeholder of the same three rows. React.lazy (no
+// next/dynamic runtime), rendered only once mounted, as with ssr: false.
+const PatternEvidence = lazy(() =>
+  import("@/components/patterns/PatternEvidence").then((mod) => ({
+    default: mod.PatternEvidence,
+  })),
+);
+// Evidence's "compare today with a past decline" row; it loads its picker
+// and chart itself, only when the row is near the screen or opened.
+const PatternCompare = lazy(() => import("@/components/patterns/PatternCompare"));
 
 const subscribe = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
+// A deep link, /patterns?case={id} (Convergence's "Compare with today"),
+// opens the compare row on that case; a Nifty 50 case opens the Nifty 50
+// lens. Read from the URL on the client only (the page is prerendered); the
+// row only ever matches it against the catalogue's ids.
+const getLinkedCase = () => new URLSearchParams(window.location.search).get("case");
+const getNoLinkedCase = () => null;
 
 function SectionLabel({ number, children }) {
   return (
@@ -32,54 +74,38 @@ function SectionLabel({ number, children }) {
   );
 }
 
-function MarketSkeleton() {
+// A local copy of the /regime status chip (that page belongs to another stream).
+function StatusBadge({ status }) {
+  const config =
+    status === "ready"
+      ? {
+          label: "Archive online",
+          dot: "bg-[#0f766e] dark:bg-[#5eead4]",
+          pulse: false,
+        }
+      : status === "error"
+        ? {
+            label: "Archive offline",
+            dot: "bg-[#ef4444]",
+            pulse: false,
+          }
+        : {
+            label: "Reading archive",
+            dot: "bg-[#d8b47a]",
+            pulse: true,
+          };
+
   return (
-    <div className="h-[480px] animate-pulse rounded-[1.6rem] border border-black/5 bg-white/35 dark:border-white/5 dark:bg-black/30" />
+    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:border-white/5 dark:bg-black/30 dark:text-white/60">
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
+          config.pulse ? "animate-pulse" : ""
+        }`}
+        aria-hidden="true"
+      />
+      {config.label}
+    </span>
   );
-}
-
-function toTimeline(window) {
-  if (!window || !Array.isArray(window.series)) return [];
-  return window.series.map((point) => ({
-    date: point.date,
-    sp500_proxy: point.value,
-  }));
-}
-
-function toSummary(window) {
-  if (!window) return null;
-  return {
-    ...window,
-    change: window.return_pct,
-    drawdown: window.drawdown_pct,
-    coreIndex: window.core_index,
-    coreBucket: window.core_index_bucket,
-  };
-}
-
-function similarityMeta(score, isDark) {
-  if (score == null) {
-    return {
-      label: "Reading echo",
-      color: null,
-    };
-  }
-  if (score > 80) {
-    return {
-      label: "Strong echo",
-      color: isDark ? "#34d399" : "#047857",
-    };
-  }
-  if (score >= 50) {
-    return {
-      label: "Partial echo",
-      color: isDark ? "#e2e8f0" : "#475569",
-    };
-  }
-  return {
-    label: "Weak echo",
-    color: isDark ? "#fb7185" : "#c0442f",
-  };
 }
 
 function AssetLens({ assetKey, onChange }) {
@@ -101,6 +127,7 @@ function AssetLens({ assetKey, onChange }) {
           return (
             <button
               key={key}
+              id={`pattern-lens-${key}`}
               type="button"
               onClick={() => onChange(key)}
               aria-pressed={selected}
@@ -134,16 +161,26 @@ export default function PatternsPage() {
     getServerSnapshot,
   );
   const isDark = !mounted || resolvedTheme !== "light";
-  const marketsHeadingRef = useRef(null);
-  const [assetKey, setAssetKey] = useState("sp500");
+  const linkedCase = useSyncExternalStore(subscribe, getLinkedCase, getNoLinkedCase);
+  const titleRef = useRef(null);
+  const announceNextRef = useRef(false);
+  const [chosenAsset, setChosenAsset] = useState(null);
+  const assetKey = chosenAsset ?? (linkedCase?.startsWith("nifty-") ? "nifty" : "sp500");
   const [reloadKey, setReloadKey] = useState(0);
+  const [, startSwitch] = useTransition();
+  // loading (nothing yet) · ready · switching (the previous lens stays, dimmed)
+  // · error. `data` is the validated `engine` block; v1 fields are not read.
   const [state, setState] = useState({
     status: "loading",
     data: null,
     error: null,
+    announce: "",
   });
 
   useEffect(() => {
+    // The deep link was rendered before the URL settled (hydration, or a
+    // client-side navigation): the store renders it at once, so fetch then.
+    if (getLinkedCase() !== linkedCase) return undefined;
     const controller = new AbortController();
 
     fetch(`/api/v1/patterns?asset=${encodeURIComponent(assetKey)}`, {
@@ -161,65 +198,68 @@ export default function PatternsPage() {
         return response.json();
       })
       .then((payload) => {
-        if (!payload?.current || !payload?.forward) {
+        const engine = payload?.engine;
+        if (!isPatternEngine(engine) || engine.asset !== assetKey) {
           throw new Error("The pattern archive returned an unexpected payload.");
         }
-        setState({ status: "ready", data: payload, error: null });
+        // Only a lens the reader chose is announced, never the first load.
+        const announce = announceNextRef.current ? answerText(engine) ?? "" : "";
+        announceNextRef.current = false;
+        setState({ status: "ready", data: engine, error: null, announce });
       })
       .catch((error) => {
         if (error.name !== "AbortError") {
-          setState({ status: "error", data: null, error: error.message });
+          announceNextRef.current = false;
+          setState({
+            status: "error",
+            data: null,
+            error: error.message,
+            announce: "",
+          });
         }
       });
 
     return () => controller.abort();
-  }, [assetKey, reloadKey]);
+  }, [assetKey, reloadKey, linkedCase]);
 
   const handleAssetChange = (key) => {
     if (key === assetKey) return;
-    setState({ status: "loading", data: null, error: null });
-    setAssetKey(key);
+    announceNextRef.current = true;
+    // A transition: the press paints at once and the page's switching render
+    // (the previous lens dimmed) follows without blocking it (INP).
+    startSwitch(() => {
+      setState((previous) => ({
+        ...previous,
+        status: previous.data ? "switching" : "loading",
+        error: null,
+      }));
+      setChosenAsset(key);
+    });
   };
 
   const handleRetry = () => {
     // The alert (and this button) unmount on retry; keep focus in the section.
-    marketsHeadingRef.current?.focus({ preventScroll: true });
-    setState({ status: "loading", data: null, error: null });
+    titleRef.current?.focus({ preventScroll: true });
+    setState({ status: "loading", data: null, error: null, announce: "" });
     setReloadKey((key) => key + 1);
   };
 
-  const data = state.data;
+  const handleOpenMirror = () => {
+    handleAssetChange("sp500");
+    document.getElementById("pattern-lens-sp500")?.focus();
+  };
+
+  const engine = state.data;
+  const switching = state.status === "switching";
   const asset = ASSET_TARGETS[assetKey] ?? ASSET_TARGETS.sp500;
-  const accent = assetChartColor(asset, isDark);
-  const fallback = Boolean(data?.mirror_fallback);
-  const nowTimeline = toTimeline(data?.current);
-  const thenTimeline = toTimeline(data?.historical);
-  const nowSummary = toSummary(data?.current);
-  const thenSummary = toSummary(data?.historical);
-  const nowDate = data?.current?.end ?? null;
-  const thenDate = data?.historical_date ?? null;
-  const thenLabel = fallback
-    ? "Closest available mirror"
-    : "Exactly 120 years ago";
-  const thenContext = fallback
-    ? data?.mirror_note ??
-      "The asset does not reach back 120 years; the earliest complete one-year mirror is used."
-    : "Railroads, electricity and the road to 1907";
-  const echo = similarityMeta(data?.similarity_percentage, isDark);
-  const echoLabel = fallback
-    ? "Short-history lens"
-    : state.status === "error"
-      ? "Unavailable"
-      : echo.label;
-  const pendingDate =
-    state.status === "error" ? "Archive unavailable" : "Loading archive…";
+  const basis = basisLabel(engine?.basis);
 
   return (
     <main className="relative h-full w-full scroll-pt-(--sh-header-clear) overflow-y-auto overflow-x-hidden pb-24 pt-(--sh-header-clear)">
       <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-micro uppercase tracking-[0.2em] text-[#c0442f] dark:text-[#ff8b77]">
+            <p className="text-micro uppercase tracking-[0.2em] text-[#a83a27] dark:text-[#ff8b77]">
               Study of Patterns
             </p>
             <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl">
@@ -228,306 +268,100 @@ export default function PatternsPage() {
                 : "The 120-year mirror."}
             </h1>
             <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70 sm:text-body">
-              A rolling comparison of two market windows, the correlation
-              between them, and exactly what happened in the historical year
-              that followed. Different technology, different headlines,
-              familiar human mechanics.
+              A rolling comparison of today’s market with its closest
+              historical setups, and what happened in the year that followed.
+              Different technology, different headlines, familiar human
+              mechanics.
             </p>
             <AssetLens
               assetKey={assetKey}
               onChange={handleAssetChange}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:border-white/5 dark:bg-black/30 dark:text-white/60">
-              <span
-                className="h-1.5 w-1.5 rounded-full bg-[#0f766e] dark:bg-[#5eead4]"
-                aria-hidden="true"
-              />
-              {fallback ? "Earliest mirror" : "120-year study"}
-            </span>
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60">
-              {nowDate ? formatDate(nowDate) : "—"} ·{" "}
-              {thenDate ? formatDate(thenDate) : "—"}
+          <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
+            <StatusBadge status={switching ? "loading" : state.status} />
+            <span
+              className={`inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 font-mono text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60 ${
+                engine ? "" : "invisible"
+              }`}
+            >
+              As of {engine ? formatDate(engine.as_of) : "00 Mon 0000"} ·{" "}
+              {basis ?? "weekly closes"}
             </span>
           </div>
         </header>
 
-        <section className="mt-5 overflow-hidden rounded-[1.6rem] border border-black/5 bg-white/40 p-4 dark:border-white/5 dark:bg-black/30 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-6">
-            <div className="px-2 py-2 sm:text-right">
-              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
-                Today
-              </p>
-              <p className="mt-1 font-mono text-lg font-medium tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
-                {nowDate ? formatDate(nowDate) : pendingDate}
-              </p>
-              <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
-                {assetKey === "nifty"
-                  ? "Domestic flows, earnings and a valuation reset"
-                  : "AI, ETFs and concentrated leadership"}
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-2 py-1 sm:flex-col">
-              <span className="h-px w-10 bg-black/10 sm:h-8 sm:w-px dark:bg-white/15" />
-              <span className="whitespace-nowrap font-mono text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
-                {fallback ? `${asset.label} mirror` : "120 years"}
-              </span>
-              <span className="h-px w-10 bg-black/10 sm:h-8 sm:w-px dark:bg-white/15" />
-            </div>
-            <div className="px-2 py-2">
-              <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
-                {thenLabel}
-              </p>
-              <p className="mt-1 font-mono text-lg font-medium tracking-[-0.03em] text-[#14121a] dark:text-[#f2ede4]">
-                {thenDate ? formatDate(thenDate) : pendingDate}
-              </p>
-              <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
-                {thenContext}
-              </p>
-            </div>
-          </div>
-        </section>
+        <div
+          className={`transition-opacity duration-(--sh-dur-micro) motion-reduce:transition-none ${
+            switching ? "pointer-events-none opacity-60" : ""
+          }`}
+          aria-busy={switching || undefined}
+          inert={switching || undefined}
+        >
+          <section className="mt-10 lg:mt-8" aria-labelledby="peek-future-title">
+            <SectionLabel number="01">What happened next</SectionLabel>
 
-        <section className="mt-8">
-          <SectionLabel number="01">Markets · then vs now</SectionLabel>
-          <div className="mt-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:justify-between">
-            <h2
-              ref={marketsHeadingRef}
-              tabIndex={-1}
-              className="text-balance text-2xl font-semibold tracking-[-0.04em] text-[#14121a] focus:outline-none dark:text-[#f2ede4] sm:text-3xl"
-            >
-              The same market animal.
-            </h2>
-            <p className="max-w-xl text-micro leading-relaxed text-black/60 dark:text-white/60">
-              {fallback
-                ? `The closest available ${asset.label} mirror is used because the index does not reach back 120 years. The historical forward tape is still real.`
-                : "A century apart, both markets were near highs, calm on the surface, and leaning on a powerful new technology story."}
-            </p>
-          </div>
-
-          {state.status === "error" ? (
-            <div
-              role="alert"
-              className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ef4444]/25 bg-[#ef4444]/4 px-4 py-3"
-            >
-              <p className="text-micro text-[#c0442f] dark:text-[#ff8b77]">
-                Pattern archive unavailable: {state.error}
-              </p>
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="shrink-0 rounded-full border border-black/14 px-3.5 py-1.5 text-micro font-medium text-black/70 transition-colors hover:bg-black/4 focus-visible:bg-black/4 pointer-coarse:min-h-11 dark:border-white/14 dark:text-white/70 dark:hover:bg-white/6 dark:focus-visible:bg-white/6"
+            {state.status === "error" ? (
+              <div
+                role="alert"
+                className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ef4444]/25 bg-[#ef4444]/4 px-4 py-3"
               >
-                Retry
-              </button>
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
-            {state.status === "loading" ? (
-              <>
-                <MarketSkeleton />
-                <div className="hidden lg:block">
-                  <div className="h-32 w-40 animate-pulse rounded-2xl bg-black/[0.04] dark:bg-white/[0.05]" />
-                </div>
-                <MarketSkeleton />
-              </>
-            ) : (
-              <>
-                <PatternMarketCard
-                  side="Now"
-                  date={nowDate}
-                  label={
-                    assetKey === "nifty"
-                      ? "A valuation reset"
-                      : "A concentrated expansion"
-                  }
-                  timeline={nowTimeline}
-                  summary={nowSummary}
-                  isDark={isDark}
-                  accent={accent}
-                  editorial={
-                    assetKey === "nifty"
-                      ? "India's benchmark is digesting a valuation reset while domestic flows and earnings growth provide support. The concentration is in large caps and financials; the risk is the global funding cycle."
-                      : "AI infrastructure, ETF flows and a narrow mega-cap leadership group carry the index near record levels. The surface is calm; the concentration is the story."
-                  }
-                />
-                <SimilarityBadge
-                  score={data?.similarity_percentage}
-                  isDark={isDark}
-                  status={state.status}
-                />
-                <PatternMarketCard
-                  side="Then"
-                  date={thenDate}
-                  label={fallback ? "The 2008 global crisis" : "The calm before 1907"}
-                  timeline={thenTimeline}
-                  summary={thenSummary}
-                  isDark={isDark}
-                  accent={accent}
-                  editorial={
-                    fallback && assetKey === "nifty"
-                      ? "The Nifty's earliest complete one-year mirror captures the 2008 global crisis: Lehman, the Mumbai attacks and the Satyam accounting shock. India was not insulated from a global funding squeeze."
-                      : "Railroads, electrification and trust consolidation were the growth story. The Panic of 1907 was still about a year away; the surface was calm then, too."
-                  }
-                />
-              </>
-            )}
-          </div>
-
-          {state.status === "ready" && data ? (
-            <PeekIntoFuture
-              forward={data.forward}
-              assetLabel={data.asset_label ?? asset.label}
-              isDark={isDark}
-              accent={accent}
-            />
-          ) : null}
-        </section>
-
-        <section className="mt-10">
-          <SectionLabel number="02">Geopolitics &amp; science</SectionLabel>
-          <div className="mt-3 flex flex-col gap-1 lg:flex-row lg:items-end lg:justify-between">
-            <h2 className="text-balance text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
-              Different tools, familiar tensions.
-            </h2>
-            <p className="max-w-xl text-micro leading-relaxed text-black/60 dark:text-white/60">
-              A general-purpose technology, a contested chokepoint, and a
-              political order under strain. The nouns change; the grammar
-              repeats.
-            </p>
-          </div>
-
-          <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-2">
-            <PatternEraPanel
-              side="Now"
-              era="2026"
-              title="AI, security and the new industrial race"
-              summary="The general-purpose technology is AI. The contested chokepoint is compute, energy and the supply chain that makes both possible."
-              bullets={[
-                "AI infrastructure and data-centre capex become strategic assets.",
-                "US–China technology competition redraws trade and alliance maps.",
-                "European security and energy transition compete for fiscal space.",
-                "A concentrated market leadership group becomes a political actor.",
-              ]}
-              accent={accent}
-            />
-            {fallback && assetKey === "nifty" ? (
-              <PatternEraPanel
-                side="Then"
-                era="2008"
-                title="Lehman, Mumbai and the Satyam shock"
-                summary="A global funding crisis met a domestic security shock and a corporate-governance failure. The Indian market had to reprice all three at once."
-                bullets={[
-                  "Lehman Brothers collapses in September 2008 and global credit freezes.",
-                  "The Mumbai attacks of November 2008 raise sovereign and security risk.",
-                  "Satyam's accounting fraud tests confidence in Indian corporate governance.",
-                  "The 2009 election result becomes a political-risk release valve.",
-                ]}
-                accent={accent}
-              />
-            ) : (
-              <PatternEraPanel
-                side="Then"
-                era="1906"
-                title="Earthquake, dreadnoughts and electricity"
-                summary="The general-purpose technology was electricity. The contested chokepoint was rail, coal and the coaling stations that connected empires."
-                bullets={[
-                  "The San Francisco earthquake (April 1906) exposes infrastructure fragility.",
-                  "HMS Dreadnought resets the naval arms race in 1906.",
-                  "The Anglo-Russian Entente rearranges the great-power map.",
-                  "Rapid industrialisation and trust consolidation set up the Panic of 1907.",
-                ]}
-                accent={accent}
-              />
-            )}
-          </div>
-        </section>
-
-        <section className="mt-10">
-          <SectionLabel number="03">Repeatability index</SectionLabel>
-          <div className="mt-3 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/40 sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[0.7fr_1.3fr] lg:items-center">
-              <div className="relative border-black/5 lg:border-r lg:pr-8 dark:border-white/10">
-                <p className="text-micro font-medium uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
-                  Structural echo
+                <p className="text-micro text-[#c0442f] dark:text-[#ff8b77]">
+                  Pattern archive unavailable: {state.error}
                 </p>
-                <div className="mt-2 flex items-end gap-2">
-                  <span className="font-mono text-[5rem] font-medium leading-[0.72] tracking-[-0.08em] text-[#14121a] dark:text-[#f2ede4] sm:text-[6rem]">
-                    {fallback ? "1Y" : "120"}
-                  </span>
-                  <span className="pb-2 text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                    {fallback ? "mirror" : "years"}
-                  </span>
-                </div>
-                <p className="mt-3 max-w-xs text-meta leading-relaxed text-black/70 dark:text-white/70">
-                  {fallback
-                    ? `The ${asset.label} lens uses its earliest complete one-year window. The pattern still rhymes: emotion, leverage and a technology story.`
-                    : "The century repeats in structure: a new technology, a credit cycle, and a contest for power."}
-                </p>
-                <span
-                  className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-micro font-medium ${
-                    echo.color
-                      ? "bg-white/80 dark:bg-(--echo-tint)"
-                      : "border-black/14 text-black/60 dark:border-white/14 dark:text-white/60"
-                  }`}
-                  style={
-                    echo.color
-                      ? {
-                          borderColor: `${echo.color}33`,
-                          "--echo-tint": `${echo.color}16`,
-                          color: echo.color,
-                        }
-                      : undefined
-                  }
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="shrink-0 rounded-full border border-black/14 px-3.5 py-1.5 text-micro font-medium text-black/70 transition-colors hover:bg-black/4 focus-visible:bg-black/4 pointer-coarse:min-h-11 dark:border-white/14 dark:text-white/70 dark:hover:bg-white/6 dark:focus-visible:bg-white/6"
                 >
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {echoLabel}
-                </span>
+                  Retry
+                </button>
               </div>
+            ) : null}
 
-              <div>
-                <h2 className="text-pretty text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl">
-                  History does not repeat. It rhymes.
-                </h2>
-                <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70">
-                  Human emotion, debt and technological booms are the
-                  constants. The 1906 boom in rails and electricity, the 2008
-                  credit shock and the 2026 boom in AI and compute are different
-                  expressions of the same sequence: a general-purpose technology
-                  attracts capital, leverage amplifies the build-out, and the
-                  bill arrives when the story stops compounding.
-                </p>
-                <div className="mt-5 grid sm:grid-cols-2">
-                  {[
-                    ["Emotion", "Fear and greed do not update with the technology."],
-                    ["Debt", "Every boom finds a new way to borrow against the future."],
-                    ["Technology", "A general-purpose tool attracts capital, then overcapacity."],
-                    ["Power", "Geopolitical competition follows the money and the chokepoint."],
-                  ].map(([label, text]) => (
-                    <div
-                      key={label}
-                      className="border-t border-(--sh-line-1) py-3 sm:odd:border-r sm:odd:pr-4 sm:even:pl-4"
-                    >
-                      <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                        {label}
-                      </p>
-                      <p className="mt-1 text-micro leading-relaxed text-black/70 dark:text-white/70">
-                        {text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <p className="mt-6 border-t border-black/5 pt-4 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60">
-              The Repeatability Index is an editorial analogy, not a
-              statistical forecast. A high price correlation is a descriptive
-              echo, not a guarantee of the next move.
-            </p>
-          </div>
-        </section>
+            <PeekIntoFuture
+              engine={engine}
+              status={state.status}
+              assetKey={assetKey}
+              isDark={isDark}
+              mounted={mounted}
+              titleRef={titleRef}
+            />
+          </section>
+
+          <section className="mt-14">
+            <SectionLabel number="02">Repeatability index</SectionLabel>
+            <PatternMirror
+              engine={engine}
+              assetKey={assetKey}
+              onOpenMirror={handleOpenMirror}
+            />
+          </section>
+
+          <section className="mt-14" aria-labelledby="pattern-evidence-title">
+            <SectionLabel number="03">Evidence</SectionLabel>
+            <h2 id="pattern-evidence-title" className="sr-only">
+              Evidence
+            </h2>
+            {mounted ? (
+              <Suspense fallback={<EvidencePlaceholder />}>
+                <PatternEvidence engine={engine} assetKey={assetKey}>
+                  <Suspense
+                    fallback={<div className="h-[57px] border-t border-(--sh-line-1)" aria-hidden="true" />}
+                  >
+                    <PatternCompare
+                      engine={engine}
+                      assetKey={assetKey}
+                      linkedCase={linkedCase}
+                    />
+                  </Suspense>
+                </PatternEvidence>
+              </Suspense>
+            ) : (
+              <EvidencePlaceholder />
+            )}
+          </section>
+        </div>
 
         <div className="mt-6 flex flex-col gap-3 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
           <span>
@@ -547,9 +381,18 @@ export default function PatternsPage() {
             >
               Compare two events
             </Link>
+            <Link
+              href="/disclaimer"
+              className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
+            >
+              Disclaimer
+            </Link>
           </div>
         </div>
       </div>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {state.announce}
+      </p>
     </main>
   );
 }

@@ -10,6 +10,7 @@ import {
   ASSET_ORDER,
   ASSET_TARGETS,
 } from "@/components/regime/assetTargets";
+import { coreIndexFlag, marketFlagText } from "@/components/regime/regimeChart";
 
 // A slim −50…+50 track under the score: ticks at −25, 0 and +25 and a marker
 // at the current value in its band's tone. The marker keeps one layout
@@ -56,8 +57,15 @@ export function MacroHUD({
   onAssetChange,
   compareAssets = false,
   onCompareToggle,
+  marketFlags = [],
 }) {
   const tone = coreIndexTone(point?.core_index_bucket, isDark);
+  // Shown only when the week has them. A warning while Balanced Growth or
+  // Trim leaves the allocation line as it is.
+  const flag = coreIndexFlag(point);
+  const flagsOn = marketFlags.filter((item) => point?.[item.field] === true);
+  // One flag shows its text (naming the week's index); two show their labels.
+  const flagText = flagsOn.length === 1 ? marketFlagText(flagsOn[0], point) : "";
 
   return (
     <div className="mx-auto w-full max-w-[1600px] px-3 pb-3 pt-3 pr-20 sm:pb-4 sm:pl-5 sm:pt-5 sm:pr-20 lg:pl-8 lg:pr-20">
@@ -107,8 +115,17 @@ export function MacroHUD({
               </span>{" "}
               {tone.allocation}
             </p>
-            <p className="mt-1 max-w-[280px] truncate text-micro text-black/60 dark:text-white/60">
-              {activeCrash ? (
+            {/* One line, always: the week's Core Index flag when it has one,
+                otherwise the NBER window or the scrub hint. */}
+            <p className="mt-1 max-w-[320px] truncate text-micro text-black/60 dark:text-white/60">
+              {flag ? (
+                <>
+                  <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
+                    {flag.label}
+                  </span>{" "}
+                  {flag.text}
+                </>
+              ) : activeCrash ? (
                 `${activeCrash.name} · NBER window`
               ) : point ? (
                 <>
@@ -207,6 +224,37 @@ export function MacroHUD({
               scrub</span>
             </p>
           </div>
+
+          {/* The S&P market flags of the week: one line kept under the date
+              (sized by the column, w-0 min-w-full, so its text never widens
+              it), so a flag turning on or off never moves the chart. With
+              two flags on, only their labels fit. From xl the line sits
+              beside the taller score column and costs no height; narrower
+              HUDs keep their height, and the snapshot card (the scrub
+              readout) and the summary above carry the flags there. The line
+              is right-aligned, so it is drawn afresh whenever its content
+              changes (keyed by it) rather than sliding what stays in it. */}
+          {marketFlags.length ? (
+            <p
+              key={`${flagsOn.map((item) => item.field).join("|")}|${flagText}`}
+              className="hidden min-h-[1.35em] w-0 min-w-full truncate text-right text-micro text-black/60 dark:text-white/60 xl:block"
+            >
+              {flagsOn.map((item, index) => (
+                <span key={item.field}>
+                  {index ? <span aria-hidden="true"> · </span> : null}
+                  <span
+                    aria-hidden="true"
+                    className="mr-1.5 inline-block h-0.5 w-3 rounded-full align-middle"
+                    style={{ backgroundColor: isDark ? item.dark : item.light }}
+                  />
+                  <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
+                    {item.label}
+                  </span>
+                  {flagText ? ` ${flagText}` : null}
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

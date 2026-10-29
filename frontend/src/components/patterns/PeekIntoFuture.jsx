@@ -1,406 +1,275 @@
 "use client";
 
-import { useMemo } from "react";
+import { lazy, Suspense } from "react";
 import {
-  buildSegments,
-  clamp,
-  formatDate,
-  formatPercent,
-  getChartTone,
-  parseIsoDay,
-  pathFromSegment,
-} from "@/components/regime/regimeUtils";
+  CHIP_GRID,
+  CHIP_SLOT,
+  FAN_BOX,
+  MIRROR_ROW,
+  READOUT_BOX,
+  STRIP_BOX,
+  STRIP_ROW,
+  answerText,
+  formatChange,
+  formatShare,
+  horizonOf,
+  mirrorExact,
+  mirrorLine,
+  setupsLabel,
+  skillLine,
+} from "@/components/patterns/patternFormat";
+import { ASSET_TARGETS } from "@/components/regime/assetTargets";
 
-const WIDTH = 760;
-const HEIGHT = 300;
-const PAD = { top: 28, right: 24, bottom: 34, left: 42 };
-const PLOT_W = WIDTH - PAD.left - PAD.right;
-const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
-
-// Dark values are unchanged; light values are the existing light counterparts
-// from the palette (Risk Elevated, Bonds, S&P 500 and Gold pairs).
-const CATEGORY_COLORS = {
-  Financial: { dark: "#fb7185", light: "#c0442f" },
-  Geopolitics: { dark: "#a78bfa", light: "#5b21b6" },
-  Science: { dark: "#67e8f9", light: "#0e7490" },
-  "Science & Technology": { dark: "#67e8f9", light: "#0e7490" },
-};
-const CATEGORY_FALLBACK = { dark: "#facc15", light: "#a16207" };
-
-function categoryPair(category) {
-  return CATEGORY_COLORS[category] ?? CATEGORY_FALLBACK;
-}
-
-function pct(value, total) {
-  return `${(value / total) * 100}%`;
-}
-
-function ForwardChart({ forward, accent, isDark }) {
-  const tone = useMemo(() => getChartTone(isDark), [isDark]);
-  const markColor = isDark ? "#fb7185" : "#c0442f";
-  const geometry = useMemo(() => {
-    if (!forward || !Array.isArray(forward.series)) return null;
-    const points = forward.series
-      .map((point) => ({
-        ...point,
-        ms: parseIsoDay(point.date),
-        value: Number(point.value),
-      }))
-      .filter(
-        (point) =>
-          point.ms != null &&
-          Number.isFinite(point.value) &&
-          point.value > 0,
-      );
-    if (points.length < 2) return null;
-
-    const startMs = points[0].ms;
-    const endMs = points[points.length - 1].ms;
-    const span = Math.max(1, endMs - startMs);
-    const values = points.map((point) => point.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = Math.max(1, max - min);
-    const x = (ms) =>
-      PAD.left + clamp((ms - startMs) / span, 0, 1) * PLOT_W;
-    const y = (value) =>
-      PAD.top + PLOT_H - ((value - min) / range) * PLOT_H;
-    const segments = buildSegments(
-      points,
-      (point) => point.value,
-      (point) => x(point.ms),
-      y,
-    );
-    const peakMs = parseIsoDay(
-      forward.drawdown_peak?.date ?? forward.peak?.date,
-    );
-    const troughMs = parseIsoDay(forward.trough?.date);
-    const baseline = PAD.top + PLOT_H;
-    const area = segments
-      .map((segment) => {
-        if (segment.length < 2) return "";
-        const firstX = segment[0][0];
-        const lastX = segment[segment.length - 1][0];
-        return `${segment
-          .map(([sx, sy], index) => `${index === 0 ? "M" : "L"}${sx},${sy}`)
-          .join(" ")} L${lastX},${baseline} L${firstX},${baseline} Z`;
-      })
-      .join(" ");
-    return {
-      points,
-      startMs,
-      endMs,
-      x,
-      y,
-      segments,
-      area,
-      peakMs,
-      troughMs,
-    };
-  }, [forward]);
-
-  if (!geometry) {
-    return (
-      <div className="grid h-[250px] place-items-center rounded-2xl border border-dashed border-black/5 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
-        Forward tape unavailable for this asset.
-      </div>
-    );
-  }
-
-  const {
-    startMs,
-    endMs,
-    x,
-    y,
-    segments,
-    area,
-    peakMs,
-    troughMs,
-  } = geometry;
-  const peakPoint =
-    peakMs == null
-      ? null
-      : {
-          ms: peakMs,
-          value: Number(
-            forward.drawdown_peak?.value ?? forward.peak?.value,
-          ),
-        };
-  const troughPoint =
-    troughMs == null
-      ? null
-      : { ms: troughMs, value: Number(forward.trough?.value) };
-  // Labels are HTML over the plot so they keep the text floor at any width;
-  // near an edge they flip sides instead of being clipped.
-  const peakX = peakPoint ? x(peakPoint.ms) : 0;
-  const troughX = troughPoint ? x(troughPoint.ms) : 0;
-  const peakFlip = peakX > WIDTH * 0.85;
-  const troughFlip = troughX < WIDTH * 0.3;
-
+// Same boxes as the instrument's own loading state, so nothing moves when its
+// code arrives. The first load is always the S&P 500 lens (a mirror row).
+function InstrumentPlaceholder() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/5 bg-black/[0.02] p-2 dark:border-white/5 dark:bg-black/25 sm:p-3">
-      <div className="relative">
-        <svg
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="h-auto w-full"
-          role="img"
-          aria-label={`Historical one-year forward price path for ${forward.asset}, ${formatDate(forward.start)} to ${formatDate(forward.end)}`}
-        >
-          <defs>
-            <linearGradient id="peek-forward-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={accent} stopOpacity="0.24" />
-              <stop offset="100%" stopColor={accent} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          <line
-            x1={PAD.left}
-            x2={WIDTH - PAD.right}
-            y1={PAD.top + PLOT_H}
-            y2={PAD.top + PLOT_H}
-            stroke={tone.grid}
-          />
-          <path d={area} fill="url(#peek-forward-fill)" />
-          {segments.map((segment, index) => (
-            <path
-              key={`peek-forward-line-${index}`}
-              d={pathFromSegment(segment)}
-              fill="none"
-              stroke={accent}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-
-          {peakPoint ? (
-            <g>
-              <line
-                x1={peakX}
-                x2={peakX}
-                y1={PAD.top}
-                y2={PAD.top + PLOT_H}
-                stroke={markColor}
-                strokeOpacity="0.45"
-                strokeDasharray="3 4"
-              />
-              <circle
-                cx={peakX}
-                cy={y(peakPoint.value)}
-                r="4"
-                fill={markColor}
-                stroke={isDark ? "#08080c" : "#f6f1e9"}
-                strokeWidth="2"
-              />
-            </g>
-          ) : null}
-
-          {troughPoint ? (
-            <g>
-              <line
-                x1={troughX}
-                x2={troughX}
-                y1={PAD.top}
-                y2={PAD.top + PLOT_H}
-                stroke={markColor}
-                strokeOpacity="0.5"
-                strokeDasharray="3 4"
-              />
-              <circle
-                cx={troughX}
-                cy={y(troughPoint.value)}
-                r="4.5"
-                fill={markColor}
-                stroke={isDark ? "#08080c" : "#f6f1e9"}
-                strokeWidth="2"
-              />
-            </g>
-          ) : null}
-        </svg>
-        <div
-          className="pointer-events-none absolute inset-0 font-mono text-micro leading-none text-[#c0442f] dark:text-[#fb7185]"
-          aria-hidden="true"
-        >
-          {peakPoint ? (
-            <span
-              className={`absolute -translate-y-full whitespace-nowrap ${
-                peakFlip ? "-translate-x-full" : ""
-              }`}
-              style={{
-                left: pct(peakFlip ? peakX - 7 : peakX + 7, WIDTH),
-                top: pct(y(peakPoint.value) - 6, HEIGHT),
-              }}
-            >
-              PEAK
-            </span>
-          ) : null}
-          {troughPoint ? (
-            <span
-              className={`absolute mt-0.5 whitespace-nowrap ${
-                troughFlip ? "" : "-translate-x-full"
-              }`}
-              style={{
-                left: pct(troughFlip ? troughX + 8 : troughX - 8, WIDTH),
-                top: pct(y(troughPoint.value), HEIGHT),
-              }}
-            >
-              {formatPercent(forward.max_drawdown_pct, 1)} DRAWDOWN
-            </span>
-          ) : null}
-        </div>
+    <div aria-hidden="true">
+      <div className="mt-2">
+        <div className={FAN_BOX} />
       </div>
-      <div
-        className="mt-1 flex justify-between gap-2 font-mono text-micro text-black/70 dark:text-white/70"
-        style={{
-          paddingLeft: pct(PAD.left, WIDTH),
-          paddingRight: pct(PAD.right, WIDTH),
-        }}
-        aria-hidden="true"
-      >
-        <span>{formatDate(startMs)}</span>
-        <span>{formatDate(endMs)}</span>
+      <div className={READOUT_BOX} />
+      <div className={STRIP_BOX}>
+        <p className="text-micro font-medium uppercase tracking-[0.16em] text-(--sh-text-3)">
+          Closest setups
+        </p>
+        <div className={STRIP_ROW}>
+          <div className={CHIP_GRID}>
+            {Array.from({ length: 10 }, (_, index) => (
+              <span key={`slot-${index}`} className={CHIP_SLOT} />
+            ))}
+          </div>
+          <div className={MIRROR_ROW}>
+            <span className="mx-1 hidden h-8 w-px bg-(--sh-line-2) sm:block" />
+            <span className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">
+              120 years ago
+            </span>
+            <span className={CHIP_SLOT} />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-export function PeekIntoFuture({ forward, assetLabel, isDark, accent }) {
-  const events = Array.isArray(forward?.events) ? forward.events : [];
+// The chart, readout and years are most of this route's code: they load after
+// the page, behind a placeholder of the same geometry. React.lazy, not
+// next/dynamic, so the route ships no extra loader runtime; the page renders
+// it only once mounted, which keeps it out of the server HTML (ssr: false).
+const AnalogInstrument = lazy(() =>
+  import("@/components/patterns/AnalogFan").then((mod) => ({ default: mod.AnalogInstrument })),
+);
+
+function LegendKey({ className }) {
+  return <i className={`inline-block w-4 border-t-2 ${className}`} aria-hidden="true" />;
+}
+
+/**
+ * Section 01: what happened in the year after the past setups most like
+ * today, beside the usual year: the answer, the comparison with all years,
+ * the honesty lines, then the instrument (legend, chart, readout, years).
+ */
+export function PeekIntoFuture({ engine, status, assetKey, isDark, mounted, titleRef }) {
+  const viewAsset = ASSET_TARGETS[engine?.asset] ? engine.asset : assetKey;
+  const target = ASSET_TARGETS[viewAsset] ?? ASSET_TARGETS.sp500;
+  const outlook = engine?.status === "insufficient" ? null : engine?.outlook ?? null;
+  const k = outlook?.k ?? engine?.analogs?.length ?? 10;
+  const twelve = horizonOf(engine, 12);
+  const drawdown = outlook?.drawdown;
+  const since = outlook?.usual_since_year ?? "—";
+  const answer = answerText(engine);
+  const skill = engine ? skillLine(engine, target.label) : null;
+  const mirror = engine ? mirrorLine(engine) : null;
+  const exact = mirrorExact(engine);
+  const blank = status === "loading" || status === "error";
+  const dash = (value) => (engine ? value : "—");
+  const showMirrorSlot = engine ? Boolean(exact) : assetKey === "sp500";
+
   return (
-    <section
-      aria-labelledby="peek-future-title"
-      className="mt-5 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 dark:bg-black/40"
-    >
-      <div className="border-b border-black/5 p-5 dark:border-white/5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-micro uppercase tracking-[0.18em] text-[#c0442f] dark:text-[#ff8b77]">
-              Forward echo{" "}
-              <span className="whitespace-nowrap">
-                · {formatDate(forward?.start)} → {formatDate(forward?.end)}
+    <>
+      {/* On large screens the answer and its lines share one reserved height
+          (the S&P 500's three-line answer and four lines): a shorter answer
+          keeps its lines right under it, and the spare room falls below. */}
+      <div className="mt-3 grid gap-4 lg:min-h-[13.5rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-2.5">
+        <h2
+          id="peek-future-title"
+          ref={titleRef}
+          tabIndex={-1}
+          className={`min-h-[8rem] max-w-[40rem] text-balance text-2xl font-semibold tracking-[-0.04em] focus:outline-none min-[390px]:min-h-[6rem] sm:min-h-[6.75rem] sm:text-3xl lg:col-start-1 lg:row-start-1 lg:min-h-0 ${
+            status === "error"
+              ? "text-(--sh-text-3)"
+              : "text-[#14121a] dark:text-[#f2ede4]"
+          }`}
+        >
+          {status === "error" ? (
+            "Archive unavailable"
+          ) : answer ? (
+            answer
+          ) : (
+            <>
+              <span className="sr-only">Reading archive</span>
+              <span className="block space-y-[0.25em] pt-[0.1em]" aria-hidden="true">
+                <span className="block h-[0.9em] w-[88%] animate-pulse rounded-lg bg-black/[0.06] dark:bg-white/[0.06]" />
+                <span className="block h-[0.9em] w-[64%] animate-pulse rounded-lg bg-black/[0.06] dark:bg-white/[0.06]" />
               </span>
-            </p>
-            <h2
-              id="peek-future-title"
-              className="mt-1 text-balance text-2xl font-semibold tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4] sm:text-3xl"
-            >
-              A Peek Into The Future: What Happened Next?
-            </h2>
-            <p className="mt-2 max-w-2xl text-meta leading-relaxed text-black/70 dark:text-white/70">
-              The exact year that followed the historical setup, shown through
-              the same asset lens. These are historical events, not predictions
-              for today.
-            </p>
-          </div>
-          <span className="rounded-full border border-black/5 bg-black/[0.03] px-3 py-1.5 font-mono text-micro text-black/60 dark:border-white/5 dark:bg-white/[0.04] dark:text-white/60">
-            {assetLabel}
+            </>
+          )}
+        </h2>
+
+        <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          {engine && !outlook ? null : (
+            <table className="w-full border-collapse">
+              <caption className="sr-only">
+                These {k} setups compared with all years since {since}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="pb-1.5 text-left align-bottom">
+                    <span className="sr-only">Measure</span>
+                  </th>
+                  <th
+                    scope="col"
+                    className="whitespace-nowrap pb-1.5 pl-3 text-right align-bottom text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)"
+                  >
+                    These {k}
+                  </th>
+                  <th
+                    scope="col"
+                    className="max-w-[8.5rem] pb-1.5 pl-3 text-right align-bottom text-micro font-medium uppercase leading-snug tracking-[0.14em] text-(--sh-text-3)"
+                  >
+                    All years since {since}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  [
+                    "Higher a year later",
+                    twelve ? `${twelve.higher} of ${twelve.of}` : null,
+                    formatShare(twelve?.base_share_up_pct),
+                  ],
+                  [
+                    "Median change",
+                    formatChange(twelve?.median_return_pct),
+                    formatChange(twelve?.base_median_return_pct),
+                  ],
+                  [
+                    "Fell 20% or more within the year",
+                    drawdown ? `${drawdown.fell_20} of ${drawdown.of}` : null,
+                    formatShare(drawdown?.base_share_20_pct),
+                  ],
+                ].map(([label, these, usual]) => (
+                  <tr key={label} className="border-t border-(--sh-line-1)">
+                    <th
+                      scope="row"
+                      className="py-2 pr-2 text-left text-meta font-normal text-(--sh-text-2) text-balance"
+                    >
+                      {label}
+                    </th>
+                    <td className="whitespace-nowrap py-2 pl-3 text-right font-mono text-strong tabular-nums text-(--sh-text-1)">
+                      {dash(these ?? "—")}
+                    </td>
+                    <td className="whitespace-nowrap py-2 pl-3 text-right font-mono text-meta tabular-nums text-(--sh-text-3)">
+                      {dash(usual)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Remounted with its content: on large screens it sits right under
+            the answer, so a two-line answer moves it up. New nodes are a
+            content swap, not a layout shift. */}
+        <div
+          key={`${blank}|${answer}|${skill}|${mirror}`}
+          className="grid min-h-[7.75rem] max-w-[36rem] content-start gap-1.5 text-balance text-meta leading-relaxed text-(--sh-text-2) min-[390px]:min-h-[6.5rem] sm:min-h-[5.75rem] sm:text-body lg:col-start-1 lg:row-start-2 lg:min-h-0"
+        >
+          {blank || !engine ? (
+            <p className="text-(--sh-text-3)">—</p>
+          ) : (
+            <>
+              {skill ? <p>{skill}</p> : null}
+              {mirror ? (
+                <p>
+                  <span
+                    className="mr-2 inline-block w-3.5 -translate-y-[3px] border-t-2 border-[#a16207] dark:border-[#d8b47a]"
+                    aria-hidden="true"
+                  />
+                  {mirror}
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div
+        className="mt-6 rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-4 [--fan-accent:var(--fan-accent-light)] [--fan-gold:#a16207] [--fan-ink:#14121a] [--fan-surface:#f3eee6] dark:bg-black/40 dark:[--fan-accent:var(--fan-accent-dark)] dark:[--fan-gold:#d8b47a] dark:[--fan-ink:#f2ede4] dark:[--fan-surface:#0b0b12] sm:px-6 sm:py-5 lg:mt-4 lg:py-4"
+        style={{ "--fan-accent-light": target.light, "--fan-accent-dark": target.dark }}
+      >
+        <div
+          className={`flex flex-wrap gap-x-4 gap-y-1 text-micro text-(--sh-text-3) ${
+            engine ? "" : "invisible"
+          }`}
+          aria-hidden="true"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <LegendKey className="border-(--fan-accent)" />
+            Today’s 12 months
+          </span>
+          {outlook || !engine ? (
+            <>
+              <span className="inline-flex items-center gap-1.5">
+                <LegendKey className="border-dashed border-(--fan-accent)" />
+                Median of the {k} setups
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-2 w-4 rounded-[2px] bg-(--fan-ink)/10" />
+                Usual middle half
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <LegendKey className="border-dotted border-(--sh-text-2)" />
+                Usual
+              </span>
+            </>
+          ) : null}
+          <span className="inline-flex items-center gap-1.5">
+            <i className="inline-block w-4 border-t border-(--fan-ink)/35" aria-hidden="true" />
+            {setupsLabel(k)}
+          </span>
+          {/* Kept in the flow without a mirror, so the legend wraps alike. */}
+          <span
+            className={`inline-flex items-center gap-1.5 ${
+              showMirrorSlot && (!engine || exact) ? "" : "invisible"
+            }`}
+          >
+            <LegendKey className="border-(--fan-gold)" />
+            120 years ago
           </span>
         </div>
+
+        {mounted ? (
+          <Suspense fallback={<InstrumentPlaceholder />}>
+            <AnalogInstrument
+              engine={blank ? null : engine}
+              status={status}
+              assetKey={assetKey}
+              assetLabel={target.label}
+              isDark={isDark}
+            />
+          </Suspense>
+        ) : (
+          <InstrumentPlaceholder />
+        )}
       </div>
 
-      <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.25fr_0.75fr]">
-        <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
-              The market echo
-            </p>
-            <div className="flex flex-wrap items-baseline gap-3 text-micro">
-              <span className="text-black/60 dark:text-white/60">
-                Forward return{" "}
-                <strong className="font-mono text-black/70 dark:text-white/70">
-                  {formatPercent(forward?.return_pct, 1)}
-                </strong>
-              </span>
-              <span className="text-[#c0442f] dark:text-[#ff8b77]">
-                Max drawdown{" "}
-                <strong className="font-mono">
-                  {formatPercent(forward?.max_drawdown_pct, 1)}
-                </strong>
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <ForwardChart forward={forward} accent={accent} isDark={isDark} />
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 border-t border-(--sh-line-1) pt-2.5">
-            <div className="min-w-0 pr-3">
-              <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
-                Drawdown peak
-              </p>
-              <p className="mt-0.5 font-mono text-micro text-[#14121a] dark:text-[#f2ede4]">
-                {forward?.drawdown_peak?.date
-                  ? formatDate(forward.drawdown_peak.date)
-                  : "—"}{" "}
-                · {forward?.drawdown_peak?.value ?? "—"}
-              </p>
-            </div>
-            <div className="min-w-0 border-l border-(--sh-line-1) pl-4">
-              <p className="text-micro uppercase tracking-[0.12em] text-[#c0442f] dark:text-[#ff8b77]">
-                Peak-to-trough
-              </p>
-              <p className="mt-0.5 font-mono text-micro text-[#c0442f] dark:text-[#ff8b77]">
-                {formatPercent(forward?.max_drawdown_pct, 1)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-micro font-medium uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
-              The event echo
-            </p>
-            <span className="font-mono text-micro text-black/60 dark:text-white/60">
-              {events.length} moments
-            </span>
-          </div>
-
-          <div className="relative mt-3 border-l border-black/10 pl-4 dark:border-white/10">
-            {events.length > 0 ? (
-              events.map((event) => {
-                const pair = categoryPair(event.category);
-                return (
-                  <article
-                    key={`${event.date}-${event.title}`}
-                    className="relative pb-4 last:pb-0"
-                    style={{ "--cat-light": pair.light, "--cat-dark": pair.dark }}
-                  >
-                    <span
-                      className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#f5f0e8] bg-(--cat-light) dark:border-[#07070b] dark:bg-(--cat-dark)"
-                      aria-hidden="true"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-micro text-black/60 dark:text-white/60">
-                        {formatDate(event.date)}
-                      </span>
-                      <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-micro font-medium uppercase tracking-[0.08em] text-(--cat-light) dark:bg-(--cat-dark)/9 dark:text-(--cat-dark)">
-                        {event.category}
-                      </span>
-                    </div>
-                    <h3 className="mt-1 text-meta font-semibold leading-snug text-[#14121a] dark:text-[#f2ede4]">
-                      {event.title}
-                    </h3>
-                    <p className="mt-1 text-micro leading-relaxed text-black/60 dark:text-white/60">
-                      {event.summary}
-                    </p>
-                  </article>
-                );
-              })
-            ) : (
-              <p className="text-micro leading-relaxed text-black/60 dark:text-white/60">
-                No curated event archive for this historical window yet.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <p className="border-t border-black/5 px-5 py-3 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60 sm:px-6">
-        This is a historical echo of what followed a similar market setup. It
-        is descriptive research, not a forecast or investment advice.
+      <p className="mt-5 border-t border-(--sh-line-1) pt-3.5 text-micro leading-relaxed text-(--sh-text-3)">
+        These are historical events, not predictions for today. This is a
+        historical echo of what followed a similar market setup. It is
+        descriptive research, not a forecast or investment advice.
       </p>
-    </section>
+    </>
   );
 }

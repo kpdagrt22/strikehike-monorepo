@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -9,7 +9,11 @@ import {
   PriceScaleMode,
   createChart,
 } from "lightweight-charts";
-import { ChartCrosshairLegend } from "@/components/regime/ChartCrosshairLegend";
+import {
+  CARD_LEFT,
+  CARD_WIDTH,
+  ChartCrosshairLegend,
+} from "@/components/regime/ChartCrosshairLegend";
 import { MacroHUD } from "@/components/regime/MacroHUD";
 import {
   ASSET_ORDER,
@@ -19,17 +23,23 @@ import {
 } from "@/components/regime/assetTargets";
 import {
   CORE_INDEX_BUCKETS,
-  bucketEnvelope,
-  chartTimeToIso,
   clamp,
   coreIndexTone,
-  formatChartTick,
   formatDate,
-  formatNumber,
   formatPercent,
   formatSigned,
   getChartTone,
+} from "@/components/regime/regimeUtils";
+import {
+  MARKET_FLAGS,
+  assetLabelAt,
+  bucketEnvelope,
+  chartTimeToIso,
+  coreIndexFlag,
+  formatAssetValue,
+  formatChartTick,
   indexAxisLevels,
+  marketFlagText,
   monotoneCurveAt,
   monotoneTangents,
   refineLevelOfDetail,
@@ -38,23 +48,24 @@ import {
   steadyTolerance,
   traceMonotoneCurve,
   traceQuadraticBSpline,
-} from "@/components/regime/regimeUtils";
+} from "@/components/regime/regimeChart";
 
 // Keyboard slider steps over chart points: ±1 week, ±52 weeks (about a year).
 const PAGE_STEP = 52;
 const FOCUS_RING_INSET =
   "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
 // Level of detail for the drawn price lines: about one point per 2-3 px at
-// rest (3-4 px on panes under 640 px, where 12 years share about 330 px) and
-// every week once weeks are 2 px or more apart. No weekly close is further
-// than the tolerance from the drawn line, and a peak or trough that is the
-// extreme within LOD_REACH buckets either side, or of an NBER window, is
-// always drawn exactly.
+// rest (a coarser 6 px, with a looser tolerance, on panes under 640 px, where
+// ten years share about 330 px, so the phone line stays calm) and every week
+// once weeks are 2 px or more apart. No weekly close is further than the
+// tolerance from the drawn line, and a peak or trough that is the extreme
+// within LOD_REACH buckets either side, or of an NBER window, is always drawn
+// exactly.
 const LOD_TARGET_PX = 2;
 const LOD_TOLERANCE_PX = 6;
 const LOD_NARROW_PANE_PX = 640;
-const LOD_NARROW_TARGET_PX = 3;
-const LOD_NARROW_TOLERANCE_PX = 8;
+const LOD_NARROW_TARGET_PX = 6;
+const LOD_NARROW_TOLERANCE_PX = 14;
 const LOD_REACH = 6;
 const LOD_CACHE_SIZE = 8;
 // The Core Index ribbon at rest: the weekly range taken from zero, over
@@ -87,9 +98,34 @@ const RIBBON_BANDS = [
   "bearish_warning",
   "extreme_bearish",
 ];
+// The chart key's words for the four bands, top to bottom.
+const RIBBON_KEY = [
+  ["strong_bullish", "trim risk"],
+  ["calm_bullish", "balanced"],
+  ["bearish_warning", "preserve"],
+  ["extreme_bearish", "accumulate"],
+];
 // The ribbon's fill alpha at 0, ±25 and ±50: quiet at the neutral line and
 // fuller towards the extremes, so the shape's outer edge reads first.
 const RIBBON_FILL_ALPHA = { dark: [0.05, 0.14, 0.26], light: [0.06, 0.16, 0.28] };
+// The price area ends at 68 % of the pane (scaleMargins.bottom 0.32); axis
+// labels may sit down to its foot, so the 0% level keeps its label there.
+const PRICE_AREA_BOTTOM = 0.68;
+// The market flags' marks at the foot of the plot: one 2 px lane per flag,
+// 1 px above the time axis, lanes 2 px apart.
+const FLAG_STRIP_PX = 2;
+const FLAG_STRIP_INSET_PX = 1;
+const FLAG_STRIP_GAP_PX = 2;
+// The snapshot card's height on a plain week from sm (it is display:none at
+// rest): what the card's drop under the stuck HUD allows for until measured.
+const CARD_REST_HEIGHT = 214;
+// The flag strip's lanes for screen readers: each rule as the strip covers
+// it (the trend rule ran on the S&P 90 before the S&P 500 began).
+const MARKET_FLAG_SPOKEN = {
+  core_index_trend_warning:
+    "the S&P 500, the S&P 90 before March 1957, below its 40-week average",
+  core_index_fast_warning: "down 7% or more in two weeks",
+};
 
 function withAlpha(hex, alpha) {
   const value = Number.parseInt(String(hex).replace("#", ""), 16);
@@ -347,6 +383,24 @@ function chartPositions(timeScale, points) {
     positions[index] = logical;
   }
   return positions;
+}
+
+// The points that lie on the chart's time scale, as their indices into
+// `points` and their logical positions, or null while none does. Under a gold,
+// bonds or Nifty line the scale starts decades after the Core Index (1928),
+// so its earlier weeks have no place on it.
+function positionsOnScale(timeScale, points, timeOf = (point) => point.time) {
+  const kept = [];
+  const positions = [];
+  for (let index = 0; index < points.length; index += 1) {
+    const logical = timeScale.timeToIndex(timeOf(points[index]), false);
+    if (logical == null) continue;
+    kept.push(index);
+    positions.push(logical);
+  }
+  return kept.length
+    ? { kept: Int32Array.from(kept), positions: Float64Array.from(positions) }
+    : null;
 }
 
 // Logical position → x (CSS px). The time scale is linear in the logical
@@ -624,11 +678,13 @@ function pointsThrough(count, xAt, yAt) {
 // weeks are 2 px or more apart (a crash zoom) the shape follows the weekly
 // values. Any −50…+50 series works.
 function createCoreIndexRibbonPrimitive(points, isDark) {
-  const values = Float64Array.from(points, (point) =>
+  const allValues = Float64Array.from(points, (point) =>
     clamp(Number(point.value), -50, 50),
   );
   const envelopes = new Map();
+  // The weeks on the chart's time scale and their values.
   let positions = null;
+  let values = null;
   let shape = null;
   let shapeKey = "";
   let geometry = null;
@@ -641,15 +697,21 @@ function createCoreIndexRibbonPrimitive(points, isDark) {
     const half = (mediaSize.height * RIBBON_HEIGHT) / 2;
     const zeroY = mediaSize.height * RIBBON_TOP + half;
     geometry = { zeroY, half };
-    if (values.length < 2) return null;
+    if (allValues.length < 2) return null;
     const timeScale = chart.timeScale();
     const range = timeScale.getVisibleLogicalRange();
     if (!range) return null;
     const key = `${range.from}|${range.to}|${mediaSize.width}|${mediaSize.height}`;
     if (key === shapeKey) return shape;
-    positions ??= chartPositions(timeScale, points);
+    if (!positions) {
+      const onScale = positionsOnScale(timeScale, points);
+      if (onScale) {
+        positions = onScale.positions;
+        values = Float64Array.from(onScale.kept, (index) => allValues[index]);
+      }
+    }
     const toX = logicalToX(timeScale, range.from);
-    if (!positions || !toX) return null;
+    if (!positions || positions.length < 2 || !toX) return null;
     const pxPerPoint = mediaSize.width / Math.max(1e-6, range.to - range.from);
     const toY = (value) => zeroY - (value / 50) * half;
     bandWidth = steadyBucketWidth(bandWidth, pxPerPoint, LOD_TARGET_PX);
@@ -782,6 +844,85 @@ function createCoreIndexRibbonPrimitive(points, isDark) {
   return primitive;
 }
 
+// The market flags (the trend warning, and the fast warning when the data
+// carries it) as fine marks at the foot of the plot: one quiet 2 px lane per
+// flag, drawn only over the weeks when it is on, at every zoom, never
+// animated. Runs of consecutive weeks are found once; a paint draws only the
+// runs in view.
+function createFlagStripPrimitive(timeline, lanes) {
+  let runs = null;
+
+  const ensureRuns = (timeScale) => {
+    if (runs) return runs;
+    const onScale = positionsOnScale(timeScale, timeline, (point) => point.date);
+    if (!onScale) return null;
+    runs = lanes.map((lane) => {
+      const from = [];
+      const to = [];
+      let open = false;
+      onScale.kept.forEach((pointIndex, k) => {
+        const on = timeline[pointIndex][lane.field] === true;
+        if (on && open) to[to.length - 1] = onScale.positions[k];
+        else if (on) {
+          from.push(onScale.positions[k]);
+          to.push(onScale.positions[k]);
+        }
+        open = on;
+      });
+      return { color: lane.color, from: Float64Array.from(from), to: Float64Array.from(to) };
+    });
+    return runs;
+  };
+
+  const renderer = {
+    draw: (target) => {
+      const chart = primitive.chart;
+      if (!chart || lanes.length === 0) return;
+      const timeScale = chart.timeScale();
+      const range = timeScale.getVisibleLogicalRange();
+      const current = ensureRuns(timeScale);
+      const toX = range ? logicalToX(timeScale, range.from) : null;
+      if (!current || !toX) return;
+      target.useBitmapCoordinateSpace(
+        ({ context, bitmapSize, horizontalPixelRatio, verticalPixelRatio }) => {
+          const thickness = Math.max(1, Math.round(FLAG_STRIP_PX * verticalPixelRatio));
+          const step = thickness + Math.round(FLAG_STRIP_GAP_PX * verticalPixelRatio);
+          const foot = bitmapSize.height - Math.round(FLAG_STRIP_INSET_PX * verticalPixelRatio);
+          current.forEach((lane, index) => {
+            const top = foot - thickness - index * step;
+            context.fillStyle = lane.color;
+            // The first run that ends in view, then every run that starts in it.
+            let k = lowerBoundSorted(lane.to, range.from - 1);
+            for (; k < lane.from.length && lane.from[k] <= range.to + 1; k += 1) {
+              const left = Math.round(toX(lane.from[k] - 0.5) * horizontalPixelRatio);
+              const right = Math.round(toX(lane.to[k] + 0.5) * horizontalPixelRatio);
+              if (right <= 0 || left >= bitmapSize.width) continue;
+              const x = Math.max(0, left);
+              const width = Math.min(bitmapSize.width, right) - x;
+              context.fillRect(x, top, Math.max(1, width), thickness);
+            }
+          });
+        },
+      );
+    },
+  };
+  const views = [{ renderer: () => renderer }];
+  const primitive = {
+    chart: null,
+    attached({ chart }) {
+      primitive.chart = chart;
+    },
+    detached() {
+      primitive.chart = null;
+    },
+    updateAllViews() {},
+    paneViews() {
+      return views;
+    },
+  };
+  return primitive;
+}
+
 // A label's row on the device-pixel grid: the gridline's first bitmap row,
 // its thickness and its centre (bitmap px).
 function axisRow(y, pixelRatio) {
@@ -797,7 +938,10 @@ function axisRow(y, pixelRatio) {
 // its gridline's device-pixel row (an axis view's box puts the text 1-2 px
 // low). Where the ink box and the row cannot share a centre (an even ink
 // height on a one-pixel row at 1x), the label sits half a pixel high.
-function createIndexAxisPrimitive({ textColor, gridColor, fontWeight }) {
+// `base` (an index level, or null for the chart's own base week) moves 0% to
+// another week for the labels only: an open NBER window reads as change since
+// its first week. The lines and the data do not move.
+function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = null }) {
   let labels = [];
   let labelsKey = "";
   const gridRenderer = {
@@ -841,14 +985,26 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight }) {
   const primitive = {
     chart: null,
     series: null,
-    attached({ chart, series }) {
+    base: base > 0 ? base : null,
+    requestUpdate: null,
+    attached({ chart, series, requestUpdate }) {
       primitive.chart = chart;
       primitive.series = series;
+      primitive.requestUpdate = requestUpdate;
     },
     detached() {
       primitive.chart = null;
       primitive.series = null;
+      primitive.requestUpdate = null;
       labels = [];
+    },
+    // A new 0% for the labels (see above); repaints only when it changes.
+    setBase(value) {
+      const next = value > 0 ? value : null;
+      if (next === primitive.base) return;
+      primitive.base = next;
+      labelsKey = "";
+      primitive.requestUpdate?.();
     },
     // Runs after the price scale is recalculated and before the axis and the
     // pane are painted, so labels and gridlines move together with the line.
@@ -856,21 +1012,24 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight }) {
       const { chart, series } = primitive;
       if (!chart || !series) return;
       const height = chart.paneSize(0)?.height ?? 0;
-      // Labels stay above the axis fade beside the Core Index ribbon.
+      // Labels stay within the price area, above the Core Index ribbon (the
+      // axis cell fades out beside it).
       const top = 12;
-      const bottom = height * 0.64 - 6;
+      const bottom = height * PRICE_AREA_BOTTOM - 2;
       const high = series.coordinateToPrice(top);
       const low = series.coordinateToPrice(bottom);
-      const key = `${height}|${high}|${low}`;
+      // Levels are counted from the label base: 100 there is 0%.
+      const scale = primitive.base ? 100 / primitive.base : 1;
+      const key = `${height}|${high}|${low}|${scale}`;
       if (key === labelsKey) return;
       labelsKey = key;
       labels =
         high == null || low == null || bottom <= top
           ? []
           : indexAxisLevels(
-              Number(low),
-              Number(high),
-              (level) => series.priceToCoordinate(level),
+              Number(low) * scale,
+              Number(high) * scale,
+              (level) => series.priceToCoordinate(level / scale),
               { gap: AXIS_LABEL_GAP, top, bottom },
             ).slice(0, AXIS_LABEL_LIMIT);
     },
@@ -950,11 +1109,15 @@ export function RegimeTimeline({
   onHoverPoint,
 }) {
   const containerRef = useRef(null);
+  const hudRef = useRef(null);
+  const chartBoxRef = useRef(null);
   const onHoverPointRef = useRef(onHoverPoint);
   const chartRef = useRef(null);
   const lineSeriesRef = useRef({});
   const primitiveRef = useRef(null);
   const marksRef = useRef(null);
+  const axisRef = useRef(null);
+  const labelBaseRef = useRef(null);
   const selectedIdRef = useRef(selectedId);
   const previousSelectedIdRef = useRef(selectedId);
   const zoomedIdRef = useRef(selectedId);
@@ -967,6 +1130,14 @@ export function RegimeTimeline({
   const [equityScaleWidth, setEquityScaleWidth] = useState(PRICE_AXIS_WIDTH);
   const [timeScaleHeight, setTimeScaleHeight] = useState(TIME_AXIS_HEIGHT);
   const [chartWidth, setChartWidth] = useState(0);
+  // The axis's 0% while the view is in deep history (see labelBase); the ref
+  // is what the chart's range handler reads.
+  const [viewBase, setViewBaseState] = useState(null);
+  const viewBaseRef = useRef(null);
+  const setViewBase = useCallback((next) => {
+    viewBaseRef.current = next;
+    setViewBaseState(next);
+  }, []);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -994,6 +1165,73 @@ export function RegimeTimeline({
   useEffect(() => {
     onHoverPointRef.current = onHoverPoint;
   }, [onHoverPoint]);
+
+  // The page keeps in-page scrolling and keyboard focus clear of the stuck
+  // HUD: its height goes to --regime-hud-h on the scrolling <main>, which adds
+  // it to the header clearance in scroll-padding-top where the HUD sticks.
+  const hasTimeline = Array.isArray(timeline) && timeline.length > 0;
+  useEffect(() => {
+    const hud = hudRef.current;
+    const page = hud?.closest("main");
+    if (!hud || !page) return undefined;
+    const sync = () =>
+      page.style.setProperty(
+        "--regime-hud-h",
+        `${Math.ceil(hud.getBoundingClientRect().height)}px`,
+      );
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(hud);
+    return () => {
+      observer.disconnect();
+      page.style.removeProperty("--regime-hud-h");
+    };
+  }, [hasTimeline]);
+
+  // While the stuck HUD covers the chart's top (a laptop window scrolled down
+  // to the chart's foot, where the ribbon and the flag strip are), the
+  // snapshot card and the red-band tooltip drop by the covered height,
+  // staying inside the price area. A transform on a CSS variable: no layout
+  // shift and no chart rebuild.
+  useEffect(() => {
+    const hud = hudRef.current;
+    const box = chartBoxRef.current;
+    const page = box?.closest("main");
+    if (!hud || !box || !page) return undefined;
+    let frame = 0;
+    let last = null;
+    const sync = () => {
+      frame = 0;
+      const covered =
+        getComputedStyle(hud).position === "sticky"
+          ? hud.getBoundingClientRect().bottom - box.getBoundingClientRect().top
+          : 0;
+      const card = box.querySelector("[data-regime-card]");
+      const cardHeight = card?.offsetHeight || CARD_REST_HEIGHT;
+      const room =
+        (box.clientHeight - TIME_AXIS_HEIGHT) * PRICE_AREA_BOTTOM - cardHeight - 24;
+      const drop = Math.round(Math.max(0, Math.min(covered, room)));
+      if (drop === last) return;
+      last = drop;
+      box.style.setProperty("--regime-card-drop", `${drop}px`);
+    };
+    const request = () => {
+      if (!frame) frame = requestAnimationFrame(sync);
+    };
+    sync();
+    page.addEventListener("scroll", request, { passive: true });
+    const observer = new ResizeObserver(request);
+    observer.observe(hud);
+    observer.observe(box);
+    const card = box.querySelector("[data-regime-card]");
+    if (card) observer.observe(card);
+    return () => {
+      cancelAnimationFrame(frame);
+      page.removeEventListener("scroll", request);
+      observer.disconnect();
+      box.style.removeProperty("--regime-card-drop");
+    };
+  }, [hasTimeline]);
 
   const tone = useMemo(() => getChartTone(isDark), [isDark]);
   const asset = useMemo(() => getAssetTarget(assetKey), [assetKey]);
@@ -1047,15 +1285,27 @@ export function RegimeTimeline({
     [timeline, isDark],
   );
 
-  const baseDate = useMemo(
+  // The market flags this archive carries (a flag the backend does not send
+  // yet is left out everywhere, so no space is kept for it).
+  const marketFlags = useMemo(
     () =>
-      timeline.find(
-        (point) =>
-          point.core_index != null &&
-          Number.isFinite(Number(point.core_index)),
-      )?.date ?? timeline[0]?.date,
+      MARKET_FLAGS.filter((flag) =>
+        timeline.some((point) => typeof point[flag.field] === "boolean"),
+      ),
     [timeline],
   );
+
+  // The percentage scale's base (0%): the first week of the year eight years
+  // before the latest week's, so 0% lies inside the resting view on every
+  // screen (the latest 9.6-10 years of plot on phones, about 28 elsewhere)
+  // and compared assets all start from the same week. The Core Index now
+  // reaches back to 1928, so its first week would put 0% decades off screen.
+  const baseDate = useMemo(() => {
+    const year = Number(timeline.at(-1)?.date?.slice(0, 4));
+    if (!Number.isFinite(year)) return timeline[0]?.date;
+    const from = `${year - 8}-01-01`;
+    return timeline.find((point) => point.date >= from)?.date ?? timeline[0]?.date;
+  }, [timeline]);
 
   const seriesData = useMemo(() => {
     const output = {};
@@ -1074,6 +1324,25 @@ export function RegimeTimeline({
     }
     return output;
   }, [timeline, seriesKeys, baseDate]);
+
+  // While an NBER window is open on a single asset, the axis labels read as
+  // change since the window's first week (0% there), so a deep-history window
+  // reads 0% … −86% rather than −99.x% against the resting base. With no
+  // window open, panning or stepping into deep history (the resting base week
+  // off screen) counts from a week in view instead (viewBase, kept by the
+  // chart's range handler). Compared assets keep the shared base week, the
+  // only one every line is drawn from.
+  const labelBase = useMemo(() => {
+    if (compareAssets) return null;
+    if (selectedCrash) {
+      const items = seriesData[assetKey] ?? [];
+      const first = items[lowerBoundByTime(items, selectedCrash.start)];
+      if (!first || first.time > selectedCrash.end || !(first.value > 0)) return null;
+      return { date: first.time, value: first.value, kind: "window" };
+    }
+    return viewBase ? { date: viewBase.date, value: viewBase.value, kind: "view" } : null;
+  }, [selectedCrash, compareAssets, seriesData, assetKey, viewBase]);
+  const zeroDate = labelBase?.date ?? baseDate;
 
   // The keyboard slider walks the dates drawn on the chart (the union of the
   // visible series), so every step lands where the crosshair can go.
@@ -1095,28 +1364,51 @@ export function RegimeTimeline({
   }, [navTimes, displayPoint]);
 
   // The snapshot card pads the asset readout to the widest value in the
-  // archive (prices are positive: the largest has the most digits), so the
-  // card's figures keep one width while scrubbing.
+  // archive, so the card's figures keep one width while scrubbing. Prices are
+  // positive: the widest is the largest value, or the largest of those below
+  // 100, which carry two decimals on the S&P series (formatAssetValue).
   const assetValueChars = useMemo(() => {
     let largest = null;
+    let largestBelow100 = null;
     for (const point of timeline) {
       const value = Number(point[asset.valueField]);
-      if (Number.isFinite(value) && (largest == null || value > largest)) {
-        largest = value;
+      if (!Number.isFinite(value)) continue;
+      if (largest == null || value > largest) largest = value;
+      if (value < 100 && (largestBelow100 == null || value > largestBelow100)) {
+        largestBelow100 = value;
       }
     }
-    return largest == null ? 0 : formatNumber(largest, asset.precision).length;
+    return Math.max(
+      largest == null ? 0 : formatAssetValue(asset, largest).length,
+      largestBelow100 == null ? 0 : formatAssetValue(asset, largestBelow100).length,
+    );
   }, [timeline, asset]);
 
+  const displayFlag = coreIndexFlag(displayPoint);
   const sliderValueText = displayPoint
     ? [
         formatDate(displayPoint.date),
-        `${asset.label} ${formatNumber(
+        `${assetLabelAt(asset, displayPoint)} ${formatAssetValue(
+          asset,
           displayPoint[asset.valueField],
-          asset.precision,
         )}`,
         `Core Index ${formatSigned(displayPoint.core_index)}`,
         coreIndexTone(displayPoint.core_index_bucket, isDark).label,
+        // "Warning, decline class crash" (the card's "Decline class: crash"
+        // without a second colon).
+        displayFlag
+          ? [
+              displayFlag.label,
+              displayFlag.text
+                ? `decline class ${displayPoint.core_index_severity}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(", ")
+          : null,
+        ...marketFlags
+          .filter((flag) => displayPoint[flag.field] === true)
+          .map((flag) => `${flag.label}: ${marketFlagText(flag, displayPoint)}`),
         crashAt(crashes, displayPoint.date)?.name,
       ]
         .filter(Boolean)
@@ -1246,7 +1538,20 @@ export function RegimeTimeline({
   };
 
   // Keyboard focus reveals what hover reveals: the crosshair and the snapshot.
-  const handleSliderFocus = () => {
+  // On a short window the chart is taller than the room under the stuck HUD,
+  // and focus can arrive with its top (and the snapshot card) beneath the
+  // HUD: its top is brought to just below it (the page's scroll padding),
+  // in one step.
+  const handleSliderFocus = (event) => {
+    const hud = hudRef.current;
+    if (
+      hud &&
+      getComputedStyle(hud).position === "sticky" &&
+      event.currentTarget.getBoundingClientRect().top <
+        hud.getBoundingClientRect().bottom - 1
+    ) {
+      event.currentTarget.scrollIntoView({ block: "start" });
+    }
     const time = navTimes[navIndex];
     if (!time) return;
     drawCrosshairAt(time);
@@ -1408,6 +1713,49 @@ export function RegimeTimeline({
 
     applyOverview(chart, container);
 
+    // The axis's 0% in deep history (one asset, no window open): while the
+    // resting base week is off screen, the first week of the first decade
+    // year in view (else of the first full year, else the first week),
+    // held until it leaves the view, so the 1930s read 0% … −80% rather than
+    // −99.x%. Back to the resting base once its week is in view. Labels
+    // repaint (axis setBase); the data and the chart stay as they are.
+    const viewItems = seriesData[assetKey] ?? [];
+    const restIndex = lowerBoundByTime(viewItems, baseDate);
+    let viewFrame = 0;
+    const readView = () => {
+      viewFrame = 0;
+      if (compareAssets || viewItems.length === 0) return;
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (!range) return;
+      const from = Math.max(0, Math.ceil(range.from));
+      const to = Math.min(viewItems.length - 1, Math.floor(range.to));
+      if (to < from) return;
+      const inView = (index) => index >= from && index <= to;
+      const held = viewBaseRef.current;
+      if (inView(restIndex)) {
+        if (held) setViewBase(null);
+        return;
+      }
+      if (held && inView(held.index)) return;
+      const firstYear = Number(viewItems[from].time.slice(0, 4));
+      const decade = Math.ceil(firstYear / 10) * 10;
+      let index = from;
+      for (const year of [decade, decade + 10, firstYear + 1]) {
+        const candidate = lowerBoundByTime(viewItems, `${year}-01-01`);
+        if (inView(candidate)) {
+          index = candidate;
+          break;
+        }
+      }
+      const item = viewItems[index];
+      if (!item || !(item.value > 0)) return;
+      setViewBase({ index, date: item.time, value: item.value });
+    };
+    const handleViewRange = () => {
+      if (!viewFrame) viewFrame = requestAnimationFrame(readView);
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handleViewRange);
+
     const syncScaleWidth = () => {
       setEquityScaleWidth(chart.priceScale("right").width() || PRICE_AXIS_WIDTH);
       setTimeScaleHeight(chart.timeScale().height() || TIME_AXIS_HEIGHT);
@@ -1429,6 +1777,14 @@ export function RegimeTimeline({
       isDark,
     );
     pane?.attachPrimitive(coreIndexPrimitive);
+    const flagStrip = createFlagStripPrimitive(
+      timeline,
+      marketFlags.map((flag) => ({
+        field: flag.field,
+        color: isDark ? flag.dark : flag.light,
+      })),
+    );
+    pane?.attachPrimitive(flagStrip);
     // Light mode takes the stronger axis ink and a medium weight: thin dark
     // 11 px glyphs on the warm paper otherwise measure about 3-4:1 at their
     // cores.
@@ -1436,8 +1792,10 @@ export function RegimeTimeline({
       textColor: isDark ? tone.axisText : tone.axisStrong,
       gridColor: isDark ? "rgba(242, 237, 228, 0.05)" : "rgba(20, 18, 26, 0.06)",
       fontWeight: isDark ? 400 : 500,
+      base: labelBaseRef.current,
     });
     lineSeries[assetKey]?.attachPrimitive(axisPrimitive);
+    axisRef.current = axisPrimitive;
     const marks = createCrosshairMarksPrimitive({
       lines: drawnLines,
       ribbon: coreIndexPrimitive,
@@ -1499,14 +1857,18 @@ export function RegimeTimeline({
 
     return () => {
       cancelAnimationFrame(scaleFrame);
+      cancelAnimationFrame(viewFrame);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleViewRange);
       scaleObserver.disconnect();
       chart.unsubscribeCrosshairMove(handleCrosshair);
       chart.unsubscribeClick(handleClick);
       if (primitiveRef.current === primitive) primitiveRef.current = null;
       if (marksRef.current === marks) marksRef.current = null;
+      if (axisRef.current === axisPrimitive) axisRef.current = null;
       try {
         pane?.detachPrimitive(primitive);
         pane?.detachPrimitive(coreIndexPrimitive);
+        pane?.detachPrimitive(flagStrip);
       } catch {
         // The chart may already have torn down the primitives.
       }
@@ -1517,13 +1879,16 @@ export function RegimeTimeline({
   }, [
     assetKey,
     bands,
+    baseDate,
     coreIndexData,
     compareAssets,
     crashes,
     isDark,
+    marketFlags,
     onSelect,
     seriesData,
     seriesKeys,
+    setViewBase,
     timeline,
     tone.axisStrong,
     tone.axisText,
@@ -1572,7 +1937,36 @@ export function RegimeTimeline({
     }
   }, [hoveredCrashId]);
 
+  // The axis labels' 0% follows the open window (labelBase) without
+  // rebuilding the chart; a rebuilt chart starts from the same base.
+  useEffect(() => {
+    labelBaseRef.current = labelBase?.value ?? null;
+    axisRef.current?.setBase(labelBaseRef.current);
+  }, [labelBase]);
+
   if (!Array.isArray(timeline) || timeline.length === 0) return null;
+
+  // The red-band tooltip shows with the snapshot card and keeps clear of it:
+  // from 1280 px centred over the chart (clear of the card on either side);
+  // narrower, centred in the free space beside the card, its name truncating
+  // first, and drawn afresh when the card changes sides. On phones the card is
+  // the scrub readout and the tooltip is left out (a tap on a band opens the
+  // window's detail, with its drawdown and score).
+  const tooltipPlace = (() => {
+    if (chartWidth < 640) return null;
+    if (chartWidth >= 1280) return { centre: true };
+    const cardShift = Math.max(
+      0,
+      chartWidth - (equityScaleWidth + 28) - CARD_LEFT - CARD_WIDTH,
+    );
+    const left =
+      legendSide === "right" ? CARD_LEFT : CARD_LEFT + CARD_WIDTH + 12;
+    const right =
+      legendSide === "right"
+        ? CARD_LEFT + cardShift - 12
+        : chartWidth - equityScaleWidth - 12;
+    return right - left >= 160 ? { left, width: right - left } : null;
+  })();
 
   return (
     <section
@@ -1584,8 +1978,24 @@ export function RegimeTimeline({
       </h2>
       <p className="sr-only">
         One percentage-scaled chart of the S&amp;P 500, London gold, Treasury
-        bonds and Nifty 50 with NBER recession shading. A colour-coded Core Index
-        ribbon from -50 to +50 sits in the lower quarter of the same chart.
+        bonds and Nifty 50 with NBER recession shading; 0% is the week of{" "}
+        {formatDate(zeroDate)}
+        {labelBase?.kind === "window"
+          ? ", the open window's first week"
+          : labelBase?.kind === "view"
+            ? ", a week in view (in deep history the axis counts from the view)"
+            : ""}
+        . A colour-coded Core Index ribbon from -50 to +50 sits in the lower
+        quarter of the same chart.
+        {marketFlags.length
+          ? ` A thin strip at its foot marks${
+              marketFlags.length > 1
+                ? `, in ${marketFlags.length === 2 ? "two" : marketFlags.length} lanes,`
+                : ""
+            } the weeks with ${marketFlags
+              .map((flag) => `a ${flag.label.toLowerCase()} (${MARKET_FLAG_SPOKEN[flag.field] ?? flag.rule})`)
+              .join(" and ")}.`
+          : ""}{" "}
         Hover a red NBER band for the crash name, peak-to-trough drawdown and
         Core Index score; click it to zoom to the event.
       </p>
@@ -1597,7 +2007,10 @@ export function RegimeTimeline({
           sits above the section and the section's overflow-clip hides it.
           On phones and short landscape windows the HUD scrolls away so the
           chart gets the screen, and the snapshot card is the scrub readout. */}
-      <div className="relative z-30 border-b border-black/5 bg-[#f5f0e8]/85 dark:border-white/5 dark:bg-[#06060a]/80 sm-tall:sticky sm-tall:top-(--sh-header-clear) sm-tall:backdrop-blur-2xl sm-tall:before:pointer-events-none sm-tall:before:absolute sm-tall:before:inset-x-0 sm-tall:before:bottom-full sm-tall:before:h-(--sh-header-clear) sm-tall:before:bg-[#f5f0e8] sm-tall:dark:before:bg-[#06060a]">
+      <div
+        ref={hudRef}
+        className="relative z-30 border-b border-black/5 bg-[#f5f0e8]/85 dark:border-white/5 dark:bg-[#06060a]/80 sm-tall:sticky sm-tall:top-(--sh-header-clear) sm-tall:backdrop-blur-2xl sm-tall:before:pointer-events-none sm-tall:before:absolute sm-tall:before:inset-x-0 sm-tall:before:bottom-full sm-tall:before:h-(--sh-header-clear) sm-tall:before:bg-[#f5f0e8] sm-tall:dark:before:bg-[#06060a]"
+      >
         <MacroHUD
           point={displayPoint}
           isDark={isDark}
@@ -1607,10 +2020,14 @@ export function RegimeTimeline({
           onAssetChange={onAssetChange}
           compareAssets={compareAssets}
           onCompareToggle={onCompareToggle}
+          marketFlags={marketFlags}
         />
       </div>
 
-      <div className="relative h-[68vh] min-h-[560px] w-full sm:min-h-[600px]">
+      <div
+        ref={chartBoxRef}
+        className="relative h-[68vh] min-h-[560px] w-full sm:min-h-[600px]"
+      >
         {/* Keyboard twin of the crosshair. It holds no children (the chart's
             attribution link stays outside it) and lets pointer input through. */}
         <div
@@ -1628,12 +2045,12 @@ export function RegimeTimeline({
         />
         {/* The TradingView attribution (licence) sits above the edge fades so
             it stays legible and its focus ring is not covered. The right
-            price-axis cell fades out where the Core Index band begins
+            price-axis cell fades out just below the price area's foot
             (scaleMargins.bottom 0.32), so no % labels sit beside the ribbon. */}
         <div
           ref={containerRef}
           data-testid="regime-terminal-chart"
-          className="absolute inset-0 [&_#tv-attr-logo]:z-20! [&_tr:first-child>td:last-child]:[mask-image:linear-gradient(to_bottom,#000_64%,transparent_69%)]"
+          className="absolute inset-0 [&_#tv-attr-logo]:z-20! [&_tr:first-child>td:last-child]:[mask-image:linear-gradient(to_bottom,#000_69%,transparent_72%)]"
         />
 
         <ChartCrosshairLegend
@@ -1645,39 +2062,53 @@ export function RegimeTimeline({
           room={chartWidth}
           rightInset={equityScaleWidth + 28}
           valueChars={assetValueChars}
+          marketFlags={marketFlags}
         />
 
-        {hoveredMetric ? (
+        {hoveredMetric && tooltipPlace ? (
           <div
-            data-testid="crash-hover-tooltip"
-            className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 whitespace-nowrap rounded-full border border-black/[0.08] bg-white/[0.92] px-3.5 py-2 font-mono text-micro font-medium text-[#14121a] shadow-[0_24px_80px_rgba(20,18,26,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0b0b12]/[0.92] dark:text-[#f2ede4] dark:shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:top-4"
+            key={`${hoveredMetric.id}|${tooltipPlace.centre ? "centre" : legendSide}`}
+            className={`pointer-events-none absolute top-4 z-20 flex justify-center sm-tall:translate-y-[var(--regime-card-drop,0px)] ${
+              tooltipPlace.centre ? "left-1/2 -translate-x-1/2" : ""
+            }`}
+            style={
+              tooltipPlace.centre
+                ? undefined
+                : { left: tooltipPlace.left, width: tooltipPlace.width }
+            }
           >
-            <span>{hoveredMetric.name}</span>
-            <span className="mx-2 text-black/25 dark:text-white/25" aria-hidden="true">|</span>
-            <span className="text-[#c0442f] dark:text-[#ffb4a8]">
-              {hoveredMetric.drawdown == null
-                ? "—"
-                : formatPercent(hoveredMetric.drawdown, 1)}
-            </span>
-            <span className="mx-2 text-black/25 dark:text-white/25" aria-hidden="true">|</span>
-            <span
-              style={{
-                color: coreIndexTone(
-                  hoveredMetric.score == null
-                    ? null
-                    : hoveredMetric.score >= 25
-                      ? "strong_bullish"
-                      : hoveredMetric.score >= 0
-                        ? "calm_bullish"
-                        : hoveredMetric.score > -25
-                          ? "bearish_warning"
-                          : "extreme_bearish",
-                  isDark,
-                ).color,
-              }}
+            <div
+              data-testid="crash-hover-tooltip"
+              className="flex min-w-0 max-w-full items-center whitespace-nowrap rounded-full border border-black/[0.08] bg-white/[0.92] px-3.5 py-2 font-mono text-micro font-medium text-[#14121a] shadow-[0_24px_80px_rgba(20,18,26,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0b0b12]/[0.92] dark:text-[#f2ede4] dark:shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
             >
-              {formatSigned(hoveredMetric.score)}
-            </span>
+              <span className="min-w-0 truncate">{hoveredMetric.name}</span>
+              <span className="mx-2 text-black/25 dark:text-white/25" aria-hidden="true">|</span>
+              <span className="shrink-0 text-[#c0442f] dark:text-[#ffb4a8]">
+                {hoveredMetric.drawdown == null
+                  ? "—"
+                  : formatPercent(hoveredMetric.drawdown, 1)}
+              </span>
+              <span className="mx-2 text-black/25 dark:text-white/25" aria-hidden="true">|</span>
+              <span
+                className="shrink-0"
+                style={{
+                  color: coreIndexTone(
+                    hoveredMetric.score == null
+                      ? null
+                      : hoveredMetric.score >= 25
+                        ? "strong_bullish"
+                        : hoveredMetric.score >= 0
+                          ? "calm_bullish"
+                          : hoveredMetric.score > -25
+                            ? "bearish_warning"
+                            : "extreme_bearish",
+                    isDark,
+                  ).color,
+                }}
+              >
+                {formatSigned(hoveredMetric.score)}
+              </span>
+            </div>
           </div>
         ) : null}
 
@@ -1687,9 +2118,19 @@ export function RegimeTimeline({
           style={{ right: equityScaleWidth ? `${equityScaleWidth}px` : 0 }}
         />
 
+        {/* The ribbon's scale. With market flags it sits just above their
+            lanes at the plot's foot (6 px clear of the top lane), so no
+            week's flag is ever hidden under it. */}
         <div
           className="pointer-events-none absolute bottom-8 left-14 z-20 hidden select-none items-baseline gap-2 rounded-full border border-black/5 bg-white/45 px-2.5 py-1 font-mono text-micro text-black/60 backdrop-blur-xl dark:border-white/5 dark:bg-black/35 dark:text-white/60 sm:flex"
-          style={{ bottom: Math.max(12, timeScaleHeight - 8) }}
+          style={{
+            bottom: marketFlags.length
+              ? timeScaleHeight +
+                FLAG_STRIP_INSET_PX +
+                marketFlags.length * (FLAG_STRIP_PX + FLAG_STRIP_GAP_PX) +
+                4
+              : Math.max(12, timeScaleHeight - 8),
+          }}
         >
           <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             Core Index
@@ -1708,32 +2149,39 @@ export function RegimeTimeline({
             <span>
               {formatDate(coverage?.start)} → {formatDate(coverage?.end)} ·{" "}
               {crashes?.length ?? 0} NBER windows ·{" "}
-              {resolution ? `${resolution} tape` : "macro tape"}
+              {resolution ? `${resolution} tape` : "macro tape"} · 0% at{" "}
+              {/* Monospaced, so a new base date never changes its width. */}
+              <span className="font-mono tabular-nums">{formatDate(zeroDate)}</span>
             </span>
             <span className="hidden text-black/20 dark:text-white/20 sm:inline">
               /
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: coreIndexTone("strong_bullish", isDark).color }}
-              />
-              trim risk
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: coreIndexTone("calm_bullish", isDark).color }}
-              />
-              balanced
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: coreIndexTone("bearish_warning", isDark).color }}
-              />
-              preserve
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: coreIndexTone("extreme_bearish", isDark).color }}
-              />
-              accumulate
+            {/* The chart key: it wraps between keys, never inside one. */}
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {RIBBON_KEY.map(([bucket, label]) => (
+                <span
+                  key={bucket}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: coreIndexTone(bucket, isDark).color }}
+                  />
+                  {label}
+                </span>
+              ))}
+              {marketFlags.map((flag) => (
+                <span
+                  key={flag.field}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <span
+                    className="h-0.5 w-3 rounded-full"
+                    style={{ backgroundColor: isDark ? flag.dark : flag.light }}
+                  />
+                  {flag.label.toLowerCase()}
+                </span>
+              ))}
             </span>
           </div>
 

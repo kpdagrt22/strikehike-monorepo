@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { MARKET_FLAGS, sp500SeriesLabel } from "@/components/regime/regimeChart";
 import {
   buildSegments,
   clamp,
@@ -21,7 +22,7 @@ const CORE_INDEX_TICKS = [-50, 0, 50];
 const EQUITY_TICKS = [100, 1_000, 10_000, 100_000];
 const DAY_MS = 86_400_000;
 
-function Legend({ tone }) {
+function Legend({ tone, equityLabel, lanes }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-micro text-black/60 dark:text-white/60">
       <span className="inline-flex items-center gap-1.5">
@@ -29,7 +30,7 @@ function Legend({ tone }) {
           className="h-0.5 w-3 rounded-full"
           style={{ backgroundColor: tone.equity }}
         />
-        Equity proxy
+        {equityLabel}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span
@@ -45,6 +46,15 @@ function Legend({ tone }) {
         />
         Recession
       </span>
+      {lanes.map((lane) => (
+        <span key={lane.field} className="inline-flex items-center gap-1.5">
+          <span
+            className="h-0.5 w-3 rounded-full"
+            style={{ backgroundColor: lane.color }}
+          />
+          {lane.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -146,6 +156,41 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
       return log >= minLog && log <= maxLog;
     });
 
+    // The index the window's S&P values belong to ("S&P 90 → S&P 500" across
+    // the S&P 500's launch in March 1957).
+    const firstPoint = equityPoints[0];
+    const lastPoint = equityPoints.at(-1);
+    const fromLabel = sp500SeriesLabel(firstPoint?.date, firstPoint?.proxy_source);
+    const toLabel = sp500SeriesLabel(lastPoint?.date, lastPoint?.proxy_source);
+    const equityLabel = fromLabel === toLabel ? fromLabel : `${fromLabel} → ${toLabel}`;
+
+    // Days with a market flag on, as runs along the plot's foot.
+    const lanes = MARKET_FLAGS.filter((flag) =>
+      points.some((point) => typeof point[flag.field] === "boolean"),
+    ).map((flag) => {
+      const runs = [];
+      let open = null;
+      for (const point of points) {
+        if (point[flag.field] !== true) {
+          open = null;
+        } else if (open) {
+          open.end = point.ms;
+        } else {
+          open = { start: point.ms, end: point.ms };
+          runs.push(open);
+        }
+      }
+      return {
+        field: flag.field,
+        label: flag.label,
+        color: isDark ? flag.dark : flag.light,
+        runs: runs.map((run) => ({
+          x0: x(run.start),
+          x1: x(Math.min(endMs, run.end + DAY_MS)),
+        })),
+      };
+    });
+
     return {
       startMs,
       endMs,
@@ -158,8 +203,10 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
       shadeEnd,
       markers,
       equityTicks,
+      equityLabel,
+      lanes,
     };
-  }, [timeline, crash, tone.axis]);
+  }, [timeline, crash, tone.axis, isDark]);
 
   if (!geometry) {
     return (
@@ -181,6 +228,8 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
     shadeEnd,
     markers,
     equityTicks,
+    equityLabel,
+    lanes,
   } = geometry;
   const baseline = PAD.top + PLOT_H;
   const hasSeries =
@@ -192,7 +241,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
         <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
           Daily window · {timeline.length} observations
         </p>
-        <Legend tone={tone} />
+        <Legend tone={tone} equityLabel={equityLabel} lanes={lanes} />
       </div>
 
       <div
@@ -205,7 +254,7 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[620px]"
           role="img"
-          aria-label={`Daily equity proxy and Core Index score around ${crash?.name ?? "the selected recession"}`}
+          aria-label={`Daily ${equityLabel} and Core Index score around ${crash?.name ?? "the selected recession"}`}
         >
           {CORE_INDEX_TICKS.map((tick) => {
             const y = yCoreIndex(tick);
@@ -257,6 +306,19 @@ export function RegimeDetailChart({ timeline, crash, isDark }) {
             fill={tone.crimson}
             fillOpacity="0.10"
           />
+
+          {lanes.map((lane, index) =>
+            lane.runs.map((run) => (
+              <rect
+                key={`detail-${lane.field}-${run.x0}`}
+                x={run.x0}
+                y={baseline - 2 - index * 4}
+                width={Math.max(1, run.x1 - run.x0)}
+                height={2}
+                fill={lane.color}
+              />
+            )),
+          )}
 
           {equitySegments.map((segment, index) => (
             <path

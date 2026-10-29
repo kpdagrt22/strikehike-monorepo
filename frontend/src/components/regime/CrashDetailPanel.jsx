@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { panel } from "@/lib/motion";
 import { RegimeDetailChart } from "@/components/regime/RegimeDetailChart";
 import { SkyStrip } from "@/components/regime/SkyStrip";
+import { coreIndexFlag } from "@/components/regime/regimeChart";
 import {
   addDaysIso,
   addMonthsIso,
@@ -33,6 +34,7 @@ function PreCrashCard({ label, data, isDark }) {
     : "—";
   const coreIndex = data?.core_index;
   const tone = coreIndexTone(data?.core_index_bucket, isDark);
+  const flag = coreIndexFlag(data);
 
   return (
     <div className="rounded-2xl border border-black/5 p-4 dark:border-white/5">
@@ -61,6 +63,15 @@ function PreCrashCard({ label, data, isDark }) {
           {tone.label} · {tone.action}
         </span>
       </div>
+
+      {flag ? (
+        <p className="mt-2 text-micro text-black/60 dark:text-white/60">
+          <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
+            {flag.label}
+          </span>{" "}
+          {flag.text}
+        </p>
+      ) : null}
     </div>
   );
 }

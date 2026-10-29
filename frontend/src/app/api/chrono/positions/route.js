@@ -34,8 +34,131 @@ async function fetchBackend(path) {
   }
 }
 
+// Range mode: ?start=YYYY-MM-DD&end=YYYY-MM-DD&step=1|7|30&bodies=Sun,Moon,Saturn
+// returns { start, end, step, source, bodies: { Sun: { lon: [], retro: [] } } }
+// from the bundled ephemeris only (no backend calls): longitudes to 0.01°,
+// retro as 1 / 0, one sample every `step` days from `start`, the range
+// clamped to the coverage and at most RANGE_MAX_SAMPLES samples. Requests with
+// `date` or `datetime` keep the single-date contract below, unchanged.
+const DAY_MS = 86_400_000;
+const RANGE_STEPS = new Set([1, 7, 30]);
+const RANGE_MAX_SAMPLES = 1500;
+const RANGE_DEFAULT_BODIES = ["Sun", "Moon", "Saturn"];
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDay(value) {
+  if (!value || !ISO_DAY.test(value)) return null;
+  const ms = Date.parse(`${value}T00:00:00Z`);
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== value) {
+    return null;
+  }
+  return ms;
+}
+
+function rangeResponse(searchParams) {
+  const startValue = searchParams.get("start");
+  const endValue = searchParams.get("end") ?? startValue;
+  const startMs = parseDay(startValue);
+  const endMs = parseDay(endValue);
+  if (startMs == null || endMs == null) {
+    return NextResponse.json(
+      { error: "start and end must be calendar dates in YYYY-MM-DD format." },
+      { status: 400 },
+    );
+  }
+  if (endMs < startMs) {
+    return NextResponse.json(
+      { error: "end must not be before start." },
+      { status: 400 },
+    );
+  }
+
+  const step = Number(searchParams.get("step") ?? "1");
+  if (!RANGE_STEPS.has(step)) {
+    return NextResponse.json(
+      { error: "step must be 1, 7 or 30." },
+      { status: 400 },
+    );
+  }
+
+  const names = (searchParams.get("bodies") ?? RANGE_DEFAULT_BODIES.join(","))
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const known = Object.keys(currentSky(ephemeris, MIN_MS));
+  if (!names.length || names.some((name) => !known.includes(name))) {
+    return NextResponse.json(
+      { error: `bodies must be a comma list of: ${known.join(", ")}.` },
+      { status: 400 },
+    );
+  }
+
+  if (endMs < MIN_MS || startMs > MAX_MS) {
+    return NextResponse.json(
+      {
+        error: `Ephemeris coverage is ${MIN_DATE} to ${MAX_DATE}.`,
+        min: MIN_DATE,
+        max: MAX_DATE,
+      },
+      { status: 422 },
+    );
+  }
+
+  // Clamp to the coverage, keeping the sample grid anchored on `start`.
+  const first = Math.max(
+    0,
+    Math.ceil((MIN_MS - startMs) / (step * DAY_MS)),
+  );
+  const firstMs = startMs + first * step * DAY_MS;
+  const lastMs = Math.min(endMs, MAX_MS);
+  const count = Math.floor((lastMs - firstMs) / (step * DAY_MS)) + 1;
+  if (count > RANGE_MAX_SAMPLES) {
+    return NextResponse.json(
+      {
+        error: `At most ${RANGE_MAX_SAMPLES} samples: shorten the range or use a larger step.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const bodies = Object.fromEntries(
+    names.map((name) => [name, { lon: [], retro: [] }]),
+  );
+  for (let index = 0; index < count; index += 1) {
+    const sky = currentSky(ephemeris, firstMs + index * step * DAY_MS);
+    for (const name of names) {
+      bodies[name].lon.push(Math.round(sky[name].lon * 100) / 100);
+      bodies[name].retro.push(sky[name].retro ? 1 : 0);
+    }
+  }
+
+  return NextResponse.json(
+    {
+      start: new Date(firstMs).toISOString().slice(0, 10),
+      end: new Date(firstMs + (count - 1) * step * DAY_MS)
+        .toISOString()
+        .slice(0, 10),
+      step,
+      source: SOURCE,
+      bodies,
+    },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+      },
+    },
+  );
+}
+
 export async function GET(request) {
   const searchParams = new URL(request.url).searchParams;
+  if (
+    searchParams.has("start") &&
+    !searchParams.has("date") &&
+    !searchParams.has("datetime")
+  ) {
+    return rangeResponse(searchParams);
+  }
   const requestedDateTime = searchParams.get("datetime");
   const requestedDate = searchParams.get("date");
   const date = requestedDateTime

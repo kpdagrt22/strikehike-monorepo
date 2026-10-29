@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT_URL } from "@/lib/contact";
@@ -203,12 +204,18 @@ export function InfoModule() {
             </div>
 
             <p className="mt-3 text-body leading-relaxed text-black/70 dark:text-white/70">
-              StrikeHike is a Universal Chrono-Spatial Engine that maps a
-              120-year ML index of market regimes, volatility and world events
-              against planetary geometry. It surfaces deep historical parallels
+              StrikeHike is a Universal Chrono-Spatial Engine that sets the US
+              macro record and market history beside the planetary sky, date by
+              date. It surfaces deep historical parallels
               and recent manifestations of the same conditions, so patterns can
               be examined without mistaking correlation for certainty.
             </p>
+            <Link
+              href="/disclaimer"
+              className="mt-1.5 inline-flex min-h-6 items-center text-micro text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:min-h-11 dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
+            >
+              Disclaimer
+            </Link>
 
             <div className="mt-5 border-t border-black/10 pt-5 dark:border-white/10">
               <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
