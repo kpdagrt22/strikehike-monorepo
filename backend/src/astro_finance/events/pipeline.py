@@ -297,6 +297,7 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         bundle_version=ctx.artifact.bundle_version,
         summary=report_summary,
         notes=notes,
+        offline_build=ctx.options.offline_dir is not None,
     )
     source_preview = json.dumps(
         [
@@ -344,6 +345,7 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         bundle_version=ctx.artifact.bundle_version,
         summary=report_summary,
         notes=notes,
+        offline_build=ctx.options.offline_dir is not None,
     )
     ctx.report = report
     ctx.bundle = finalize_bundle(

@@ -30,6 +30,7 @@ def quality_report_payload(
     bundle_version: str,
     summary: Mapping[str, int],
     notes: Iterable[str] = (),
+    offline_build: bool = False,
 ) -> dict[str, Any]:
     upcoming_counts: dict[str, dict[str, int]] = {}
     for theme in THEME_ORDER:
@@ -44,11 +45,12 @@ def quality_report_payload(
                 and today <= event.start_date
                 and (event.start_date - today).days <= horizon
             )
-    publishable = all(gate.status == "pass" for gate in gate_results)
+    publishable = all(gate.status == "pass" for gate in gate_results) and not offline_build
     return {
         "schema_version": SCHEMA_VERSION,
         "as_of": today.isoformat(),
         "bundle_version": bundle_version,
+        "test_build": offline_build,
         "publishable": publishable,
         "summary": dict(summary),
         "upcoming_counts": upcoming_counts,
@@ -75,29 +77,34 @@ def quality_report_payload(
 
 def quality_report_markdown(report: Mapping[str, Any]) -> str:
     summary = report["summary"]
-    lines = [
-        "# Events bundle quality report",
-        "",
-        f"As of {report['as_of']}. Bundle version `{report['bundle_version']}`. "
-        f"Publishable: **{'yes' if report['publishable'] else 'no'}**.",
-        "",
-        "## Summary",
-        "",
-        f"- Records extracted: {summary.get('events_discovered', 0)}",
-        f"- Events added or updated: {summary.get('events_updated', 0)}",
-        f"- Records rejected: {summary.get('events_rejected', 0)}",
-        f"- Duplicates removed: {summary.get('duplicates_removed', 0)}",
-        f"- Events in bundle: {summary.get('events_total', 0)} "
-        f"({summary.get('historical_total', 0)} historical, "
-        f"{summary.get('upcoming_total', 0)} upcoming)",
-        "",
-        "## Upcoming events by theme",
-        "",
-        "Scheduled and tentative events only.",
-        "",
-        "| Theme | Next 30 days | Next 90 days | Next 365 days |",
-        "|---|---:|---:|---:|",
-    ]
+    lines = []
+    if report.get("test_build"):
+        lines.extend(["TEST BUILD (offline fixtures), never publishable", ""])
+    lines.extend(
+        [
+            "# Events bundle quality report",
+            "",
+            f"As of {report['as_of']}. Bundle version `{report['bundle_version']}`. "
+            f"Publishable: **{'yes' if report['publishable'] else 'no'}**.",
+            "",
+            "## Summary",
+            "",
+            f"- Records extracted: {summary.get('events_discovered', 0)}",
+            f"- Events added or updated: {summary.get('events_updated', 0)}",
+            f"- Records rejected: {summary.get('events_rejected', 0)}",
+            f"- Duplicates removed: {summary.get('duplicates_removed', 0)}",
+            f"- Events in bundle: {summary.get('events_total', 0)} "
+            f"({summary.get('historical_total', 0)} historical, "
+            f"{summary.get('upcoming_total', 0)} upcoming)",
+            "",
+            "## Upcoming events by theme",
+            "",
+            "Scheduled and tentative events only.",
+            "",
+            "| Theme | Next 30 days | Next 90 days | Next 365 days |",
+            "|---|---:|---:|---:|",
+        ]
+    )
     for theme, counts in report["upcoming_counts"].items():
         lines.append(
             f"| {theme} | {counts['30']} | {counts['90']} | {counts['365']} |"

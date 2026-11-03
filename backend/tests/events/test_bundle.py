@@ -56,7 +56,11 @@ def test_build_is_idempotent_apart_from_created_at(tmp_path):
     first = _build(tmp_path / "first", created_at=NOW)
     second = _build(tmp_path / "second", created_at=NOW + timedelta(hours=1))
     assert first.bundle_version == second.bundle_version
-    assert first.publishable and second.publishable
+    assert not first.publishable and not second.publishable
+    assert first.quality_report["test_build"] is True
+    assert (first.bundle_dir / "quality_report.md").read_text("utf-8").startswith(
+        "TEST BUILD (offline fixtures), never publishable\n\n"
+    )
 
     for name in ("events.json", "events.sqlite", "quality_report.json", "quality_report.md"):
         assert (first.bundle_dir / name).read_bytes() == (
@@ -90,7 +94,7 @@ def test_manifest_has_the_documented_keys_and_counts(tmp_path):
     assert manifest["theme_metadata"]["Natural Disasters"]["schedulable"] is False
     assert manifest["counts"]["Science"]["historical"]["completed"] == 43
     assert manifest["counts"]["Politics"]["historical"]["completed"] == 46
-    assert manifest["publishable"] is True
+    assert manifest["publishable"] is False
     assert set(manifest["files"]) == {
         "events.json",
         "events.sqlite",
@@ -110,6 +114,10 @@ def test_bundle_version_is_a_short_sha_of_the_content(tmp_path):
 def test_quality_report_has_counts_for_every_theme(tmp_path):
     result = _build(tmp_path / "out", created_at=NOW)
     report = json.loads((result.bundle_dir / "quality_report.json").read_text("utf-8"))
+    assert report["test_build"] is True
+    assert report["publishable"] is False
+    markdown = (result.bundle_dir / "quality_report.md").read_text("utf-8")
+    assert markdown.startswith("TEST BUILD (offline fixtures), never publishable\n\n")
     assert set(report["upcoming_counts"]) == {
         "Politics",
         "Science",

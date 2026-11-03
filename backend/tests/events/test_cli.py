@@ -62,15 +62,34 @@ def _build(out: Path, *extra: str) -> int:
 
 def test_cli_build_validate_report_and_diff(tmp_path, capsys):
     out = tmp_path / "build"
-    assert _build(out) == 0
+    assert _build(out) == 2
     bundle = out / "bundle"
     assert (bundle / "manifest.json").exists()
-    assert main(["validate", str(bundle)]) == 0
+    assert main(["validate", str(bundle)]) == 2
     assert main(["report", str(bundle)]) == 0
     assert main(["diff", str(bundle), str(bundle)]) == 0
     captured = capsys.readouterr()
     assert "Publishable" in captured.out or "publishable" in captured.out
     assert "added: 0" in captured.out
+
+
+def test_cli_build_without_network_sources_can_exit_zero(tmp_path):
+    result = main(
+        [
+            "build",
+            "--out",
+            str(tmp_path / "local-only"),
+            "--today",
+            "2026-11-03",
+            "--sources",
+            "historical_curated,astronomy_computed,culture_computed,curated_upcoming",
+        ]
+    )
+    assert result == 0
+    manifest = json.loads(
+        (tmp_path / "local-only" / "bundle" / "manifest.json").read_text("utf-8")
+    )
+    assert manifest["publishable"] is True
 
 
 def test_cli_build_exits_two_when_a_gate_fails(tmp_path, capsys):

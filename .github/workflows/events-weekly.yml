@@ -56,6 +56,17 @@ jobs:
         run: |
           python -m pytest tests/events -q
 
+      - name: Verify FRED release ids and names
+        shell: bash
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          if [ -z "${FRED_API_KEY:-}" ]; then
+            echo "::error::FRED_API_KEY is not set; cannot verify the configured FRED releases."
+            exit 1
+          fi
+          python -m astro_finance.events.verify_fred_releases
+
       - name: Fetch the newest previous bundle release
         id: previous
         shell: bash

@@ -40,7 +40,8 @@ def _run(tmp_path: Path, data_dir: Path, *, previous: Path | None = None, name: 
 def test_pipeline_writes_stage_records_and_raw_cache(tmp_path):
     data_dir = _copy_data(tmp_path)
     result = _run(tmp_path, data_dir)
-    assert result.publishable
+    assert not result.publishable
+    assert result.exit_code == 2
     log_path = result.out_dir / "runs" / "run-out.jsonl"
     records = [json.loads(line) for line in log_path.read_text("utf-8").splitlines()]
     assert [record["stage"] for record in records] == [
@@ -93,7 +94,8 @@ def test_pipeline_reschedule_archives_the_previous_record(tmp_path):
     assert moved["start_date"] == "2026-11-06"
     assert moved["supersedes"] == archived["event_id"]
     assert second.bundle_version != first.bundle_version
-    assert second.publishable
+    assert second.publishable is False
+    assert second.exit_code == 2
 
 
 def test_pipeline_marks_missing_curated_events_unverified_after_two_runs(tmp_path):
@@ -137,7 +139,8 @@ def test_pipeline_adopts_a_changed_historical_seed(tmp_path):
         event for event in events if event["event_id"].endswith("galveston-hurricane:1900")
     )
     assert first_event["description"] == "Changed by the owner."
-    assert second.publishable
+    assert second.publishable is False
+    assert second.exit_code == 2
 
 
 def test_pipeline_reports_natural_disasters_as_not_schedulable(tmp_path):
