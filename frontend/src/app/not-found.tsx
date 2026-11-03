@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
+// Out of the index, links still followed. The root layout sets no canonical or hreflang, so the
+// 404 claims no URL of its own.
 export const metadata: Metadata = {
   title: "Off the timeline",
+  robots: { index: false, follow: true },
 };
 
 const VIEWS = [

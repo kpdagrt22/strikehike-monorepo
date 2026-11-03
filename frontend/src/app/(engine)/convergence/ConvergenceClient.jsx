@@ -141,7 +141,13 @@ const SPANS = [
   { key: "recovery", label: "Recovery" },
 ];
 const SERIES_KEYS = new Set(SERIES_OPTIONS.map((option) => option.key));
+const SELECTION_KEYS = ["a", "b", "series", "span"];
 const UNKNOWN_NOTE = "That case is not in the archive; showing the default pair.";
+
+/** The page's own check on a catalogue, fetched or read by the server. */
+function isCatalogue(payload) {
+  return Array.isArray(payload?.cases) && payload.cases.length >= 2;
+}
 
 function readSelection(payload, search) {
   const cases = payload.cases;
@@ -881,10 +887,37 @@ function MethodDetails({ data }) {
 
 const SPAN_DRAW_RESET = { a: 0, b: 0 };
 
-export default function ConvergencePage() {
+/**
+ * The /convergence view. `page.tsx` renders it on the server with the case
+ * catalogue it read (`initialCatalogue`, or null), the server-rendered table of
+ * every decline (`after`, placed after Method & limits) and the site colophon
+ * (`colophon`, the container's last child).
+ *
+ * @param {{
+ *   initialCatalogue?: object | null,
+ *   after?: import("react").ReactNode,
+ *   colophon?: import("react").ReactNode,
+ * }} props
+ */
+export default function ConvergenceClient({
+  initialCatalogue = null,
+  after = null,
+  colophon = null,
+}) {
+  // The server's catalogue, when it passes the same check as a fetched one: the
+  // first render (server and browser alike) then shows the default pair, and the
+  // URL's own pair is applied right after hydration, as for a fetched catalogue.
+  const [seed] = useState(() => (isCatalogue(initialCatalogue) ? initialCatalogue : null));
   const [reloadKey, setReloadKey] = useState(0);
-  const [catalogue, setCatalogue] = useState({ status: "loading", data: null, error: null });
-  const [sel, setSel] = useState(null);
+  const [catalogue, setCatalogue] = useState(() =>
+    seed
+      ? { status: "ready", data: seed, error: null }
+      : { status: "loading", data: null, error: null },
+  );
+  const [sel, setSel] = useState(() => (seed ? readSelection(seed, "").selection : null));
+  // Bumped when a shared link's pair replaces the server's default pair:
+  // everything under the bar then mounts afresh (new nodes, not layout shifts).
+  const [linkMount, setLinkMount] = useState(0);
   const [note, setNote] = useState(null);
   // { key, content }: what the read showed when a change made it wait for
   // paths; it stays on screen while the read for `key` loads.
@@ -942,31 +975,46 @@ export default function ConvergencePage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/v1/regime/cases", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(
-            payload?.detail || payload?.error || `Case archive returned ${response.status}.`,
-          );
-        }
-        return response.json();
-      })
+    // The first load reads the server's copy when there is one (no request);
+    // a retry always fetches.
+    const fromServer = reloadKey === 0 ? seed : null;
+    const request = fromServer
+      ? Promise.resolve(fromServer)
+      : fetch("/api/v1/regime/cases", { signal: controller.signal }).then(async (response) => {
+          if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            throw new Error(
+              payload?.detail || payload?.error || `Case archive returned ${response.status}.`,
+            );
+          }
+          return response.json();
+        });
+    request
       .then((payload) => {
-        if (!Array.isArray(payload?.cases) || payload.cases.length < 2) {
+        if (controller.signal.aborted) return;
+        if (!isCatalogue(payload)) {
           throw new Error("The case archive is empty.");
         }
         const initial = readSelection(payload, window.location.search);
         setCatalogue({ status: "ready", data: payload, error: null });
         setSel(initial.selection);
         setNote(initial.unknown ? UNKNOWN_NOTE : null);
+        if (fromServer) {
+          const shown = readSelection(fromServer, "").selection;
+          if (
+            initial.unknown ||
+            SELECTION_KEYS.some((key) => shown[key] !== initial.selection[key])
+          ) {
+            setLinkMount((count) => count + 1);
+          }
+        }
       })
       .catch((error) => {
         if (error?.name === "AbortError") return;
         setCatalogue({ status: "error", data: null, error: error?.message ?? "" });
       });
     return () => controller.abort();
-  }, [reloadKey]);
+  }, [reloadKey, seed]);
 
   useEffect(() => () => window.clearTimeout(previewTimer.current), []);
 
@@ -1336,9 +1384,11 @@ export default function ConvergencePage() {
             </div>
 
             {/* Everything under the bar mounts afresh when the catalogue
-                arrives: new nodes are not layout shifts, so a shared link
-                whose read runs to five lines loads without moving the page. */}
-            <Fragment key={ready ? "ready" : "wait"}>
+                arrives, and again when a shared link's pair replaces the
+                server's default pair: new nodes are not layout shifts, so a
+                shared link whose read runs to five lines loads without moving
+                the page. */}
+            <Fragment key={ready ? `ready-${linkMount}` : "wait"}>
               {note ? (
                 <div role="status" className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-micro text-(--sh-text-2)">
                   <span>{note}</span>
@@ -1514,6 +1564,8 @@ export default function ConvergencePage() {
           </>
         ) : null}
 
+        {after}
+
         {catalogue.status !== "loading" ? (
           <div className="mt-4 flex justify-end gap-4">
             <button
@@ -1530,6 +1582,8 @@ export default function ConvergencePage() {
             </Link>
           </div>
         ) : null}
+
+        {colophon}
       </div>
       <p className="sr-only" role="status" aria-live="polite">
         {announcement.text}

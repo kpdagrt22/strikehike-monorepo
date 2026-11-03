@@ -11,19 +11,19 @@ const STEPS = [
   {
     number: "1",
     title: "The Timeline",
-    body: "Scrub the chart to explore 120 years of history. Red zones are major crashes.",
+    body: "Scrub the chart to explore US market history since 1854. Red bands are NBER recessions.",
     dot: "bg-[#0e7490] dark:bg-[#67e8f9]",
   },
   {
     number: "2",
     title: "The Score",
-    body: "The Core Index maps crowd emotion from -50 (maximum fear) to +50 (euphoria). We read it contrarian: trim into strength, accumulate into panic.",
+    body: "The Core Index reads US market trend and stress each week, from −50 (Maximum Fear) to +50 (Risk Elevated). We read it contrarian: trim into strength, accumulate into panic.",
     dot: "bg-[#a16207] dark:bg-[#facc15]",
   },
   {
     number: "3",
-    title: "The Future",
-    body: "By studying historical cycles, we can anticipate what happens next.",
+    title: "The Record",
+    body: "Each view shows what followed similar moments in the past. Descriptive history, not a forecast.",
     dot: "bg-[#5b21b6] dark:bg-[#8b5cf6]",
   },
 ];
@@ -34,17 +34,8 @@ export function OnboardingModal() {
   const dialogRef = useRef(null);
   const titleRef = useRef(null);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        if (window.localStorage.getItem(STORAGE_KEY) !== "1") setOpen(true);
-      } catch {
-        // Private browsing can block storage; the modal still works in-memory.
-      }
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, []);
-
+  // The note never opens by itself (a full-screen modal on arrival is an
+  // interstitial); "How it works" opens it through this event.
   useEffect(() => {
     const show = () => setOpen(true);
     window.addEventListener("strikehike:show-onboarding", show);

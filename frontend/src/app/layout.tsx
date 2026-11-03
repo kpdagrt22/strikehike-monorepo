@@ -2,6 +2,19 @@ import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import {
+  APP_ID,
+  ORG_ID,
+  PAGES,
+  PERSON_ID,
+  PERSON_NAME,
+  PERSON_SAME_AS,
+  PERSON_URL,
+  REPO_URL,
+  SITE_NAME,
+  SITE_URL,
+  WEBSITE_ID,
+} from "@/lib/seo/site";
 
 const onest = Onest({
   variable: "--font-onest",
@@ -9,20 +22,27 @@ const onest = Onest({
   display: "swap",
 });
 
-const SITE_URL = "https://strikehike.com";
-const SITE_NAME = "StrikeHike";
-const SITE_TITLE = "StrikeHike — Universal Chrono-Spatial Engine";
-const SITE_DESCRIPTION =
-  "A neutral, date-addressable index of time, volatility, and historical parallel.";
+const HOME = PAGES["/"];
 const GOOGLE_SITE_VERIFICATION =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
 
+// The site-wide graph: who makes StrikeHike, who publishes it, the site and the app.
+// Each page adds its own WebPage (and Dataset, BreadcrumbList) graph that points here by @id.
+// No ratings or reviews, ever: the Software App rich result may flag their absence; that is accepted.
 const structuredData = {
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "Person",
+      "@id": PERSON_ID,
+      name: PERSON_NAME,
+      alternateName: "KP",
+      url: PERSON_URL,
+      sameAs: [...PERSON_SAME_AS],
+    },
+    {
       "@type": "Organization",
-      "@id": `${SITE_URL}/#organization`,
+      "@id": ORG_ID,
       name: SITE_NAME,
       url: SITE_URL,
       logo: {
@@ -32,31 +52,35 @@ const structuredData = {
         height: 512,
       },
       description:
-        "Publisher of the StrikeHike Universal Chrono-Spatial Engine, a research surface for market cycles, planetary geometry, and historical parallels.",
+        "Publisher of StrikeHike, a free research site that sets the US market and macro record beside the planetary sky, date by date.",
+      founder: { "@id": PERSON_ID },
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "customer support",
-        url: `${SITE_URL}/#contact`,
+        url: "https://thisiskp.in/consulting#enquire",
         availableLanguage: ["en-US", "en-IN"],
       },
     },
     {
       "@type": "WebSite",
-      "@id": `${SITE_URL}/#website`,
+      "@id": WEBSITE_ID,
       url: SITE_URL,
       name: SITE_NAME,
-      description: SITE_DESCRIPTION,
-      inLanguage: ["en-US", "en-IN"],
-      publisher: { "@id": `${SITE_URL}/#organization` },
+      alternateName: "StrikeHike Universal Chrono-Spatial Engine",
+      description:
+        "A free research site that sets the US market and macro record beside the planetary sky, date by date. Research, not investment advice.",
+      inLanguage: "en",
+      publisher: { "@id": ORG_ID },
+      creator: { "@id": PERSON_ID },
     },
     {
-      "@type": "SoftwareApplication",
-      "@id": `${SITE_URL}/#software`,
+      "@type": "WebApplication",
+      "@id": APP_ID,
       name: "StrikeHike Universal Chrono-Spatial Engine",
-      alternateName: "StrikeHike Chrono Engine",
+      alternateName: ["StrikeHike", "StrikeHike Chrono Engine"],
       url: SITE_URL,
       description:
-        "A date-addressable chrono-spatial engine that combines a 120-year ML index of market regimes and volatility with Swiss Ephemeris planetary geometry. It returns deep historical parallels and recent manifestations for any date from 1900 to 2035.",
+        "A date-addressable research engine that sets Swiss Ephemeris planetary positions (Lahiri sidereal) beside US market and macro history: a 3D orrery, every NBER recession since 1854, a weekly Core Index of US market trend and stress, a catalogue of market declines since 1871, and today's market beside its closest past setups. Descriptive history, not a forecast.",
       applicationCategory: "FinanceApplication",
       applicationSubCategory:
         "Financial astrology, market history, and historical event parallels",
@@ -68,35 +92,49 @@ const structuredData = {
         price: "0",
         priceCurrency: "USD",
       },
-      publisher: { "@id": `${SITE_URL}/#organization` },
+      creator: { "@id": PERSON_ID },
+      author: { "@id": PERSON_ID },
+      publisher: { "@id": ORG_ID },
       audience: {
         "@type": "Audience",
         audienceType:
           "Investors, market researchers, historians, and astrology researchers",
       },
       keywords:
-        "Universal Chrono-Spatial Engine, financial astrology, market cycles, historical parallels, Swiss Ephemeris, astro-finance, StrikeHike",
+        "market history, NBER recessions, stock market crashes, market declines, Core Index, S&P 500 history, Nifty 50, Bitcoin, gold, planetary positions, Swiss Ephemeris, financial astrology, StrikeHike",
       featureList: [
-        "Date-addressable planetary geometry for 1900–2035",
-        "120-year ML market-regime and volatility index",
-        "Dual-epoch historical and recent event parallels",
-        "Interactive 3D orrery and historical timeline",
-        "120-year macro regime atlas with NBER recession windows",
+        "3D orrery of the Sun, Moon and planets by date (Swiss Ephemeris, Lahiri sidereal), with sign, nakshatra and retrograde state",
+        "Archive of dated world events, and past and upcoming dates with similar planetary geometry",
+        "US market and macro atlas with every NBER recession window since 1854",
+        "Weekly Core Index of US market trend and stress on a −50 to +50 scale, with a trend warning",
+        "Catalogue of market declines since 1871, compared side by side: US stocks, Nifty 50, Bitcoin, gold and Treasury bonds",
+        "Study of Patterns: today's S&P 500 and Nifty 50 beside their closest past setups, and the 120-year mirror",
       ],
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": `${SITE_URL}/#source`,
+      name: "strikehike-monorepo",
+      codeRepository: REPO_URL,
+      programmingLanguage: ["TypeScript", "JavaScript", "Python"],
+      author: { "@id": PERSON_ID },
+      targetProduct: { "@id": APP_ID },
     },
   ],
 };
 
+// Site-wide defaults. No `alternates` and no openGraph `url` here: each page sets its own
+// canonical and og:url (lib/seo/site.ts pageMetadata), so the 404 claims no URL.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: SITE_TITLE,
+    default: HOME.title,
     template: "%s | StrikeHike",
   },
-  description: SITE_DESCRIPTION,
+  description: HOME.description,
   applicationName: SITE_NAME,
-  authors: [{ name: SITE_NAME, url: SITE_URL }],
-  creator: SITE_NAME,
+  authors: [{ name: PERSON_NAME, url: PERSON_URL }],
+  creator: PERSON_NAME,
   publisher: SITE_NAME,
   icons: {
     icon: [
@@ -123,37 +161,34 @@ export const metadata: Metadata = {
   category: "Finance",
   classification: "Finance, Astrology, History",
   keywords: [
-    "Universal Chrono-Spatial Engine",
-    "financial astrology",
-    "astro-finance",
-    "market cycles",
-    "historical parallels",
+    "StrikeHike",
+    "market history",
+    "NBER recessions",
+    "stock market crashes",
+    "market declines",
+    "Core Index",
+    "S&P 500 history",
+    "Nifty 50",
+    "Bitcoin",
+    "gold",
+    "planetary positions",
     "Swiss Ephemeris",
     "Lahiri sidereal",
-    "market volatility",
-    "StrikeHike",
+    "financial astrology",
+    "Universal Chrono-Spatial Engine",
   ],
-  alternates: {
-    canonical: "/",
-    languages: {
-      "en-US": "/",
-      "en-IN": "/",
-      "x-default": "/",
-    },
-  },
   openGraph: {
     type: "website",
     locale: "en_IN",
     alternateLocale: ["en_US"],
-    url: SITE_URL,
     siteName: SITE_NAME,
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
+    title: HOME.title,
+    description: HOME.description,
   },
   twitter: {
-    card: "summary",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
+    card: "summary_large_image",
+    title: HOME.title,
+    description: HOME.description,
   },
   robots: {
     index: true,
@@ -183,6 +218,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={onest.variable} suppressHydrationWarning>
       <head>
+        {/* thisiskp.in links here with rel="me"; this closes the pair. */}
+        <link rel="me" href={PERSON_URL} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

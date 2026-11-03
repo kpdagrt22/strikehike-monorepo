@@ -1,0 +1,44 @@
+# StrikeHike
+
+> StrikeHike (strikehike.com) is a free research site that sets the US market and macro record beside the planetary sky, date by date: a 3D orrery, every NBER recession since 1854, a weekly Core Index of US market trend and stress, and a catalogue of market declines since 1871. It is built and run by Prakash Kantumutchu (KP) in Faridabad, Delhi NCR, India. Research, not investment advice.
+
+Every number on StrikeHike describes the past. Each page shows the date its data run to; please cite that date with any figure. The site publishes no calls on future prices.
+
+## Pages
+
+- [Orrery](https://strikehike.com/): a 3D orrery of the Sun, Moon and planets for any date on its timeline (July 1906 to December 2027), with each planet's sidereal sign, nakshatra and retrograde state, beside an archive of dated world events and the past and upcoming dates whose planetary geometry is most similar.
+- [Regime](https://strikehike.com/regime): one chart of US market and macro history: every NBER recession window since 1854, the weekly Core Index on a −50 to +50 scale, a trend warning, and the S&P 500, gold, Treasury bonds and the Nifty 50 on one percentage scale.
+- [Convergence](https://strikehike.com/convergence): any two market declines side by side, aligned at their peaks: how far each fell, how long it took to reach its low and to regain its peak, the macro reading on the same days, and the Sun, Moon and Saturn at each peak. The catalogue covers US stocks since 1871, the Nifty 50, Bitcoin, gold and Treasury bonds.
+- [Study of Patterns](https://strikehike.com/patterns): today's S&P 500 or Nifty 50 beside its closest past setups, what followed each within a year, and how often all past years rose; plus the 120-year mirror, the latest 12 months beside the same months exactly 120 years earlier.
+- [Disclaimer](https://strikehike.com/disclaimer): what the site is and is not, and where its data come from.
+
+## Definitions
+
+- Core Index: a weekly reading of US market trend and stress, set at each Friday close, on a −50 to +50 scale with four bands: Maximum Fear (−50 to −25), Capital Preservation (−24 to −1), Balanced Growth (0 to +24) and Risk Elevated (+25 to +50). Its inputs are the S&P 500's trend and volatility, with credit spreads, unemployment and the yield curve as stress inputs, each used only from the date it was published.
+- Trend warning: on when the S&P 500's Friday close is below the average of its last 40 Friday closes. It is shown beside the Core Index and does not change it.
+- Market decline (Convergence): starts at the highest close before a fall of at least 15% (US stocks, the Nifty 50, the Treasury bond model), 25% (gold, monthly average) or 50% (Bitcoin). Each case gives its peak, its low and depth, and the date it was back at its peak, or that it has not been.
+- 120-year mirror (Study of Patterns): the latest 12 months of the US stock index beside the same 12 months exactly 120 years earlier, on monthly averages.
+
+## Data sources
+
+- Recessions: NBER business-cycle dates via FRED (USREC), month-precise and dated after the fact: https://fred.stlouisfed.org/series/USREC
+- US stocks, 1871–1927: the Cowles Commission index of common stocks, monthly average (NBER Macrohistory Database, via FRED): https://fred.stlouisfed.org/series/M1125AUSM343NNBR
+- US stocks from 30 Dec 1927: daily S&P closes from Yahoo Finance (^GSPC), the S&P 90 until 4 Mar 1957 and the S&P 500 after, with official S&P Dow Jones Indices closes via FRED where Yahoo's differ. Prices exclude dividends.
+- Nifty 50: Yahoo Finance (^NSEI), daily from 17 Sep 2007.
+- Gold: World Bank Pink Sheet, London bullion, monthly: https://www.worldbank.org/en/research/commodity-markets
+- Bitcoin: Blockchain.com daily market price from 18 Aug 2010: https://www.blockchain.com/explorer/charts/market-price
+- Treasury bonds: a 7.5-duration 10-year Treasury total-return model.
+- Planetary positions: Swiss Ephemeris 2.10.03, Lahiri sidereal, 1900–2035: https://www.astro.com/swisseph/
+
+## About
+
+- Built and run by Prakash Kantumutchu (KP): https://thisiskp.in
+- Source code: https://github.com/kpdagrt22/strikehike-monorepo
+- LinkedIn: https://www.linkedin.com/in/prakash-kantumutchu
+- Enquiries: https://thisiskp.in/consulting#enquire
+
+## Notes
+
+- Descriptive history, not a forecast.
+- The astro layer is a historical lens, not a forecast.
+- Research, not investment advice.

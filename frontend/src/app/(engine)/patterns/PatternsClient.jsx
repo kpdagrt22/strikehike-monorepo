@@ -151,7 +151,17 @@ function AssetLens({ assetKey, onChange }) {
   );
 }
 
-export default function PatternsPage() {
+/**
+ * The /patterns view. `page.tsx` renders it on the server with the S&P 500
+ * payload it read (`initialData`: { as_of, asset, asset_label, engine, notes },
+ * or null) and the site colophon (`colophon`, the container's last child).
+ *
+ * @param {{
+ *   initialData?: { engine?: object } | null,
+ *   colophon?: import("react").ReactNode,
+ * }} props
+ */
+export default function PatternsClient({ initialData = null, colophon = null }) {
   const { resolvedTheme } = useTheme();
   // false during SSR/hydration, true after: the server cannot know the theme, so
   // JS-computed colours switch to the resolved theme only once mounted.
@@ -168,19 +178,30 @@ export default function PatternsPage() {
   const assetKey = chosenAsset ?? (linkedCase?.startsWith("nifty-") ? "nifty" : "sp500");
   const [reloadKey, setReloadKey] = useState(0);
   const [, startSwitch] = useTransition();
+  // The server's S&P 500 engine block, when it passes the page's own check:
+  // the first render (server and browser alike) then shows the answer, its
+  // table and its lines, and the first request is skipped.
+  const [seed] = useState(() => {
+    const engine = initialData?.engine;
+    return isPatternEngine(engine) && engine.asset === "sp500" ? engine : null;
+  });
+  const firstLoad = useRef(true);
   // loading (nothing yet) · ready · switching (the previous lens stays, dimmed)
   // · error. `data` is the validated `engine` block; v1 fields are not read.
-  const [state, setState] = useState({
-    status: "loading",
-    data: null,
-    error: null,
-    announce: "",
-  });
+  const [state, setState] = useState(() =>
+    seed
+      ? { status: "ready", data: seed, error: null, announce: "" }
+      : { status: "loading", data: null, error: null, announce: "" },
+  );
 
   useEffect(() => {
     // The deep link was rendered before the URL settled (hydration, or a
     // client-side navigation): the store renders it at once, so fetch then.
     if (getLinkedCase() !== linkedCase) return undefined;
+    // The server already sent the S&P 500 lens: no first request for it.
+    const first = firstLoad.current;
+    firstLoad.current = false;
+    if (first && seed && reloadKey === 0 && assetKey === seed.asset) return undefined;
     const controller = new AbortController();
 
     fetch(`/api/v1/patterns?asset=${encodeURIComponent(assetKey)}`, {
@@ -220,7 +241,7 @@ export default function PatternsPage() {
       });
 
     return () => controller.abort();
-  }, [assetKey, reloadKey, linkedCase]);
+  }, [assetKey, reloadKey, linkedCase, seed]);
 
   const handleAssetChange = (key) => {
     if (key === assetKey) return;
@@ -249,8 +270,14 @@ export default function PatternsPage() {
     document.getElementById("pattern-lens-sp500")?.focus();
   };
 
+  // A deep link to a Nifty 50 case opens that lens after hydration: until its
+  // payload arrives, the server's S&P 500 answer stays, dimmed, as in a switch.
+  const status =
+    state.status === "ready" && state.data && state.data.asset !== assetKey
+      ? "switching"
+      : state.status;
   const engine = state.data;
-  const switching = state.status === "switching";
+  const switching = status === "switching";
   const asset = ASSET_TARGETS[assetKey] ?? ASSET_TARGETS.sp500;
   const basis = basisLabel(engine?.basis);
 
@@ -279,7 +306,7 @@ export default function PatternsPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
-            <StatusBadge status={switching ? "loading" : state.status} />
+            <StatusBadge status={switching ? "loading" : status} />
             <span
               className={`inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 font-mono text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60 ${
                 engine ? "" : "invisible"
@@ -301,7 +328,7 @@ export default function PatternsPage() {
           <section className="mt-10 lg:mt-8" aria-labelledby="peek-future-title">
             <SectionLabel number="01">What happened next</SectionLabel>
 
-            {state.status === "error" ? (
+            {status === "error" ? (
               <div
                 role="alert"
                 className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ef4444]/25 bg-[#ef4444]/4 px-4 py-3"
@@ -321,7 +348,7 @@ export default function PatternsPage() {
 
             <PeekIntoFuture
               engine={engine}
-              status={state.status}
+              status={status}
               assetKey={assetKey}
               isDark={isDark}
               mounted={mounted}
@@ -379,7 +406,7 @@ export default function PatternsPage() {
               href="/convergence"
               className="text-black/70 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/70 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
             >
-              Compare two events
+              Compare two market declines
             </Link>
             <Link
               href="/disclaimer"
@@ -389,6 +416,8 @@ export default function PatternsPage() {
             </Link>
           </div>
         </div>
+
+        {colophon}
       </div>
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {state.announce}
