@@ -6,8 +6,9 @@ SQLite store and from `regime/cases.py`: it reads the curated historical seed,
 adds real scheduled dates from a small set of sources, merges the result with
 the previous bundle, and publishes nothing unless every quality gate passes.
 
-The architect owns the endpoint, the UI, deployment and activation.  This
-package owns the pipeline, the bundle format, the gates and the read helpers.
+The architect reviews and merges.  This package owns the pipeline, the bundle
+format, the gates, the read helpers, the release assets and the activation/
+rollback commands.  The endpoint and UI are covered in the Read API section.
 
 ## Architecture
 
@@ -295,26 +296,80 @@ Tests:
 PYTHONPATH="src;." C:/Python314/python.exe -m pytest tests/events -q
 ```
 
-## What the architect's publish step must do
+## Activation and rollback
 
-The build-only workflow stops after the artifact.  Before the build it runs
-`verify_fred_releases` with `FRED_API_KEY`; a missing key or a changed release
-id/name fails the job.  Activation is a separate, reviewed step and must:
+The weekly workflow publishes a release and then activates it automatically
+when the bundle is publishable and the run is not a `dry_run`.
 
-1. download `events-bundle-<bundle_version>.tar.gz`, `manifest.json` and
-   `SHA256SUMS` from the GitHub Release;
-2. verify `SHA256SUMS`, then every file hash in `manifest.json`;
-3. extract into a staging directory such as
-   `/app/data/runtime/events/bundles/<version>.tmp`;
-4. run `PRAGMA integrity_check` and compare the row count with the manifest;
-5. rename the staging directory to `bundles/<version>`;
-6. swap a `current` pointer atomically (`current.tmp` → `fsync` →
-   `os.replace`), never by editing the live directory;
-7. verify a read through `store.py` against the manifest;
-8. on any failure restore the previous pointer, leave the previous bundle
-   active, exit non-zero;
-9. keep the last three bundles and prune older ones only after a successful
-   activation.
+Release assets:
+
+```text
+events-bundle-<V>.tar.gz   # bundle files at the tarball root, including manifest.json
+manifest.json             # standalone, byte-identical to the tarball copy
+SHA256SUMS                # hashes for the tarball and standalone manifest
+```
+
+Inside the running backend container:
+
+```bash
+python -m astro_finance.events activate --version <V> \
+  [--repo kpdagrt22/strikehike-monorepo]
+```
+
+Activation:
+
+1. downloads the three assets over HTTPS from the public GitHub Release (no
+   token);
+2. verifies `SHA256SUMS`, the standalone manifest, `bundle_version`,
+   `publishable: true`, and every file hash in `manifest.json`;
+3. extracts to `bundles/<V>.tmp` with a path-traversal-safe extractor, then
+   renames it to `bundles/<V>`;
+4. runs `PRAGMA integrity_check`, checks `user_version`, and compares the SQLite
+   row count with the manifest's theme × kind × status counts;
+5. writes `current.tmp` containing the runtime-relative
+   `bundles/<V>`, fsyncs it and `os.replace`s it onto `current`;
+6. self-checks through `store.py` (version and full counts);
+7. on any failure restores the previous `current` pointer, removes the
+   partially installed version and exits non-zero;
+8. on success records the old pointer in `<runtime>/previous`, keeps the three
+   newest bundle directories, and prunes older ones.
+
+`<runtime>` defaults to `backend/data/runtime/events`, overridable with
+`EVENTS_RUNTIME_DIR`; in the container it is `/app/data/runtime/events`.
+
+Other commands:
+
+```bash
+python -m astro_finance.events rollback [--runtime-dir DIR]
+python -m astro_finance.events status [--runtime-dir DIR] [--json]
+```
+
+`rollback` verifies the previous bundle before swapping `current`, then swaps
+the `previous` pointer too, so a second rollback returns to the newer version.
+`status` lists the active and previous versions and every retained directory.
+
+The workflow's `activate` job uses the existing Lightsail deploy secrets and
+the same SSH action as `deploy-lightsail.yml`, joins the
+`lightsail-production` concurrency group, runs the activation inside the
+backend container, then requires the public health endpoint to report the new
+version and `counts.total > 0`. Any failure runs the rollback command and fails
+the job.
+
+## Release ownership and manual recovery
+
+The build workflow stops after the artifact and the jobs above publish and
+activate automatically.  Before the build it runs `verify_fred_releases` with
+`FRED_API_KEY`; a missing key or a changed release id/name fails the job.
+
+If the SSH activation cannot reach the container, run the same command by hand
+from the application directory:
+
+```bash
+docker compose -p strikehike-chrono exec -T backend \
+  python -m astro_finance.events activate --version <V>
+docker compose -p strikehike-chrono exec -T backend \
+  python -m astro_finance.events rollback
+```
 
 The read API resolves `current` on each request, caches by the pointer file's
 mtime, and falls back to the empty five-theme response when no pointer exists.

@@ -9,10 +9,17 @@ from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Sequence
 
+from .activate import (
+    DEFAULT_REPO,
+    activate_bundle,
+    activation_status,
+    rollback_bundle,
+)
 from .bundle import validate_bundle_files
 from .logging_utils import StructuredLogger, make_execution_id
 from .models import Event
 from .pipeline import PipelineError, PipelineOptions, run_pipeline
+from .release import ActivationError
 from .security import redact_secrets
 
 
@@ -185,6 +192,57 @@ def _diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _activate(args: argparse.Namespace) -> int:
+    try:
+        result = activate_bundle(
+            version=args.version,
+            repo=args.repo or DEFAULT_REPO,
+            runtime_dir=args.runtime_dir,
+            release_dir=args.release_dir,
+        )
+    except ActivationError as exc:
+        print(f"activation failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"active_version: {result.version}")
+    print(f"bundle_dir: {result.bundle_dir}")
+    print(f"previous_version: {result.previous_version or 'none'}")
+    if result.pruned:
+        print(f"pruned: {', '.join(result.pruned)}")
+    return 0
+
+
+def _rollback(args: argparse.Namespace) -> int:
+    try:
+        result = rollback_bundle(runtime_dir=args.runtime_dir)
+    except ActivationError as exc:
+        print(f"rollback failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"active_version: {result.to_version}")
+    print(f"previous_version: {result.previous_version or 'none'}")
+    return 0
+
+
+def _status(args: argparse.Namespace) -> int:
+    payload = activation_status(runtime_dir=args.runtime_dir)
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
+    print(f"active_version: {payload['active_version'] or 'none'}")
+    print(f"active_bundle: {payload['active_bundle'] or 'none'}")
+    print(f"previous_version: {payload['previous_version'] or 'none'}")
+    for bundle in payload["bundles"]:
+        flags = []
+        if bundle.get("active"):
+            flags.append("active")
+        if bundle.get("previous"):
+            flags.append("previous")
+        detail = f" [{', '.join(flags)}]" if flags else ""
+        print(f"  {bundle['version']}{detail}")
+        if bundle.get("error"):
+            print(f"    error: {bundle['error']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="python -m astro_finance.events",
@@ -222,6 +280,36 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("old", type=Path)
     diff.add_argument("new", type=Path)
     diff.set_defaults(func=_diff)
+
+    activate = subparsers.add_parser(
+        "activate", help="download, verify and atomically activate a release"
+    )
+    activate.add_argument("--version", required=True, help="bundle release version")
+    activate.add_argument(
+        "--repo",
+        default=DEFAULT_REPO,
+        help=f"GitHub repository (default {DEFAULT_REPO})",
+    )
+    activate.add_argument("--runtime-dir", type=Path)
+    activate.add_argument(
+        "--release-dir",
+        type=Path,
+        help="local directory with the three release assets (tests/offline use)",
+    )
+    activate.set_defaults(func=_activate)
+
+    rollback = subparsers.add_parser(
+        "rollback", help="switch the current pointer back to the previous bundle"
+    )
+    rollback.add_argument("--runtime-dir", type=Path)
+    rollback.set_defaults(func=_rollback)
+
+    status = subparsers.add_parser(
+        "status", help="show the active, previous and retained bundles"
+    )
+    status.add_argument("--runtime-dir", type=Path)
+    status.add_argument("--json", action="store_true")
+    status.set_defaults(func=_status)
     return parser
 
 

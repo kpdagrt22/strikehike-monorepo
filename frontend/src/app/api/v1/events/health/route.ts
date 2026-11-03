@@ -1,5 +1,4 @@
 import {
-  cachedRoute,
   jsonTextResponse,
   type RouteLoadResult,
 } from "@/lib/server/routeCache";
@@ -10,8 +9,8 @@ const BACKEND_URL = (
   process.env.CHRONO_API_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 const BACKEND_TIMEOUT_MS = 10_000;
-const CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600";
-const CACHE_POLICY = { ttlMs: 60_000, maxStaleMs: 5 * 60_000 };
+// Health is the activation gate: never serve a cached old active_version.
+const CACHE_CONTROL = "no-store";
 const UNAVAILABLE = { error: "Events health service is unavailable." };
 
 async function loadHealth(): Promise<RouteLoadResult> {
@@ -46,6 +45,6 @@ async function loadHealth(): Promise<RouteLoadResult> {
 }
 
 export async function GET() {
-  const result = await cachedRoute("events-health", CACHE_POLICY, loadHealth);
+  const result = await loadHealth();
   return jsonTextResponse(result, CACHE_CONTROL);
 }

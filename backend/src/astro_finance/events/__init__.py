@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from .activate import (
+    ActivationResult,
+    RollbackResult,
+    activate_bundle,
+    activation_status,
+    rollback_bundle,
+)
 from .bundle import (
     BundleResult,
     DatasetArtifact,
@@ -21,17 +28,22 @@ from .store import (
 )
 
 __all__ = [
+    "ActivationResult",
     "BundleResult",
     "DatasetArtifact",
     "GateContext",
     "GateResult",
     "PipelineOptions",
     "PipelineResult",
+    "RollbackResult",
+    "activate_bundle",
+    "activation_status",
     "bundle_info",
     "bundle_version_for",
     "current_bundle_dir",
     "empty_event_counts",
     "event_counts",
+    "rollback_bundle",
     "run_gates",
     "run_pipeline",
     "upcoming_by_theme",

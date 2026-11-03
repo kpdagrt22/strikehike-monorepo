@@ -73,6 +73,14 @@ def current_bundle_dir(runtime_dir: Path | None = None) -> Path | None:
     return resolved
 
 
+def clear_bundle_cache(runtime_dir: Path | None = None) -> None:
+    """Drop the pointer cache after an activation/rollback writes ``current``."""
+
+    runtime = Path(runtime_dir) if runtime_dir is not None else runtime_dir_from_env()
+    _POINTER_CACHE.pop(str(runtime), None)
+
+
+
 
 def _normalise_themes(themes: Iterable[str] | None) -> list[Theme]:
     if themes is None:
