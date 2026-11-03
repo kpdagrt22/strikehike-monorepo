@@ -254,7 +254,8 @@ jobs:
 
             if ! docker compose -p strikehike-chrono exec -T backend \
               python -m astro_finance.events activate --version "$VERSION"; then
-              rollback_and_fail
+              echo "::error::Activation failed; the CLI restored the previous pointer."
+              exit 1
             fi
 
             health="$(mktemp)"

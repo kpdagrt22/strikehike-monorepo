@@ -352,8 +352,9 @@ The workflow's `activate` job uses the existing Lightsail deploy secrets and
 the same SSH action as `deploy-lightsail.yml`, joins the
 `lightsail-production` concurrency group, runs the activation inside the
 backend container, then requires the public health endpoint to report the new
-version and `counts.total > 0`. Any failure runs the rollback command and fails
-the job.
+version and `counts.total > 0`. Activation failures restore the previous
+pointer inside the CLI; a post-activation health failure runs the rollback
+command and fails the job.
 
 ## Release ownership and manual recovery
 
