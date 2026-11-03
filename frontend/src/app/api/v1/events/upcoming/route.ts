@@ -11,7 +11,8 @@ const BACKEND_URL = (
 ).replace(/\/+$/, "");
 const BACKEND_TIMEOUT_MS = 15_000;
 const CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=86400";
-const CACHE_POLICY = { ttlMs: 60 * 60_000, maxStaleMs: 24 * 60 * 60_000 };
+// Five minutes: a weekly bundle swap shows up within minutes instead of an hour.
+const CACHE_POLICY = { ttlMs: 5 * 60_000, maxStaleMs: 24 * 60 * 60_000 };
 const UNAVAILABLE = { error: "Upcoming events service is unavailable." };
 const UPSTREAM_PARAMS = ["themes", "limit_per_theme", "horizon_days"];
 
