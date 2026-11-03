@@ -176,3 +176,95 @@ source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html
 verified_on = "2026-11-03"
 status = "scheduled"
 description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+# Federal Reserve FOMC decisions: the statement comes on the second day of each meeting.
+# Read on https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm on 2026-11-03.
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2026-12-09"
+external_id = "fomc-2026-12"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the December 8-9, 2026 meeting, with the Summary of Economic Projections."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-01-27"
+external_id = "fomc-2027-01"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the January 26-27, 2027 meeting."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-03-17"
+external_id = "fomc-2027-03"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the March 16-17, 2027 meeting, with the Summary of Economic Projections."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-04-28"
+external_id = "fomc-2027-04"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the April 27-28, 2027 meeting."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-06-09"
+external_id = "fomc-2027-06"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the June 8-9, 2027 meeting, with the Summary of Economic Projections."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-07-28"
+external_id = "fomc-2027-07"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the July 27-28, 2027 meeting."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-09-15"
+external_id = "fomc-2027-09"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the September 14-15, 2027 meeting, with the Summary of Economic Projections."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-10-27"
+external_id = "fomc-2027-10"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the October 26-27, 2027 meeting."
+
+[[events]]
+theme = "Finance"
+name = "Federal Reserve FOMC policy decision"
+date = "2027-12-08"
+external_id = "fomc-2027-12"
+source_url = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Federal Open Market Committee statement at the end of the December 7-8, 2027 meeting, with the Summary of Economic Projections."
