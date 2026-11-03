@@ -14,7 +14,7 @@ concurrency:
 jobs:
   test-backend:
     name: Backend tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       PYTHONPATH: "src:."
@@ -49,7 +49,7 @@ jobs:
 
   test-frontend:
     name: Frontend lint and build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -79,7 +79,7 @@ jobs:
   deploy:
     name: Deploy monorepo to Lightsail
     needs: [test-backend, test-frontend]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Build new stack, stop legacy edge, cut over
