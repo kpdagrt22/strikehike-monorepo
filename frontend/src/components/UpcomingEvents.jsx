@@ -55,11 +55,11 @@ function daysLabel(days) {
 }
 
 function countLabel(total, shown) {
-  if (total === 0) return "No verified events in the next 12 months.";
+  if (total === 0) return "No scheduled events in the next 12 months.";
   if (total < 5) {
-    return `${total} verified event${total === 1 ? "" : "s"} in the next 12 months`;
+    return `${total} upcoming event${total === 1 ? "" : "s"} in the next 12 months`;
   }
-  return `${shown} of ${total} verified events in the next 12 months`;
+  return `${shown} of ${total} upcoming events in the next 12 months`;
 }
 
 function Skeleton() {
@@ -153,6 +153,13 @@ export function UpcomingEvents() {
         : "border-transparent text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
     }`;
 
+  const focusChip = (event) => {
+    event.currentTarget.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  };
+
   const payload = state.payload;
   const themes = payload?.themes ?? {};
   const message = payload?.message;
@@ -162,12 +169,13 @@ export function UpcomingEvents() {
       <div
         role="group"
         aria-label="Filter upcoming events by theme"
-        className="flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-center gap-1 overflow-x-auto py-2 [mask-image:linear-gradient(to_right,#000_calc(100%_-_2rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <button
           type="button"
           aria-pressed={allSelected}
           onClick={() => setSelected([])}
+          onFocus={focusChip}
           className={chipClass(allSelected)}
         >
           All
@@ -181,6 +189,7 @@ export function UpcomingEvents() {
               type="button"
               aria-pressed={active}
               onClick={() => toggleTheme(theme)}
+              onFocus={focusChip}
               className={chipClass(active)}
             >
               <span
@@ -195,6 +204,7 @@ export function UpcomingEvents() {
         <button
           type="button"
           onClick={() => setSelected([])}
+          onFocus={focusChip}
           className={chipClass(false)}
         >
           Clear

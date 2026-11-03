@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { categoryTone } from "@/lib/categoryTone";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
@@ -9,9 +9,38 @@ import { UpcomingEvents } from "@/components/UpcomingEvents";
 const getEventsDockButton = () =>
   document.getElementById("chrono-dock-archive");
 
+const subscribeToLocation = (onStoreChange) => {
+  window.addEventListener("popstate", onStoreChange);
+  return () => window.removeEventListener("popstate", onStoreChange);
+};
+const getLocationSearch = () => window.location.search;
+const getServerSearch = () => "";
+
+function hasThemeFilter(search) {
+  const value = new URLSearchParams(search).get("themes");
+  return Boolean(
+    value &&
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .some(Boolean),
+  );
+}
+
 export function FutureLadder() {
   const [reloadKey, setReloadKey] = useState(0);
-  const [view, setView] = useState("sky");
+  const [viewChoice, setViewChoice] = useState(null);
+  const locationSearch = useSyncExternalStore(
+    subscribeToLocation,
+    getLocationSearch,
+    getServerSearch,
+  );
+  // A shared ?themes= link opens Upcoming after hydration. The server render
+  // uses the empty server snapshot, so it still emits the default Sky ladder;
+  // the no-JS page keeps that default too.
+  const view =
+    viewChoice ?? (hasThemeFilter(locationSearch) ? "upcoming" : "sky");
+  const selectView = (next) => setViewChoice(next);
   const sheetRef = useRef(null);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
@@ -137,7 +166,7 @@ export function FutureLadder() {
             type="button"
             aria-pressed={view === "sky"}
             aria-controls="chrono-ladder-content"
-            onClick={() => setView("sky")}
+            onClick={() => selectView("sky")}
             className={`h-8 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
               view === "sky"
                 ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
@@ -150,7 +179,7 @@ export function FutureLadder() {
             type="button"
             aria-pressed={view === "upcoming"}
             aria-controls="chrono-ladder-content"
-            onClick={() => setView("upcoming")}
+            onClick={() => selectView("upcoming")}
             className={`h-8 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
               view === "upcoming"
                 ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
