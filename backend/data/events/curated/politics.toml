@@ -1,0 +1,17 @@
+# Verified Politics events.
+#
+# Nothing is shipped here yet: no 2026-2027 Politics event was verified against
+# an official election-authority page on 2026-11-03.  Do not add a date from a
+# news article, a prediction or a countdown site.  Open the official page first,
+# then copy its URL and the date you checked it.
+#
+# Example (commented out so the file contributes no events):
+#
+# [[events]]
+# theme = "Politics"
+# name = "Example national election"
+# date = "2027-05-02"
+# source_url = "https://www.example.gov/elections/calendar"
+# verified_on = "2026-11-03"
+# status = "scheduled"
+# description = "Optional plain-language note."

@@ -1,0 +1,22 @@
+{
+  "fixture_note": "Synthetic release dates for offline pipeline tests; not a live FRED response.",
+  "release_id": 101,
+  "release_name": "FOMC Press Release",
+  "realtime_start": "2026-11-03",
+  "realtime_end": "2027-11-03",
+  "order_by": "release_date",
+  "sort_order": "asc",
+  "count": 8,
+  "offset": 0,
+  "limit": 1000,
+  "release_dates": [
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2026-12-09"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-01-27"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-03-17"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-04-28"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-06-16"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-07-28"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-09-15"},
+    {"release_id": 101, "release_name": "FOMC Press Release", "date": "2027-10-27"}
+  ]
+}

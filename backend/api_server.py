@@ -33,6 +33,7 @@ from astro_finance.historical_parallels import (  # noqa: E402
     forecast_ladder,
     list_events_by_category,
 )
+from astro_finance.events.router import router as events_router  # noqa: E402
 from regime.cases_router import router as cases_router  # noqa: E402
 from regime.router import patterns_router, router as regime_router  # noqa: E402
 
@@ -40,6 +41,7 @@ app = FastAPI(title="Astro-Finance API")
 app.include_router(regime_router, prefix="/api/v1")
 app.include_router(patterns_router, prefix="/api/v1")
 app.include_router(cases_router, prefix="/api/v1")
+app.include_router(events_router, prefix="/api/v1")
 
 CORS_ORIGINS = [
     origin.strip()

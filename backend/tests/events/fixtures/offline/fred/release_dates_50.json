@@ -1,0 +1,26 @@
+{
+  "fixture_note": "Synthetic release dates for offline pipeline tests; not a live FRED response.",
+  "release_id": 50,
+  "release_name": "Employment Situation",
+  "realtime_start": "2026-11-03",
+  "realtime_end": "2027-11-03",
+  "order_by": "release_date",
+  "sort_order": "asc",
+  "count": 12,
+  "offset": 0,
+  "limit": 1000,
+  "release_dates": [
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2026-12-04"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-01-08"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-02-05"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-03-05"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-04-02"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-05-07"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-06-04"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-07-02"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-08-06"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-09-03"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-10-01"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2027-11-05"}
+  ]
+}

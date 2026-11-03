@@ -1,0 +1,19 @@
+{
+  "fixture_note": "Synthetic release dates for offline pipeline tests; not a live FRED response.",
+  "release_id": 53,
+  "release_name": "Gross Domestic Product",
+  "realtime_start": "2026-11-03",
+  "realtime_end": "2027-11-03",
+  "order_by": "release_date",
+  "sort_order": "asc",
+  "count": 5,
+  "offset": 0,
+  "limit": 1000,
+  "release_dates": [
+    {"release_id": 53, "release_name": "Gross Domestic Product", "date": "2026-12-23"},
+    {"release_id": 53, "release_name": "Gross Domestic Product", "date": "2027-03-25"},
+    {"release_id": 53, "release_name": "Gross Domestic Product", "date": "2027-06-24"},
+    {"release_id": 53, "release_name": "Gross Domestic Product", "date": "2027-09-30"},
+    {"release_id": 53, "release_name": "Gross Domestic Product", "date": "2027-12-22"}
+  ]
+}

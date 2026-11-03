@@ -1,15 +1,46 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { categoryTone } from "@/lib/categoryTone";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
+import { UpcomingEvents } from "@/components/UpcomingEvents";
 
 const getEventsDockButton = () =>
   document.getElementById("chrono-dock-archive");
 
+const subscribeToLocation = (onStoreChange) => {
+  window.addEventListener("popstate", onStoreChange);
+  return () => window.removeEventListener("popstate", onStoreChange);
+};
+const getLocationSearch = () => window.location.search;
+const getServerSearch = () => "";
+
+function hasThemeFilter(search) {
+  const value = new URLSearchParams(search).get("themes");
+  return Boolean(
+    value &&
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .some(Boolean),
+  );
+}
+
 export function FutureLadder() {
   const [reloadKey, setReloadKey] = useState(0);
+  const [viewChoice, setViewChoice] = useState(null);
+  const locationSearch = useSyncExternalStore(
+    subscribeToLocation,
+    getLocationSearch,
+    getServerSearch,
+  );
+  // A shared ?themes= link opens Upcoming after hydration. The server render
+  // uses the empty server snapshot, so it still emits the default Sky ladder;
+  // the no-JS page keeps that default too.
+  const view =
+    viewChoice ?? (hasThemeFilter(locationSearch) ? "upcoming" : "sky");
+  const selectView = (next) => setViewChoice(next);
   const sheetRef = useRef(null);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
@@ -88,10 +119,12 @@ export function FutureLadder() {
               tabIndex={-1}
               className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
             >
-              Future ladder
+              {view === "sky" ? "Future ladder" : "Upcoming"}
             </h2>
             <p className="mt-1 text-meta text-black/60 dark:text-white/60">
-              Next 180 days · top match per category
+              {view === "sky"
+                ? "Next 180 days · top match per category"
+                : "Real scheduled events · next 12 months"}
             </p>
           </div>
           <div className="flex items-center gap-1 lg:hidden">
@@ -124,8 +157,48 @@ export function FutureLadder() {
           </div>
         </div>
 
-        <div className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-33.25rem)))]">
-          {error ? (
+        <div
+          role="group"
+          aria-label="Events view"
+          className="flex items-center gap-1 border-b border-black/10 px-3 py-2 dark:border-white/10"
+        >
+          <button
+            type="button"
+            aria-pressed={view === "sky"}
+            aria-controls="chrono-ladder-content"
+            onClick={() => selectView("sky")}
+            className={`h-8 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
+              view === "sky"
+                ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
+                : "text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+            }`}
+          >
+            Sky ladder
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === "upcoming"}
+            aria-controls="chrono-ladder-content"
+            onClick={() => selectView("upcoming")}
+            className={`h-8 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
+              view === "upcoming"
+                ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
+                : "text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+            }`}
+          >
+            Upcoming
+          </button>
+        </div>
+
+        <div
+          id="chrono-ladder-content"
+          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-33.25rem)))]"
+        >
+          {view === "upcoming" ? (
+            <UpcomingEvents />
+          ) : (
+            <>
+              {error ? (
             <p className="px-2 py-3 text-meta text-black/80 dark:text-white/80">
               <span
                 className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#f05d49] align-middle"
@@ -191,7 +264,9 @@ export function FutureLadder() {
                 </span>
               </button>
             );
-          })}
+              })}
+            </>
+          )}
         </div>
       </div>
     </div>

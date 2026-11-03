@@ -62,11 +62,15 @@ The frontend's route handlers expect the backend at `http://127.0.0.1:8000` unle
 | GET, POST | `/api/v1/historical-parallels` | Historical and recent events whose planetary geometry is closest to a date (and optional UTC minute) |
 | GET | `/api/v1/forecast-ladder` | The strongest upcoming geometric echoes of past events within the next `days` (1–180) |
 | GET | `/api/v1/events` | The curated event list, grouped into five categories |
+| GET | `/api/v1/events/upcoming` | Five verified upcoming events per theme from the active bundle; `themes`, `limit_per_theme` (1–20) and `horizon_days` (1–730); never calls the network |
+| GET | `/api/v1/events/health` | Active events bundle version, `created_at`, counts and schema version; null version and zero counts when none is active |
 | GET | `/`, `/api/current-state`, `/api/historical` | Endpoints kept from the earlier API; the frontend does not call them |
 
 ## Data files
 
 The image copies exactly these files; everything else under `data/` stays out of it.
+
+The weekly events pipeline and its quality gates are documented in [src/astro_finance/events/README.md](src/astro_finance/events/README.md).
 
 | File | Produced by | Read by |
 |---|---|---|
