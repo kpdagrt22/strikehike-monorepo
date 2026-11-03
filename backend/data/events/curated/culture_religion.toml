@@ -1,0 +1,18 @@
+# Verified Culture/Religion festivals.
+#
+# Western and Orthodox Easter are computed by the culture_computed source, so
+# they do not belong here.  Add a festival only after opening the official
+# organiser, church or government page that publishes the date.
+#
+# Example (commented out so the file contributes no events):
+#
+# [[events]]
+# theme = "Culture/Religion"
+# name = "Example public holiday"
+# date = "2027-01-01"
+# source_url = "https://www.example.gov/holidays/2027"
+# verified_on = "2026-11-03"
+# status = "scheduled"
+# time = "00:00"
+# timezone = "Asia/Kolkata"
+# description = "Optional plain-language note."

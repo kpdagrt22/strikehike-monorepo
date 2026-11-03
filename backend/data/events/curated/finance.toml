@@ -1,0 +1,178 @@
+# Verified non-US central-bank decisions (Finance).
+#
+# Every date below was read on the official page in source_url on the
+# verified_on date.  The pages publish dates but not decision times, so these
+# entries are all-day.  Add new entries only after opening the official page.
+#
+# Schema:
+#   [[events]]
+#   theme = "Finance"
+#   name = "..."
+#   date = "YYYY-MM-DD"
+#   external_id = "..."             # optional, stable per occurrence
+#   source_url = "https://..."      # official page, required
+#   verified_on = "YYYY-MM-DD"      # required
+#   status = "scheduled"            # scheduled | tentative | cancelled
+#   description = "..."             # optional
+#   time = "HH:MM"                  # optional; requires timezone
+#   timezone = "Europe/London"      # IANA zone; required when time is set
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2026-11-05"
+external_id = "boe-mpc-2026-11"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes, with the November Monetary Policy Report."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2026-12-17"
+external_id = "boe-mpc-2026-12"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2027-02-04"
+external_id = "boe-mpc-2027-02"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes, with the February Monetary Policy Report."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2027-03-18"
+external_id = "boe-mpc-2027-03"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2027-04-29"
+external_id = "boe-mpc-2027-04"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes, with the April Monetary Policy Report."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2027-06-17"
+external_id = "boe-mpc-2027-06"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2027-07-29"
+external_id = "boe-mpc-2027-07"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes, with the July Monetary Policy Report."
+
+[[events]]
+theme = "Finance"
+name = "Bank of England Monetary Policy Committee decision"
+date = "2027-09-16"
+external_id = "boe-mpc-2027-09"
+source_url = "https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Bank Rate announcement and publication of the Monetary Policy Committee summary and minutes."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2026-12-17"
+external_id = "ecb-gc-2026-12"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-02-04"
+external_id = "ecb-gc-2027-02"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-03-18"
+external_id = "ecb-gc-2027-03"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-04-29"
+external_id = "ecb-gc-2027-04"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-06-10"
+external_id = "ecb-gc-2027-06"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-07-22"
+external_id = "ecb-gc-2027-07"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-09-09"
+external_id = "ecb-gc-2027-09"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."
+
+[[events]]
+theme = "Finance"
+name = "European Central Bank Governing Council monetary policy decision"
+date = "2027-10-28"
+external_id = "ecb-gc-2027-10"
+source_url = "https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html"
+verified_on = "2026-11-03"
+status = "scheduled"
+description = "Second day of the Governing Council monetary policy meeting in Frankfurt, followed by the press conference."

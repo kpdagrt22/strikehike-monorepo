@@ -1,0 +1,101 @@
+# Source registry for the weekly EVENTS pipeline.
+#
+# Every source declares the themes it is allowed to emit.  A record whose theme
+# is not listed here is rejected by validation rather than guessed.
+# FRED release ids were verified on the official FRED release index on
+# 2026-11-03 (see backend/src/astro_finance/events/README.md).
+
+schema_version = 1
+updated = "2026-11-03"
+
+[[sources]]
+id = "historical_curated"
+themes = ["Politics", "Science", "Finance", "Culture/Religion", "Natural Disasters"]
+kind = "historical"
+url = "https://github.com/kpdagrt22/strikehike-monorepo/blob/main/backend/data/historical_events.json"
+terms = "Curated by the project; dates are UTC calendar dates. The seed file is the source of truth and is never modified by this pipeline."
+rate_limit = "none (local file)"
+expected_freshness_days = 3650
+reliability = "high"
+enabled = true
+verification = "curated"
+immutable = true
+
+[[sources]]
+id = "fred_release_dates"
+themes = ["Finance"]
+kind = "api"
+url = "https://api.stlouisfed.org/fred/releases/dates"
+terms = "FRED, Federal Reserve Bank of St. Louis. Attribution required; see https://fred.stlouisfed.org/legal/. Dates only; no time is published."
+rate_limit = "2 requests/second"
+expected_freshness_days = 7
+reliability = "high"
+enabled = true
+verification = "verified"
+horizon_days = 365
+max_pages = 5
+page_limit = 1000
+
+[[sources.releases]]
+release_id = 101
+name = "FOMC Press Release"
+verified_on = "2026-11-03"
+
+[[sources.releases]]
+release_id = 50
+name = "Employment Situation"
+verified_on = "2026-11-03"
+
+[[sources.releases]]
+release_id = 10
+name = "Consumer Price Index"
+verified_on = "2026-11-03"
+
+[[sources.releases]]
+release_id = 53
+name = "Gross Domestic Product"
+verified_on = "2026-11-03"
+
+[[sources.releases]]
+release_id = 54
+name = "Personal Income and Outlays"
+verified_on = "2026-11-03"
+
+[[sources]]
+id = "astronomy_computed"
+themes = ["Science"]
+kind = "computed"
+url = "https://www.astro.com/swisseph/"
+terms = "Swiss Ephemeris via pyswisseph, used in Moshier mode. pyswisseph/Swiss Ephemeris is AGPL-3.0 or commercially licensed; no ephemeris data is downloaded by this pipeline."
+rate_limit = "none (local computation)"
+expected_freshness_days = 1
+reliability = "high"
+enabled = true
+verification = "computed"
+horizon_days = 365
+
+[[sources]]
+id = "culture_computed"
+themes = ["Culture/Religion"]
+kind = "computed"
+url = "https://www.churchofengland.org/"
+terms = "Dates are computed locally with the anonymous Gregorian computus and Meeus' Julian computus; no liturgical calendar data is downloaded. Orthodox reference: https://www.patriarchate.org/"
+rate_limit = "none (local computation)"
+expected_freshness_days = 1
+reliability = "high"
+enabled = true
+verification = "computed"
+horizon_days = 365
+
+[[sources]]
+id = "curated_upcoming"
+themes = ["Politics", "Culture/Religion", "Finance"]
+kind = "curated"
+url = "https://github.com/kpdagrt22/strikehike-monorepo/tree/main/backend/data/events/curated"
+terms = "Owner-curated. Every entry must cite an official https source_url and a verified_on date; entries without a source_url are rejected."
+rate_limit = "none (local files)"
+expected_freshness_days = 30
+reliability = "high"
+enabled = true
+verification = "curated"
+horizon_days = 365

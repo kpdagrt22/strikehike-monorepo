@@ -68,6 +68,8 @@ The frontend's route handlers expect the backend at `http://127.0.0.1:8000` unle
 
 The image copies exactly these files; everything else under `data/` stays out of it.
 
+The weekly events pipeline and its quality gates are documented in [src/astro_finance/events/README.md](src/astro_finance/events/README.md).
+
 | File | Produced by | Read by |
 |---|---|---|
 | `data/processed/macro_regime_history.parquet` | `scripts/flows/macro_ingestion.py` | `regime/service.py` |
