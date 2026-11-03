@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: events-weekly
@@ -155,13 +156,116 @@ jobs:
           echo "::error::Events build exited ${{ steps.build.outputs.exit_code }}; the bundle is not publishable."
           exit 1
 
-  # architect: release + activation
   publish:
-    name: Publish (placeholder)
+    name: Publish events bundle release
     needs: build
-    if: false
+    if: needs.build.outputs.publishable == 'true' && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      bundle_dir: ${{ steps.version.outputs.bundle_dir }}
     steps:
-      - name: Not implemented in the build-only phase
+      - name: Download the gated bundle artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: events-bundle-${{ github.run_id }}
+          path: ${{ runner.temp }}/events-bundle
+
+      - name: Read and validate the manifest
+        id: version
+        shell: bash
         run: |
-          echo "architect: release + activation"
+          set -euo pipefail
+          manifest="$(find "$RUNNER_TEMP/events-bundle" -name manifest.json -print -quit)"
+          test -n "$manifest"
+          version="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["bundle_version"])' "$manifest")"
+          publishable="$(python -c 'import json,sys; print(str(json.load(open(sys.argv[1])).get("publishable")).lower())' "$manifest")"
+          if [ -z "$version" ] || [ "$publishable" != "true" ]; then
+            echo "::error::Bundle manifest is missing a version or is not publishable."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "bundle_dir=$(dirname "$manifest")" >> "$GITHUB_OUTPUT"
+
+      - name: Create the release idempotently
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUNDLE_DIR: ${{ steps.version.outputs.bundle_dir }}
+        run: |
+          set -euo pipefail
+          tag="events-bundle-$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; skipping."
+            exit 0
+          fi
+          tarball="$RUNNER_TEMP/events-bundle-$VERSION.tar.gz"
+          tar -czf "$tarball" -C "$BUNDLE_DIR" .
+          cp "$BUNDLE_DIR/manifest.json" "$RUNNER_TEMP/manifest.json"
+          cd "$RUNNER_TEMP"
+          sha256sum "events-bundle-$VERSION.tar.gz" manifest.json > SHA256SUMS
+          gh release create "$tag" \
+            "events-bundle-$VERSION.tar.gz" \
+            manifest.json \
+            SHA256SUMS \
+            --title "Events bundle $VERSION" \
+            --notes "Weekly events bundle $VERSION. Manifest publishable=true."
+
+  activate:
+    name: Activate events bundle
+    needs: publish
+    if: needs.publish.outputs.version != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: lightsail-production
+      cancel-in-progress: false
+    steps:
+      - name: Activate in the running backend container and verify health
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        env:
+          EVENTS_VERSION: ${{ needs.publish.outputs.version }}
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 20m
+          envs: EVENTS_VERSION
+          script: |
+            set -euo pipefail
+            VERSION="${EVENTS_VERSION}"
+            APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
+            cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
+
+            rollback_and_fail() {
+              echo "::error::Events activation or health check failed; rolling back."
+              docker compose -p strikehike-chrono exec -T backend \
+                python -m astro_finance.events rollback || true
+              exit 1
+            }
+
+            if ! docker compose -p strikehike-chrono exec -T backend \
+              python -m astro_finance.events activate --version "$VERSION"; then
+              rollback_and_fail
+            fi
+
+            health="$(mktemp)"
+            if ! curl --fail --silent --show-error \
+              --retry 12 --retry-delay 5 --retry-connrefused \
+              https://strikehike.com/api/v1/events/health -o "$health"; then
+              rollback_and_fail
+            fi
+            if ! python3 -c 'import json,sys; payload=json.load(open(sys.argv[1])); counts=payload.get("counts") or {}; assert payload.get("active_version") == sys.argv[2]; assert int(counts.get("total", 0)) > 0' "$health" "$VERSION"; then
+              rm -f "$health"
+              rollback_and_fail
+            fi
+            rm -f "$health"
+            echo "Activated events bundle $VERSION."
