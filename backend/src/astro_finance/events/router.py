@@ -99,6 +99,8 @@ def get_upcoming(
     selected = parse_themes(themes)
 
     if bundle_dir is None:
+        # The empty state is always the full five-theme contract, even if the
+        # caller passed a filter; it is the honest answer until activation.
         return UpcomingResponse(
             as_of=today,
             bundle_version=None,
@@ -109,7 +111,7 @@ def get_upcoming(
                     total_available=0,
                     events=[],
                 )
-                for theme in selected
+                for theme in THEME_ORDER
             },
         )
 

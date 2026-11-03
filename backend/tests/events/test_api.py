@@ -228,6 +228,13 @@ def test_missing_bundle_returns_the_five_themes_and_a_message(client, tmp_path, 
     assert all(theme["events"] == [] for theme in payload["themes"].values())
 
 
+def test_missing_bundle_ignores_a_filter_for_the_empty_contract(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(tmp_path / "empty-filter"))
+    payload = client.get("/api/v1/events/upcoming?themes=Finance").json()
+    assert set(payload["themes"]) == {theme.value for theme in Theme}
+    assert payload["themes"]["Finance"]["events"] == []
+
+
 def test_health_with_bundle(client, tmp_path, monkeypatch):
     monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(_make_runtime(tmp_path, _events())))
     payload = client.get("/api/v1/events/health").json()

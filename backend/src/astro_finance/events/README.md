@@ -316,9 +316,9 @@ id/name fails the job.  Activation is a separate, reviewed step and must:
 9. keep the last three bundles and prune older ones only after a successful
    activation.
 
-The read API should resolve `current` on each request, cache by the pointer
-file's mtime, and fall back to the empty five-theme response when no pointer
-exists.  Never call the network from the request path.
+The read API resolves `current` on each request, caches by the pointer file's
+mtime, and falls back to the empty five-theme response when no pointer exists.
+Never call the network from the request path.
 
 ## Assumptions and open questions
 
