@@ -24,7 +24,7 @@ from ..security import redact_secrets
 from ..text import normalize_text, parse_date
 from . import SourceError, SourceExtraction
 
-FRED_ENDPOINT = "https://api.stlouisfed.org/fred/releases/dates"
+FRED_ENDPOINT = "https://api.stlouisfed.org/fred/release/dates"
 MONTHS = (
     "January",
     "February",
