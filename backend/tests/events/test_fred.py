@@ -234,3 +234,11 @@ def test_missing_api_key_is_an_honest_error(monkeypatch):
     source = load_registry().by_id()["fred_release_dates"]
     with pytest.raises(FredError, match="FRED_API_KEY is not set"):
         extract(source, today=TODAY, now=NOW, offline_dir=None)
+
+
+def test_fred_endpoint_is_the_single_release_calendar():
+    # fred/releases/dates (plural) lists every release and ignores release_id;
+    # the first live run returned release 23 when asked for 101.
+    from astro_finance.events.sources import fred
+
+    assert fred.FRED_ENDPOINT == "https://api.stlouisfed.org/fred/release/dates"
