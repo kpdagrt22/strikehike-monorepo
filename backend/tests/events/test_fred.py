@@ -212,11 +212,11 @@ def test_offline_fixture_extraction_returns_realistic_records():
 
     source = load_registry().by_id()["fred_release_dates"]
     extraction = extract(source, today=TODAY, now=NOW, offline_dir=FIXTURES / "offline")
-    assert len(extraction.records) == 45
+    assert len(extraction.records) == 37
     assert all(record.verification == "verified" for record in extraction.records)
     assert all(TODAY.isoformat() <= record.start_date <= "2027-11-03" for record in extraction.records)
-    assert len({record.external_id for record in extraction.records}) == 45
-    assert len(extraction.raw_payloads) == 5
+    assert len({record.external_id for record in extraction.records}) == 37
+    assert len(extraction.raw_payloads) == 4
 
 
 def test_missing_offline_fixture_is_an_error(tmp_path):
@@ -242,3 +242,16 @@ def test_fred_endpoint_is_the_single_release_calendar():
     from astro_finance.events.sources import fred
 
     assert fred.FRED_ENDPOINT == "https://api.stlouisfed.org/fred/release/dates"
+
+
+def test_a_release_with_too_many_dates_a_month_fails_the_source():
+    # FRED's FOMC release (101) updates every few days; listed as events it
+    # showed "FOMC Press Release" every other day on the first live bundle.
+    from astro_finance.events.registry import load_registry
+    from astro_finance.events.sources import fred
+
+    source = load_registry().by_id()["fred_release_dates"]
+    every_other_day = [f"2026-11-{day:02d}" for day in range(4, 30, 2)]
+    payload = _payload(every_other_day)
+    with pytest.raises(fred.FredError, match="not a scheduled-release calendar"):
+        _release_records(source, _release(), payload, start=TODAY, end=date(2027, 11, 3))

@@ -61,7 +61,7 @@ def test_pipeline_writes_stage_records_and_raw_cache(tmp_path):
     assert records[0]["data_version"] is None
     assert records[-1]["data_version"] == result.bundle_version
     assert (result.out_dir / "raw" / "historical_curated" / "historical_events.json").exists()
-    assert (result.out_dir / "raw" / "fred_release_dates" / "release_dates_101.json").exists()
+    assert (result.out_dir / "raw" / "fred_release_dates" / "release_dates_50.json").exists()
     assert (result.out_dir / "raw" / "astronomy_computed" / "computed_events.json").exists()
     assert (result.out_dir / "raw" / "curated_upcoming" / "finance.toml").exists()
     rejects = json.loads((result.out_dir / "rejects.json").read_text("utf-8"))

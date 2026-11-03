@@ -127,9 +127,9 @@ def test_quality_report_has_counts_for_every_theme(tmp_path):
     }
     for theme in report["upcoming_counts"].values():
         assert set(theme) == {"30", "90", "365"}
-    assert report["summary"]["events_total"] == 231
+    assert report["summary"]["events_total"] == 232
     assert report["summary"]["historical_total"] == 159
-    assert report["summary"]["upcoming_total"] == 72
+    assert report["summary"]["upcoming_total"] == 73
     assert all(gate["status"] == "pass" for gate in report["gates"])
 
 

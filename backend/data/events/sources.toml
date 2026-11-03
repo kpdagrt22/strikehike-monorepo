@@ -36,10 +36,8 @@ horizon_days = 365
 max_pages = 5
 page_limit = 1000
 
-[[sources.releases]]
-release_id = 101
-name = "FOMC Press Release"
-verified_on = "2026-11-03"
+# FOMC decisions come from the Fed's own meeting calendar (curated/finance.toml):
+# FRED release 101 updates every few days, so its calendar is not the meeting schedule.
 
 [[sources.releases]]
 release_id = 50

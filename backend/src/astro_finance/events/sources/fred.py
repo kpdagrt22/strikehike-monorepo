@@ -25,6 +25,7 @@ from ..text import normalize_text, parse_date
 from . import SourceError, SourceExtraction
 
 FRED_ENDPOINT = "https://api.stlouisfed.org/fred/release/dates"
+MAX_DATES_PER_MONTH = 3
 MONTHS = (
     "January",
     "February",
@@ -207,6 +208,15 @@ def _release_records(
             dates.append(value)
     dates = sorted(set(dates))
     month_counts = Counter(value.strftime("%Y-%m") for value in dates)
+    # A scheduled-release calendar has a few dates a month. A release that lists
+    # more is a data-update feed (FRED's FOMC release updates every few days),
+    # and showing it as events would mislead, so the source fails instead.
+    busiest = max(month_counts.values(), default=0)
+    if busiest > MAX_DATES_PER_MONTH:
+        raise FredError(
+            f"FRED release {release.release_id} lists {busiest} dates in one month; "
+            "it is not a scheduled-release calendar"
+        )
     month_seen: defaultdict[str, int] = defaultdict(int)
     records: list[RawRecord] = []
     for value in dates:
