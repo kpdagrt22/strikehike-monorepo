@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { categoryTone } from "@/lib/categoryTone";
 
 const THEMES = [
@@ -89,6 +89,8 @@ export function UpcomingEvents() {
   });
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({ status: "loading", payload: null });
+  const chipRowRef = useRef(null);
+  const didInitialScroll = useRef(false);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -98,6 +100,20 @@ export function UpcomingEvents() {
       url.searchParams.delete("themes");
     }
     window.history.replaceState(null, "", url);
+  }, [selected]);
+
+  // A deep link can preselect a chip that starts under the right-edge fade.
+  // After hydration, bring the first selected theme fully into view.
+  useEffect(() => {
+    if (didInitialScroll.current || selected.length === 0) return;
+    didInitialScroll.current = true;
+    const frame = requestAnimationFrame(() => {
+      const first = chipRowRef.current?.querySelector(
+        '[data-theme][aria-pressed="true"]',
+      );
+      first?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [selected]);
 
   // One request, debounced, for the full five-theme response. Chip changes
@@ -167,6 +183,7 @@ export function UpcomingEvents() {
   return (
     <div className="px-2.5 pb-4">
       <div
+        ref={chipRowRef}
         role="group"
         aria-label="Filter upcoming events by theme"
         className="flex items-center gap-1 overflow-x-auto py-2 [mask-image:linear-gradient(to_right,#000_calc(100%_-_2rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -187,6 +204,7 @@ export function UpcomingEvents() {
             <button
               key={theme}
               type="button"
+              data-theme={theme}
               aria-pressed={active}
               onClick={() => toggleTheme(theme)}
               onFocus={focusChip}

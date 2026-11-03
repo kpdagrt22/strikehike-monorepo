@@ -258,15 +258,11 @@ jobs:
               exit 1
             fi
 
-            health="$(mktemp)"
             if ! curl --fail --silent --show-error \
               --retry 12 --retry-delay 5 --retry-connrefused \
-              https://strikehike.com/api/v1/events/health -o "$health"; then
+              https://strikehike.com/api/v1/events/health \
+              | docker compose -p strikehike-chrono exec -T backend \
+                  python -c 'import json,sys; payload=json.load(sys.stdin); counts=payload.get("counts") or {}; assert payload.get("active_version") == sys.argv[1]; assert int(counts.get("total", 0)) > 0' "$VERSION"; then
               rollback_and_fail
             fi
-            if ! python3 -c 'import json,sys; payload=json.load(open(sys.argv[1])); counts=payload.get("counts") or {}; assert payload.get("active_version") == sys.argv[2]; assert int(counts.get("total", 0)) > 0' "$health" "$VERSION"; then
-              rm -f "$health"
-              rollback_and_fail
-            fi
-            rm -f "$health"
             echo "Activated events bundle $VERSION."
