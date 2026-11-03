@@ -11,6 +11,7 @@ import {
   coreIndexFlag,
   marketFlagText,
 } from "@/components/regime/regimeChart";
+import { CycleMini } from "@/components/regime/CycleMini";
 
 // The card's place from sm up (sm:left-7, sm:w-[244px]); the chart keeps its
 // red-band tooltip clear of it.
@@ -60,6 +61,9 @@ export function ChartCrosshairLegend({
   rightInset = 0,
   valueChars = 0,
   marketFlags = [],
+  // The primary asset's cycle reading: { trail, assetLabel } (see
+  // cycleMap.js), or null to leave the section out.
+  cycle = null,
 }) {
   const tone = coreIndexTone(point?.core_index_bucket, isDark);
   const flag = coreIndexFlag(point);
@@ -167,6 +171,17 @@ export function ChartCrosshairLegend({
           </p>
         ) : null}
       </div>
+
+      {/* The cycle map in small, above the flags block, so a flag turning on
+          never moves it. */}
+      {cycle ? (
+        <CycleMini
+          trail={cycle.trail}
+          assetLabel={cycle.assetLabel}
+          isDark={isDark}
+          ringColor={surface}
+        />
+      ) : null}
 
       {/* From sm: each flag with its text, in a block of its own at the
           card's foot. */}
