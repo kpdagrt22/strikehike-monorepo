@@ -217,7 +217,8 @@ the baked `data/processed/macro_regime_history.parquet` on the first run):
 A failed check becomes the `macro_data` gate and makes the bundle
 unpublishable. The parquet is then stored in the bundle at
 `data/macro_regime_history.parquet`; `MacroRegimeService` prefers the active
-bundle's copy and falls back to the baked file.
+bundle's copy and falls back to the baked file. The events build receives it
+with `--macro-parquet` and the model output with `--model-dir`.
 
 The model target is **S&P 500 proxy lower 28 calendar days later**. Features
 are `fed_cross`, `curve_cross` and `sahm_alert`. The 28-day purge gap ensures
