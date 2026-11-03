@@ -11,7 +11,14 @@ from .bundle import (
 )
 from .gates import GateContext, GateResult, run_gates
 from .pipeline import PipelineOptions, PipelineResult, run_pipeline
-from .store import bundle_info, event_counts, upcoming_by_theme
+from .store import (
+    bundle_info,
+    current_bundle_dir,
+    empty_event_counts,
+    event_counts,
+    upcoming_by_theme,
+    upcoming_totals_by_theme,
+)
 
 __all__ = [
     "BundleResult",
@@ -22,10 +29,13 @@ __all__ = [
     "PipelineResult",
     "bundle_info",
     "bundle_version_for",
+    "current_bundle_dir",
+    "empty_event_counts",
     "event_counts",
     "run_gates",
     "run_pipeline",
     "upcoming_by_theme",
+    "upcoming_totals_by_theme",
     "validate_bundle_files",
     "write_dataset",
 ]

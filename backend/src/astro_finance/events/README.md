@@ -188,6 +188,42 @@ first as `--previous` has a lower `events_updated` count in its quality report;
 its `bundle_version` and canonical event files still match when the facts have
 not changed.
 
+## Read API
+
+The backend exposes two read-only routes under `/api/v1/events`. They never
+call the network.
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/v1/events/upcoming` | `{as_of, bundle_version, message, themes: {<theme>: {schedulable, total_available, events: [...]}}}` |
+| GET | `/api/v1/events/health` | `{active_version, created_at, counts, schema_version}` |
+
+`upcoming` query parameters:
+
+- `themes` — comma-separated theme names; omit for all five. Unknown names are
+  a 422.
+- `limit_per_theme` — 1–20, default 5.
+- `horizon_days` — 1–730, default 365.
+
+Only `scheduled` and `tentative` events at or after today are returned, ordered
+by start date then start time. Natural Disasters always returns
+`schedulable: false`, `total_available: 0` and no events. The response is
+`Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`.
+
+The active bundle is resolved through the activation pointer:
+`$EVENTS_RUNTIME_DIR/current` (default `backend/data/runtime/events`). The
+pointer holds a bundle directory (absolute, relative to the runtime directory,
+or a bare version under `bundles/`). `store.current_bundle_dir` caches the
+resolved path by the pointer file's mtime. With no pointer, `upcoming` returns
+the five themes with empty lists and an honest message, and `health` returns
+`active_version: null` and zero counts.
+
+The Next.js proxy routes are
+`frontend/src/app/api/v1/events/upcoming/route.ts` and
+`.../events/health/route.ts`. The UI is the **Upcoming** view beside the
+existing **Sky ladder** in `FutureLadder.jsx`; it uses a shareable `?themes=`
+filter and never changes the astro-similarity ladder itself.
+
 ## Adding a curated event
 
 Open the official page first.  Then add a block to the matching
@@ -241,8 +277,11 @@ python -m astro_finance.events report <bundle-dir>
 python -m astro_finance.events diff <old-bundle> <new-bundle>
 ```
 
-Exit codes: `0` okay, `2` one or more gates failed (the bundle is still written
-with `publishable: false`), `1` an error or a failed stage.
+Exit codes: `0` okay, `2` one or more gates failed or the build used `--offline`
+(the bundle is still written with `publishable: false`), `1` an error or a
+failed stage.  Any `--offline` build is a test build: `manifest.publishable` is
+always false and `quality_report.md` starts with
+`TEST BUILD (offline fixtures), never publishable`.
 
 `--offline` replaces network sources with fixtures under
 `tests/events/fixtures/offline/`; the checked-in FRED fixtures are synthetic
@@ -258,8 +297,9 @@ PYTHONPATH="src;." C:/Python314/python.exe -m pytest tests/events -q
 
 ## What the architect's publish step must do
 
-The build-only workflow stops after the artifact.  Activation is a separate,
-reviewed step and must:
+The build-only workflow stops after the artifact.  Before the build it runs
+`verify_fred_releases` with `FRED_API_KEY`; a missing key or a changed release
+id/name fails the job.  Activation is a separate, reviewed step and must:
 
 1. download `events-bundle-<bundle_version>.tar.gz`, `manifest.json` and
    `SHA256SUMS` from the GitHub Release;

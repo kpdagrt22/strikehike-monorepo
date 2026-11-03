@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
@@ -18,6 +19,59 @@ from .models import (
 
 UPCOMING_STATUSES = (EventStatus.SCHEDULED.value, EventStatus.TENTATIVE.value)
 MAX_LIMIT_PER_THEME = 20
+
+# The pointer format is deliberately simple: a small text file named
+# ``current`` containing a bundle directory (absolute, relative to the runtime
+# directory, or a bare version under ``bundles/``).  Activation owns the atomic
+# replacement; this module only resolves it.
+DEFAULT_RUNTIME_DIR = Path(__file__).resolve().parents[3] / "data" / "runtime" / "events"
+_POINTER_CACHE: dict[str, tuple[int, Path | None]] = {}
+
+
+def runtime_dir_from_env() -> Path:
+    value = os.environ.get("EVENTS_RUNTIME_DIR", "").strip()
+    return Path(value) if value else DEFAULT_RUNTIME_DIR
+
+
+def _resolve_current(runtime_dir: Path, pointer: Path) -> Path | None:
+    try:
+        text = pointer.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not text:
+        return None
+    candidates: list[Path] = []
+    raw = Path(text)
+    candidates.append(raw if raw.is_absolute() else runtime_dir / raw)
+    candidates.append(runtime_dir / "bundles" / text)
+    for candidate in candidates:
+        if (
+            candidate.is_dir()
+            and (candidate / "manifest.json").is_file()
+            and (candidate / "events.sqlite").is_file()
+        ):
+            return candidate
+    return None
+
+
+def current_bundle_dir(runtime_dir: Path | None = None) -> Path | None:
+    """Resolve the active bundle pointer, cached by the pointer's mtime."""
+
+    runtime = Path(runtime_dir) if runtime_dir is not None else runtime_dir_from_env()
+    pointer = runtime / "current"
+    try:
+        modified = pointer.stat().st_mtime_ns
+    except OSError:
+        _POINTER_CACHE.pop(str(runtime), None)
+        return None
+    key = str(runtime)
+    cached = _POINTER_CACHE.get(key)
+    if cached is not None and cached[0] == modified:
+        return cached[1]
+    resolved = _resolve_current(runtime, pointer)
+    _POINTER_CACHE[key] = (modified, resolved)
+    return resolved
+
 
 
 def _normalise_themes(themes: Iterable[str] | None) -> list[Theme]:
@@ -101,6 +155,60 @@ def _row_to_dict(row: sqlite3.Row, *, today: date) -> dict[str, Any]:
         date.fromisoformat(payload["start_date"]) - today
     ).days
     return payload
+
+
+def upcoming_totals_by_theme(
+    db_path: Path,
+    themes: Iterable[str] | None = None,
+    *,
+    today: date,
+    horizon_days: int = 365,
+) -> dict[str, int]:
+    """Count active upcoming events per theme before applying a display limit."""
+
+    if not isinstance(db_path, Path):
+        db_path = Path(db_path)
+    horizon_end = today + timedelta(days=max(0, int(horizon_days)))
+    selected = _normalise_themes(themes)
+    totals = {theme.value: 0 for theme in selected}
+    connection = _read_only_connection(db_path)
+    try:
+        rows = connection.execute(
+            """
+            SELECT theme, COUNT(*) AS count
+            FROM events
+            WHERE kind = ? AND status IN (?, ?)
+              AND start_date >= ? AND start_date <= ?
+            GROUP BY theme
+            """,
+            (
+                EventKind.UPCOMING.value,
+                *UPCOMING_STATUSES,
+                today.isoformat(),
+                horizon_end.isoformat(),
+            ),
+        ).fetchall()
+    finally:
+        connection.close()
+    for row in rows:
+        theme = str(row["theme"])
+        if theme in totals:
+            totals[theme] = int(row["count"])
+    return totals
+
+
+def empty_event_counts() -> dict[str, Any]:
+    """The same shape as :func:`event_counts` when no bundle exists."""
+
+    matrix: dict[str, dict[str, dict[str, int]]] = {
+        theme.value: {
+            kind.value: {status.value: 0 for status in EventStatus}
+            for kind in EventKind
+        }
+        for theme in THEME_ORDER
+    }
+    return {"total": 0, "by_theme_kind_status": matrix}
+
 
 
 def event_counts(db_path: Path) -> dict[str, Any]:
