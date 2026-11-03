@@ -33,6 +33,10 @@ jobs:
     name: Build and gate the weekly events bundle
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # The publish job reads this; without it needs.build.outputs is empty and
+    # publishing is always skipped.
+    outputs:
+      publishable: ${{ steps.build.outputs.publishable }}
     defaults:
       run:
         working-directory: backend
