@@ -1,8 +1,13 @@
 "use client";
 
+// A decorative plate for the era: hidden from assistive technology (the panel's
+// own heading and text name the era).
 function PlaceholderVisual({ era, accent }) {
   return (
-    <div className="relative h-44 overflow-hidden rounded-2xl border border-(--sh-line-1) bg-[#f2ede4] dark:border-white/10 dark:bg-[#111119]">
+    <div
+      aria-hidden="true"
+      className="relative h-44 overflow-hidden rounded-2xl border border-(--sh-line-1) bg-[#f2ede4] dark:border-white/10 dark:bg-[#111119]"
+    >
       {/* The plate's base stops are CSS variables, so the server markup is
           already theme-correct; only the accent comes from JS. */}
       <div
@@ -21,9 +26,6 @@ function PlaceholderVisual({ era, accent }) {
       />
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
         <div>
-          <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/70 dark:text-white/60">
-            Editorial visual placeholder
-          </p>
           <p className="mt-1 font-mono text-3xl font-medium tracking-[-0.05em] text-black/80 dark:text-white/80">
             {era}
           </p>

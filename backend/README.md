@@ -14,12 +14,13 @@ The regime routes load `data/processed/macro_regime_history.parquet` on first us
 
 | Path | Role |
 |---|---|
-| `api_server.py` | The FastAPI app. Mounts the regime and patterns routers under `/api/v1` and serves planetary positions, historical parallels, the forecast ladder, the event list and `/health`. |
+| `api_server.py` | The FastAPI app. Mounts the regime, patterns and cases routers under `/api/v1` and serves planetary positions, historical parallels, the forecast ladder, the event list and `/health`. |
 | `regime/router.py` | Routes under `/api/v1/regime` and `/api/v1/patterns`. |
 | `regime/service.py` | `MacroRegimeService`: loads the parquet artifact and its metadata, caches payloads, and builds the timeline, regime runs, crypto milestones, pattern comparison and 30-day regime probability. |
 | `regime/analytics.py` | Macro strength meter, Core Index, NBER episodes and crash windows, and the long-run S&P 500 series. Shared with the ingestion flow. |
 | `regime/patterns.py`, `regime/patterns_events.json` | The 120-year pattern comparison and its curated events. |
-| `regime/patterns_v2.py` | Study of Patterns v2: the past 12-month setups closest to the latest 12 months, what followed them beside the usual rate, and the 120-year mirror. Served as the `engine` block of `/api/v1/patterns`. |
+| `regime/patterns_v2.py`, `regime/patterns_v2_schemas.py` | Study of Patterns v2: the past 12-month setups closest to the latest 12 months, what followed them beside the usual rate, and the 120-year mirror. Served as the `engine` block of `/api/v1/patterns`. |
+| `regime/cases.py`, `regime/cases_router.py`, `regime/case_schemas.py` | The Convergence case catalogue: market declines found by one rule per market (US stocks, the Nifty 50, Bitcoin, gold and the Treasury model), each case's path from its peak, and the routes under `/api/v1/regime/cases`. |
 | `regime/crypto_milestones.py` | Hand-picked crypto comparison windows (editorial, not statistically detected). |
 | `regime/schemas.py` | Pydantic response models. |
 | `src/astro_finance/energy_metric_compiler.py` | Turns a row of the precomputed daily frame into a 0–100 energy score and a polarity state. |
@@ -31,10 +32,6 @@ The regime routes load `data/processed/macro_regime_history.parquet` on first us
 | `Dockerfile` | Production image: Python 3.11.9-slim with `requirements-minimal.txt`, `api_server.py`, `src/`, `regime/`, `scripts/`, `websocket_server.py` and the six data files the API reads. |
 | `requirements-minimal.txt` | Dependencies installed by the image and by CI. |
 | `tests/` | The pytest suite. |
-
-### In progress on this branch
-
-Not yet on strikehike.com: the ingestion flow's daily S&P 500 history from Yahoo Finance (`^GSPC`), Core Index v2 with its severity, warning and trend-warning columns, Study of Patterns v2 (`regime/patterns_v2.py` and `data/processed/patterns_v2_skill.json`), and a Convergence case catalogue (`regime/cases.py`, `regime/cases_router.py`, `regime/case_schemas.py`, mounted under `/api/v1/regime`, with tests in `tests/test_regime_cases.py`).
 
 ## Run
 
@@ -57,6 +54,8 @@ The frontend's route handlers expect the backend at `http://127.0.0.1:8000` unle
 | GET | `/api/v1/regime/macro-history` | The downsampled macro timeline (macro strength, regime state, Core Index, asset series, drawdowns, volatility percentiles) and every NBER recession window. Query: `resolution` (`auto`, `daily`, `weekly`, `monthly`), optional `start` and `end` |
 | GET | `/api/v1/regime/runs` | Monthly regime runs, the 3×3 transition matrix and median durations |
 | GET | `/api/v1/regime/crypto-milestones` | The curated crypto windows with asset drawdowns and Core Index readings |
+| GET | `/api/v1/regime/cases` | The Convergence case catalogue: every decline of at least its market's threshold on one series (US stocks, the Nifty 50, Bitcoin, gold, the Treasury model), with its peak, low and return to the peak, the Core Index and macro strength at the peak and the low, and the overlapping NBER recessions; also the rules, the suggested pairs, notes and coverage. Cached until the parquet changes |
+| GET | `/api/v1/regime/cases/{case_id}/path` | One case's path in calendar days from its peak, with the Core Index and macro strength on the same dates; `case_id=today` starts at the series' latest all-time high or its last observation. Query: `series` (`own`, `sp500`, `gold`, `bonds`, `nifty`, `bitcoin`), `from` (`0`, `-90`, `-365`, `-730`) and, for `today` only, `align` (`peak`, `latest`) |
 | GET | `/api/v1/regime/forecast` | The probability that the regime is "disruptive" 30 calendar days ahead, from a logistic regression on three artifact features (`fed_cross`, `curve_cross`, `sahm_alert`), fitted on first request and cached until the artifact changes |
 | GET | `/api/v1/patterns` | The 120-year pattern comparison and the historical year that followed, plus the Study of Patterns v2 `engine` block (closest historical setups, the usual rate, the 120-year mirror and the precomputed track record; `null` if it cannot be built). Query: `asset` (`sp500`, `nifty`, `gold`, `bonds`, `bitcoin`) |
 | GET | `/api/v1/astro-positions` | Planetary positions and the 0–100 energy metric for a `date` inside the precomputed frame (1992-02-11 to 2025-01-01) |
@@ -74,7 +73,7 @@ The image copies exactly these files; everything else under `data/` stays out of
 | `data/processed/macro_regime_history.parquet` | `scripts/flows/macro_ingestion.py` | `regime/service.py` |
 | `data/processed/macro_regime_history.meta.json` | The same flow: coverage, versions, notes and warnings, each FRED series with its URL, and a source label for each asset series | `regime/service.py`, which returns parts of it as `meta` |
 | `data/processed/crypto_milestones.json` | The same flow, from `regime/crypto_milestones.py` | `regime/service.py` |
-| `data/processed/patterns_v2_skill.json` | The same flow, or `scripts/patterns_v2_evidence.py`: the Study of Patterns v2 track record per asset, stamped with the parquet's `data_version` | `regime/service.py` (the `engine.skill` block) |
+| `data/processed/patterns_v2_skill.json` | The same flow, or `scripts/patterns_v2_evidence.py`: the Study of Patterns v2 track record per asset (schema 2), each asset's record pinned to a fingerprint of that asset's price inputs, so the API marks it stale when those prices change | `regime/service.py` (the `engine.skill` block) |
 | `data/processed/final_data_with_regimes.csv` | Committed with the earlier project's code: a daily frame of planetary features, regime labels and volatility from 1992-02-11 to 2025-01-01. No script in this repository writes it | `api_server.py` and the energy metric compiler |
 | `data/historical_events.json` | Curated by hand | `historical_parallels.py`, which seeds SQLite at `HISTORICAL_EVENTS_DB` |
 
@@ -83,7 +82,7 @@ The image copies exactly these files; everything else under `data/` stays out of
 `scripts/flows/macro_ingestion.py` runs offline, never in the request path. It:
 
 1. fetches every series in its FRED registry (`SERIES_REGISTRY`), using the official API when `FRED_API_KEY` is set and FRED's public CSV endpoint otherwise (`--source auto|api|csv`). Requests retry with backoff, and each series is cached as CSV in `data/raw/fred/` (git-ignored);
-2. fetches the series that do not come from FRED: the World Bank Pink Sheet London gold price (monthly), Blockchain.com's daily Bitcoin price, and Yahoo Finance daily closes for the Nifty 50 (`^NSEI`) and, on this branch, the S&P 500 (`^GSPC`). Without an API key it also backfills the ICE BofA high-yield spread from a public mirror, because FRED's CSV endpoint serves only the last three years of that series;
+2. fetches the series that do not come from FRED: the World Bank Pink Sheet London gold price (monthly), Blockchain.com's daily Bitcoin price, and Yahoo Finance daily closes for the Nifty 50 (`^NSEI`) and the S&P 500 (`^GSPC`). Without an API key it also backfills the ICE BofA high-yield spread from a public mirror, because FRED's CSV endpoint serves only the last three years of that series;
 3. merges everything onto one forward-filled daily calendar, marks NBER recession windows from `USREC`, and computes the macro strength meter (a 0–100 coincident heuristic from the Fed funds rate, the 10-year minus 2-year Treasury spread and a Sahm-rule unemployment proxy), the Core Index, the asset series, one-year drawdowns and volatility percentiles. The Core Index (`core-index-v2` in `regime/analytics.py`) is a weekly trend-and-stress state machine decided at each Friday close on the daily S&P 500 series, with credit spreads, unemployment and the yield curve as stress inputs, each lagged by its publication delay. It also writes a severity label, a warning flag and a separate 40-week trend warning, and keeps the retired v1 composite's inputs and sub-scores as diagnostic columns;
 4. writes the parquet file, its `.meta.json`, `crypto_milestones.json` and `patterns_v2_skill.json` to `--output-dir` (default `data/processed/`), each through a temporary file that then replaces the old one.
 
@@ -135,7 +134,7 @@ On Windows, set `PYTHONPATH` to `src;.` instead.
 | `test_macro_ingestion.py` | The series registry, FRED and Yahoo parsing, the daily merge, NBER alignment, the macro strength meter, the S&P 500 series, the asset series and the Core Index |
 | `test_patterns.py` | The 120-year date, the one-year forward window and the fallback for assets with short histories; Study of Patterns v2 causality (no look-ahead), its API contract and the committed skill artifact |
 | `test_regime_service.py` | Macro history, regime runs, the 30-day probability, input validation and crypto milestones |
-| `test_regime_cases.py` | The Convergence case catalogue (in progress): episode detection, case and path contracts, caching and routes |
+| `test_regime_cases.py` | The Convergence case catalogue: episode detection, case and path contracts, caching and routes |
 
 ## Legacy code not used by the site
 

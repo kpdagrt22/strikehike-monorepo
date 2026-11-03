@@ -1,16 +1,33 @@
 import Link from "next/link";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { SiteColophon } from "@/components/seo/SiteColophon";
 import { CONTACT_URL } from "@/lib/contact";
+import { disclaimerGraph } from "@/lib/seo/graphs";
+import { PERSON_URL } from "@/lib/seo/site";
 
 // Composed only from what the views already say: the "not investment advice"
 // and "not a forecast" lines, the data and sky notes in Method & limits, and
-// the Info panel's heading and enquiry link. No terms, privacy or liability
-// text (the owner's). A server component: static, no motion. The light-theme
+// the Info panel's heading and enquiry link; plus the owner-approved maker and
+// sources paragraph (SEO plan 3.7f). No terms, privacy or liability text (the
+// owner's). A server component: static, no motion. The light-theme
 // eyebrow is #a83a27, not #c0442f, to keep 4.5:1 over the brand pill's shadow.
 // "month-precise" stays whole through nowrap, not U+2011: Onest has no U+2011
 // glyph, so a non-breaking hyphen would fall back to a system font.
 
 const LINK =
   "underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]";
+
+// The maker and the sources, each linked to the record the data come from (the
+// same addresses as llms.txt and the pages' JSON-LD). Plain links: no nofollow.
+const SOURCES = {
+  usrec: "https://fred.stlouisfed.org/series/USREC",
+  cowles: "https://fred.stlouisfed.org/series/M1125AUSM343NNBR",
+  sp500: "https://finance.yahoo.com/quote/%5EGSPC/",
+  nifty: "https://finance.yahoo.com/quote/%5ENSEI/",
+  gold: "https://www.worldbank.org/en/research/commodity-markets",
+  bitcoin: "https://www.blockchain.com/explorer/charts/market-price",
+  ephemeris: "https://www.astro.com/swisseph/",
+};
 
 export default function DisclaimerPage() {
   return (
@@ -73,6 +90,41 @@ export default function DisclaimerPage() {
             historical correspondence lens: not an economic input and not a
             causal input to the Core Index.
           </p>
+          <p>
+            StrikeHike is built and run by Prakash Kantumutchu (KP),{" "}
+            <a href={PERSON_URL} rel="author" className={LINK}>
+              thisiskp.in
+            </a>
+            . Sources: NBER recession dates via{" "}
+            <a href={SOURCES.usrec} className={LINK}>
+              FRED (USREC)
+            </a>{" "}
+            · the Cowles stock index, 1871–1927, via{" "}
+            <a href={SOURCES.cowles} className={LINK}>
+              FRED
+            </a>{" "}
+            · S&amp;P closes from{" "}
+            <a href={SOURCES.sp500} className={LINK}>
+              Yahoo Finance
+            </a>
+            , with official closes via FRED where they differ · Nifty 50 from{" "}
+            <a href={SOURCES.nifty} className={LINK}>
+              Yahoo Finance
+            </a>{" "}
+            · gold from{" "}
+            <a href={SOURCES.gold} className={LINK}>
+              the World Bank
+            </a>{" "}
+            · Bitcoin from{" "}
+            <a href={SOURCES.bitcoin} className={LINK}>
+              Blockchain.com
+            </a>{" "}
+            · planetary positions from{" "}
+            <a href={SOURCES.ephemeris} className={LINK}>
+              the Swiss Ephemeris
+            </a>{" "}
+            (Lahiri sidereal).
+          </p>
         </div>
 
         <footer className="mt-8 flex max-w-xl flex-wrap items-center gap-x-3 gap-y-1 border-t border-(--sh-line-1) pt-4 text-micro text-black/60 dark:text-white/60">
@@ -102,7 +154,10 @@ export default function DisclaimerPage() {
             Opens the enquiry form on thisiskp.in
           </span>
         </footer>
+
+        <SiteColophon current="/disclaimer" />
       </div>
+      <JsonLd data={disclaimerGraph()} />
     </main>
   );
 }
