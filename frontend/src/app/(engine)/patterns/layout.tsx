@@ -1,30 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { pageMetadata } from "@/lib/seo/site";
 
-const TITLE = "Study of Patterns";
-const DESCRIPTION =
-  "A rolling 120-year comparison of S&P 500 and Nifty 50 paths, similarity scoring, one-year forward echoes, geopolitics and the structural patterns that repeat across centuries.";
-
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: {
-    canonical: "/patterns",
-  },
-  openGraph: {
-    type: "website",
-    locale: "en_IN",
-    url: "https://strikehike.com/patterns",
-    siteName: "StrikeHike",
-    title: `${TITLE} | StrikeHike`,
-    description: DESCRIPTION,
-  },
-  twitter: {
-    card: "summary",
-    title: `${TITLE} | StrikeHike`,
-    description: DESCRIPTION,
-  },
-};
+// Title, description, canonical, Open Graph and Twitter: one source, lib/seo/site.ts.
+// The share image comes from ./opengraph-image.tsx.
+export const metadata: Metadata = pageMetadata("/patterns");
 
 export default function PatternsLayout({ children }: { children: ReactNode }) {
   return children;

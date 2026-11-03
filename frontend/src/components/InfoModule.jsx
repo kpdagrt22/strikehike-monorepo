@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion, useAnimationControls } from "framer-motion";
 import { CONTACT_URL } from "@/lib/contact";
 import { INTENT, reveal } from "@/lib/motion";
 
@@ -10,8 +10,24 @@ import { INTENT, reveal } from "@/lib/motion";
 // longer than the nav's intent delay.
 const HOVER_PREVIEW_MS = 150;
 
+// The other views and the disclaimer, as plain links.
+const VIEWS = [
+  { href: "/regime", label: "Regime" },
+  { href: "/convergence", label: "Convergence" },
+  { href: "/patterns", label: "Study of Patterns" },
+  { href: "/disclaimer", label: "Disclaimer" },
+];
+
+const LINK =
+  "inline-flex min-h-6 items-center text-micro text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:min-h-11 dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]";
+
 export function InfoModule() {
   const [open, setOpen] = useState(false);
+  // The panel is always in the page, so the server HTML carries it. While
+  // closed it is `hidden`: out of view, out of the tab order and out of the
+  // accessibility tree. It hides only once its exit has played.
+  const [panelHidden, setPanelHidden] = useState(true);
+  const controls = useAnimationControls();
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const openVia = useRef(null); // "hover" | "tab" | "click"
@@ -28,6 +44,7 @@ export function InfoModule() {
   const show = useCallback((via, at) => {
     openVia.current = via;
     openedAt.current = at;
+    setPanelHidden(false);
     setOpen(true);
   }, []);
 
@@ -43,7 +60,25 @@ export function InfoModule() {
 
   useEffect(() => clearTimers, [clearTimers]);
 
-  // /#contact (the JSON-LD contact point) arrives with the panel open.
+  // Open plays reveal.initial → reveal.animate; close plays reveal.exit and
+  // then hides the panel, unless it was opened again in the meantime.
+  useEffect(() => {
+    let current = true;
+    if (open) {
+      controls.set("initial");
+      controls.start("animate");
+    } else {
+      controls.start("exit").then(() => {
+        if (current) setPanelHidden(true);
+      });
+    }
+    return () => {
+      current = false;
+    };
+  }, [open, controls]);
+
+  // /#contact (older links; the JSON-LD contact point is now thisiskp.in's
+  // enquiry form) arrives with the panel open.
   useEffect(() => {
     const openFromHash = () => {
       if (window.location.hash === "#contact") show("click", performance.now());
@@ -167,92 +202,110 @@ export function InfoModule() {
         </svg>
       </button>
 
-      <AnimatePresence>
-        {open ? (
-          <motion.section
-            id="strikehike-info-panel"
-            role="region"
-            aria-label="About StrikeHike and contact"
-            variants={reveal}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-right overflow-hidden rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4]"
+      <motion.section
+        id="strikehike-info-panel"
+        role="region"
+        aria-label="About StrikeHike and contact"
+        hidden={panelHidden}
+        variants={reveal}
+        initial="initial"
+        animate={controls}
+        className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-right overflow-hidden rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+            About the engine
+          </p>
+          <button
+            type="button"
+            onClick={() => hide(true)}
+            aria-label="Close information panel"
+            className="relative grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/60 transition-colors before:absolute before:-inset-1.5 before:content-[''] hover:bg-black/[0.04] hover:text-black/80 focus-visible:bg-black/[0.04] focus-visible:text-black/80 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/80 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/80"
           >
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                About the engine
-              </p>
-              <button
-                type="button"
-                onClick={() => hide(true)}
-                aria-label="Close information panel"
-                className="relative grid h-8 w-8 place-items-center rounded-full border border-black/10 text-black/60 transition-colors before:absolute before:-inset-1.5 before:content-[''] hover:bg-black/[0.04] hover:text-black/80 focus-visible:bg-black/[0.04] focus-visible:text-black/80 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/80 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/80"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  className="h-3 w-3"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.25"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <path d="M4 4l8 8M12 4l-8 8" />
-                </svg>
-              </button>
-            </div>
-
-            <p className="mt-3 text-body leading-relaxed text-black/70 dark:text-white/70">
-              StrikeHike is a Universal Chrono-Spatial Engine that sets the US
-              macro record and market history beside the planetary sky, date by
-              date. It surfaces deep historical parallels
-              and recent manifestations of the same conditions, so patterns can
-              be examined without mistaking correlation for certainty.
-            </p>
-            <Link
-              href="/disclaimer"
-              className="mt-1.5 inline-flex min-h-6 items-center text-micro text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:min-h-11 dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]"
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.25"
+              strokeLinecap="round"
+              aria-hidden="true"
             >
-              Disclaimer
-            </Link>
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+          </button>
+        </div>
 
-            <div className="mt-5 border-t border-black/10 pt-5 dark:border-white/10">
-              <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                Enquiry
-              </p>
-              <a
-                href={CONTACT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-describedby="info-enquiry-note"
-                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#f05d49]/40 px-5 text-micro font-medium uppercase tracking-[0.16em] text-[#c0442f] transition-colors hover:border-[#f05d49]/70 hover:bg-black/[0.04] focus-visible:border-[#f05d49]/70 focus-visible:bg-black/[0.04] dark:text-[#ff8b77] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
-              >
-                Write to KP
-                <svg
-                  viewBox="0 0 16 16"
-                  className="h-3 w-3"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.25"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5.5 10.5l5-5M6.5 5.5h4v4" />
-                </svg>
-                <span className="sr-only"> (opens in a new tab)</span>
-              </a>
-              <p
-                id="info-enquiry-note"
-                className="mt-2 text-micro text-black/60 dark:text-white/60"
-              >
-                Opens the enquiry form on thisiskp.in
-              </p>
-            </div>
-          </motion.section>
-        ) : null}
-      </AnimatePresence>
+        <p className="mt-3 text-body leading-relaxed text-black/70 dark:text-white/70">
+          StrikeHike sets the US market and macro record beside the planetary
+          sky, date by date: a 3D orrery, every NBER recession since 1854, a
+          weekly Core Index of US market trend and stress, and a catalogue of
+          market declines since 1871. It describes the past, so patterns can be
+          examined without mistaking correlation for certainty.
+        </p>
+
+        <p
+          id="info-views-label"
+          className="mt-4 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60"
+        >
+          Views
+        </p>
+        <nav
+          aria-labelledby="info-views-label"
+          className="mt-1 flex flex-wrap items-center gap-x-3"
+        >
+          {VIEWS.map((view) => (
+            <Link
+              key={view.href}
+              href={view.href}
+              prefetch={false}
+              className={LINK}
+            >
+              {view.label}
+            </Link>
+          ))}
+        </nav>
+        <p className="mt-1 flex flex-wrap items-center gap-x-1 text-micro text-black/60 dark:text-white/60">
+          <span>Built and run by</span>
+          <a href="https://thisiskp.in" rel="author" className={LINK}>
+            Prakash Kantumutchu (KP)
+          </a>
+        </p>
+
+        <div className="mt-5 border-t border-black/10 pt-5 dark:border-white/10">
+          <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+            Enquiry
+          </p>
+          <a
+            href={CONTACT_URL}
+            target="_blank"
+            rel="noopener"
+            aria-describedby="info-enquiry-note"
+            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#f05d49]/40 px-5 text-micro font-medium uppercase tracking-[0.16em] text-[#c0442f] transition-colors hover:border-[#f05d49]/70 hover:bg-black/[0.04] focus-visible:border-[#f05d49]/70 focus-visible:bg-black/[0.04] dark:text-[#ff8b77] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+          >
+            Write to KP
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.25"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5.5 10.5l5-5M6.5 5.5h4v4" />
+            </svg>
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          <p
+            id="info-enquiry-note"
+            className="mt-2 text-micro text-black/60 dark:text-white/60"
+          >
+            Opens the enquiry form on thisiskp.in
+          </p>
+        </div>
+      </motion.section>
     </div>
   );
 }

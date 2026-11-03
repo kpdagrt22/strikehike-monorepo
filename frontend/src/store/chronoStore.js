@@ -7,16 +7,24 @@ export function currentUtcDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Start on today's UTC date. The date only changes when the user selects a
-// timeline marker, event, future ladder entry, or precise datetime.
-export const DEFAULT_FOCUSED_DATE = currentUtcDate();
+// The timeline starts on today's UTC date. The date only changes when the user
+// selects a timeline marker, event, future ladder entry, or precise datetime.
+//
+// The home page is prerendered, so its server HTML cannot know the visitor's
+// today, and zustand hydrates every component from the store's initial state
+// (its server snapshot). The initial date is therefore one fixed day that the
+// server HTML and the browser's first render share: a day before this code
+// shipped, so it is never anyone's today and the Today control renders alike on
+// both. The browser then moves the store to today (end of this file), and each
+// component re-renders with it right after hydration.
+const PRERENDERED_DATE = "2026-10-28";
 
 // One shared empty list: a scrub step that clears the parallels keeps the same
 // reference, so subscribers that only read `parallels` do not re-render.
 const NO_PARALLELS = [];
 
 export const useChronoStore = create((set) => ({
-  focusedDate: DEFAULT_FOCUSED_DATE,
+  focusedDate: PRERENDERED_DATE,
   focusedTime: "00:00",
   positions: null,
   source: null,
@@ -116,3 +124,11 @@ export const useChronoStore = create((set) => ({
       status: "loading",
     })),
 }));
+
+// In the browser the timeline starts on today's UTC date, set when this module
+// loads (before any visitor choice and before hydration). Hydration still reads
+// the initial state above, so the server HTML matches; React then re-renders
+// each subscriber with today's date, and a deep link (?d=) applies after that.
+if (typeof window !== "undefined") {
+  useChronoStore.setState({ focusedDate: currentUtcDate() });
+}

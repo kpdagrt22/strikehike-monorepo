@@ -88,16 +88,19 @@ function Stat({ label, value, suffix, detail, accent }) {
   );
 }
 
+// At least one screen tall, as the chart it stands in for is: Method & limits,
+// the NBER table and the page's foot (server-rendered below it) then start
+// below the fold, so the chart's arrival moves nothing on screen.
 function LoadingState() {
   return (
-    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/40 sm:p-6">
+    <section className="mt-6 flex min-h-[100dvh] flex-col overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/40 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-micro uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
           Loading 170 years of macro history
         </p>
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d8b47a]" />
       </div>
-      <div className="mt-5 h-[320px] animate-pulse rounded-2xl bg-black/[0.04] dark:bg-white/[0.05]" />
+      <div className="mt-5 min-h-[320px] flex-1 animate-pulse rounded-2xl bg-black/[0.04] dark:bg-white/[0.05]" />
       <div className="mt-3 h-3 w-2/3 animate-pulse rounded-full bg-black/[0.04] dark:bg-white/[0.05]" />
     </section>
   );
@@ -351,7 +354,23 @@ function MethodDetails({ meta }) {
   );
 }
 
-export default function RegimePage() {
+/**
+ * The /regime view. `page.tsx` renders it on the server with the summary it
+ * read (`initialSummary`: the archive's meta, coverage and window count, or
+ * null), the server-rendered NBER table (`after`, placed after Method &
+ * limits) and the site colophon (`colophon`, the container's last child).
+ *
+ * @param {{
+ *   initialSummary?: { as_of?: string, coverage?: object, meta?: object, windows?: number } | null,
+ *   after?: import("react").ReactNode,
+ *   colophon?: import("react").ReactNode,
+ * }} props
+ */
+export default function RegimeClient({
+  initialSummary = null,
+  after = null,
+  colophon = null,
+}) {
   const { resolvedTheme } = useTheme();
   // false during SSR/hydration, true after: server and first client render agree.
   const mounted = useSyncExternalStore(
@@ -421,7 +440,15 @@ export default function RegimePage() {
   }, []);
 
   const data = state.data;
-  const latestCoreIndex = data?.meta?.latest_core_index ?? null;
+  // Until the archive arrives (or if it fails), the summary the server read
+  // with the page fills the Stat row, the coverage chip and Method & limits:
+  // the same meta, coverage and windows, so the page reads the same before
+  // and after hydration, and without JS.
+  const summary = data ? null : initialSummary;
+  const meta = data?.meta ?? summary?.meta ?? null;
+  const coverage = data?.coverage ?? summary?.coverage ?? null;
+  const windowCount = data ? data.crashes.length : summary?.windows;
+  const latestCoreIndex = meta?.latest_core_index ?? null;
   const latestTone = coreIndexTone(latestCoreIndex?.bucket, isDark);
   // Today's flags, named in the summary only while they are on, in one
   // compact phrase: "trend warning", or "Core Index, trend and fast warnings".
@@ -525,11 +552,64 @@ export default function RegimePage() {
             <StatusBadge status={state.status} />
             <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60">
               FRED ·{" "}
-              {data?.coverage?.start?.slice(0, 4) ?? "1854"}–
-              {data?.coverage?.end?.slice(0, 4) ?? "2026"}
+              {coverage?.start?.slice(0, 4) ?? "1854"}–
+              {coverage?.end?.slice(0, 4) ?? "2026"}
             </span>
           </div>
         </header>
+
+        {/* One slot for the Stat row in every state, so it never remounts when
+            the archive replaces the server's summary (same figures). */}
+        {latestCoreIndex || coverage ? (
+          <div className="mt-5 grid grid-cols-2 gap-x-4 border-y border-(--sh-line-1) sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-(--sh-line-1)">
+            <Stat
+              label="Latest Core Index"
+              value={formatSigned(latestCoreIndex?.score)}
+              suffix="/ +50"
+              detail={
+                latestFlagText ? (
+                  // Two unbreakable parts: a narrow column wraps between
+                  // them, never inside one.
+                  <>
+                    <span className="whitespace-nowrap">
+                      {latestTone.label} ·
+                    </span>{" "}
+                    <span className="whitespace-nowrap">{latestFlagText}</span>
+                  </>
+                ) : (
+                  latestTone.label
+                )
+              }
+              accent={latestTone.color}
+            />
+            <Stat
+              label="As of"
+              value={latestCoreIndex?.date ? formatDate(latestCoreIndex.date) : "—"}
+              detail={data ? `${formatNumber(data.point_count)} timeline points` : null}
+            />
+            <Stat
+              label="Coverage"
+              value={isNumber(coverage?.years) ? `${coverage.years.toFixed(0)} yrs` : "—"}
+              detail={`${formatDate(coverage?.start)} → ${formatDate(coverage?.end)}`}
+            />
+            <Stat
+              label="NBER windows"
+              value={isNumber(windowCount) ? String(windowCount) : "—"}
+              detail={
+                state.status === "error" ? null : (
+                  <>
+                    <span className="[@media(hover:none)]:hidden">
+                      Hover a red band · click to zoom
+                    </span>
+                    <span className="hidden [@media(hover:none)]:inline">
+                      Press and hold the chart to scrub
+                    </span>
+                  </>
+                )
+              }
+            />
+          </div>
+        ) : null}
 
         {state.status === "loading" ? <LoadingState /> : null}
 
@@ -556,53 +636,6 @@ export default function RegimePage() {
 
         {state.status === "ready" && data ? (
           <>
-            <div className="mt-5 grid grid-cols-2 gap-x-4 border-y border-(--sh-line-1) sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-(--sh-line-1)">
-              <Stat
-                label="Latest Core Index"
-                value={formatSigned(latestCoreIndex?.score)}
-                suffix="/ +50"
-                detail={
-                  latestFlagText ? (
-                    // Two unbreakable parts: a narrow column wraps between
-                    // them, never inside one.
-                    <>
-                      <span className="whitespace-nowrap">
-                        {latestTone.label} ·
-                      </span>{" "}
-                      <span className="whitespace-nowrap">{latestFlagText}</span>
-                    </>
-                  ) : (
-                    latestTone.label
-                  )
-                }
-                accent={latestTone.color}
-              />
-              <Stat
-                label="As of"
-                value={latestCoreIndex?.date ? formatDate(latestCoreIndex.date) : "—"}
-                detail={`${formatNumber(data.point_count)} timeline points`}
-              />
-              <Stat
-                label="Coverage"
-                value={`${data.coverage.years.toFixed(0)} yrs`}
-                detail={`${formatDate(data.coverage.start)} → ${formatDate(data.coverage.end)}`}
-              />
-              <Stat
-                label="NBER windows"
-                value={String(data.crashes.length)}
-                detail={
-                  <>
-                    <span className="[@media(hover:none)]:hidden">
-                      Hover a red band · click to zoom
-                    </span>
-                    <span className="hidden [@media(hover:none)]:inline">
-                      Press and hold the chart to scrub
-                    </span>
-                  </>
-                }
-              />
-            </div>
-
             <RegimeTimeline
               timeline={data.timeline}
               crashes={data.crashes}
@@ -638,46 +671,54 @@ export default function RegimePage() {
                 assetKey={selectedAsset}
               />
             </div>
-
-            <MethodDetails meta={data.meta} />
-
-            <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                FRED · World Bank · Blockchain.com · Yahoo Finance ·{" "}
-                {data.meta?.core_index_version ?? "core-index-v1"}
-              </span>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    window.dispatchEvent(
-                      new Event("strikehike:show-onboarding"),
-                    )
-                  }
-                  className={FOOTER_LINK}
-                >
-                  How it works
-                </button>
-                <Link
-                  href={
-                    orreryDate
-                      ? `/?d=${encodeURIComponent(orreryDate)}`
-                      : "/"
-                  }
-                  className={FOOTER_LINK}
-                >
-                  Open the Orrery at this date
-                </Link>
-                <Link
-                  href="/disclaimer"
-                  className={FOOTER_LINK}
-                >
-                  Disclaimer
-                </Link>
-              </div>
-            </footer>
           </>
         ) : null}
+
+        {/* Outside the status gates: from the server's summary until the
+            archive arrives, then from the archive (the same meta). */}
+        {meta ? <MethodDetails meta={meta} /> : null}
+
+        {after}
+
+        {state.status === "ready" && data ? (
+          <footer className="mt-6 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              FRED · World Bank · Blockchain.com · Yahoo Finance ·{" "}
+              {data.meta?.core_index_version ?? "core-index-v1"}
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  window.dispatchEvent(
+                    new Event("strikehike:show-onboarding"),
+                  )
+                }
+                className={FOOTER_LINK}
+              >
+                How it works
+              </button>
+              <Link
+                href={
+                  orreryDate
+                    ? `/?d=${encodeURIComponent(orreryDate)}`
+                    : "/"
+                }
+                className={FOOTER_LINK}
+              >
+                Open the Orrery at this date
+              </Link>
+              <Link
+                href="/disclaimer"
+                className={FOOTER_LINK}
+              >
+                Disclaimer
+              </Link>
+            </div>
+          </footer>
+        ) : null}
+
+        {colophon}
       </div>
       <OnboardingModal />
     </main>
