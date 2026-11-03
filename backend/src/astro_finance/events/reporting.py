@@ -31,6 +31,8 @@ def quality_report_payload(
     summary: Mapping[str, int],
     notes: Iterable[str] = (),
     offline_build: bool = False,
+    macro_data: Mapping[str, Any] | None = None,
+    model_lifecycle: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     upcoming_counts: dict[str, dict[str, int]] = {}
     for theme in THEME_ORDER:
@@ -46,7 +48,7 @@ def quality_report_payload(
                 and (event.start_date - today).days <= horizon
             )
     publishable = all(gate.status == "pass" for gate in gate_results) and not offline_build
-    return {
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "as_of": today.isoformat(),
         "bundle_version": bundle_version,
@@ -73,6 +75,11 @@ def quality_report_payload(
         "theme_metadata": _theme_manifest(),
         "notes": list(notes),
     }
+    if macro_data is not None:
+        payload["macro_data"] = dict(macro_data)
+    if model_lifecycle is not None:
+        payload["model_lifecycle"] = dict(model_lifecycle)
+    return payload
 
 
 def quality_report_markdown(report: Mapping[str, Any]) -> str:
@@ -128,6 +135,58 @@ def quality_report_markdown(report: Mapping[str, Any]) -> str:
             f"| {source_id} | {source['records']} | {source['rejected']} | "
             f"{'yes' if source['fetched_this_run'] else 'no'} | {error} |"
         )
+    if report.get("macro_data"):
+        macro = report["macro_data"]
+        lines.extend(
+            [
+                "",
+                "## Macro dataset refresh",
+                "",
+                f"- Rows: {macro.get('rows', 0)} (previous {macro.get('previous_rows', 0)})",
+                f"- Last date: {macro.get('last_date') or 'unknown'}",
+                f"- Fingerprint: `{macro.get('fingerprint')}`",
+                f"- Status: {'pass' if macro.get('passed') else 'fail'}",
+            ]
+        )
+        for check in macro.get("checks", []):
+            lines.append(
+                f"- {check.get('id')}: {check.get('status')} — {check.get('reason')}"
+            )
+    if report.get("model_lifecycle"):
+        model = report["model_lifecycle"]
+        lines.extend(
+            [
+                "",
+                "## Model lifecycle",
+                "",
+                f"- Decision: {model.get('status')}",
+                f"- Reason: {model.get('reason')}",
+                f"- Candidate: {model.get('candidate_version') or 'none'}",
+                f"- Production: {model.get('production_version') or 'none'}",
+                f"- Dataset fingerprint: `{model.get('dataset_fingerprint')}`",
+                f"- Training skipped: {'yes' if model.get('training_skipped') else 'no'}",
+            ]
+        )
+        candidate_metrics = model.get("candidate_metrics") or {}
+        production_metrics = model.get("production_metrics") or {}
+        persistence_metrics = model.get("persistence_metrics") or {}
+        if candidate_metrics:
+            lines.append(
+                "- Candidate balanced accuracy / Brier: "
+                f"{candidate_metrics.get('balanced_accuracy')} / "
+                f"{candidate_metrics.get('brier')}"
+            )
+        if production_metrics:
+            lines.append(
+                "- Production balanced accuracy / Brier: "
+                f"{production_metrics.get('balanced_accuracy')} / "
+                f"{production_metrics.get('brier')}"
+            )
+        if persistence_metrics:
+            lines.append(
+                "- Persistence balanced accuracy: "
+                f"{persistence_metrics.get('balanced_accuracy')}"
+            )
     if report.get("notes"):
         lines.extend(["", "## Notes", ""])
         lines.extend(f"- {note}" for note in report["notes"])

@@ -14,7 +14,7 @@ from regime.schemas import (
     PatternsResponse,
     RegimeRunsResponse,
 )
-from regime.service import MacroRegimeService
+from regime.service import MacroRegimeService, ModelUnavailableError
 
 router = APIRouter(prefix="/regime", tags=["regime"])
 patterns_router = APIRouter(prefix="/patterns", tags=["patterns"])
@@ -123,15 +123,23 @@ def get_crypto_milestones() -> dict:
     response_model=ForecastResponse,
     summary="30-day forward probability of a Disruptive macro regime",
     description=(
-        "Trains/caches a lightweight logistic regression on the V2 Parquet "
-        "features fed_cross, curve_cross and sahm_alert. The target is a "
-        "Disruptive regime 30 calendar days after each observation. Returns "
-        "the current probability and risk percentage for the top HUD."
+        "Loads the production logistic regression from the active events "
+        "bundle. The target is the S&P 500 proxy lower 28 calendar days after "
+        "the current observation. Nothing is fitted at request time; no active "
+        "production model returns 503."
     ),
 )
 def get_regime_forecast() -> dict:
     try:
         return _service.forecast()
+    except ModelUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No production forecast model is active. Activate an events "
+                "bundle that contains models/model.joblib and model_card.json."
+            ),
+        ) from exc
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=503,

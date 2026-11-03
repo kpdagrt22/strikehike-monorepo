@@ -277,6 +277,8 @@ class ForecastResponse(BaseModel):
     as_of: str
     horizon_days: int
     model: str
+    model_version: str | None = None
+    target: str | None = None
     features: list[str]
     training: ForecastTraining
     current: ForecastCurrent
