@@ -105,6 +105,8 @@ export function MacroHUD({
   onShownToggle,
   valueMode = "roi",
   onValueModeChange,
+  cycleOn = true,
+  onCycleToggle,
   marketFlags = [],
 }) {
   const tone = coreIndexTone(point?.core_index_bucket, isDark);
@@ -313,6 +315,35 @@ export function MacroHUD({
                 );
               })}
             </div>
+
+            {/* Shows or hides the small cycle map in the hover card (the full
+                map below the chart stays). */}
+            <button
+              type="button"
+              onClick={onCycleToggle}
+              aria-pressed={cycleOn}
+              title="The 90-day cycle map in the hover card"
+              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-micro font-medium transition-colors ${
+                cycleOn
+                  ? "border-black/10 bg-black/[0.07] text-[#14121a] dark:border-white/10 dark:bg-white/[0.08] dark:text-[#f2ede4]"
+                  : "border-black/5 text-black/60 hover:bg-black/[0.04] hover:text-black/75 focus-visible:bg-black/[0.04] focus-visible:text-black/75 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/75 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/75"
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3 w-3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3.5" y="3.5" width="17" height="17" rx="2" />
+                <path d="M12 3.5v17M3.5 12h17" />
+              </svg>
+              Cycle map
+            </button>
           </div>
 
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 xl:justify-end">

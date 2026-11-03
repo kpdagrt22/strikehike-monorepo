@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -15,6 +23,8 @@ import {
   ChartCrosshairLegend,
 } from "@/components/regime/ChartCrosshairLegend";
 import { MacroHUD } from "@/components/regime/MacroHUD";
+import { cycleZoneLabel } from "@/components/regime/CycleMini";
+import { weeklyTrail } from "@/components/regime/cycleMap";
 import {
   ASSET_ORDER,
   ASSET_TARGETS,
@@ -54,6 +64,32 @@ import {
 } from "@/components/regime/regimeChart";
 
 // Keyboard slider steps over chart points: ±1 week, ±52 weeks (about a year).
+// Where each viewer's cycle-map switch is remembered.
+const CYCLE_KEY = "strikehike:regime:cycle-map";
+// Storage can be blocked: the switch then works for this visit only.
+let cycleChoice = null;
+const cycleListeners = new Set();
+function subscribeCycle(listener) {
+  cycleListeners.add(listener);
+  return () => cycleListeners.delete(listener);
+}
+function readCycle() {
+  if (cycleChoice != null) return cycleChoice;
+  try {
+    return localStorage.getItem(CYCLE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+function writeCycle(on) {
+  cycleChoice = on;
+  try {
+    localStorage.setItem(CYCLE_KEY, on ? "on" : "off");
+  } catch {
+    // Not remembered; the choice above still holds for this visit.
+  }
+  cycleListeners.forEach((listener) => listener());
+}
 const PAGE_STEP = 52;
 const FOCUS_RING_INSET =
   "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[var(--sh-focus,rgba(240,93,73,0.55))]";
@@ -1328,6 +1364,11 @@ export function RegimeTimeline({
   // "roi": every line indexed to its base week and read as the return since
   // then; "price": every line at its own weekly value. Both on the log scale.
   const [valueMode, setValueMode] = useState("roi");
+  // The small cycle map in the hover card, on by default; each viewer's
+  // choice is remembered in this browser. The server and the first client
+  // render both read "on", so hydration agrees.
+  const cycleOn = useSyncExternalStore(subscribeCycle, readCycle, () => true);
+  const toggleCycle = () => writeCycle(!cycleOn);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -1440,6 +1481,15 @@ export function RegimeTimeline({
     [selectedCrash, timeline],
   );
   const displayPoint = hoveredPoint ?? selectedPoint ?? latestPoint;
+
+  // The primary asset's 90-day cycle trail up to the week on show, from the
+  // weekly tape already loaded (no request while scrubbing).
+  const cycleTrail = useMemo(() => {
+    if (!displayPoint?.date) return [];
+    const index = lowerBoundByDate(timeline, displayPoint.date);
+    if (timeline[index]?.date !== displayPoint.date) return [];
+    return weeklyTrail(timeline, index, asset);
+  }, [timeline, displayPoint, asset]);
 
   // Compare mode keeps all four series on the chart and draws the checked
   // ones, so a checkbox never rebuilds the chart or moves the time scale.
@@ -1661,6 +1711,9 @@ export function RegimeTimeline({
         ),
         `Core Index ${formatSigned(displayPoint.core_index)}`,
         coreIndexTone(displayPoint.core_index_bucket, isDark).label,
+        cycleOn && cycleZoneLabel(cycleTrail)
+          ? `${asset.label} cycle: ${cycleZoneLabel(cycleTrail)}`
+          : null,
         // "Warning, decline class crash" (the card's "Decline class: crash"
         // without a second colon).
         displayFlag
@@ -2352,6 +2405,8 @@ export function RegimeTimeline({
           onShownToggle={handleShownToggle}
           valueMode={valueMode}
           onValueModeChange={setValueMode}
+          cycleOn={cycleOn}
+          onCycleToggle={toggleCycle}
           marketFlags={marketFlags}
         />
       </div>
@@ -2396,6 +2451,7 @@ export function RegimeTimeline({
           rightInset={equityScaleWidth + 28}
           valueChars={valueChars}
           marketFlags={marketFlags}
+          cycle={cycleOn ? { trail: cycleTrail, assetLabel: assetLabelAt(asset, displayPoint) } : null}
         />
 
         {hoveredMetric && tooltipPlace ? (

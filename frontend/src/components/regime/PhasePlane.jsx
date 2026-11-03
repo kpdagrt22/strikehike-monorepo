@@ -14,15 +14,19 @@ import {
   ASSET_TARGETS,
   getAssetTarget,
 } from "@/components/regime/assetTargets";
+import {
+  DRAWDOWN_THRESHOLD,
+  QUADRANTS,
+  TRACE_DAYS,
+  VOL_THRESHOLD,
+  cycleQuadrant,
+} from "@/components/regime/cycleMap";
 
 const WIDTH = 760;
 const HEIGHT = 420;
 const PAD = { top: 30, right: 30, bottom: 52, left: 58 };
 const PLOT_W = WIDTH - PAD.left - PAD.right;
 const PLOT_H = HEIGHT - PAD.top - PAD.bottom;
-const VOL_THRESHOLD = 50;
-const DRAWDOWN_THRESHOLD = -10;
-const TRACE_DAYS = 90;
 // Fetch a trace only once the pointer rests on a week, and keep recent traces
 // so scrubbing back and forth does not refetch them.
 const TRACE_DWELL_MS = 220;
@@ -60,33 +64,6 @@ function slimTrace(timeline) {
     return slim;
   });
 }
-
-const QUADRANTS = {
-  calm_bullish: {
-    label: "Complacency / Trim Risk",
-    detail: "low volatility · shallow",
-    fill: "#b45309",
-    fillDark: "#fbbf24",
-  },
-  volatile_bullish: {
-    label: "Euphoria / Distribution",
-    detail: "high volatility · shallow",
-    fill: "#c0442f",
-    fillDark: "#fb7185",
-  },
-  calm_bearish: {
-    label: "Despair / Base Building",
-    detail: "low volatility · deep",
-    fill: "#0f766e",
-    fillDark: "#5eead4",
-  },
-  volatile_bearish: {
-    label: "Panic / Accumulation Zone",
-    detail: "high volatility · deep",
-    fill: "#047857",
-    fillDark: "#34d399",
-  },
-};
 
 function Quadrant({ x, y, width, height, quadrant, isDark, strong }) {
   return (
@@ -253,17 +230,9 @@ export function PhasePlane({
     Number.isFinite(current.drawdown);
   const currentVol = hasPoint ? current.vol : Number.NaN;
   const currentDrawdown = hasPoint ? current.drawdown : Number.NaN;
-  const currentQuadrant =
-    !hasPoint
-      ? null
-      : currentVol >= VOL_THRESHOLD &&
-          currentDrawdown <= DRAWDOWN_THRESHOLD
-        ? "volatile_bearish"
-        : currentVol >= VOL_THRESHOLD
-          ? "volatile_bullish"
-          : currentDrawdown <= DRAWDOWN_THRESHOLD
-            ? "calm_bearish"
-            : "calm_bullish";
+  const currentQuadrant = hasPoint
+    ? cycleQuadrant(currentVol, currentDrawdown)
+    : null;
   const toneForIndex = coreIndexTone(
     current?.core_index_bucket ?? point?.core_index_bucket,
     isDark,
