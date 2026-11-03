@@ -38,10 +38,13 @@ import {
   coreIndexFlag,
   formatAssetValue,
   formatChartTick,
+  formatReturn,
   indexAxisLevels,
   marketFlagText,
   monotoneCurveAt,
   monotoneTangents,
+  priceAxisCaption,
+  priceAxisLevels,
   refineLevelOfDetail,
   selectLevelOfDetail,
   steadyBucketWidth,
@@ -83,6 +86,12 @@ const PRICE_AXIS_WIDTH = 64;
 const AXIS_LABEL_LIMIT = 10;
 const AXIS_LABEL_GAP = 60;
 const AXIS_LABEL_X = 8;
+// The axis caption ("ROI", "Index", "$/oz", "Price") is centred 9 px below
+// the plot's top; tick labels start 17 px under it, so they never touch it.
+const AXIS_CAPTION_Y = 9;
+const AXIS_LABEL_TOP = 26;
+// A line with no breaks (see createLevelOfDetailLinePrimitive).
+const NO_BREAKS = new Int32Array(0);
 const CHART_FONT = '"Onest", ui-sans-serif, system-ui, sans-serif';
 const CHART_FONT_SIZE = 11;
 // The time axis is 28 px tall with an 11 px font (measured; read again once
@@ -116,9 +125,12 @@ const PRICE_AREA_BOTTOM = 0.68;
 const FLAG_STRIP_PX = 2;
 const FLAG_STRIP_INSET_PX = 1;
 const FLAG_STRIP_GAP_PX = 2;
-// The snapshot card's height on a plain week from sm (it is display:none at
-// rest): what the card's drop under the stuck HUD allows for until measured.
-const CARD_REST_HEIGHT = 214;
+// The snapshot card's height on a plain week with one asset row, and what
+// each further row adds, measured from lg (the larger type; 205 and 23 px
+// from sm). It is display:none at rest: what the card's drop under the
+// stuck HUD allows for until measured.
+const CARD_REST_HEIGHT = 213;
+const CARD_ROW_HEIGHT = 24;
 // The flag strip's lanes for screen readers: each rule as the strip covers
 // it (the trend rule ran on the S&P 90 before the S&P 500 began).
 const MARKET_FLAG_SPOKEN = {
@@ -126,6 +138,18 @@ const MARKET_FLAG_SPOKEN = {
     "the S&P 500, the S&P 90 before March 1957, below its 40-week average",
   core_index_fast_warning: "down 7% or more in two weeks",
 };
+// The drawn assets as the chart's description names them.
+const ASSET_SPOKEN = {
+  sp500: "the S&P 500",
+  gold: "London gold",
+  bonds: "Treasury bonds",
+  nifty: "the Nifty 50",
+};
+
+function listInWords(items) {
+  if (items.length < 2) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
 
 function withAlpha(hex, alpha) {
   const value = Number.parseInt(String(hex).replace("#", ""), 16);
@@ -297,6 +321,80 @@ function buildChartSeries(timeline, target) {
     previousSource = source;
   }
   return output;
+}
+
+// A line in price mode: the asset's own weekly values, unindexed, on the
+// same weeks as its ROI line. The S&P series joins two indices at the end of
+// 1927 (the Cowles index, then the S&P 90 on its own base), so the line
+// breaks where the source changes rather than drawing a fall that never
+// happened.
+function buildPriceSeries(timeline, target) {
+  const points = [];
+  const breaks = [];
+  let previousSource = null;
+  for (const point of timeline) {
+    const value = Number(point[target.valueField]);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const source = point[target.sourceField] ?? null;
+    if (points.length > 0 && source !== previousSource) breaks.push(points.length);
+    points.push({ time: point.date, value });
+    previousSource = source;
+  }
+  return { points, breaks: Int32Array.from(breaks) };
+}
+
+// The built-in tick text is hidden (the axis primitive draws the labels),
+// but its width still sets the axis width: short text in both modes keeps
+// the axis at PRICE_AXIS_WIDTH.
+const ROI_TICK_FORMAT = (price) => `${(Number(price) - 100).toFixed(0)}%`;
+const PRICE_TICK_FORMAT = (price) =>
+  Number(price).toLocaleString("en-US", { maximumFractionDigits: Number(price) < 10 ? 2 : 0 });
+
+// Brings a built chart to what the page shows now, in place: each line's data
+// in this mode (ROI or price: the same weeks, so the visible range, the open
+// window and the crosshair stay as they are), which lines are drawn (hidden
+// ones leave the autoscale and draw nothing), the axis labels and caption,
+// and the series that carries the axis and the crosshair marks (the first
+// drawn one: every line shares the price scale). Only what changed is redone.
+function applyChartLines(parts, next) {
+  const { chart, series, lods, axis, marks } = parts;
+  const previous = parts.applied;
+  const keys = Object.keys(series);
+  if (previous?.lines !== next.lines) {
+    for (const key of keys) {
+      const line = next.lines[key];
+      series[key].setData(line?.points ?? []);
+      lods[key].setData(line?.points ?? [], line?.breaks ?? NO_BREAKS);
+    }
+  }
+  if (previous?.drawnKeys !== next.drawnKeys) {
+    for (const key of keys) {
+      const drawn = next.drawnKeys.includes(key);
+      series[key].applyOptions({ visible: drawn });
+      lods[key].setHidden(!drawn);
+    }
+    const host = series[next.drawnKeys.find((key) => series[key])] ?? null;
+    if (host && host !== parts.host) {
+      if (parts.host) {
+        parts.host.detachPrimitive(axis);
+        parts.host.detachPrimitive(marks);
+      }
+      host.attachPrimitive(axis);
+      host.attachPrimitive(marks);
+      parts.host = host;
+    }
+  }
+  if (previous?.valueMode !== next.valueMode || previous?.caption !== next.caption) {
+    axis.setMode(next.valueMode, next.caption);
+    if (previous?.valueMode !== next.valueMode) {
+      chart.applyOptions({
+        localization: {
+          priceFormatter: next.valueMode === "price" ? PRICE_TICK_FORMAT : ROI_TICK_FORMAT,
+        },
+      });
+    }
+  }
+  parts.applied = next;
 }
 
 function createRecessionBandsPrimitive(bands, initialSelectedId) {
@@ -551,12 +649,17 @@ function windowExtremes(points, windows) {
 // point per 2-3 px at rest, every week once weeks are 2 px or more apart (a
 // crash zoom). Points join as a monotone curve, which never overshoots a peak
 // or a trough. The hidden full-resolution series it is attached to keeps
-// driving the crosshair, the readouts and the autoscale.
-function createLevelOfDetailLinePrimitive(points, { color, lineWidth, glowColor, windows }) {
-  const levels = Float64Array.from(points, (point) => Math.log10(point.value));
-  const every = Int32Array.from(points, (_, index) => index);
-  // Each NBER window's trough and peak are always drawn, at any zoom.
-  const keep = windowExtremes(points, windows);
+// driving the crosshair, the readouts and the autoscale. setData swaps the
+// points in place (ROI or price, same weeks); `breaks` are the indices where
+// a new run starts, and the line is not joined across them. A hidden line
+// (an asset unchecked in compare mode) draws nothing and takes no mark.
+function createLevelOfDetailLinePrimitive({ color, lineWidth, windows }) {
+  let points = [];
+  let levels = new Float64Array(0);
+  let every = new Int32Array(0);
+  let keep = new Int32Array(0);
+  let runStarts = NO_BREAKS;
+  let hidden = false;
   const selections = new Map();
   let positions = null;
   let path = null;
@@ -565,11 +668,21 @@ function createLevelOfDetailLinePrimitive(points, { color, lineWidth, glowColor,
   let width = 0;
   let tolerance = 0;
 
+  const forget = () => {
+    selections.clear();
+    positions = null;
+    path = null;
+    pathKey = "";
+  };
+
+  // The run (0, 1, …) that point `index` belongs to.
+  const runOf = (index) => lowerBoundSorted(runStarts, index + 1);
+
   // Recomputed only when the visible range, the pane size or the price scale
   // changes (at most once per chart frame), never on a pointer move.
   const ensurePath = (mediaSize) => {
     const { chart, series } = primitive;
-    if (!chart || !series || points.length === 0) return null;
+    if (!chart || !series || hidden || points.length === 0) return null;
     const timeScale = chart.timeScale();
     const range = timeScale.getVisibleLogicalRange();
     const y100 = series.priceToCoordinate(100);
@@ -608,11 +721,21 @@ function createLevelOfDetailLinePrimitive(points, { color, lineWidth, glowColor,
       range.from - width,
       range.to + width,
     );
-    path = curveThrough(
-      end - start + 1,
-      (k) => toX(positions[selection[start + k]]),
-      (k) => series.priceToCoordinate(points[selection[start + k]].value),
-    );
+    // One curve per run in view (a single one unless the line has breaks).
+    path = [];
+    let first = start;
+    for (let k = start + 1; k <= end + 1; k += 1) {
+      if (k <= end && runOf(selection[k]) === runOf(selection[k - 1])) continue;
+      const from = first;
+      path.push(
+        curveThrough(
+          k - from,
+          (j) => toX(positions[selection[from + j]]),
+          (j) => series.priceToCoordinate(points[selection[from + j]].value),
+        ),
+      );
+      first = k;
+    }
     pathKey = key;
     return path;
   };
@@ -625,8 +748,7 @@ function createLevelOfDetailLinePrimitive(points, { color, lineWidth, glowColor,
         context.save();
         context.lineJoin = "round";
         context.lineCap = "round";
-        if (glowColor) strokeCurve(context, current, glowColor, 5);
-        strokeCurve(context, current, color, lineWidth);
+        for (const curve of current) strokeCurve(context, curve, color, lineWidth);
         context.restore();
       });
     },
@@ -647,11 +769,34 @@ function createLevelOfDetailLinePrimitive(points, { color, lineWidth, glowColor,
     paneViews() {
       return views;
     },
+    setData(nextPoints, breaks = NO_BREAKS) {
+      points = nextPoints;
+      levels = Float64Array.from(points, (point) => Math.log10(point.value));
+      every = Int32Array.from(points, (_, index) => index);
+      runStarts = breaks;
+      // Each NBER window's trough and peak are always drawn, at any zoom, and
+      // so are both ends of every run.
+      const picks = new Set(windowExtremes(points, windows));
+      for (const index of breaks) {
+        picks.add(index - 1);
+        picks.add(index);
+      }
+      keep = Int32Array.from(picks).sort();
+      forget();
+    },
+    setHidden(value) {
+      if (value === hidden) return;
+      hidden = value;
+      forget();
+    },
     // The drawn line's y at x (CSS px), so the crosshair mark sits on it.
     yAt(x) {
-      return path
-        ? monotoneCurveAt(path.xs, path.ys, path.tangents, path.count, x)
-        : null;
+      if (hidden || !path) return null;
+      for (const curve of path) {
+        const y = monotoneCurveAt(curve.xs, curve.ys, curve.tangents, curve.count, x);
+        if (y != null) return y;
+      }
+      return null;
     },
   };
   return primitive;
@@ -931,19 +1076,37 @@ function axisRow(y, pixelRatio) {
   return { top, thickness, centre: top + thickness / 2 };
 }
 
-// Exact round labels for the log-scaled price axis (change since the base
-// week: 0%, +100%, +300% …), each drawn at its own value, with faint
-// gridlines at the same rows. The built-in tick labels are hidden. Labels are
-// drawn here rather than as axis views so each one's ink box is centred on
-// its gridline's device-pixel row (an axis view's box puts the text 1-2 px
-// low). Where the ink box and the row cannot share a centre (an even ink
-// height on a one-pixel row at 1x), the label sits half a pixel high.
-// `base` (an index level, or null for the chart's own base week) moves 0% to
-// another week for the labels only: an open NBER window reads as change since
-// its first week. The lines and the data do not move.
+// Exact round labels for the log-scaled price axis, each drawn at its own
+// value, with faint gridlines at the same rows: in ROI mode the change since
+// the base week (0%, +100%, +300% …), in price mode round prices (1,000,
+// 2,000, 5,000 …). The built-in tick labels are hidden. Labels are drawn here
+// rather than as axis views so each one's ink box is centred on its
+// gridline's device-pixel row (an axis view's box puts the text 1-2 px low).
+// Where the ink box and the row cannot share a centre (an even ink height on
+// a one-pixel row at 1x), the label sits half a pixel high. A caption at the
+// top of the axis names what the labels are ("ROI", "Index", "$/oz",
+// "Price"); the labels keep clear of it. `base` (an index level, or null for
+// the chart's own base week) moves 0% to another week for the ROI labels
+// only: an open NBER window reads as change since its first week. The lines
+// and the data do not move.
 function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = null }) {
   let labels = [];
   let labelsKey = "";
+  const captionRenderer = (context, horizontalPixelRatio, verticalPixelRatio) => {
+    if (!primitive.caption) return;
+    context.font = `${fontWeight + 100} ${CHART_FONT_SIZE * verticalPixelRatio}px ${CHART_FONT}`;
+    const row = axisRow(AXIS_CAPTION_Y, verticalPixelRatio);
+    const ink = context.measureText(primitive.caption);
+    const baseline = Math.floor(
+      row.centre +
+        ((ink.actualBoundingBoxAscent || 0) - (ink.actualBoundingBoxDescent || 0)) / 2,
+    );
+    context.fillText(
+      primitive.caption,
+      Math.round(AXIS_LABEL_X * horizontalPixelRatio),
+      baseline,
+    );
+  };
   const gridRenderer = {
     draw: (target) => {
       target.useBitmapCoordinateSpace(({ context, bitmapSize, verticalPixelRatio }) => {
@@ -976,6 +1139,7 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = nul
               baseline,
             );
           }
+          captionRenderer(context, horizontalPixelRatio, verticalPixelRatio);
         },
       );
     },
@@ -986,6 +1150,9 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = nul
     chart: null,
     series: null,
     base: base > 0 ? base : null,
+    // "roi" or "price", and the caption over the labels.
+    mode: "roi",
+    caption: "",
     requestUpdate: null,
     attached({ chart, series, requestUpdate }) {
       primitive.chart = chart;
@@ -1006,27 +1173,41 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = nul
       labelsKey = "";
       primitive.requestUpdate?.();
     },
+    setMode(mode, caption) {
+      if (mode === primitive.mode && caption === primitive.caption) return;
+      primitive.mode = mode;
+      primitive.caption = caption;
+      labelsKey = "";
+      primitive.requestUpdate?.();
+    },
     // Runs after the price scale is recalculated and before the axis and the
     // pane are painted, so labels and gridlines move together with the line.
     updateAllViews() {
       const { chart, series } = primitive;
       if (!chart || !series) return;
       const height = chart.paneSize(0)?.height ?? 0;
-      // Labels stay within the price area, above the Core Index ribbon (the
-      // axis cell fades out beside it).
-      const top = 12;
+      // Labels stay below the caption and within the price area, above the
+      // Core Index ribbon (the axis cell fades out beside it).
+      const top = AXIS_LABEL_TOP;
       const bottom = height * PRICE_AREA_BOTTOM - 2;
       const high = series.coordinateToPrice(top);
       const low = series.coordinateToPrice(bottom);
-      // Levels are counted from the label base: 100 there is 0%.
-      const scale = primitive.base ? 100 / primitive.base : 1;
-      const key = `${height}|${high}|${low}|${scale}`;
+      // ROI levels are counted from the label base: 100 there is 0%. Prices
+      // are absolute.
+      const price = primitive.mode === "price";
+      const scale = !price && primitive.base ? 100 / primitive.base : 1;
+      // No levels over a stretch where no drawn line has data (compared
+      // assets without the S&P, panned before 1960): the scale keeps its last
+      // range there. The host is the earliest-starting drawn line.
+      const range = chart.timeScale().getVisibleLogicalRange();
+      const inView = range ? series.barsInLogicalRange(range)?.from != null : false;
+      const key = `${height}|${high}|${low}|${scale}|${primitive.mode}|${inView}`;
       if (key === labelsKey) return;
       labelsKey = key;
       labels =
-        high == null || low == null || bottom <= top
+        high == null || low == null || bottom <= top || !inView
           ? []
-          : indexAxisLevels(
+          : (price ? priceAxisLevels : indexAxisLevels)(
               Number(low) * scale,
               Number(high) * scale,
               (level) => series.priceToCoordinate(level / scale),
@@ -1114,6 +1295,8 @@ export function RegimeTimeline({
   const onHoverPointRef = useRef(onHoverPoint);
   const chartRef = useRef(null);
   const lineSeriesRef = useRef({});
+  // The built chart's lines, axis and marks, for applyChartLines.
+  const chartPartsRef = useRef(null);
   const primitiveRef = useRef(null);
   const marksRef = useRef(null);
   const axisRef = useRef(null);
@@ -1138,6 +1321,13 @@ export function RegimeTimeline({
     viewBaseRef.current = next;
     setViewBaseState(next);
   }, []);
+  // The assets drawn in compare mode, in ASSET_ORDER: all four whenever
+  // compare turns on, then as the checkboxes leave them (kept here, not on
+  // the page, for as long as it is open). Never empty.
+  const [shownAssets, setShownAssets] = useState(ASSET_ORDER);
+  // "roi": every line indexed to its base week and read as the return since
+  // then; "price": every line at its own weekly value. Both on the log scale.
+  const [valueMode, setValueMode] = useState("roi");
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -1207,7 +1397,9 @@ export function RegimeTimeline({
           ? hud.getBoundingClientRect().bottom - box.getBoundingClientRect().top
           : 0;
       const card = box.querySelector("[data-regime-card]");
-      const cardHeight = card?.offsetHeight || CARD_REST_HEIGHT;
+      const rows = Number(card?.dataset.rows) || 1;
+      const cardHeight =
+        card?.offsetHeight || CARD_REST_HEIGHT + (rows - 1) * CARD_ROW_HEIGHT;
       const room =
         (box.clientHeight - TIME_AXIS_HEIGHT) * PRICE_AREA_BOTTOM - cardHeight - 24;
       const drop = Math.round(Math.max(0, Math.min(covered, room)));
@@ -1249,9 +1441,15 @@ export function RegimeTimeline({
   );
   const displayPoint = hoveredPoint ?? selectedPoint ?? latestPoint;
 
+  // Compare mode keeps all four series on the chart and draws the checked
+  // ones, so a checkbox never rebuilds the chart or moves the time scale.
   const seriesKeys = useMemo(
     () => (compareAssets ? ASSET_ORDER : [assetKey]),
     [compareAssets, assetKey],
+  );
+  const drawnKeys = useMemo(
+    () => (compareAssets ? shownAssets : [assetKey]),
+    [compareAssets, shownAssets, assetKey],
   );
 
   const bands = useMemo(
@@ -1325,6 +1523,31 @@ export function RegimeTimeline({
     return output;
   }, [timeline, seriesKeys, baseDate]);
 
+  const priceData = useMemo(() => {
+    const output = {};
+    for (const key of seriesKeys) {
+      output[key] = buildPriceSeries(timeline, ASSET_TARGETS[key] ?? ASSET_TARGETS.sp500);
+    }
+    return output;
+  }, [timeline, seriesKeys]);
+
+  // What each series draws in the current mode.
+  const lines = useMemo(() => {
+    const output = {};
+    for (const key of seriesKeys) {
+      output[key] =
+        valueMode === "price"
+          ? priceData[key]
+          : { points: seriesData[key] ?? [], breaks: NO_BREAKS };
+    }
+    return output;
+  }, [valueMode, priceData, seriesData, seriesKeys]);
+
+  // The axis caption: ROI, or the unit the ticks are in (compared assets each
+  // keep their own unit on the one log axis, so it reads "Price").
+  const axisCaption =
+    valueMode === "roi" ? "ROI" : compareAssets ? "Price" : priceAxisCaption(asset);
+
   // While an NBER window is open on a single asset, the axis labels read as
   // change since the window's first week (0% there), so a deep-history window
   // reads 0% … −86% rather than −99.x% against the resting base. With no
@@ -1345,14 +1568,14 @@ export function RegimeTimeline({
   const zeroDate = labelBase?.date ?? baseDate;
 
   // The keyboard slider walks the dates drawn on the chart (the union of the
-  // visible series), so every step lands where the crosshair can go.
+  // drawn series), so every step lands where the crosshair can go.
   const navTimes = useMemo(() => {
     const times = new Set();
-    for (const key of seriesKeys) {
+    for (const key of drawnKeys) {
       for (const item of seriesData[key] ?? []) times.add(item.time);
     }
     return Array.from(times).sort();
-  }, [seriesData, seriesKeys]);
+  }, [seriesData, drawnKeys]);
 
   const navIndex = useMemo(() => {
     if (navTimes.length === 0) return 0;
@@ -1363,35 +1586,79 @@ export function RegimeTimeline({
     );
   }, [navTimes, displayPoint]);
 
-  // The snapshot card pads the asset readout to the widest value in the
-  // archive, so the card's figures keep one width while scrubbing. Prices are
+  // The snapshot card pads its figures to the widest value any drawn line
+  // can show in this mode, so they keep one width while scrubbing. Prices are
   // positive: the widest is the largest value, or the largest of those below
-  // 100, which carry two decimals on the S&P series (formatAssetValue).
-  const assetValueChars = useMemo(() => {
-    let largest = null;
-    let largestBelow100 = null;
-    for (const point of timeline) {
-      const value = Number(point[asset.valueField]);
-      if (!Number.isFinite(value)) continue;
-      if (largest == null || value > largest) largest = value;
-      if (value < 100 && (largestBelow100 == null || value > largestBelow100)) {
-        largestBelow100 = value;
+  // 100, which carry two decimals on the S&P series (formatAssetValue). A
+  // return is widest at the line's extremes: against the shared base week
+  // when assets are compared, against any week (an open window or a week in
+  // view can be the base) for one asset.
+  const valueChars = useMemo(() => {
+    let chars = 0;
+    for (const key of drawnKeys) {
+      const target = getAssetTarget(key);
+      if (valueMode === "price") {
+        let largest = null;
+        let largestBelow100 = null;
+        for (const item of priceData[key]?.points ?? []) {
+          if (largest == null || item.value > largest) largest = item.value;
+          if (item.value < 100 && (largestBelow100 == null || item.value > largestBelow100)) {
+            largestBelow100 = item.value;
+          }
+        }
+        for (const value of [largest, largestBelow100]) {
+          if (value != null) chars = Math.max(chars, formatAssetValue(target, value).length);
+        }
+        continue;
+      }
+      let low = Infinity;
+      let high = -Infinity;
+      for (const item of seriesData[key] ?? []) {
+        low = Math.min(low, item.value);
+        high = Math.max(high, item.value);
+      }
+      if (!(low > 0)) continue;
+      const bases = compareAssets ? [100] : [low, high];
+      for (const base of bases) {
+        for (const value of [low, high]) {
+          chars = Math.max(chars, formatReturn(value / base - 1).length);
+        }
       }
     }
-    return Math.max(
-      largest == null ? 0 : formatAssetValue(asset, largest).length,
-      largestBelow100 == null ? 0 : formatAssetValue(asset, largestBelow100).length,
-    );
-  }, [timeline, asset]);
+    return chars;
+  }, [drawnKeys, valueMode, priceData, seriesData, compareAssets]);
+
+  // Each drawn asset's value at the week shown, in this mode: the return
+  // since the axis's base week (labelBase, else the shared base week, where
+  // every line is 100), or its own price. The snapshot card and the slider
+  // read these.
+  const assetReadouts = drawnKeys.map((key) => {
+    const target = getAssetTarget(key);
+    let value = "—";
+    if (displayPoint && valueMode === "price") {
+      value = formatAssetValue(target, displayPoint[target.valueField]);
+    } else if (displayPoint) {
+      const items = seriesData[key] ?? [];
+      const item = items[lowerBoundByTime(items, displayPoint.date)];
+      if (item?.time === displayPoint.date) {
+        value = formatReturn(item.value / (labelBase?.value ?? 100) - 1);
+      }
+    }
+    return {
+      key,
+      label: assetLabelAt(target, displayPoint),
+      value,
+      color: assetChartColor(target, isDark),
+    };
+  });
 
   const displayFlag = coreIndexFlag(displayPoint);
   const sliderValueText = displayPoint
     ? [
         formatDate(displayPoint.date),
-        `${assetLabelAt(asset, displayPoint)} ${formatAssetValue(
-          asset,
-          displayPoint[asset.valueField],
-        )}`,
+        ...assetReadouts.map(({ label, value }) =>
+          valueMode === "roi" ? `${label} ROI ${value}` : `${label} ${value}`,
+        ),
         `Core Index ${formatSigned(displayPoint.core_index)}`,
         coreIndexTone(displayPoint.core_index_bucket, isDark).label,
         // "Warning, decline class crash" (the card's "Decline class: crash"
@@ -1415,12 +1682,34 @@ export function RegimeTimeline({
         .join(" · ")
     : "Awaiting market archive";
 
+  // Compare on: all four lines again. Compare off: the single view shows the
+  // page's asset if it was drawn, else the first drawn one (both updates land
+  // in one render, so the chart is rebuilt once).
+  const handleCompareToggle = () => {
+    if (compareAssets) {
+      if (!shownAssets.includes(assetKey)) onAssetChange?.(shownAssets[0]);
+    } else {
+      setShownAssets(ASSET_ORDER);
+    }
+    onCompareToggle?.();
+  };
+
+  // A checkbox: draws or hides one line. The last line drawn stays.
+  const handleShownToggle = (key) => {
+    setShownAssets((current) => {
+      const next = ASSET_ORDER.filter(
+        (item) => (item === key) !== current.includes(item),
+      );
+      return next.length > 0 ? next : current;
+    });
+  };
+
   const drawCrosshairAt = (time) => {
     const chart = chartRef.current;
     if (!chart || !time) return;
     const place = () => {
-      for (const key of [assetKey, ...seriesKeys]) {
-        const items = seriesData[key] ?? [];
+      for (const key of drawnKeys) {
+        const items = lines[key]?.points ?? [];
         const item = items[lowerBoundByTime(items, time)];
         const series = lineSeriesRef.current[key];
         if (series && item?.time === time) {
@@ -1587,6 +1876,15 @@ export function RegimeTimeline({
     onHoverPointRef.current?.(null);
   });
 
+  // What the lines show now, read when the chart is built; a later mode
+  // switch or checkbox is applied in place (see the effect after the build).
+  const chartLinesNow = useEffectEvent(() => ({
+    lines,
+    drawnKeys,
+    valueMode,
+    caption: axisCaption,
+  }));
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container || timeline.length === 0) return undefined;
@@ -1608,8 +1906,7 @@ export function RegimeTimeline({
         horzLines: { visible: false },
       },
       localization: {
-        priceFormatter: (price) =>
-          `${(Number(price) - 100).toFixed(0)}%`,
+        priceFormatter: ROI_TICK_FORMAT,
         // Any date the chart formats reads like every other ("05 Sep 2008").
         timeFormatter: (time) => formatDate(chartTimeToIso(time)),
       },
@@ -1665,17 +1962,20 @@ export function RegimeTimeline({
     });
     chartRef.current = chart;
     const lineSeries = {};
+    const lods = {};
     const drawnLines = [];
 
     for (const key of seriesKeys) {
       const target = ASSET_TARGETS[key] ?? ASSET_TARGETS.sp500;
       const color = assetChartColor(target, isDark);
-      const selected = key === assetKey;
-      const lineWidth = compareAssets ? (selected ? 2.4 : 1.7) : 2.2;
+      // Compared lines share one width: the checkboxes choose what is drawn,
+      // and no line stands above the others.
+      const lineWidth = compareAssets ? 2 : 2.2;
 
       // The full weekly series stays on the chart but is not drawn: it drives
       // the crosshair, the readouts, the keyboard slider and the autoscale,
-      // so every number shown is a true weekly value.
+      // so every number shown is a true weekly value. Its data and its
+      // visibility come from applyChartLines below.
       const line = chart.addSeries(LineSeries, {
         color,
         lineWidth,
@@ -1688,18 +1988,16 @@ export function RegimeTimeline({
         // would only repaint the main layer while scrubbing.
         hitTestTolerance: -1,
       });
-      line.setData(seriesData[key] ?? []);
-      // What is drawn is the level-of-detail line. A soft underlay marks the
-      // primary line only when several are drawn.
-      const drawn = createLevelOfDetailLinePrimitive(seriesData[key] ?? [], {
+      // What is drawn is the level-of-detail line.
+      const drawn = createLevelOfDetailLinePrimitive({
         color,
         lineWidth,
-        glowColor: selected && compareAssets ? withAlpha(color, 0.12) : null,
         windows: crashes,
       });
       line.attachPrimitive(drawn);
       drawnLines.push({ primitive: drawn, color });
       lineSeries[key] = line;
+      lods[key] = drawn;
     }
     lineSeriesRef.current = lineSeries;
 
@@ -1794,7 +2092,6 @@ export function RegimeTimeline({
       fontWeight: isDark ? 400 : 500,
       base: labelBaseRef.current,
     });
-    lineSeries[assetKey]?.attachPrimitive(axisPrimitive);
     axisRef.current = axisPrimitive;
     const marks = createCrosshairMarksPrimitive({
       lines: drawnLines,
@@ -1802,10 +2099,21 @@ export function RegimeTimeline({
       weeks: new Map(coreIndexData.map((point) => [point.time, point])),
       ringColor: isDark ? "#08080c" : "#f6f1e9",
     });
-    // On a series, so its top-layer view repaints with the crosshair (pane
-    // primitives are painted only with the main layer).
-    lineSeries[assetKey]?.attachPrimitive(marks);
     marksRef.current = marks;
+    // The axis and the marks go on the first drawn series: the marks on a
+    // series so their top-layer view repaints with the crosshair (pane
+    // primitives are painted only with the main layer).
+    const parts = {
+      chart,
+      series: lineSeries,
+      lods,
+      axis: axisPrimitive,
+      marks,
+      host: null,
+      applied: null,
+    };
+    applyChartLines(parts, chartLinesNow());
+    chartPartsRef.current = parts;
 
     const pointsByTime = new Map(
       timeline.map((point) => [point.date, point]),
@@ -1874,6 +2182,7 @@ export function RegimeTimeline({
       }
       if (chartRef.current === chart) chartRef.current = null;
       if (lineSeriesRef.current === lineSeries) lineSeriesRef.current = {};
+      if (chartPartsRef.current === parts) chartPartsRef.current = null;
       chart.remove();
     };
   }, [
@@ -1893,6 +2202,15 @@ export function RegimeTimeline({
     tone.axisStrong,
     tone.axisText,
   ]);
+
+  // A mode switch or a checkbox changes the built chart in place: no
+  // rebuild, so the visible range, the open window and the crosshair stay.
+  // After a rebuild this finds everything already applied.
+  useEffect(() => {
+    const parts = chartPartsRef.current;
+    if (!parts) return;
+    applyChartLines(parts, { lines, drawnKeys, valueMode, caption: axisCaption });
+  }, [lines, drawnKeys, valueMode, axisCaption]);
 
   useEffect(() => {
     const primitive = primitiveRef.current;
@@ -1977,15 +2295,25 @@ export function RegimeTimeline({
         Unified Core Index macro and multi-asset regime chart
       </h2>
       <p className="sr-only">
-        One percentage-scaled chart of the S&amp;P 500, London gold, Treasury
-        bonds and Nifty 50 with NBER recession shading; 0% is the week of{" "}
-        {formatDate(zeroDate)}
-        {labelBase?.kind === "window"
-          ? ", the open window's first week"
-          : labelBase?.kind === "view"
-            ? ", a week in view (in deep history the axis counts from the view)"
-            : ""}
-        . A colour-coded Core Index ribbon from -50 to +50 sits in the lower
+        {`One log-scaled chart of ${listInWords(
+          drawnKeys.map((key) => ASSET_SPOKEN[key] ?? getAssetTarget(key).label),
+        )} with NBER recession shading, `}
+        {valueMode === "roi"
+          ? `read as ROI: ${drawnKeys.length > 1 ? "each line's" : "its"} return since the week of ${formatDate(zeroDate)}${
+              labelBase?.kind === "window"
+                ? ", the open window's first week"
+                : labelBase?.kind === "view"
+                  ? ", a week in view (in deep history the axis counts from the view)"
+                  : ""
+            }, where it reads 0%.`
+          : `${drawnKeys.length > 1 ? "each line at its own" : "at its"} weekly price (${
+              !drawnKeys.includes("gold")
+                ? "index points"
+                : drawnKeys.length === 1
+                  ? "US dollars per troy ounce"
+                  : "index points; gold in US dollars per troy ounce"
+            }).`}{" "}
+        A colour-coded Core Index ribbon from -50 to +50 sits in the lower
         quarter of the same chart.
         {marketFlags.length
           ? ` A thin strip at its foot marks${
@@ -2019,7 +2347,11 @@ export function RegimeTimeline({
           assetKey={asset.key}
           onAssetChange={onAssetChange}
           compareAssets={compareAssets}
-          onCompareToggle={onCompareToggle}
+          onCompareToggle={handleCompareToggle}
+          shownAssets={shownAssets}
+          onShownToggle={handleShownToggle}
+          valueMode={valueMode}
+          onValueModeChange={setValueMode}
           marketFlags={marketFlags}
         />
       </div>
@@ -2055,13 +2387,14 @@ export function RegimeTimeline({
 
         <ChartCrosshairLegend
           point={displayPoint}
-          asset={asset}
+          rows={assetReadouts}
+          caption={valueMode === "roi" ? `ROI from ${formatDate(zeroDate)}` : "Price"}
           isDark={isDark}
           active={crosshairActive}
           side={legendSide}
           room={chartWidth}
           rightInset={equityScaleWidth + 28}
-          valueChars={assetValueChars}
+          valueChars={valueChars}
           marketFlags={marketFlags}
         />
 
@@ -2149,9 +2482,23 @@ export function RegimeTimeline({
             <span>
               {formatDate(coverage?.start)} → {formatDate(coverage?.end)} ·{" "}
               {crashes?.length ?? 0} NBER windows ·{" "}
-              {resolution ? `${resolution} tape` : "macro tape"} · 0% at{" "}
-              {/* Monospaced, so a new base date never changes its width. */}
-              <span className="font-mono tabular-nums">{formatDate(zeroDate)}</span>
+              {resolution ? `${resolution} tape` : "macro tape"} ·{" "}
+              {/* Both readings share one box (the wider one's), so switching
+                  modes never re-wraps the footer; the date is monospaced, so
+                  a new base date never changes its width. */}
+              <span className="inline-grid">
+                <span
+                  className={`col-start-1 row-start-1 ${valueMode === "roi" ? "" : "invisible"}`}
+                >
+                  ROI from{" "}
+                  <span className="font-mono tabular-nums">{formatDate(zeroDate)}</span>
+                </span>
+                <span
+                  className={`col-start-1 row-start-1 ${valueMode === "price" ? "" : "invisible"}`}
+                >
+                  log price scale
+                </span>
+              </span>
             </span>
             <span className="hidden text-black/20 dark:text-white/20 sm:inline">
               /
