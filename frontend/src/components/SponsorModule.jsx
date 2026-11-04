@@ -7,6 +7,8 @@ import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
 
+const PAYPAL_URL = "https://paypal.me/kpdagrt22";
+
 export function SponsorModule() {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
@@ -135,6 +137,23 @@ export function SponsorModule() {
               <p className="mt-1 break-all font-mono text-[12px] tracking-[0.02em] text-black/60 dark:text-white/60">
                 UPI ID: thisiskp22@axl
               </p>
+            </div>
+
+            {/* UPI is for India; an Indian PayPal account only receives from abroad. */}
+            <div className="mt-3 border-t border-black/10 pt-3 text-center dark:border-white/10">
+              <p className="text-[12px] text-black/60 dark:text-white/60">
+                Outside India?
+              </p>
+              <a
+                href={PAYPAL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-black/10 px-4 text-[13px] font-medium tracking-[-0.01em] text-[#14121a] transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] lg:min-h-9 dark:border-white/10 dark:text-[#f2ede4] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+              >
+                Buy me a drink · PayPal
+                <span aria-hidden="true">↗</span>
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
             </div>
           </motion.section>
         ) : null}
