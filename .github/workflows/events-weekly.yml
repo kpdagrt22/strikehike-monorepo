@@ -401,3 +401,31 @@ jobs:
               rollback_and_fail
             fi
             echo "Activated events bundle $VERSION."
+
+            # The Next proxy checks the active bundle version at most once a
+            # minute; wait for that window, then warm the atlas and /regime so
+            # the first visitor does not pay for the cold rebuild.
+            sleep 65
+            MARKER="NBER recession windows from FRED"
+            BASE_URL="https://strikehike.com"
+            CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
+
+            "${CURL[@]}" \
+              "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
+              > /dev/null
+
+            regime_page="$(mktemp)"
+            for attempt in $(seq 1 30); do
+              if "${CURL[@]}" "$BASE_URL/regime" -o "$regime_page" \
+                && grep -qF "$MARKER" "$regime_page"; then
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "::error::/regime did not warm with the NBER table."
+                rm -f "$regime_page"
+                exit 1
+              fi
+              sleep 3
+            done
+            rm -f "$regime_page"
+            echo "Warmed the weekly atlas and /regime."

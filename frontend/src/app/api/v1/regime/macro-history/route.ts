@@ -11,7 +11,7 @@ const BACKEND_URL = (
 ).replace(/\/+$/, "");
 const BACKEND_TIMEOUT_MS = 15_000;
 const CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600";
-const CACHE_POLICY = { ttlMs: 15 * 60_000, maxStaleMs: 60 * 60_000 };
+const CACHE_POLICY = { ttlMs: 15 * 60_000, maxStaleMs: 24 * 60 * 60_000 };
 const UNAVAILABLE = { error: "Macro regime service is unavailable." };
 // The longest daily window any view asks for is CrashDetailPanel's 1873-04-01
 // to 1879-03-31 span around the 65-month NBER recession: 2,190 days. 1.25x
