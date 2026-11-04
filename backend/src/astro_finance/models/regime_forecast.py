@@ -30,6 +30,7 @@ RANDOM_SEED = 42
 FIRST_TEST_YEAR = 2000
 MIN_TRAIN_ROWS = 250
 MIN_TEST_ROWS = 20
+MIN_BALANCED_ACCURACY = 0.52
 CORE_SEGMENT = "core_index_bucket"
 DEFAULT_CONFIG = {
     "features": list(FEATURE_COLUMNS),
@@ -207,6 +208,7 @@ def walk_forward(data: pd.DataFrame) -> WalkForwardResult:
     all_y: list[int] = []
     all_probability: list[float] = []
     all_persistence: list[float] = []
+    all_historical_average: list[float] = []
     all_frames: list[pd.DataFrame] = []
     folds: list[dict[str, Any]] = []
 
@@ -231,6 +233,7 @@ def walk_forward(data: pd.DataFrame) -> WalkForwardResult:
         probability = model.predict_proba(x_test)[:, 1]
         majority = int(y_train.mean() >= 0.5)
         persistence = test["persistence"].fillna(majority).astype(int)
+        historical_average_probability = float(y_train.mean())
         fold_metrics = _metrics(y_test.to_numpy(), probability)
         folds.append(
             {
@@ -247,6 +250,9 @@ def walk_forward(data: pd.DataFrame) -> WalkForwardResult:
         all_y.extend(y_test.astype(int).tolist())
         all_probability.extend(float(value) for value in probability)
         all_persistence.extend(persistence.tolist())
+        all_historical_average.extend(
+            [historical_average_probability] * len(test)
+        )
         all_frames.append(test.copy())
 
     if not all_y:
@@ -256,10 +262,14 @@ def walk_forward(data: pd.DataFrame) -> WalkForwardResult:
     persistence = np.asarray(all_persistence, dtype=float)
     segment_frame = pd.concat(all_frames)
     majority_probability = np.full_like(probability, float(y.mean() >= 0.5))
+    historical_average_probability = np.asarray(
+        all_historical_average, dtype=float
+    )
     overall = _metrics(y, probability)
     baselines = {
         "majority": _metrics(y, majority_probability),
         "persistence": _metrics(y, persistence),
+        "historical_average": _metrics(y, historical_average_probability),
     }
     return WalkForwardResult(
         overall=overall,

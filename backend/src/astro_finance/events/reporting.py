@@ -99,6 +99,7 @@ def quality_report_markdown(report: Mapping[str, Any]) -> str:
             f"- Records extracted: {summary.get('events_discovered', 0)}",
             f"- Events added or updated: {summary.get('events_updated', 0)}",
             f"- Records rejected: {summary.get('events_rejected', 0)}",
+            f"- Events retired with removed sources: {summary.get('events_retired', 0)}",
             f"- Duplicates removed: {summary.get('duplicates_removed', 0)}",
             f"- Events in bundle: {summary.get('events_total', 0)} "
             f"({summary.get('historical_total', 0)} historical, "
@@ -186,6 +187,12 @@ def quality_report_markdown(report: Mapping[str, Any]) -> str:
             lines.append(
                 "- Persistence balanced accuracy: "
                 f"{persistence_metrics.get('balanced_accuracy')}"
+            )
+        historical_average_metrics = model.get("historical_average_metrics") or {}
+        if historical_average_metrics:
+            lines.append(
+                "- Historical-average Brier: "
+                f"{historical_average_metrics.get('brier')}"
             )
     if report.get("notes"):
         lines.extend(["", "## Notes", ""])
