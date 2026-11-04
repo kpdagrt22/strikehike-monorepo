@@ -481,7 +481,7 @@ export function PhasePlane({
       <div className="grid grid-cols-2 gap-2 border-t border-black/5 px-4 py-3 dark:border-white/5 sm:grid-cols-3">
         <div>
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
-            At cursor
+            Selected week
           </p>
           {/* Two lines kept below sm, where the longest zone name wraps. */}
           <p

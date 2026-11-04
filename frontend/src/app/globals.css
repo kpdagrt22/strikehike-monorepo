@@ -312,6 +312,22 @@
   border-radius: 9999px;
 }
 
+/* Sky activity fire (GaugeAura.jsx): a particle fire on a canvas from 85.
+   The canvas holds its last frame after a ~3 s burst, so nothing runs at
+   rest; the container only fades in. */
+.sh-aura {
+  animation: sh-aura-in 320ms var(--sh-ease-out) both;
+}
+
+@keyframes sh-aura-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* One switch for DOM motion: honour the OS setting everywhere. framer-motion
    follows the same preference through <MotionConfig reducedMotion="user">. */
 @media (prefers-reduced-motion: reduce) {

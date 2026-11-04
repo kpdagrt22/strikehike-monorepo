@@ -2,9 +2,10 @@
 
 import { useId, useState } from "react";
 
-// A quiet 24 px info control: the definition opens on hover, keyboard focus or
-// a tap, and closes when the pointer/focus leaves or the control is tapped
-// again. The tooltip is plain text, not a second interactive surface.
+// A quiet info control for a definition. It draws 20 px but takes a 44 px hit
+// area on touch, opens on hover, focus or tap, and closes on leave, blur, a
+// second tap or Escape. The definition is plain text (role="tooltip"), on the
+// overlay surface, with the reveal timing from the motion tokens.
 export function InfoTip({
   label,
   description,
@@ -36,7 +37,7 @@ export function InfoTip({
         type="button"
         aria-label={label}
         aria-expanded={open}
-        aria-controls={open ? id : undefined}
+        aria-describedby={open ? id : undefined}
         onClick={(event) => {
           event.stopPropagation();
           setPinned((value) => !value);
@@ -48,26 +49,35 @@ export function InfoTip({
         }}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
+            event.stopPropagation();
             setHovered(false);
             setPinned(false);
-            event.currentTarget.blur();
           }
         }}
-        className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-black/10 text-black/60 transition-colors hover:border-black/20 hover:text-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus) dark:border-white/15 dark:text-white/60 dark:hover:border-white/25 dark:hover:text-white/85"
+        className="relative grid h-5 w-5 shrink-0 place-items-center rounded-full text-(--sh-text-3) transition-colors duration-(--sh-dur-micro) before:absolute before:-inset-3 before:content-[''] hover:bg-(--sh-hover) hover:text-(--sh-text-1) aria-expanded:text-(--sh-text-1) pointer-fine:before:-inset-2"
       >
-        <span aria-hidden="true" className="font-serif text-[13px] italic leading-none">
-          i
-        </span>
-      </button>
-      {open ? (
-        <span
-          id={id}
-          role="tooltip"
-          className={`absolute top-full z-50 mt-1.5 w-60 max-w-[calc(100vw-2rem)] rounded-xl border border-black/10 bg-[#f5f0e8] p-2.5 text-left text-micro font-normal normal-case leading-relaxed tracking-normal text-black/70 shadow-[0_12px_36px_rgba(20,18,26,0.16)] dark:border-white/10 dark:bg-[#14121a] dark:text-white/70 dark:shadow-[0_12px_36px_rgba(0,0,0,0.45)] ${position}`}
+        <svg
+          viewBox="0 0 16 16"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          aria-hidden="true"
         >
-          {description}
-        </span>
-      ) : null}
+          <circle cx="8" cy="8" r="6.25" />
+          <path d="M8 7.25v3.5" />
+          <path d="M8 5.1v.05" strokeWidth="1.6" />
+        </svg>
+      </button>
+      <span
+        id={id}
+        role="tooltip"
+        hidden={!open}
+        className={`absolute top-full z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-(--sh-line-2) bg-(--sh-surface-overlay) p-3 text-left text-micro font-normal normal-case leading-relaxed tracking-normal text-(--sh-text-2) shadow-(--sh-shadow-overlay) backdrop-blur-xl ${position}`}
+      >
+        {description}
+      </span>
     </span>
   );
 }

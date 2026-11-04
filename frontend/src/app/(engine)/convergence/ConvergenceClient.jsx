@@ -227,7 +227,7 @@ const SIDE_SWATCH = {
 const CORE_INDEX_DEFINITION = (
   <>
     Core Index is a weekly trend-and-stress reading of the S&amp;P 500 from
-    -50 to +50, read as a contrarian sentiment map. A high score means
+    -50 to +50, read as a sentiment map. A high score means
     euphoria and elevated risk, a low score means maximum fear. It is not a
     directional prediction.
     <span className="mt-1.5 block font-mono text-(--sh-text-3)">

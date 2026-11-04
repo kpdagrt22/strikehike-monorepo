@@ -122,7 +122,7 @@ export function MacroHUD({
         <div className="flex flex-wrap items-end gap-4 sm:gap-8">
           <div className="min-w-0">
             <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
-              Core Index at cursor
+              Core Index
               {point?.date ? ` · ${formatDate(point.date)}` : ""}
             </p>
             <div className="mt-1 flex items-end gap-1.5 sm:gap-2">
@@ -141,7 +141,7 @@ export function MacroHUD({
             </div>
             <CoreIndexScale value={point?.core_index} color={tone.color} />
             <p className="mt-1 font-mono text-micro text-black/60 dark:text-white/60">
-              −50 ↔ +50 · contrarian sentiment map
+              −50 ↔ +50 · sentiment map
             </p>
           </div>
 
@@ -160,13 +160,23 @@ export function MacroHUD({
             {/* Lines reserved for the longest band line (three below sm, two
                 from sm), so hovering across buckets never moves the chart. */}
             <p className="mt-1.5 min-h-[4.875em] max-w-[360px] text-micro leading-relaxed text-black/60 dark:text-white/60 sm:min-h-[3.25em]">
-              Band: {tone.description}. What followed similar readings →{" "}
-              <a
-                href="#regime-method"
-                className="underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
-              >
-                Method &amp; record
-              </a>
+              {tone.description !== "—" ? (
+                <>
+                  Band {tone.description}. What followed similar readings:{" "}
+                  <a
+                    href="#regime-method"
+                    onClick={() => {
+                      // The record sits in a closed <details>: open it, then
+                      // let the link scroll to it.
+                      const method = document.getElementById("regime-method");
+                      if (method && "open" in method) method.open = true;
+                    }}
+                    className="whitespace-nowrap underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
+                  >
+                    Method &amp; record
+                  </a>
+                </>
+              ) : null}
             </p>
             {/* One line, always: the week's Core Index flag when it has one,
                 otherwise the NBER window or the scrub hint. */}

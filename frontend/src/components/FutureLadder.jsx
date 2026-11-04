@@ -5,8 +5,7 @@ import { categoryTone } from "@/lib/categoryTone";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { UpcomingEvents } from "@/components/UpcomingEvents";
-import { InfoTip } from "@/components/ui/InfoTip";
-import { GEOMETRY_MATCH_DEFINITION } from "@/lib/astro/definitions";
+import { GEOMETRY_MATCH_FOOTNOTE } from "@/lib/astro/definitions";
 
 const getEventsDockButton = () =>
   document.getElementById("chrono-dock-archive");
@@ -233,7 +232,7 @@ export function FutureLadder() {
 
         <div
           id="chrono-ladder-content"
-          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-33.25rem)))]"
+          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-36.75rem)))]"
         >
           {view === "upcoming" ? (
             <UpcomingEvents />
@@ -280,47 +279,48 @@ export function FutureLadder() {
             const tone = categoryTone(match.event.category);
             const year = pastYear(match.event.date);
 
+            // One button per card: its text is its accessible name. The match
+            // is defined once, in the always-visible note under the list.
             return (
-              <div
+              <button
                 key={`${match.date}-${match.event.name}`}
-                className="group relative flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors duration-[140ms] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                type="button"
+                onClick={() => {
+                  setFocusedDate(match.date);
+                  if (sheetOpen) dismissSheet({ restoreFocus: true });
+                }}
+                className="group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors duration-[140ms] hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
-                {/* One card-wide target, with the info control above it. */}
-                <button
-                  type="button"
-                  aria-label={`Show the sky for ${formatLadderDate(match.date)}`}
-                  onClick={() => {
-                    setFocusedDate(match.date);
-                    if (sheetOpen) dismissSheet({ restoreFocus: true });
-                  }}
-                  className="absolute inset-0 z-0 rounded-xl focus-visible:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus) dark:focus-visible:bg-white/[0.06]"
-                />
                 <span
-                  className="pointer-events-none relative z-10 mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                  className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ backgroundColor: tone.color }}
                 />
-                <span className="pointer-events-none relative z-10 min-w-0">
-                  <span className="block text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                    {formatLadderDate(match.date)}
+                <span className="min-w-0">
+                  <span className="block text-micro font-medium uppercase tracking-[0.14em] text-black/60 tabular-nums dark:text-white/60">
+                    {formatLadderDate(match.date)} · {match.event.category}
                   </span>
                   <span className="mt-0.5 block text-body leading-snug text-black/75 group-hover:text-[#14121a] dark:text-white/70 dark:group-hover:text-white">
-                    Sky resembles {year ?? "the past"} · {match.event.name}
+                    {year ? `Sky resembles ${year} · ` : "Sky resembles "}
+                    {match.event.name}
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1.5 text-micro tabular-nums text-black/60 dark:text-white/60">
+                  <span className="mt-0.5 block text-micro tabular-nums text-black/60 dark:text-white/60">
                     Geometry match {formatMatch(match.similarity_percent)}
-                    <InfoTip
-                      label="What geometry match means"
-                      description={GEOMETRY_MATCH_DEFINITION}
-                      align="end"
-                    />
                   </span>
                 </span>
-              </div>
+              </button>
             );
               })}
             </>
           )}
         </div>
+
+        {/* The definition stays visible: an explanation of what a number
+            means is never hidden behind a gesture. */}
+        {view === "sky" && !error && matches.length > 0 ? (
+          <p className="border-t border-(--sh-line-1) px-4 pt-2.5 pb-3 text-micro leading-relaxed text-(--sh-text-3)">
+            {GEOMETRY_MATCH_FOOTNOTE}
+          </p>
+        ) : null}
       </div>
     </div>
   );

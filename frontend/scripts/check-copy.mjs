@@ -37,6 +37,7 @@ const BANNED = [
   "future ladder",
   "trim into",
   "accumulate into",
+  "contrarian",
 ];
 
 async function* files(dir) {

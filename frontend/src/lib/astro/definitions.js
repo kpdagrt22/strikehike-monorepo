@@ -4,10 +4,18 @@
 export const GEOMETRY_MATCH_DEFINITION =
   "How closely the planets' positions on this date match those on a past date. It measures geometry only and says nothing about what will happen.";
 
-// OWNER REVIEW: drafted from frontend/src/lib/astro/energy.js. The local
-// fallback weights hard aspects among the malefic pairs (35%), hard-aspect
-// density across all measured pairs (25%), longitude concentration (25%) and
-// the retrograde share of Mercury to Saturn (15%), then scales the result to
-// 0-100. Keep this sentence in step with that function.
+
+// The same definition, written for the Sky ladder's always-visible note.
+export const GEOMETRY_MATCH_FOOTNOTE =
+  "Geometry match compares planet positions only; it predicts nothing.";
+
+// OWNER REVIEW: the gauge shows the backend's calibrated score
+// (backend/src/astro_finance/historical_parallels.py: geometry_energy_score,
+// then calibrated_geometry_score). The raw score weights hard aspects among
+// Mars, Saturn, Rahu and Ketu (35%), hard-aspect density (25%), clustering in
+// longitude (25%) and the retrograde share (15%); the number shown is that
+// score's percentile among the curated past events, and STRESS_ENERGY_FLOORS
+// pins eight crash dates at 92-97. Keep this sentence true to that code
+// (decision D-17 asks whether the pins should go).
 export const SKY_ACTIVITY_DEFINITION =
-  "Sky activity scores the day's planetary geometry from 0 to 100: 35% hard aspects among Mars, Saturn, Rahu and Ketu, 25% the share of all measured pairs in a hard aspect, 25% how closely the eight bodies cluster in longitude, and 15% the share of Mercury to Saturn that is retrograde. It describes geometry only and is not a market forecast.";
+  "Sky activity ranks the day's planetary geometry (hard aspects, how tightly the planets cluster, and retrogrades) against the past events in StrikeHike's catalogue: 50 means busier than half of them, 99 busier than almost all. Eight well-known crash days are pinned at 92 or above. It describes the sky, not markets, and is not a forecast.";

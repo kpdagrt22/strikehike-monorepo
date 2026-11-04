@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
 import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { GaugeAura, auraTier } from "@/components/GaugeAura";
 import {
   GEOMETRY_MATCH_DEFINITION,
   SKY_ACTIVITY_DEFINITION,
@@ -49,7 +51,7 @@ function SelectedDayParallel({ parallels }) {
   const tone = categoryTone(parallel.category);
 
   return (
-    <div data-hud-part="parallel" className="mt-3 w-full text-center">
+    <div data-hud-part="parallel" className="mt-3 w-full text-center pointer-coarse:mt-7">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={`${parallel.date}-${parallel.name}-${parallel.similarity_percent}`}
@@ -93,6 +95,7 @@ export function EnergyGauge({ isDark = true }) {
   const energy = useChronoStore((state) => state.energy);
   const parallels = useChronoStore((state) => state.parallels);
   const status = useChronoStore((state) => state.status);
+  const [auraKey, setAuraKey] = useState(0);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   // A failed read for the focused moment must not show the previous sky's
   // energy as current.
@@ -127,11 +130,23 @@ export function EnergyGauge({ isDark = true }) {
         mobileSheet ? "max-lg:opacity-0" : ""
       }`}
     >
-      <div className="relative h-[116px] w-[116px]">
+      {/* From 85 the ring gains a flame aura. Hovering the ring (fine pointers
+          only, so a drag on the orrery is never blocked) relights it. */}
+      <div
+        className="relative h-[116px] w-[116px] pointer-fine:pointer-events-auto"
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse") setAuraKey((key) => key + 1);
+        }}
+      >
         <div
           aria-hidden="true"
           className="absolute inset-3 rounded-full opacity-70 blur-2xl"
           style={{ backgroundColor: tone.glow }}
+        />
+        <GaugeAura
+          key={`${auraTier(score)}-${auraKey}`}
+          score={score}
+          isDark={isDark}
         />
 
         <svg
@@ -196,9 +211,6 @@ export function EnergyGauge({ isDark = true }) {
               / 100
             </span>
           </span>
-          <span className="mt-1 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-            Sky activity
-          </span>
         </div>
       </div>
 
@@ -207,7 +219,7 @@ export function EnergyGauge({ isDark = true }) {
           className="h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: tone.stroke }}
         />
-        {label}
+        {score === null ? label : `Sky activity · ${label}`}
         <InfoTip
           label="What sky activity means"
           description={SKY_ACTIVITY_DEFINITION}
