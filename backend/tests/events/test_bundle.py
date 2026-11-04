@@ -24,6 +24,7 @@ from astro_finance.events.pipeline import PipelineOptions, run_pipeline
 from astro_finance.events.reporting import quality_report_payload
 from astro_finance.events.sqlite_writer import EVENT_COLUMNS
 from conftest import FIXTURES, NOW, TODAY, build_event
+from regime import patterns_v2
 
 DATA = (
     Path(__file__).resolve().parents[2]
@@ -45,12 +46,17 @@ def _macro_source(
     with_skill: bool = True,
     data_version: str | None = None,
     latest_date: str = "2026-11-03",
+    skill_fingerprint: str | None = None,
 ) -> Path:
     source = tmp_path / "macro"
     source.mkdir(parents=True)
     parquet = source / MACRO_PARQUET_FILENAME
     frame = pd.DataFrame(
-        {"core_index": [1.0]},
+        {
+            "core_index": [1.0],
+            "sp500_proxy": [100.0],
+            "sp500_proxy_source": ["TEST"],
+        },
         index=pd.DatetimeIndex(["2026-11-03"], tz="UTC"),
     )
     frame.to_parquet(parquet, engine="pyarrow", compression="snappy")
@@ -66,8 +72,17 @@ def _macro_source(
             encoding="utf-8",
         )
     if with_skill:
+        fingerprint = skill_fingerprint or patterns_v2.inputs_fingerprint(
+            frame, "sp500"
+        )
         (source / PATTERNS_SKILL_FILENAME).write_text(
-            json.dumps({"schema_version": 2}), encoding="utf-8"
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "inputs_fingerprint": {"sp500": fingerprint},
+                }
+            ),
+            encoding="utf-8",
         )
     (source / CRYPTO_MILESTONES_FILENAME).write_text(
         json.dumps({"events": []}), encoding="utf-8"
@@ -197,6 +212,18 @@ def test_macro_bundle_warns_when_siblings_are_missing_or_stale(tmp_path):
     )
     assert any("data_version" in warning for warning in stale_artifact.warnings)
     assert any("latest Core Index date" in warning for warning in stale_artifact.warnings)
+
+
+def test_macro_bundle_warns_when_the_skill_fingerprint_does_not_match(tmp_path):
+    stale = _macro_source(tmp_path, skill_fingerprint="0" * 16)
+    artifact = write_dataset(
+        tmp_path / "stale-skill-staging", [], today=TODAY, macro_parquet=stale
+    )
+
+    assert any(
+        "inputs_fingerprint" in warning and "sp500" in warning
+        for warning in artifact.warnings
+    )
 
 
 def test_quality_report_and_summary_carry_the_macro_sibling_warnings(tmp_path):

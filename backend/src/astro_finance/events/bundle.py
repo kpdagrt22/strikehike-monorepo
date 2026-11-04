@@ -168,11 +168,73 @@ def macro_bundle_warnings(data_dir: Path) -> tuple[str, ...]:
                     f"date ({parquet_date!r})."
                 )
 
-    if not (data_dir / PATTERNS_SKILL_FILENAME).is_file():
+    skill_path = data_dir / PATTERNS_SKILL_FILENAME
+    if not skill_path.is_file():
         warnings.append(
             f"WARNING: {PATTERNS_SKILL_FILENAME} is missing from the bundle's"
             " data/ directory; /patterns will fall back to the baked skill."
         )
+    else:
+        try:
+            skill = json.loads(skill_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            skill = None
+        if not isinstance(skill, dict):
+            warnings.append(
+                f"WARNING: {PATTERNS_SKILL_FILENAME} is not a readable JSON"
+                " object; /patterns will fall back to the baked skill."
+            )
+        else:
+            recorded = skill.get("inputs_fingerprint")
+            if not isinstance(recorded, dict) or not recorded:
+                warnings.append(
+                    f"WARNING: {PATTERNS_SKILL_FILENAME} has no"
+                    " inputs_fingerprint map; the track record cannot be"
+                    " verified against the bundled parquet."
+                )
+            else:
+                frame = None
+                if parquet.is_file():
+                    try:
+                        frame = pd.read_parquet(parquet)
+                    except (OSError, ValueError):
+                        frame = None
+                if frame is None:
+                    warnings.append(
+                        f"WARNING: {PATTERNS_SKILL_FILENAME} cannot be verified"
+                        " because the bundled parquet cannot be read."
+                    )
+                else:
+                    try:
+                        from regime import patterns_v2
+                    except ImportError:
+                        warnings.append(
+                            f"WARNING: {PATTERNS_SKILL_FILENAME} cannot be"
+                            " verified because the patterns module is"
+                            " unavailable."
+                        )
+                    else:
+                        mismatched: list[str] = []
+                        for asset in sorted(recorded):
+                            try:
+                                expected = patterns_v2.inputs_fingerprint(
+                                    frame, asset
+                                )
+                            except (KeyError, TypeError, ValueError):
+                                mismatched.append(
+                                    f"{asset} (missing price inputs)"
+                                )
+                                continue
+                            if str(recorded[asset]) != expected:
+                                mismatched.append(asset)
+                        if mismatched:
+                            warnings.append(
+                                f"WARNING: {PATTERNS_SKILL_FILENAME}"
+                                " inputs_fingerprint does not match the"
+                                " bundled parquet for: "
+                                + ", ".join(mismatched)
+                                + "."
+                            )
     return tuple(warnings)
 
 
