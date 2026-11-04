@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { feedbackSubmitted, viewOpened } from "@/lib/analytics/events";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
@@ -9,7 +10,9 @@ import { useEntityStore } from "@/store/entityStore";
 export function FeedbackModule() {
   const [open, setOpen] = useState(false);
   const [thoughts, setThoughts] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [website, setWebsite] = useState("");
+  const [status, setStatus] = useState("");
+  const [sending, setSending] = useState(false);
   const timerRef = useRef(null);
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
@@ -34,37 +37,44 @@ export function FeedbackModule() {
     [],
   );
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
     const message = thoughts.trim();
-    if (!message) return;
+    if (message.length < 3 || sending) return;
 
+    setSending(true);
+    setStatus("");
     try {
-      const existing = JSON.parse(
-        localStorage.getItem("strikehike.feedback") || "[]",
-      );
-      localStorage.setItem(
-        "strikehike.feedback",
-        JSON.stringify(
-          [
-            ...(Array.isArray(existing) ? existing : []),
-            { message, date: new Date().toISOString() },
-          ].slice(-20),
-        ),
-      );
+      const response = await fetch("/api/v1/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          website,
+          path: window.location.pathname,
+          app_version: (process.env.NEXT_PUBLIC_BUILD_SHA || "dev").slice(0, 7),
+        }),
+      });
+      if (response.status === 204) {
+        setThoughts("");
+        setWebsite("");
+        setStatus("Sent to KP. Thank you.");
+        feedbackSubmitted(message.length);
+        textareaRef.current?.focus({ preventScroll: true });
+      } else if (response.status === 422) {
+        setStatus("Please leave out email addresses and links.");
+      } else if (response.status === 429) {
+        setStatus("Too many messages from here. Please try again later.");
+      } else {
+        setStatus("Couldn't send. Please try again.");
+      }
     } catch {
-      // Storage can be unavailable (private mode). Keep the text rather than
-      // claim a save that did not happen.
-      return;
+      setStatus("Couldn't send. Please try again.");
+    } finally {
+      setSending(false);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setStatus(""), 6000);
     }
-
-    setThoughts("");
-    setSaved(true);
-    // Send is disabled once the field clears; keep focus in the form rather
-    // than letting it drop to <body>.
-    textareaRef.current?.focus({ preventScroll: true });
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setSaved(false), 4000);
   };
 
   return (
@@ -80,7 +90,10 @@ export function FeedbackModule() {
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          if (!open) viewOpened("feedback", event.detail === 0 ? "keyboard" : "click");
+          setOpen((value) => !value);
+        }}
         aria-label="Open feedback"
         aria-expanded={open}
         aria-controls="strikehike-feedback-panel"
@@ -165,22 +178,37 @@ export function FeedbackModule() {
                 value={thoughts}
                 onChange={(event) => setThoughts(event.target.value)}
                 rows={4}
+                maxLength={1000}
                 className="mt-1.5 w-full resize-none rounded-xl border border-black/10 bg-black/[0.025] px-3 py-2.5 text-meta leading-relaxed text-black/80 transition-colors focus:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/80 dark:focus:bg-white/[0.06]"
+              />
+              <p className="mt-1.5 text-micro leading-relaxed text-black/60 dark:text-white/60">
+                No email needed. KP can&apos;t reply, so please leave out contact
+                details.
+              </p>
+              <input
+                type="text"
+                name="website"
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
               />
               <div className="mt-2 flex items-center justify-between gap-3">
                 <span
                   aria-live="polite"
-                  className={`text-micro font-medium transition-opacity ${
-                    saved
-                      ? "text-[#0f766e] opacity-100 dark:text-[#5eead4]"
-                      : "opacity-0"
+                  className={`text-micro font-medium ${
+                    status.startsWith("Sent")
+                      ? "text-[#0f766e] dark:text-[#5eead4]"
+                      : "text-black/60 dark:text-white/60"
                   }`}
                 >
-                  {saved ? "Saved on this device only." : ""}
+                  {status}
                 </span>
                 <button
                   type="submit"
-                  disabled={!thoughts.trim()}
+                  disabled={thoughts.trim().length < 3 || sending}
                   className="h-11 shrink-0 rounded-full bg-[#f05d49] px-4 text-micro font-medium uppercase tracking-[0.14em] text-[#14121a] transition-colors hover:bg-[#e8533f] disabled:cursor-not-allowed disabled:opacity-[0.38] lg:h-9"
                 >
                   Send
