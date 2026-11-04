@@ -33,14 +33,6 @@ from .registry import SourceSpec
 from .reporting import quality_report_markdown
 from .sqlite_writer import write_sqlite
 
-BUNDLE_FILES = (
-    "events.json",
-    "events.sqlite",
-    "quality_report.json",
-    "quality_report.md",
-)
-
-
 @dataclass(frozen=True, slots=True)
 class DatasetArtifact:
     staging_dir: Path
@@ -71,9 +63,16 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def bundle_version_for(events: Iterable[Event]) -> str:
-    canonical = [event.content_dict() for event in sort_events(events)]
-    return sha256_hex(canonical_json(canonical))[:16]
+def bundle_version_for(
+    events: Iterable[Event],
+    extra_hashes: Mapping[str, str] | None = None,
+) -> str:
+    payload: dict[str, Any] = {
+        "events": [event.content_dict() for event in sort_events(events)]
+    }
+    if extra_hashes:
+        payload["files"] = dict(sorted(extra_hashes.items()))
+    return sha256_hex(canonical_json(payload))[:16]
 
 
 def count_matrix(events: Iterable[Event]) -> dict[str, dict[str, dict[str, int]]]:
@@ -101,8 +100,10 @@ def write_dataset(
     events: list[Event],
     *,
     today: date,
+    macro_parquet: Path | None = None,
+    model_dir: Path | None = None,
 ) -> DatasetArtifact:
-    """Write ``events.json`` and a fresh SQLite database into staging."""
+    """Write ``events.json``, SQLite and optional macro/model payloads."""
 
     del today  # reserved for future dataset-level metadata
     if staging_dir.exists():
@@ -120,11 +121,32 @@ def write_dataset(
     sqlite_events = [Event.from_dict(item) for item in serialized["events"]]
     sqlite_path = staging_dir / "events.sqlite"
     write_sqlite(sqlite_path, sqlite_events)
+
+    extra_hashes: dict[str, str] = {}
+    if macro_parquet is not None:
+        target = staging_dir / "data" / "macro_regime_history.parquet"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(macro_parquet, target)
+        extra_hashes["data/macro_regime_history.parquet"] = sha256_file(target)
+    if model_dir is not None:
+        source = Path(model_dir)
+        if (source / "models").is_dir():
+            source = source / "models"
+        target_root = staging_dir / "models"
+        for path in sorted(source.rglob("*")):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(source)
+            target = target_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+            extra_hashes[f"models/{relative.as_posix()}"] = sha256_file(target)
+
     return DatasetArtifact(
         staging_dir=staging_dir,
         events_json=events_json,
         sqlite_path=sqlite_path,
-        bundle_version=bundle_version_for(ordered),
+        bundle_version=bundle_version_for(ordered, extra_hashes),
         canonical_events=tuple(event.content_dict() for event in ordered),
     )
 
@@ -192,6 +214,8 @@ def finalize_bundle(
     today: date,
     execution_id: str,
     historical_source_sha256: str,
+    macro_data: Mapping[str, Any] | None = None,
+    models: Mapping[str, Any] | None = None,
 ) -> BundleResult:
     staging = artifact.staging_dir
     _write_json(staging / "quality_report.json", report)
@@ -200,8 +224,9 @@ def finalize_bundle(
     )
 
     files = {
-        name: sha256_file(staging / name)
-        for name in BUNDLE_FILES
+        path.relative_to(staging).as_posix(): sha256_file(path)
+        for path in sorted(staging.rglob("*"))
+        if path.is_file()
     }
     manifest = {
         "bundle_version": artifact.bundle_version,
@@ -218,6 +243,10 @@ def finalize_bundle(
         "historical_source_sha256": historical_source_sha256,
         "publishable": report["publishable"],
     }
+    if macro_data is not None:
+        manifest["macro_data"] = dict(macro_data)
+    if models is not None:
+        manifest["models"] = dict(models)
     _write_json(staging / "manifest.json", manifest)
 
     final_dir = out_dir / "bundle"
@@ -271,7 +300,11 @@ def validate_bundle_files(bundle_dir: Path) -> list[str]:
         events = [Event.from_dict(item) for item in payload.get("events", [])]
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"events.json contains an invalid event: {exc}")
-    if events and bundle_version_for(events) != manifest.get("bundle_version"):
+    if events and bundle_version_for(events, {
+        name: digest
+        for name, digest in manifest.get("files", {}).items()
+        if name.startswith("data/") or name.startswith("models/")
+    }) != manifest.get("bundle_version"):
         errors.append("bundle_version does not match the canonical event content")
 
     sqlite_path = bundle_dir / "events.sqlite"

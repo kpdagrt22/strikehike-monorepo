@@ -8,15 +8,18 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from pathlib import Path
 from typing import Callable, Mapping
 
 from .bundle import finalize_bundle, quality_report_markdown, write_dataset
 from .dedup import deduplicate
-from .gates import GateContext, run_gates
+from .gates import GateContext, GateResult, run_gates
 from .io_utils import summary, write_raw, write_rejects
 from .lifecycle import merge_with_previous
+from .macro_data import MacroDataError, validate_macro_refresh
+from .model_bundle import model_gate, model_info
 from .models import EventKind, SourceRun, iso_utc, parse_utc, replace_event
-from .registry import load_registry, select_sources
+from .registry import default_data_dir, load_registry, select_sources
 from .reporting import quality_report_payload
 from .runtime import (
     STAGES,
@@ -264,9 +267,36 @@ def stage_classification(ctx: PipelineContext) -> StageOutcome:
     return StageOutcome(len(ctx.events), len(ctx.events))
 
 
+def _macro_baseline(ctx: PipelineContext) -> Path:
+    if ctx.options.previous_dir is not None:
+        previous = (
+            ctx.options.previous_dir / "data" / "macro_regime_history.parquet"
+        )
+        if previous.is_file():
+            return previous
+    return default_data_dir().parent / "processed" / "macro_regime_history.parquet"
+
+
 def stage_dataset(ctx: PipelineContext) -> StageOutcome:
     staging = ctx.options.out_dir / f".bundle-{ctx.execution_id}"
-    ctx.artifact = write_dataset(staging, ctx.events, today=ctx.options.today)
+    if ctx.options.macro_parquet is not None:
+        baseline = _macro_baseline(ctx)
+        try:
+            ctx.macro_validation = validate_macro_refresh(
+                ctx.options.macro_parquet,
+                baseline,
+                allow_unchanged_reason=ctx.options.macro_allow_unchanged_reason,
+            )
+        except MacroDataError as exc:
+            raise PipelineError(f"macro dataset validation failed: {exc}") from exc
+    ctx.artifact = write_dataset(
+        staging,
+        ctx.events,
+        today=ctx.options.today,
+        macro_parquet=ctx.options.macro_parquet,
+        model_dir=ctx.options.model_dir,
+    )
+    ctx.model_lifecycle = model_info(ctx.options.model_dir)
     ctx.data_version = ctx.artifact.bundle_version
     return StageOutcome(len(ctx.events), len(ctx.events))
 
@@ -298,6 +328,12 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         summary=report_summary,
         notes=notes,
         offline_build=ctx.options.offline_dir is not None,
+        macro_data=(
+            ctx.macro_validation.to_dict()
+            if ctx.macro_validation is not None
+            else None
+        ),
+        model_lifecycle=ctx.model_lifecycle,
     )
     source_preview = json.dumps(
         [
@@ -337,6 +373,24 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         output_texts=output_texts,
     )
     ctx.gates = tuple(run_gates(gate_ctx))
+    extra_gates = []
+    if ctx.macro_validation is not None:
+        validation = ctx.macro_validation
+        extra_gates.append(
+            GateResult(
+                "macro_data",
+                "pass" if validation.passed else "fail",
+                (
+                    "macro refresh checks passed"
+                    if validation.passed
+                    else "; ".join(validation.reasons)
+                ),
+            )
+        )
+    model_result = model_gate(ctx.options.model_dir)
+    if model_result is not None:
+        extra_gates.append(model_result)
+    ctx.gates = tuple(ctx.gates) + tuple(extra_gates)
     report = quality_report_payload(
         events=ctx.events,
         source_runs=ctx.source_runs,
@@ -346,6 +400,12 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         summary=report_summary,
         notes=notes,
         offline_build=ctx.options.offline_dir is not None,
+        macro_data=(
+            ctx.macro_validation.to_dict()
+            if ctx.macro_validation is not None
+            else None
+        ),
+        model_lifecycle=ctx.model_lifecycle,
     )
     ctx.report = report
     ctx.bundle = finalize_bundle(
@@ -360,6 +420,12 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         today=ctx.options.today,
         execution_id=ctx.execution_id,
         historical_source_sha256=ctx.historical_source_sha256,
+        macro_data=(
+            ctx.macro_validation.to_dict()
+            if ctx.macro_validation is not None
+            else None
+        ),
+        models=ctx.model_lifecycle,
     )
     return StageOutcome(len(ctx.events), len(ctx.events))
 

@@ -34,6 +34,10 @@ from regime.schemas import PatternEngineV2
 
 logger = logging.getLogger(__name__)
 
+
+class ModelUnavailableError(RuntimeError):
+    """No production model is present in the active events bundle."""
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_ARTIFACT = BACKEND_DIR / "data" / "processed" / "macro_regime_history.parquet"
 DEFAULT_META = BACKEND_DIR / "data" / "processed" / "macro_regime_history.meta.json"
@@ -444,6 +448,10 @@ class MacroRegimeService:
         self._meta_mtime: float | None = None
         self._cache: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._forecast_cache: dict[str, Any] | None = None
+        self._model_cache: (
+            tuple[tuple[float, float, str], Any, dict[str, Any]] | None
+        ) = None
+        self._artifact_used: Path | None = None
         # Study of Patterns v2: one engine block per asset, kept until the
         # parquet or the skill artifact changes.
         self._patterns_engine_cache: dict[
@@ -451,14 +459,30 @@ class MacroRegimeService:
         ] = {}
         self._lock = threading.RLock()
 
+    def _artifact_path(self) -> Path:
+        """Prefer the active bundle's refreshed parquet, then the baked file."""
+
+        try:
+            from astro_finance.events.store import current_bundle_dir
+
+            bundle = current_bundle_dir()
+        except (ImportError, OSError):
+            bundle = None
+        if bundle is not None:
+            candidate = bundle / "data" / "macro_regime_history.parquet"
+            if candidate.is_file():
+                return candidate
+        return self.artifact_path
+
     def _load(self) -> pd.DataFrame:
         with self._lock:
-            if not self.artifact_path.exists():
+            artifact_path = self._artifact_path()
+            if not artifact_path.exists():
                 raise FileNotFoundError(
-                    f"Macro regime artifact not found at {self.artifact_path}. "
+                    f"Macro regime artifact not found at {artifact_path}. "
                     "Run: python -m scripts.flows.macro_ingestion"
                 )
-            mtime = self.artifact_path.stat().st_mtime
+            mtime = artifact_path.stat().st_mtime
             meta_mtime = (
                 self.meta_path.stat().st_mtime
                 if self.meta_path.exists()
@@ -468,13 +492,15 @@ class MacroRegimeService:
                 self._frame is None
                 or mtime != self._mtime
                 or meta_mtime != self._meta_mtime
+                or artifact_path != self._artifact_used
             ):
-                frame = pd.read_parquet(self.artifact_path)
+                frame = pd.read_parquet(artifact_path)
                 frame.index = pd.to_datetime(frame.index, utc=True)
                 frame = frame.sort_index()
                 self._frame = frame
                 self._mtime = mtime
                 self._meta_mtime = meta_mtime
+                self._artifact_used = artifact_path
                 self._meta = _read_json(self.meta_path)
                 self._crashes = build_crashes(frame)
                 self._cache.clear()
@@ -870,83 +896,92 @@ class MacroRegimeService:
                 self._patterns_engine_cache[asset] = (key, engine)
         return engine
 
+    def _production_model(self) -> tuple[Any, dict[str, Any]]:
+        from astro_finance.events.store import current_bundle_dir
+
+        bundle = current_bundle_dir()
+        if bundle is None:
+            raise ModelUnavailableError(
+                "No active events bundle contains a production forecast model."
+            )
+        model_path = bundle / "models" / "model.joblib"
+        card_path = bundle / "models" / "model_card.json"
+        if not model_path.is_file() or not card_path.is_file():
+            raise ModelUnavailableError(
+                "The active events bundle has no production forecast model."
+            )
+        cache_key = (
+            model_path.stat().st_mtime_ns,
+            card_path.stat().st_mtime_ns,
+            str(model_path),
+        )
+        if self._model_cache is not None and self._model_cache[0] == cache_key:
+            return self._model_cache[1], self._model_cache[2]
+        try:
+            import joblib
+
+            model = joblib.load(model_path)
+            card = json.loads(card_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ModelUnavailableError(
+                f"Production forecast model cannot be loaded: {exc}"
+            ) from exc
+        if not isinstance(card, dict):
+            raise ModelUnavailableError("Production model card is not an object.")
+        features = card.get("features")
+        if not isinstance(features, list) or not features:
+            raise ModelUnavailableError("Production model card has no features.")
+        self._model_cache = (cache_key, model, card)
+        return model, card
+
     def forecast(self) -> dict[str, Any]:
-        """30-day forward probability of a Disruptive macro regime.
+        """Probability that the S&P 500 proxy is lower four weeks later.
 
-        A lightweight logistic regression is fitted on the serialized V2
-        features only. The target is ``regime_state == "disruptive"`` thirty
-        calendar days after each observation. The model is cached until the
-        parquet artifact changes.
+        The model is loaded from the active bundle.  Nothing is fitted in the
+        request path; a missing production model is a 503 at the router.
         """
+
+        model, card = self._production_model()
         frame = self._load()
-        if self._forecast_cache is not None:
-            return self._forecast_cache
-
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.pipeline import make_pipeline
-        from sklearn.preprocessing import StandardScaler
-
-        feature_columns = ["fed_cross", "curve_cross", "sahm_alert"]
-        missing = [
-            column for column in feature_columns if column not in frame.columns
-        ]
+        features = [str(value) for value in card["features"]]
+        missing = [column for column in features if column not in frame.columns]
         if missing:
             raise ValueError(
                 "Forecast features are missing from the artifact: "
                 + ", ".join(missing)
             )
-
-        data = frame[feature_columns + ["regime_state", "macro_strength"]].copy()
-        data["sahm_alert"] = (
-            data["sahm_alert"].astype("boolean").fillna(False).astype(float)
-        )
-        future_state = data["regime_state"].shift(-30)
-        target = pd.Series(pd.NA, index=data.index, dtype="boolean")
-        valid_future = future_state.notna()
-        target.loc[valid_future] = future_state.loc[valid_future].eq(
-            "disruptive"
-        )
-        data["disruptive_30d"] = target
-
-        current_rows = data.dropna(subset=feature_columns)
-        train = data.dropna(subset=feature_columns + ["disruptive_30d"])
-        if current_rows.empty or len(train) < 250:
-            raise ValueError("Not enough observations to fit the forecast model")
-
+        data = frame[features].copy()
+        if "sahm_alert" in data.columns:
+            data["sahm_alert"] = (
+                data["sahm_alert"].astype("boolean").fillna(False).astype(float)
+            )
+        current_rows = data.dropna()
+        if current_rows.empty:
+            raise ValueError("No current row has all forecast features.")
         current = current_rows.iloc[-1]
-        X_train = train[feature_columns].astype(float)
-        y_train = train["disruptive_30d"].astype(int)
-        model = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(
-                max_iter=2000,
-                solver="lbfgs",
-                class_weight=None,
-            ),
-        )
-        model.fit(X_train, y_train)
-        probability = float(
-            model.predict_proba(
-                current[feature_columns].astype(float).to_frame().T
-            )[0, 1]
-        )
+        try:
+            probability = float(
+                model.predict_proba(current[features].astype(float).to_frame().T)[0, 1]
+            )
+        except (ValueError, AttributeError) as exc:
+            raise ModelUnavailableError(
+                f"Production forecast model cannot score the current row: {exc}"
+            ) from exc
         probability = max(0.0, min(1.0, probability))
-        classifier = model[-1]
-        coefficients = {
-            column: round(float(value), 6)
-            for column, value in zip(feature_columns, classifier.coef_[0])
-        }
-
+        training = card.get("training", {})
+        target = card.get("target", {})
         payload = {
             "as_of": current.name.date().isoformat(),
-            "horizon_days": 30,
+            "horizon_days": int(target.get("horizon_days", 28)),
             "model": "logistic_regression_v2",
-            "features": feature_columns,
+            "model_version": card.get("model_version"),
+            "target": target.get("name"),
+            "features": features,
             "training": {
-                "start": train.index.min().date().isoformat(),
-                "end": train.index.max().date().isoformat(),
-                "observations": int(len(train)),
-                "disruptive_base_rate": round(float(y_train.mean()), 4),
+                "start": training.get("start"),
+                "end": training.get("end"),
+                "observations": int(training.get("observations", 0)),
+                "disruptive_base_rate": training.get("base_rate"),
             },
             "current": {
                 "as_of": current.name.date().isoformat(),
@@ -955,19 +990,21 @@ class MacroRegimeService:
                     current.get("macro_strength"), 2
                 ),
                 "features": {
-                    "fed_cross": round(float(current["fed_cross"]), 6),
-                    "curve_cross": round(float(current["curve_cross"]), 6),
-                    "sahm_alert": bool(current["sahm_alert"]),
+                    feature: (
+                        bool(current[feature])
+                        if feature == "sahm_alert"
+                        else round(float(current[feature]), 6)
+                    )
+                    for feature in features
                 },
             },
             "disruptive_probability": round(probability, 4),
             "risk_pct": round(probability * 100.0, 1),
-            "coefficients": coefficients,
-            "intercept": round(float(classifier.intercept_[0]), 6),
-            "notes": [
-                "Target is regime_state == disruptive 30 calendar days after each observation.",
-                "Logistic regression uses standardized V2 features and is cached until the artifact changes.",
-                "Macro-regime risk only; not a security-specific return forecast or investment advice.",
+            "coefficients": card.get("coefficients", {}),
+            "intercept": card.get("intercept", 0.0),
+            "notes": list(card.get("notes", []))
+            + [
+                "Loaded from the active bundle; the endpoint never fits at request time.",
             ],
         }
         self._forecast_cache = payload

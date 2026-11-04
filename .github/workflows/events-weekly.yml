@@ -15,6 +15,10 @@ on:
         required: false
         default: false
         type: boolean
+      macro_unchanged_reason:
+        description: "Explicit reason if the macro last date is allowed to stay unchanged"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -32,7 +36,7 @@ jobs:
   build:
     name: Build and gate the weekly events bundle
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     # The publish job reads this; without it needs.build.outputs is empty and
     # publishing is always skipped.
     outputs:
@@ -107,17 +111,75 @@ jobs:
           fi
           echo "previous_dir=$previous_dir" >> "$GITHUB_OUTPUT"
 
+      - name: Refresh the macro regime artifact
+        shell: bash
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FRED_API_KEY:-}" ]; then
+            echo "::error::FRED_API_KEY is not set; cannot refresh the macro dataset."
+            exit 1
+          fi
+          python -m scripts.flows.macro_ingestion \
+            --source api \
+            --output-dir "$RUNNER_TEMP/macro-refresh"
+
+      - name: Validate the refreshed macro artifact
+        shell: bash
+        continue-on-error: true
+        env:
+          PREVIOUS_DIR: ${{ steps.previous.outputs.previous_dir }}
+          MACRO_UNCHANGED_REASON: ${{ github.event.inputs.macro_unchanged_reason }}
+        run: |
+          set -euo pipefail
+          baseline="$PWD/data/processed/macro_regime_history.parquet"
+          if [ -n "${PREVIOUS_DIR:-}" ] && \
+            [ -f "$PREVIOUS_DIR/data/macro_regime_history.parquet" ]; then
+            baseline="$PREVIOUS_DIR/data/macro_regime_history.parquet"
+          fi
+          reason_args=()
+          if [ -n "${MACRO_UNCHANGED_REASON:-}" ]; then
+            reason_args=(--allow-unchanged-reason "$MACRO_UNCHANGED_REASON")
+          fi
+          python -m astro_finance.events.macro_data validate \
+            --data "$RUNNER_TEMP/macro-refresh/macro_regime_history.parquet" \
+            --baseline "$baseline" \
+            --json-out "$RUNNER_TEMP/macro-validation.json" \
+            "${reason_args[@]}"
+
+      - name: Train, evaluate and promote the forecast model
+        shell: bash
+        env:
+          PREVIOUS_DIR: ${{ steps.previous.outputs.previous_dir }}
+        run: |
+          set -euo pipefail
+          previous=()
+          if [ -n "${PREVIOUS_DIR:-}" ]; then
+            previous=(--previous-bundle "$PREVIOUS_DIR")
+          fi
+          python -m astro_finance.models.regime_forecast train \
+            --data "$RUNNER_TEMP/macro-refresh/macro_regime_history.parquet" \
+            --out "$RUNNER_TEMP/model" \
+            "${previous[@]}"
+
       - name: Build and run the quality gates
         id: build
         shell: bash
         env:
           INPUT_TODAY: ${{ github.event.inputs.today }}
           PREVIOUS_DIR: ${{ steps.previous.outputs.previous_dir }}
+          MACRO_UNCHANGED_REASON: ${{ github.event.inputs.macro_unchanged_reason }}
         run: |
           set +e
           args=(build --out "$RUNNER_TEMP/events-out")
+          args+=(--macro-parquet "$RUNNER_TEMP/macro-refresh/macro_regime_history.parquet")
+          args+=(--model-dir "$RUNNER_TEMP/model")
           if [ -n "${INPUT_TODAY:-}" ]; then
             args+=(--today "$INPUT_TODAY")
+          fi
+          if [ -n "${MACRO_UNCHANGED_REASON:-}" ]; then
+            args+=(--macro-allow-unchanged-reason "$MACRO_UNCHANGED_REASON")
           fi
           if [ -n "${PREVIOUS_DIR:-}" ]; then
             args+=(--previous "$PREVIOUS_DIR")
@@ -151,6 +213,21 @@ jobs:
           else
             echo "No quality report: the build did not reach the bundle stage." \
               >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Append the model promotion decision to the job summary
+        if: always()
+        shell: bash
+        run: |
+          promotion="$RUNNER_TEMP/model/models/promotion.json"
+          if [ -f "$promotion" ]; then
+            {
+              echo ""
+              echo "## Model promotion"
+              echo '```json'
+              cat "$promotion"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Fail when the bundle is not publishable

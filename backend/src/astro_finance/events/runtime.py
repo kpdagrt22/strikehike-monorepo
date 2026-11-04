@@ -55,6 +55,9 @@ class PipelineOptions:
     execution_id: str | None = None
     created_at: datetime | None = None
     clock: Callable[[], datetime] | None = None
+    macro_parquet: Path | None = None
+    model_dir: Path | None = None
+    macro_allow_unchanged_reason: str | None = None
 
 
 @dataclass
@@ -104,6 +107,8 @@ class PipelineContext:
     historical_source_sha256: str = "missing"
     raw_files: list[Path] = field(default_factory=list)
     data_version: str | None = None
+    macro_validation: Any = None
+    model_lifecycle: dict[str, Any] | None = None
 
     def clock(self) -> datetime:
         if self.options.clock:
