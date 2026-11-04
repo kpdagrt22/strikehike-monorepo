@@ -57,6 +57,10 @@ jobs:
             tests/test_patterns.py \
             tests/test_regime_service.py \
             tests/test_regime_cases.py \
+            tests/test_analytics_schema.py \
+            tests/test_analytics_store.py \
+            tests/test_analytics_api.py \
+            tests/test_analytics_activation.py \
             -q
 
   test-frontend:
@@ -90,6 +94,9 @@ jobs:
 
       - name: Unit tests
         run: npm run test:unit
+
+      - name: Tracker size
+        run: npm run check:tracker
 
       - name: Build
         run: npm run build
@@ -138,6 +145,8 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           TURBO_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "1"
+          NEXT_PUBLIC_BUILD_SHA: "smoke01"
 
       - name: Start the stack and run the smoke tests
         run: |
@@ -248,6 +257,7 @@ jobs:
             fi
 
             # Build the new stack while the existing site is still serving.
+            export BUILD_SHA="$(git rev-parse --short=7 HEAD)"
             docker compose -p strikehike-chrono build
 
             OLD_IDS="$(docker ps -aq --filter 'label=com.docker.compose.project=strikehike' || true)"
@@ -460,3 +470,6 @@ jobs:
             fi
 
             prune_after_success
+            df -h /
+            docker compose -p strikehike-chrono exec -T backend \
+              du -sh /app/data/runtime/analytics 2>/dev/null || true

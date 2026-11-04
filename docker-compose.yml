@@ -11,6 +11,8 @@ services:
       ENABLE_LEGACY_WEBSOCKET: "0"
       HISTORICAL_EVENTS_DB: /app/data/runtime/historical_events.db
       HISTORICAL_EVENTS_SEED: /app/data/historical_events.json
+      ANALYTICS_DB: /app/data/runtime/analytics/analytics.sqlite
+      ANALYTICS_INGEST_ENABLED: "1"
       PYTHONUNBUFFERED: "1"
     ports:
       # Host-loopback only. The frontend reaches it over the internal network.
@@ -44,6 +46,8 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION:-}
+        NEXT_PUBLIC_ANALYTICS_ENABLED: "1"
+        NEXT_PUBLIC_BUILD_SHA: ${BUILD_SHA:-dev}
     environment:
       CHRONO_API_URL: http://backend:8010
       NEXT_TELEMETRY_DISABLED: "1"
