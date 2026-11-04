@@ -90,7 +90,7 @@ def test_training_skips_when_the_dataset_fingerprint_is_unchanged(tmp_path):
     )
     assert two["status"] == "skipped"
     assert "fingerprint" in two["reason"]
-    assert (second / "models" / "model.joblib").is_file()
+    assert (second / "models" / "promotion.json").is_file()
 
 
 def test_registry_keeps_the_previous_production_for_rollback(tmp_path):
@@ -99,16 +99,49 @@ def test_registry_keeps_the_previous_production_for_rollback(tmp_path):
     frame.index = pd.to_datetime(frame.index, utc=True)
     frame.loc[frame.index[-10:], "sp500_proxy"] *= 0.98
     _write_copy(changed, frame)
+
     first = tmp_path / "first"
+    (first / "models").mkdir(parents=True)
+    joblib.dump({"dummy": True}, first / "models" / "model.joblib")
+    production_card = {
+        "model_version": "prod-model",
+        "features": ["fed_cross", "curve_cross", "sahm_alert"],
+        "walk_forward": {
+            "overall": {"balanced_accuracy": 0.60, "brier": 0.20, "observations": 100},
+            "per_segment": [
+                {"bucket": "calm_bullish", "balanced_accuracy": 0.60},
+                {"bucket": "bearish_warning", "balanced_accuracy": 0.60},
+            ],
+        },
+        "baselines": {
+            "persistence": {"balanced_accuracy": 0.50, "brier": 0.30},
+            "historical_average": {"brier": 0.30},
+        },
+    }
+    (first / "models" / "model_card.json").write_text(
+        json.dumps(production_card), encoding="utf-8"
+    )
+    (first / "models" / "registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "models": [
+                    {
+                        "version": "prod-model",
+                        "status": "production",
+                        "promoted_at": "2026-01-01T00:00:00Z",
+                        "previous_production": None,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     second = tmp_path / "second"
-    first_decision = run_training_job(data_path=DATA, out_dir=first)
-    assert first_decision["status"] in {"promoted", "retired"}
     second_decision = run_training_job(
         data_path=changed, out_dir=second, previous_bundle=first
     )
-    first_card = json.loads(
-        (first / "models" / "model_card.json").read_text("utf-8")
-    )
+    assert second_decision["status"] == "retired"
     registry = json.loads(
         (second / "models" / "registry.json").read_text("utf-8")
     )
@@ -116,23 +149,14 @@ def test_registry_keeps_the_previous_production_for_rollback(tmp_path):
         item for item in registry["models"] if item["status"] == "production"
     ]
     assert len(productions) == 1
-    if second_decision["status"] == "retired":
-        assert productions[0]["version"] == first_card["model_version"]
-        candidate = next(
-            item
-            for item in registry["models"]
-            if item["version"] == second_decision["candidate_version"]
-        )
-        assert candidate["status"] == "retired"
-        assert candidate["previous_production"] == first_card["model_version"]
-    else:
-        previous = next(
-            item
-            for item in registry["models"]
-            if item["version"] == first_card["model_version"]
-        )
-        assert previous["status"] == "retired"
-        assert productions[0]["previous_production"] == first_card["model_version"]
+    assert productions[0]["version"] == "prod-model"
+    candidate = next(
+        item
+        for item in registry["models"]
+        if item["version"] == second_decision["candidate_version"]
+    )
+    assert candidate["status"] == "retired"
+    assert candidate["previous_production"] == "prod-model"
 
 
 def _card(
@@ -142,6 +166,7 @@ def _card(
     brier: float = 0.20,
     bucket: float = 0.55,
     persistence: float = 0.50,
+    historical_brier: float = 0.30,
 ) -> dict:
     return {
         "model_version": version,
@@ -161,7 +186,11 @@ def _card(
                 "balanced_accuracy": persistence,
                 "brier": 0.30,
                 "observations": 100,
-            }
+            },
+            "historical_average": {
+                "brier": historical_brier,
+                "observations": 100,
+            },
         },
     }
 
@@ -179,6 +208,22 @@ def test_promotion_requires_a_full_point_of_balanced_accuracy():
     decision = decide_promotion(candidate, production)
     assert decision["status"] == "retired"
     assert "balanced accuracy" in decision["reason"]
+
+
+def test_promotion_requires_the_minimum_skill_bar():
+    candidate = _card(balanced=0.51)
+    production = _card(version="production", balanced=0.49, brier=0.25)
+    decision = decide_promotion(candidate, production)
+    assert decision["status"] == "retired"
+    assert "0.52" in decision["reason"]
+
+
+def test_promotion_requires_brier_better_than_the_historical_average():
+    candidate = _card(balanced=0.60, brier=0.35, historical_brier=0.30)
+    production = _card(version="production", balanced=0.58, brier=0.40)
+    decision = decide_promotion(candidate, production)
+    assert decision["status"] == "retired"
+    assert "historical average" in decision["reason"]
 
 
 def test_promotion_requires_brier_not_to_worsen():
@@ -206,7 +251,7 @@ def test_promotion_rejects_a_worse_core_index_bucket():
 
 
 def test_promotion_of_a_first_model_requires_beating_persistence():
-    candidate = _card(balanced=0.51, persistence=0.50)
+    candidate = _card(balanced=0.53, persistence=0.50)
     assert decide_promotion(candidate, None)["status"] == "promoted"
     weak = _card(balanced=0.49, persistence=0.50)
     assert decide_promotion(weak, None)["status"] == "retired"
@@ -380,6 +425,36 @@ def test_model_gate_rejects_a_directory_without_a_production_model(tmp_path):
     result = model_gate(tmp_path / "empty")
     assert result is not None
     assert result.status == "fail"
+
+
+def test_model_gate_allows_a_retired_candidate_without_production(tmp_path):
+    from astro_finance.events.model_bundle import model_gate
+
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "promotion.json").write_text(
+        json.dumps({"status": "retired", "reason": "minimum skill not met"}),
+        encoding="utf-8",
+    )
+    (models / "registry.json").write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "version": "candidate",
+                        "status": "retired",
+                        "promoted_at": None,
+                        "previous_production": None,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = model_gate(models)
+    assert result is not None
+    assert result.status == "pass"
+    assert "no qualifying production model" in result.reason
 
 
 def test_macro_validation_rejects_nan_explosion(tmp_path):

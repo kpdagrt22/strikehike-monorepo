@@ -11,6 +11,7 @@ from typing import Any
 import joblib
 
 from .regime_forecast import (
+    MIN_BALANCED_ACCURACY,
     build_dataset,
     config_fingerprint,
     dataset_fingerprint,
@@ -77,10 +78,24 @@ def decide_promotion(
 
     candidate_metrics = _metrics(candidate)
     persistence = candidate.get("baselines", {}).get("persistence", {})
+    historical_average = candidate.get("baselines", {}).get("historical_average", {})
     candidate_balanced = float(candidate_metrics.get("balanced_accuracy", 0.0))
     candidate_brier = float(candidate_metrics.get("brier", 1.0))
     persistence_balanced = float(persistence.get("balanced_accuracy", 0.0))
-    conditions: list[dict[str, Any]] = []
+    historical_average_brier = float(historical_average.get("brier", 1.0))
+    conditions: list[dict[str, Any]] = [
+        {
+            "condition": f"balanced accuracy >= {MIN_BALANCED_ACCURACY:.2f}",
+            "pass": candidate_balanced >= MIN_BALANCED_ACCURACY,
+            "candidate": candidate_balanced,
+        },
+        {
+            "condition": "Brier score better than the historical average",
+            "pass": candidate_brier < historical_average_brier,
+            "candidate": candidate_brier,
+            "historical_average": historical_average_brier,
+        },
+    ]
 
     if production is None:
         conditions.append(
@@ -159,6 +174,7 @@ def decide_promotion(
         "candidate_metrics": candidate_metrics,
         "production_metrics": _metrics(production) if production else None,
         "persistence_metrics": persistence,
+        "historical_average_metrics": historical_average,
     }
 
 
@@ -206,6 +222,11 @@ def run_training_job(
     fingerprint = dataset_fingerprint(build_dataset(frame))
     config = config_fingerprint()
     registry, production_card, _ = load_production(previous_bundle)
+    previous_promotion = (
+        _read_json(previous_bundle / "models" / "promotion.json")
+        if previous_bundle is not None
+        else None
+    )
     production_version = (
         str(production_card.get("model_version")) if production_card else None
     )
@@ -214,10 +235,20 @@ def run_training_job(
     models_dir.mkdir(parents=True, exist_ok=True)
     promotion_path = models_dir / "promotion.json"
 
+    previous_fingerprint = (
+        (previous_promotion or {}).get("dataset_fingerprint")
+        if previous_promotion
+        else None
+    )
+    previous_config = (
+        (previous_promotion or {}).get("config_fingerprint")
+        if previous_promotion
+        else None
+    )
     if (
-        production_card is not None
-        and production_card.get("data", {}).get("fingerprint") == fingerprint
-        and production_card.get("config_fingerprint") == config
+        previous_promotion is not None
+        and previous_fingerprint == fingerprint
+        and previous_config == config
     ):
         _copy_previous_production(previous_bundle, models_dir)
         promotion = {
@@ -226,6 +257,7 @@ def run_training_job(
             "candidate_version": None,
             "production_version": production_version,
             "dataset_fingerprint": fingerprint,
+            "config_fingerprint": config,
         }
         promotion_path.write_text(json.dumps(promotion, indent=2), encoding="utf-8")
         return promotion
@@ -293,9 +325,11 @@ def run_training_job(
         ),
         "previous_production": production_version,
         "dataset_fingerprint": fingerprint,
+        "config_fingerprint": config,
         "candidate_metrics": decision["candidate_metrics"],
         "production_metrics": decision["production_metrics"],
         "persistence_metrics": decision["persistence_metrics"],
+        "historical_average_metrics": decision["historical_average_metrics"],
         "conditions": decision["conditions"],
     }
     promotion_path.write_text(json.dumps(promotion, indent=2), encoding="utf-8")

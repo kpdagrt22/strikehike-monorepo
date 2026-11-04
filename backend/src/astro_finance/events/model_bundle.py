@@ -50,6 +50,7 @@ def model_info(model_dir: Path | None) -> dict[str, Any] | None:
         "candidate_metrics": promotion.get("candidate_metrics"),
         "production_metrics": promotion.get("production_metrics"),
         "persistence_metrics": promotion.get("persistence_metrics"),
+        "historical_average_metrics": promotion.get("historical_average_metrics"),
         "conditions": promotion.get("conditions", []),
         "production_present": production_entry is not None,
         "registry_entries": len(registry.get("models", [])),
@@ -65,10 +66,6 @@ def model_gate(model_dir: Path | None) -> GateResult | None:
         problems.append("promotion.json is missing")
     if not (root / "registry.json").is_file():
         problems.append("registry.json is missing")
-    if not (root / "model_card.json").is_file():
-        problems.append("model_card.json is missing")
-    if not (root / "model.joblib").is_file():
-        problems.append("model.joblib is missing")
     promotion = _json(root / "promotion.json") or {}
     registry = _json(root / "registry.json") or {}
     card = _json(root / "model_card.json") or {}
@@ -80,14 +77,27 @@ def model_gate(model_dir: Path | None) -> GateResult | None:
         for item in registry.get("models", [])
         if isinstance(item, dict) and item.get("status") == "production"
     ]
-    if len(productions) != 1:
+    if len(productions) > 1:
         problems.append(
-            f"registry must contain exactly one production model, found {len(productions)}"
+            f"registry may contain at most one production model, found {len(productions)}"
         )
-    elif productions[0].get("version") != card.get("model_version"):
-        problems.append("production registry entry does not match model_card.json")
+    if productions:
+        if not (root / "model_card.json").is_file():
+            problems.append("model_card.json is missing")
+        if not (root / "model.joblib").is_file():
+            problems.append("model.joblib is missing")
+        if productions[0].get("version") != card.get("model_version"):
+            problems.append("production registry entry does not match model_card.json")
+    elif status == "promoted":
+        problems.append("promotion says promoted but no production model is registered")
     if problems:
         return GateResult("model_lifecycle", "fail", "; ".join(problems))
+    if not productions:
+        return GateResult(
+            "model_lifecycle",
+            "pass",
+            "no qualifying production model; forecast endpoint returns 503",
+        )
     return GateResult(
         "model_lifecycle",
         "pass",

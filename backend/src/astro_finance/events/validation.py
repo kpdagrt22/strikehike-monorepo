@@ -241,6 +241,19 @@ def validate_events(
     for event in events:
         source = sources.get(event.source_id)
         if source is None:
+            # A retired event from a removed source is retained but hidden;
+            # it must still keep a valid shape.  Active events cannot survive
+            # without an enabled source.
+            if event.status in (
+                EventStatus.UNVERIFIED,
+                EventStatus.COMPLETED,
+                EventStatus.CANCELLED,
+                EventStatus.RESCHEDULED,
+            ):
+                reasons = validate_event(event, today=today)
+                if reasons:
+                    failures[event.event_id] = reasons
+                continue
             failures[event.event_id] = [
                 f"source_id {event.source_id!r} is not an enabled source"
             ]
