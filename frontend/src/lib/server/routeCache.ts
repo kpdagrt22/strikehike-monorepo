@@ -10,6 +10,10 @@
  *   straight through); the total is capped at 48 MB, least recently used first.
  *   The total counts two bytes per character of body and key: V8 stores any
  *   string with a non-Latin-1 character (an em dash will do) as UTF-16.
+ * - The active events-bundle version is checked at most once every 60 seconds,
+ *   as one shared request per process. A change clears every entry before a
+ *   request is served; a failed health call keeps the cache and retries after
+ *   the next interval.
  *
  * State is per server process and starts empty after a restart or deploy.
  */
@@ -30,84 +34,183 @@ export type RouteCacheResult = RouteLoadResult & {
   cache: "hit" | "stale" | "miss";
 };
 
+export type RouteCacheOptions = {
+  /** Backend base URL; defaults to CHRONO_API_URL, as the proxy routes do. */
+  backendUrl?: string;
+  /** Test seam for the 60-second throttle. */
+  now?: () => number;
+  /** Test seam for the health request. */
+  fetchImpl?: typeof fetch;
+};
+
 type Entry = { body: string; cost: number; storedAt: number };
 
 const MAX_ENTRY_BYTES = 4 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 48 * 1024 * 1024;
+const VERSION_CHECK_INTERVAL_MS = 60_000;
+const VERSION_CHECK_TIMEOUT_MS = 2_000;
 
-const entries = new Map<string, Entry>();
-const inflight = new Map<string, Promise<RouteLoadResult>>();
-let totalBytes = 0;
+export function createRouteCache(options: RouteCacheOptions = {}) {
+  const backendUrl = (
+    options.backendUrl ??
+    process.env.CHRONO_API_URL ??
+    "http://127.0.0.1:8000"
+  ).replace(/\/+$/, "");
+  const now = options.now ?? (() => Date.now());
+  const fetchImpl =
+    options.fetchImpl ??
+    ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
 
-function remove(key: string) {
-  const entry = entries.get(key);
-  if (!entry) return;
-  entries.delete(key);
-  totalBytes -= entry.cost;
-}
+  const entries = new Map<string, Entry>();
+  const inflight = new Map<string, Promise<RouteLoadResult>>();
+  let totalBytes = 0;
+  // A version change bumps the generation, so a load started before it cannot
+  // repopulate the cache with a response for the old bundle.
+  let generation = 0;
+  // undefined = no successful health read yet; null = no active bundle.
+  let activeBundleVersion: string | null | undefined;
+  let nextVersionCheckAt = 0;
+  let versionCheck: Promise<void> | null = null;
 
-function store(key: string, body: string) {
-  remove(key);
-  if (Buffer.byteLength(body, "utf8") > MAX_ENTRY_BYTES) return;
-  // Heap cost, not wire size; remove() subtracts the same amount.
-  const cost = 2 * (body.length + key.length);
-  entries.set(key, { body, cost, storedAt: Date.now() });
-  totalBytes += cost;
-  // Map iteration follows insertion order, so the first keys are the least
-  // recently used ones.
-  for (const oldestKey of entries.keys()) {
-    if (totalBytes <= MAX_TOTAL_BYTES) break;
-    remove(oldestKey);
+  function remove(key: string) {
+    const entry = entries.get(key);
+    if (!entry) return;
+    entries.delete(key);
+    totalBytes -= entry.cost;
   }
-}
 
-function load(
-  key: string,
-  loader: () => Promise<RouteLoadResult>,
-): Promise<RouteLoadResult> {
-  const pending = inflight.get(key);
-  if (pending) return pending;
+  function clearAll() {
+    entries.clear();
+    inflight.clear();
+    totalBytes = 0;
+    generation += 1;
+  }
 
-  const next = loader()
-    .then((result) => {
-      if (result.status === 200) store(key, result.body);
-      return result;
-    })
-    .finally(() => {
-      inflight.delete(key);
-    });
-  inflight.set(key, next);
-  return next;
-}
+  // Loads are keyed by generation too: a request for the new bundle never
+  // joins a load started before the version change.
+  function inflightKey(key: string) {
+    return `${generation}\u0000${key}`;
+  }
 
-export async function cachedRoute(
-  key: string,
-  policy: RouteCachePolicy,
-  loader: () => Promise<RouteLoadResult>,
-): Promise<RouteCacheResult> {
-  const entry = entries.get(key);
-  if (entry) {
-    const age = Date.now() - entry.storedAt;
-    const maxStaleMs = Math.max(policy.ttlMs, policy.maxStaleMs ?? 0);
-    if (age < maxStaleMs) {
-      entries.delete(key);
-      entries.set(key, entry);
-      if (age < policy.ttlMs) {
-        return { status: 200, body: entry.body, cache: "hit" };
-      }
-      if (!inflight.has(key)) {
-        load(key, loader).catch(() => {
-          // Keep serving the stale entry; the next request tries again.
-        });
-      }
-      return { status: 200, body: entry.body, cache: "stale" };
-    }
+  function store(key: string, body: string) {
     remove(key);
+    if (Buffer.byteLength(body, "utf8") > MAX_ENTRY_BYTES) return;
+    // Heap cost, not wire size; remove() subtracts the same amount.
+    const cost = 2 * (body.length + key.length);
+    entries.set(key, { body, cost, storedAt: now() });
+    totalBytes += cost;
+    // Map iteration follows insertion order, so the first keys are the least
+    // recently used ones.
+    for (const oldestKey of entries.keys()) {
+      if (totalBytes <= MAX_TOTAL_BYTES) break;
+      remove(oldestKey);
+    }
   }
 
-  const result = await load(key, loader);
-  return { ...result, cache: "miss" };
+  function load(
+    key: string,
+    loader: () => Promise<RouteLoadResult>,
+  ): Promise<RouteLoadResult> {
+    const pendingKey = inflightKey(key);
+    const pending = inflight.get(pendingKey);
+    if (pending) return pending;
+
+    const startGeneration = generation;
+    const next = loader()
+      .then((result) => {
+        if (result.status === 200 && startGeneration === generation) {
+          store(key, result.body);
+        }
+        return result;
+      })
+      .finally(() => {
+        inflight.delete(pendingKey);
+      });
+    inflight.set(pendingKey, next);
+    return next;
+  }
+
+  async function readActiveVersion(): Promise<string | null | undefined> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), VERSION_CHECK_TIMEOUT_MS);
+    try {
+      const response = await fetchImpl(`${backendUrl}/api/v1/events/health`, {
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (!response.ok) return undefined;
+      const payload: unknown = await response.json();
+      if (payload === null || typeof payload !== "object") return undefined;
+      const version = (payload as { active_version?: unknown }).active_version;
+      if (version === null) return null;
+      return typeof version === "string" ? version : undefined;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function refreshActiveBundleVersion(): Promise<void> {
+    const version = await readActiveVersion();
+    if (version === undefined) return; // health failed: keep the cache
+    const previous = activeBundleVersion;
+    activeBundleVersion = version;
+    if (previous !== undefined && previous !== version) clearAll();
+  }
+
+  function ensureActiveBundleVersion(): Promise<void> {
+    // Every concurrent caller waits for the same in-flight check, even when
+    // the 60-second window has already been claimed.
+    if (versionCheck !== null) return versionCheck;
+    if (now() < nextVersionCheckAt) return Promise.resolve();
+    nextVersionCheckAt = now() + VERSION_CHECK_INTERVAL_MS;
+    versionCheck = refreshActiveBundleVersion()
+      .catch(() => {
+        // A health check must never fail a proxy request.
+      })
+      .finally(() => {
+        versionCheck = null;
+      });
+    return versionCheck;
+  }
+
+  async function cachedRoute(
+    key: string,
+    policy: RouteCachePolicy,
+    loader: () => Promise<RouteLoadResult>,
+  ): Promise<RouteCacheResult> {
+    await ensureActiveBundleVersion();
+    const entry = entries.get(key);
+    if (entry) {
+      const age = now() - entry.storedAt;
+      const maxStaleMs = Math.max(policy.ttlMs, policy.maxStaleMs ?? 0);
+      if (age < maxStaleMs) {
+        entries.delete(key);
+        entries.set(key, entry);
+        if (age < policy.ttlMs) {
+          return { status: 200, body: entry.body, cache: "hit" };
+        }
+        if (!inflight.has(inflightKey(key))) {
+          load(key, loader).catch(() => {
+            // Keep serving the stale entry; the next request tries again.
+          });
+        }
+        return { status: 200, body: entry.body, cache: "stale" };
+      }
+      remove(key);
+    }
+
+    const result = await load(key, loader);
+    return { ...result, cache: "miss" };
+  }
+
+  return { cachedRoute };
 }
+
+const defaultCache = createRouteCache();
+
+export const cachedRoute = defaultCache.cachedRoute;
 
 /** JSON text response; Cache-Control is sent on 200 responses only. */
 export function jsonTextResponse(
