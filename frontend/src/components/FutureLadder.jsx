@@ -232,7 +232,7 @@ export function FutureLadder() {
 
         <div
           id="chrono-ladder-content"
-          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-36.75rem)))]"
+          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-40.5rem)))]"
         >
           {view === "upcoming" ? (
             <UpcomingEvents />
