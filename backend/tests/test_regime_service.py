@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -447,3 +448,38 @@ def test_crypto_milestones_join_market_stats_and_core_index(tmp_path):
     assert covid["core_index"]["at_peak"] == 12.34
     assert covid["core_index"]["at_trough"] == 12.34
     assert covid["core_index"]["at_peak_bucket"] == "calm_bullish"
+
+def test_bundle_first_resolution_prefers_bundle_then_baked(tmp_path, monkeypatch):
+    artifact, meta_path = _write_artifact(tmp_path)
+    runtime = tmp_path / "runtime"
+    bundle = runtime / "bundles" / "test"
+    data = bundle / "data"
+    data.mkdir(parents=True)
+    shutil.copyfile(artifact, data / "macro_regime_history.parquet")
+    bundle_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    bundle_meta["data_version"] = "bundle-version"
+    (data / "macro_regime_history.meta.json").write_text(
+        json.dumps(bundle_meta), encoding="utf-8"
+    )
+    (data / "patterns_v2_skill.json").write_text("{}", encoding="utf-8")
+    (bundle / "manifest.json").write_text("{}", encoding="utf-8")
+    (bundle / "events.sqlite").touch()
+    (runtime / "current").write_text("bundles/test\n", encoding="utf-8")
+    monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(runtime))
+
+    service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
+    assert service._artifact_path() == data / "macro_regime_history.parquet"
+    assert service._meta_path() == data / "macro_regime_history.meta.json"
+    assert service._patterns_skill_path() == data / "patterns_v2_skill.json"
+    payload = service.macro_history(resolution="weekly")
+    assert payload["meta"]["data_version"] == "bundle-version"
+
+    # A missing bundle file falls back to the baked copy on its own.
+    (data / "macro_regime_history.meta.json").unlink()
+    assert service._meta_path() == meta_path
+    assert service._artifact_path() == data / "macro_regime_history.parquet"
+
+    monkeypatch.delenv("EVENTS_RUNTIME_DIR", raising=False)
+    assert service._artifact_path() == artifact
+    assert service._meta_path() == meta_path
+    assert service._patterns_skill_path() == tmp_path / "patterns_v2_skill.json"

@@ -385,6 +385,10 @@ def test_service_loads_the_model_from_the_active_bundle(tmp_path, monkeypatch):
     (bundle / "data").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(DATA, bundle / "data" / "macro_regime_history.parquet")
     model, card = train_dataset(DATA)
+    # This test is about serving the active bundle's model, not about whether
+    # the fixture clears today's bar (the next test covers the below-bar case).
+    card["walk_forward"]["overall"]["balanced_accuracy"] = 0.60
+    card["baselines"]["historical_average"] = {"brier": 1.0}
     (bundle / "models").mkdir(parents=True, exist_ok=True)
     joblib.dump(model, bundle / "models" / "model.joblib")
     (bundle / "models" / "model_card.json").write_text(
@@ -537,3 +541,48 @@ def test_macro_validation_rejects_nan_explosion(tmp_path):
     )
     assert not result.passed
     assert any("nan_core_columns" in reason for reason in result.reasons)
+
+def test_forecast_returns_503_when_the_bundle_model_is_below_the_skill_bar(
+    tmp_path, monkeypatch
+):
+    runtime = tmp_path / "runtime"
+    bundle = runtime / "bundles" / "below-bar"
+    models = bundle / "models"
+    models.mkdir(parents=True)
+    joblib.dump({"dummy": True}, models / "model.joblib")
+    (models / "model_card.json").write_text(
+        json.dumps(
+            {
+                "model_version": "below-bar",
+                "features": ["core_index"],
+                "walk_forward": {
+                    "overall": {"balanced_accuracy": 0.50, "brier": 0.25}
+                },
+                "baselines": {"historical_average": {"brier": 0.24}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "manifest.json").write_text("{}", encoding="utf-8")
+    (bundle / "events.sqlite").touch()
+    (runtime / "current").write_text("bundles/below-bar\n", encoding="utf-8")
+    monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(runtime))
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from regime.router import router
+    from regime.service import MacroRegimeService, ModelUnavailableError
+
+    service = MacroRegimeService(
+        artifact_path=tmp_path / "missing.parquet",
+        meta_path=tmp_path / "missing.meta.json",
+    )
+    with pytest.raises(ModelUnavailableError, match="skill bar"):
+        service.forecast()
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    response = TestClient(app).get("/api/v1/regime/forecast")
+    assert response.status_code == 503
+    assert "No production forecast model is active" in response.json()["detail"]

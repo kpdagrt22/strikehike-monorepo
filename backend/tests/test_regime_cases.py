@@ -719,3 +719,27 @@ def test_golden_paths_keep_case_marks(committed):
         since = context.series[key].eras[-1].obs.loc[_ts(path["t0"]):]
         assert (since.idxmin() - _ts(path["t0"])).days in path["d"], key
         assert min(path["v"]) == round((since.min() / since.iloc[0] - 1.0) * 100.0, 2), key
+
+def test_case_store_resolves_the_active_bundle(tmp_path, monkeypatch):
+    baked_dir = tmp_path / "baked"
+    baked_dir.mkdir()
+    artifact, meta, events = _write(baked_dir, _frame().loc[:"2012-12-31"])
+
+    runtime = tmp_path / "runtime"
+    bundle = runtime / "bundles" / "test"
+    data = bundle / "data"
+    data.mkdir(parents=True)
+    _frame().to_parquet(
+        data / "macro_regime_history.parquet", engine="pyarrow", compression="snappy"
+    )
+    (data / "macro_regime_history.meta.json").write_text(
+        json.dumps({"data_version": "bundle"}), encoding="utf-8"
+    )
+    (bundle / "manifest.json").write_text("{}", encoding="utf-8")
+    (bundle / "events.sqlite").touch()
+    (runtime / "current").write_text("bundles/test\n", encoding="utf-8")
+    monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(runtime))
+
+    store = cases.CaseStore(artifact, meta, events)
+    payload = store.case_path("today")
+    assert payload["last_obs"] == "2013-12-31"
