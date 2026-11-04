@@ -159,6 +159,75 @@ def test_registry_keeps_the_previous_production_for_rollback(tmp_path):
     assert candidate["previous_production"] == "prod-model"
 
 
+def _serving_bundle(root: Path, *, balanced: float, promotion: dict | None = None) -> Path:
+    """A previous bundle whose serving model was promoted under the old rule."""
+    (root / "models").mkdir(parents=True)
+    joblib.dump({"dummy": True}, root / "models" / "model.joblib")
+    card = {
+        "model_version": "old-model",
+        "walk_forward": {"overall": {"balanced_accuracy": balanced, "brier": 0.2368}},
+        # Cards from before the historical-average baseline have only persistence.
+        "baselines": {"persistence": {"balanced_accuracy": 0.4988}},
+    }
+    (root / "models" / "model_card.json").write_text(json.dumps(card), encoding="utf-8")
+    (root / "models" / "registry.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "models": [
+                    {"version": "old-model", "status": "production",
+                     "model": "models/model.joblib", "card": "models/model_card.json"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    if promotion is not None:
+        (root / "models" / "promotion.json").write_text(json.dumps(promotion), encoding="utf-8")
+    return root
+
+
+def test_a_serving_model_below_the_skill_bar_is_retired_even_when_data_is_unchanged(tmp_path):
+    from astro_finance.events.model_bundle import model_gate
+    from astro_finance.models.regime_forecast import config_fingerprint, dataset_fingerprint, load_frame
+
+    fingerprint = dataset_fingerprint(build_dataset(load_frame(DATA)))
+    previous = _serving_bundle(
+        tmp_path / "previous",
+        balanced=0.5003,
+        promotion={
+            "status": "promoted",
+            "dataset_fingerprint": fingerprint,
+            "config_fingerprint": config_fingerprint(),
+        },
+    )
+    out = tmp_path / "out"
+    decision = run_training_job(data_path=DATA, out_dir=out, previous_bundle=previous)
+
+    # Same data and config would normally skip; the demotion forces a fresh decision.
+    assert decision["status"] == "retired"
+    assert decision["demoted_production"] == "old-model"
+    assert decision["production_version"] is None
+    assert not (out / "models" / "model.joblib").exists()
+    registry = json.loads((out / "models" / "registry.json").read_text("utf-8"))
+    old = next(item for item in registry["models"] if item["version"] == "old-model")
+    assert old["status"] == "retired"
+    assert old["retired_reason"] == "below the minimum skill bar"
+    assert not [item for item in registry["models"] if item["status"] == "production"]
+    gate = model_gate(out)
+    assert gate.status == "pass"
+    assert "503" in gate.reason
+
+
+def test_a_serving_model_above_the_skill_bar_keeps_serving(tmp_path):
+    previous = _serving_bundle(tmp_path / "previous", balanced=0.60)
+    out = tmp_path / "out"
+    decision = run_training_job(data_path=DATA, out_dir=out, previous_bundle=previous)
+    assert decision["demoted_production"] is None
+    assert decision["production_version"] == "old-model"
+    assert (out / "models" / "model.joblib").is_file()
+
+
 def _card(
     *,
     version: str = "candidate",

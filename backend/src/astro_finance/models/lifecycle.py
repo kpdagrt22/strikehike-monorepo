@@ -70,6 +70,22 @@ def _segments(card: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def meets_minimum_skill(card: dict[str, Any]) -> bool:
+    """The skill bar a model must clear to serve, whether new or already serving.
+
+    A card written before the historical-average baseline existed is judged on
+    balanced accuracy alone.
+    """
+
+    metrics = _metrics(card)
+    if float(metrics.get("balanced_accuracy", 0.0)) < MIN_BALANCED_ACCURACY:
+        return False
+    historical_average = card.get("baselines", {}).get("historical_average", {})
+    if "brier" in historical_average:
+        return float(metrics.get("brier", 1.0)) < float(historical_average["brier"])
+    return True
+
+
 def decide_promotion(
     candidate: dict[str, Any],
     production: dict[str, Any] | None,
@@ -227,9 +243,26 @@ def run_training_job(
         if previous_bundle is not None
         else None
     )
+    if registry is None and previous_bundle is not None:
+        # Keep the registry history even when no model is serving.
+        registry = _read_json(previous_bundle / "models" / "registry.json")
     production_version = (
         str(production_card.get("model_version")) if production_card else None
     )
+
+    # A serving model promoted before the skill bar existed must clear it too;
+    # otherwise it is retired and the forecast endpoint returns 503.
+    demoted_version = None
+    if production_card is not None and not meets_minimum_skill(production_card):
+        demoted_version = production_version
+        for item in (registry or {}).get("models", []):
+            if isinstance(item, dict) and item.get("status") == "production":
+                item["status"] = "retired"
+                item["retired_reason"] = "below the minimum skill bar"
+                item["model"] = None
+                item["card"] = None
+        production_card = None
+        production_version = None
 
     models_dir = out_dir / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -246,7 +279,8 @@ def run_training_job(
         else None
     )
     if (
-        previous_promotion is not None
+        demoted_version is None
+        and previous_promotion is not None
         and previous_fingerprint == fingerprint
         and previous_config == config
     ):
@@ -292,7 +326,8 @@ def run_training_job(
             )
         )
     else:
-        _copy_previous_production(previous_bundle, models_dir)
+        if production_card is not None:
+            _copy_previous_production(previous_bundle, models_dir)
         models = [
             item
             for item in (registry or {}).get("models", [])
@@ -324,6 +359,7 @@ def run_training_job(
             candidate_card["model_version"] if promoted else production_version
         ),
         "previous_production": production_version,
+        "demoted_production": demoted_version,
         "dataset_fingerprint": fingerprint,
         "config_fingerprint": config,
         "candidate_metrics": decision["candidate_metrics"],
