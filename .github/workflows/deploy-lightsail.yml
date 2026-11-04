@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       rehearse_rollback:
-        description: "Deploy this commit, force the probes to fail, then restore the previous images"
+        description: "Deploy this commit, force the probes to fail, restore the previous images (green if the restore passes every probe)"
         required: false
         default: false
         type: boolean
@@ -415,7 +415,7 @@ jobs:
             docker compose -p strikehike-chrono ps
 
             if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
-              echo "::warning::Rollback rehearsal requested; the probe gate is forced to fail after this same-commit deploy."
+              echo "::warning::Rollback rehearsal requested; the probe gate is forced to fail so the :rollback images are restored; the job passes if the restore works."
               PROBES_OK=1
             elif wait_ready && warm_up && run_probes; then
               PROBES_OK=0
@@ -425,9 +425,19 @@ jobs:
             fi
 
             if [ "$PROBES_OK" -ne 0 ]; then
-              echo "::error::The new release failed its probes; restoring the :rollback images."
+              if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+                echo "Rehearsal: restoring the :rollback images."
+              else
+                echo "::error::The new release failed its probes; restoring the :rollback images."
+              fi
               if rollback_images; then
                 if wait_ready && warm_up && run_probes; then
+                  # A rehearsal passes (green) when the restore works; only a
+                  # real failed release keeps the job red.
+                  if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+                    echo "::notice::Rollback rehearsal passed: the previous images were restored and passed every probe."
+                    exit 0
+                  fi
                   echo "::error::Previous images restored and passed the probes; failing this job because the new release did not."
                 else
                   echo "::error::Previous images were restored but the probes still fail."
