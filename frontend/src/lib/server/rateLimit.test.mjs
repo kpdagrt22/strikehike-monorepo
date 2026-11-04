@@ -1,0 +1,82 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  clientIpFromHeaders,
+  createRateLimiter,
+  DAILY_LIMIT_PER_MINUTE,
+  API_LIMIT_PER_MINUTE,
+} from "./rateLimit.js";
+
+test("the general API bucket allows 120 requests a minute", () => {
+  let time = 0;
+  const limiter = createRateLimiter({ now: () => time });
+
+  for (let index = 0; index < API_LIMIT_PER_MINUTE; index += 1) {
+    assert.equal(limiter.consume("1.2.3.4").allowed, true, `request ${index + 1}`);
+  }
+  const blocked = limiter.consume("1.2.3.4");
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfterSeconds >= 1);
+
+  time = 60_000;
+  assert.equal(limiter.consume("1.2.3.4").allowed, true);
+});
+
+test("daily requests have their own 30-request bucket", () => {
+  let time = 0;
+  const limiter = createRateLimiter({ now: () => time });
+
+  for (let index = 0; index < DAILY_LIMIT_PER_MINUTE; index += 1) {
+    assert.equal(limiter.consume("1.2.3.4", true).allowed, true, `daily ${index + 1}`);
+  }
+  const blocked = limiter.consume("1.2.3.4", true);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfterSeconds >= 1);
+
+  // The general bucket still has tokens, and a non-daily request can use them.
+  assert.equal(limiter.consume("1.2.3.4", false).allowed, true);
+});
+
+test("idle buckets are evicted after ten minutes", () => {
+  let time = 0;
+  const limiter = createRateLimiter({ now: () => time });
+  limiter.consume("old-a");
+  limiter.consume("old-b");
+  assert.equal(limiter.size(), 2);
+
+  time = 11 * 60_000;
+  limiter.consume("new");
+  assert.equal(limiter.size(), 1);
+});
+
+test("the bucket map is capped at maxKeys", () => {
+  let time = 0;
+  const limiter = createRateLimiter({ now: () => time, maxKeys: 3 });
+  limiter.consume("a");
+  limiter.consume("b");
+  limiter.consume("c");
+  limiter.consume("d");
+  assert.equal(limiter.size(), 3);
+});
+
+test("the client key is the first forwarded address, then the real IP", () => {
+  const headers = (values) => ({ get: (name) => values[name] ?? null });
+
+  assert.equal(
+    clientIpFromHeaders(
+      headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.2", "x-real-ip": "10.0.0.2" }),
+      "127.0.0.1",
+    ),
+    "203.0.113.7",
+  );
+  assert.equal(
+    clientIpFromHeaders(headers({ "x-real-ip": "198.51.100.4" }), null),
+    "198.51.100.4",
+  );
+  assert.equal(clientIpFromHeaders(headers({}), "127.0.0.1"), "127.0.0.1");
+  assert.equal(
+    clientIpFromHeaders(headers({ "x-real-ip": "198.51.100.4" }), "127.0.0.1"),
+    "127.0.0.1",
+  );
+});

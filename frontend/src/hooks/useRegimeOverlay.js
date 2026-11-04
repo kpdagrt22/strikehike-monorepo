@@ -63,10 +63,20 @@ export function useRegimeOverlay() {
       return undefined;
     }
 
+    // A future focus has no observation yet: clamp the end to today, and skip
+    // the request entirely when the whole seven-day window is in the future.
+    const today = new Date().toISOString().slice(0, 10);
+    const end = focusedDate > today ? today : focusedDate;
+    if (start > end) {
+      store.setRegimeTone(null);
+      store.setRegimeOverlayStatus("unavailable");
+      return undefined;
+    }
+
     delay(OVERLAY_FETCH_DEBOUNCE_MS, controller.signal)
       .then(() =>
         fetch(
-          `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${focusedDate}`,
+          `/api/v1/regime/macro-history?resolution=daily&start=${start}&end=${end}`,
           { signal: controller.signal, cache: "no-store" },
         ),
       )

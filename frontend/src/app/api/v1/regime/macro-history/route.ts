@@ -13,6 +13,11 @@ const BACKEND_TIMEOUT_MS = 15_000;
 const CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600";
 const CACHE_POLICY = { ttlMs: 15 * 60_000, maxStaleMs: 60 * 60_000 };
 const UNAVAILABLE = { error: "Macro regime service is unavailable." };
+// The longest daily window any view asks for is CrashDetailPanel's 1873-04-01
+// to 1879-03-31 span around the 65-month NBER recession: 2,190 days. 1.25x
+// that is 2,737.5, rounded up; the 3-year floor is already smaller.
+const MAX_DAILY_RANGE_DAYS = 2_738;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // view=atlas (weekly only): the timeline fields the /regime page reads
 // (RegimeTimeline, MacroHUD, ChartCrosshairLegend, PhasePlane and the asset
@@ -101,11 +106,53 @@ async function loadMacroHistory(
 // The only parameters the FastAPI endpoint accepts, in a fixed order.
 const UPSTREAM_PARAMS = ["resolution", "start", "end"];
 
+function parseIsoDate(value: string | null) {
+  if (!value || !ISO_DATE.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10) === value ? parsed : null;
+}
+
+function badRequest(detail: string): Response {
+  return jsonTextResponse(
+    { status: 400, body: JSON.stringify({ detail }) },
+    CACHE_CONTROL,
+  );
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const resolution = searchParams.get("resolution");
+  const start = searchParams.get("start");
+  const end = searchParams.get("end");
+  const startDate = parseIsoDate(start);
+  const endDate = parseIsoDate(end);
+
+  if (start && !startDate) {
+    return badRequest("start must be an ISO date (YYYY-MM-DD).");
+  }
+  if (end && !endDate) {
+    return badRequest("end must be an ISO date (YYYY-MM-DD).");
+  }
+  if (startDate && endDate && startDate.getTime() > endDate.getTime()) {
+    return badRequest("start must be on or before end.");
+  }
+  if (resolution === "daily") {
+    if (!startDate || !endDate) {
+      return badRequest("resolution=daily requires start and end.");
+    }
+    const days = Math.round(
+      (endDate.getTime() - startDate.getTime()) / 86_400_000,
+    );
+    if (days > MAX_DAILY_RANGE_DAYS) {
+      return badRequest(
+        `Daily ranges are capped at ${MAX_DAILY_RANGE_DAYS} days.`,
+      );
+    }
+  }
+
   const atlas =
-    searchParams.get("view") === "atlas" &&
-    searchParams.get("resolution") === "weekly";
+    searchParams.get("view") === "atlas" && resolution === "weekly";
 
   // One canonical query is both the upstream request and the cache key, so
   // unknown parameters can neither reach the backend nor mint new entries.
