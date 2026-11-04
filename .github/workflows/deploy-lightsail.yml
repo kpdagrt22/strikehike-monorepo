@@ -3,13 +3,24 @@ name: Deploy to Lightsail
 on:
   push:
     branches: [main]
+  # Pull requests run the test jobs only; the deploy job never runs for them.
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rehearse_rollback:
+        description: "Deploy this commit, force the probes to fail, then restore the previous images"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: lightsail-production
-  cancel-in-progress: false
+  # PR runs get their own group so they never queue behind (or cancel) a deploy.
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || 'lightsail-production' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test-backend:
@@ -39,6 +50,7 @@ jobs:
       - name: Run backend tests
         run: |
           python -m pytest \
+            tests/events \
             tests/test_energy_metric_compiler.py \
             tests/test_historical_parallels.py \
             tests/test_macro_ingestion.py \
@@ -76,20 +88,110 @@ jobs:
       - name: Route cache tests
         run: npm run test:route-cache
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           TURBO_TELEMETRY_DISABLED: "1"
 
+  test-frontend-smoke:
+    name: Frontend smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Set up Python 3.11.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.9"
+          cache: pip
+          cache-dependency-path: backend/requirements-minimal.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-minimal.txt
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          TURBO_TELEMETRY_DISABLED: "1"
+
+      - name: Start the stack and run the smoke tests
+        run: |
+          set -euo pipefail
+          (
+            cd ../backend
+            PYTHONPATH="src:." LOAD_ML_MODELS=0 \
+              nohup uvicorn api_server:app --host 127.0.0.1 --port 8010 \
+              > /tmp/backend.log 2>&1 &
+          )
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:8010/health > /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              cat /tmp/backend.log
+              exit 1
+            fi
+            sleep 2
+          done
+          CHRONO_API_URL=http://127.0.0.1:8010 PORT=3000 HOSTNAME=127.0.0.1 \
+            nohup npm run start > /tmp/frontend.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/ > /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              cat /tmp/frontend.log
+              exit 1
+            fi
+            sleep 2
+          done
+          npx playwright test
+
+      - name: Upload Playwright results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-smoke-${{ github.run_id }}
+          path: frontend/test-results
+          if-no-files-found: ignore
+
   deploy:
     name: Deploy monorepo to Lightsail
-    needs: [test-backend, test-frontend]
+    needs: [test-backend, test-frontend, test-frontend-smoke]
+    # Production only: pushes to main, or a manual run started from main.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Build new stack, stop legacy edge, cut over
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          REHEARSE_ROLLBACK: ${{ github.event.inputs.rehearse_rollback || 'false' }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -97,6 +199,7 @@ jobs:
           port: 22
           script_stop: true
           command_timeout: 30m
+          envs: REHEARSE_ROLLBACK
           script: |
             set -euo pipefail
 
@@ -108,6 +211,39 @@ jobs:
             git checkout main
             git pull --ff-only origin main
 
+            MARKER="NBER recession windows from FRED"
+            BASE_URL="https://strikehike.com"
+            CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
+
+            tag_rollback_images() {
+              for service in backend frontend; do
+                cid="$(docker compose -p strikehike-chrono ps -q "$service" 2>/dev/null || true)"
+                if [ -n "$cid" ]; then
+                  image_id="$(docker inspect --format '{{.Image}}' "$cid" 2>/dev/null || true)"
+                  if [ -n "$image_id" ] && docker tag "$image_id" "strikehike-rollback-${service}:rollback"; then
+                    echo "Tagged ${service} image ${image_id} as :rollback."
+                  else
+                    echo "::warning::Could not tag the ${service} rollback image."
+                  fi
+                fi
+              done
+            }
+
+            # Tag the running images before the new build can replace their
+            # names. The running containers keep the old image IDs.
+            tag_rollback_images
+
+            # A rehearsal must never reach the cutover without images to go
+            # back to; stop here, before anything has changed.
+            if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+              for service in backend frontend; do
+                if ! docker image inspect "strikehike-rollback-${service}:rollback" > /dev/null 2>&1; then
+                  echo "::error::Cannot rehearse: no :rollback image for ${service}. Nothing was changed."
+                  exit 1
+                fi
+              done
+            fi
+
             # Build the new stack while the existing site is still serving.
             docker compose -p strikehike-chrono build
 
@@ -118,7 +254,7 @@ jobs:
               OLD_CONFIG="$(docker inspect "$OLD_FIRST" --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null || true)"
             fi
 
-            rollback() {
+            legacy_rollback() {
               echo "::error::New strikehike-chrono stack failed; rolling back to legacy strikehike stack."
               docker compose -p strikehike-chrono down --remove-orphans || true
               if [ -n "$OLD_CONFIG" ] && [ -f "$OLD_CONFIG" ]; then
@@ -127,6 +263,127 @@ jobs:
                 docker start $OLD_IDS || true
               fi
               exit 1
+            }
+
+            rollback_images() {
+              for service in backend frontend; do
+                if ! docker image inspect "strikehike-rollback-${service}:rollback" > /dev/null 2>&1; then
+                  return 1
+                fi
+              done
+              override="$(mktemp)"
+              {
+                echo "services:"
+                for service in backend frontend; do
+                  echo "  ${service}:"
+                  echo "    image: strikehike-rollback-${service}:rollback"
+                done
+              } > "$override"
+              if ! docker compose -p strikehike-chrono -f docker-compose.yml -f "$override" \
+                up -d --remove-orphans; then
+                rm -f "$override"
+                return 1
+              fi
+              rm -f "$override"
+              return 0
+            }
+
+            prune_after_success() {
+              protected="$(
+                {
+                  docker compose -p strikehike-chrono ps -q \
+                    | xargs -r docker inspect --format '{{.Image}}' || true
+                  docker image ls --no-trunc --format '{{.ID}} {{.Repository}}:{{.Tag}}' \
+                    | awk '$2 ~ /:rollback$/ {print $1}'
+                } | sort -u
+              )"
+              # Full sha256 IDs on both sides, so the protected list matches.
+              for id in $(docker image ls --no-trunc --format '{{.ID}}' --filter "until=24h" | sort -u); do
+                if printf '%s\n' "$protected" | grep -qx "$id"; then
+                  continue
+                fi
+                docker image rm "$id" > /dev/null 2>&1 || true
+              done
+              docker image prune -f > /dev/null 2>&1 || true
+              docker builder prune -f --filter "until=24h" > /dev/null 2>&1 || true
+              docker container prune -f --filter "until=24h" > /dev/null 2>&1 || true
+            }
+
+            probe_backend() {
+              curl --fail --silent --show-error \
+                --retry 12 --retry-delay 5 --retry-connrefused \
+                http://127.0.0.1:8010/health > /dev/null
+            }
+
+            probe_events() {
+              "${CURL[@]}" "$BASE_URL/api/v1/events/health" \
+                | docker compose -p strikehike-chrono exec -T backend \
+                    python -c 'import json,sys; payload=json.load(sys.stdin); counts=payload.get("counts") or {}; assert int(counts.get("total", 0)) > 0'
+            }
+
+            probe_atlas() {
+              "${CURL[@]}" "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
+                | docker compose -p strikehike-chrono exec -T backend \
+                    python -c 'import json,sys; payload=json.load(sys.stdin); assert len(payload.get("timeline") or []) > 8000'
+            }
+
+            probe_upcoming() {
+              "${CURL[@]}" "$BASE_URL/api/v1/events/upcoming" > /dev/null
+            }
+
+            probe_home() {
+              "${CURL[@]}" "$BASE_URL/" > /dev/null
+            }
+
+            probe_regime() {
+              page="$(mktemp)"
+              for attempt in $(seq 1 30); do
+                if "${CURL[@]}" "$BASE_URL/regime" -o "$page" \
+                  && grep -qF "$MARKER" "$page"; then
+                  rm -f "$page"
+                  return 0
+                fi
+                if [ "$attempt" -eq 30 ]; then
+                  rm -f "$page"
+                  return 1
+                fi
+                sleep 3
+              done
+              rm -f "$page"
+              return 1
+            }
+
+            probe_chrono() {
+              "${CURL[@]}" "$BASE_URL/api/chrono/positions?date=2008-09-15" > /dev/null
+            }
+
+            # Containers take a while to start and Caddy may still be
+            # provisioning TLS, so wait (up to ~4 min) before the strict probes.
+            wait_ready() {
+              probe_backend \
+                && "${CURL[@]}" --retry 36 --retry-delay 5 --retry-connrefused --retry-all-errors \
+                  "$BASE_URL/" > /dev/null
+            }
+
+            warm_up() {
+              probe_atlas \
+                && probe_upcoming \
+                && probe_home \
+                && probe_regime
+            }
+
+            run_probes() {
+              probe_backend \
+                && probe_events \
+                && probe_chrono \
+                && probe_atlas \
+                && probe_home \
+                && probe_regime
+            }
+
+            show_caddy_logs() {
+              echo "--- caddy logs ---"
+              docker compose -p strikehike-chrono logs --tail=120 caddy || true
             }
 
             # Free ports 80/443 only after the new images are built.
@@ -143,43 +400,50 @@ jobs:
             fi
 
             if ! docker compose -p strikehike-chrono up -d --remove-orphans; then
-              rollback
+              if ! rollback_images && [ -n "$OLD_IDS" ]; then
+                legacy_rollback
+              fi
+              exit 1
             fi
-
-            # Reclaim disk space from unused images, stopped containers, and stale build cache.
-            docker system prune -a -f --filter "until=24h"
 
             # Give Caddy a baseline window to provision the certificate before probing TLS.
             sleep 15
 
             docker compose -p strikehike-chrono ps
 
-            if ! curl --fail --silent --show-error \
-              --retry 12 --retry-delay 5 --retry-connrefused \
-              http://127.0.0.1:8010/health; then
-              rollback
+            if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+              echo "::warning::Rollback rehearsal requested; the probe gate is forced to fail after this same-commit deploy."
+              PROBES_OK=1
+            elif wait_ready && warm_up && run_probes; then
+              PROBES_OK=0
+            else
+              PROBES_OK=1
+              show_caddy_logs
             fi
 
-            if ! curl --fail --silent --show-error \
-              --retry 36 --retry-delay 5 --retry-connrefused --retry-all-errors \
-              --resolve strikehike.com:443:127.0.0.1 \
-              https://strikehike.com/ > /dev/null; then
-              echo "--- caddy logs ---"
-              docker compose -p strikehike-chrono logs --tail=120 caddy || true
-              rollback
-            fi
-
-            if ! curl --fail --silent --show-error \
-              --retry 12 --retry-delay 5 --retry-connrefused --retry-all-errors \
-              --resolve strikehike.com:443:127.0.0.1 \
-              "https://strikehike.com/api/chrono/positions?date=2008-09-15" \
-              > /dev/null; then
-              echo "--- caddy logs ---"
-              docker compose -p strikehike-chrono logs --tail=120 caddy || true
-              rollback
+            if [ "$PROBES_OK" -ne 0 ]; then
+              echo "::error::The new release failed its probes; restoring the :rollback images."
+              if rollback_images; then
+                if wait_ready && warm_up && run_probes; then
+                  echo "::error::Previous images restored and passed the probes; failing this job because the new release did not."
+                else
+                  echo "::error::Previous images were restored but the probes still fail."
+                  show_caddy_logs
+                fi
+              elif [ -n "$OLD_IDS" ]; then
+                echo "::error::No :rollback images are available."
+                legacy_rollback
+              else
+                # Nothing older to start: taking the stack down would only
+                # turn a degraded site into an offline one.
+                echo "::error::No :rollback images and no legacy stack; leaving the new release running."
+              fi
+              exit 1
             fi
 
             # The old containers can be removed after the new stack is healthy.
             if [ -n "$OLD_IDS" ]; then
-              docker rm $OLD_IDS 2>/dev/null || true
+              docker rm $OLD_IDS 2> /dev/null || true
             fi
+
+            prune_after_success

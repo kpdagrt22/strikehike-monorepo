@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "check:copy": "node scripts/check-copy.mjs",
-    "test:route-cache": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs"
+    "test:route-cache": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs",
+    "test:unit": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs src/lib/server/rateLimit.test.mjs",
+    "test:smoke": "playwright test"
   },
   "dependencies": {
     "@react-spring/three": "^10.1.2",
@@ -18,7 +20,7 @@
     "framer-motion": "^12.43.0",
     "gsap": "^3.15.0",
     "lightweight-charts": "^5.2.1",
-    "next": "16.2.9",
+    "next": "16.4.2",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -27,13 +29,15 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.186.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
