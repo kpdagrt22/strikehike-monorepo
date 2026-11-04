@@ -18,7 +18,7 @@ from .io_utils import summary, write_raw, write_rejects
 from .lifecycle import merge_with_previous
 from .macro_data import MacroDataError, validate_macro_refresh
 from .model_bundle import model_gate, model_info
-from .models import EventKind, SourceRun, iso_utc, parse_utc, replace_event
+from .models import EventKind, EventStatus, SourceRun, iso_utc, parse_utc, replace_event
 from .registry import default_data_dir, load_registry, select_sources
 from .reporting import quality_report_payload
 from .runtime import (
@@ -265,6 +265,13 @@ def stage_classification(ctx: PipelineContext) -> StageOutcome:
     for event in ctx.events:
         source = ctx.source_specs.get(event.source_id)
         if source is None:
+            if event.status in (
+                EventStatus.UNVERIFIED,
+                EventStatus.COMPLETED,
+                EventStatus.CANCELLED,
+                EventStatus.RESCHEDULED,
+            ):
+                continue
             raise PipelineError(f"event {event.event_id} has no enabled source")
         if event.theme not in source.themes:
             raise PipelineError(

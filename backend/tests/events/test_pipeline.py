@@ -5,7 +5,6 @@ import shutil
 from datetime import timedelta
 from pathlib import Path
 
-from astro_finance.events.models import EventStatus
 from astro_finance.events.pipeline import PipelineOptions, run_pipeline
 from astro_finance.events.registry import default_data_dir
 from conftest import FIXTURES, NOW, TODAY
@@ -149,6 +148,29 @@ def test_pipeline_reports_natural_disasters_as_not_schedulable(tmp_path):
     report = json.loads((result.bundle_dir / "quality_report.json").read_text("utf-8"))
     assert report["theme_metadata"]["Natural Disasters"]["schedulable"] is False
     assert report["upcoming_counts"]["Natural Disasters"]["365"] == 0
+
+
+def test_pipeline_retires_events_from_a_removed_source_in_the_same_run(tmp_path):
+    from astro_finance.events.bundle import write_dataset
+    from conftest import build_event
+
+    data_dir = _copy_data(tmp_path)
+    previous = tmp_path / "previous"
+    event = build_event(
+        event_id="science:removed_source:gone-2027",
+        source_id="removed_source",
+        start_date=TODAY + timedelta(days=10),
+    )
+    write_dataset(previous, [event], today=TODAY)
+    result = _run(tmp_path, data_dir, previous=previous, name="removed")
+    payload = json.loads((result.bundle_dir / "events.json").read_text("utf-8"))
+    retired = next(
+        item for item in payload["events"] if item["event_id"] == event.event_id
+    )
+    assert retired["status"] == "unverified"
+    assert retired["missing_runs"] == 2
+    report = json.loads((result.bundle_dir / "quality_report.json").read_text("utf-8"))
+    assert report["summary"]["events_retired"] == 1
 
 
 def test_pipeline_writes_reject_reasons_and_fails_the_reject_rate_gate(tmp_path):
