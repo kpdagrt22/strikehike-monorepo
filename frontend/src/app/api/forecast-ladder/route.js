@@ -9,7 +9,7 @@ const BACKEND_TIMEOUT_MS = 8000;
 // No long stale-while-revalidate: the ladder rolls over with the UTC date.
 const CACHE_CONTROL = "public, max-age=300";
 const CACHE_POLICY = { ttlMs: 60 * 60_000 };
-const UNAVAILABLE = { error: "Forecast ladder service is unavailable." };
+const UNAVAILABLE = { error: "Sky ladder service is unavailable." };
 
 async function loadLadder() {
   const controller = new AbortController();

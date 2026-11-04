@@ -133,7 +133,7 @@
 
   /* From lg the planet readout docks 20rem wide at 15.5rem from the top
      (Tooltip.jsx): up to 1712 px it can reach the gauge's 23rem column, so
-     the "Most Similar Day" line steps back while a readout is up. The ring
+     the "Closest past sky" line steps back while a readout is up. The ring
      and the polarity above it stay. */
   [data-hud="gauge"] [data-hud-part="parallel"] {
     transition: opacity var(--sh-dur-reveal) var(--sh-ease-out);
@@ -146,7 +146,7 @@
   }
 
   /* Short windows below lg (landscape phones): the gauge starts under the
-     header row, so its "Most Similar Day" line would run under the mobile
+     header row, so its "Closest past sky" line would run under the mobile
      dock. It steps out there; the score, the ring and the polarity stay. */
   @media (max-width: 1023.98px) and (max-height: 26rem) {
     [data-hud="gauge"] [data-hud-part="parallel"] {
@@ -310,6 +310,22 @@
   outline: 2px solid var(--sh-focus);
   outline-offset: 4px;
   border-radius: 9999px;
+}
+
+/* Sky activity fire (GaugeAura.jsx): a particle fire on a canvas from 85.
+   The canvas holds its last frame after a ~3 s burst, so nothing runs at
+   rest; the container only fades in. */
+.sh-aura {
+  animation: sh-aura-in 320ms var(--sh-ease-out) both;
+}
+
+@keyframes sh-aura-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* One switch for DOM motion: honour the OS setting everywhere. framer-motion

@@ -30,6 +30,12 @@ from regime.crypto_milestones import (
 )
 from regime.cases import window_stats
 from regime import patterns_v2
+from regime.bundle_paths import (
+    MACRO_META_FILENAME,
+    MACRO_PARQUET_FILENAME,
+    PATTERNS_SKILL_FILENAME,
+    resolve_bundle_data_file,
+)
 from regime.schemas import PatternEngineV2
 
 logger = logging.getLogger(__name__)
@@ -446,6 +452,7 @@ class MacroRegimeService:
         self._crashes: list[dict[str, Any]] = []
         self._mtime: float | None = None
         self._meta_mtime: float | None = None
+        self._meta_used: Path | None = None
         self._cache: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._forecast_cache: dict[str, Any] | None = None
         self._model_cache: (
@@ -462,37 +469,37 @@ class MacroRegimeService:
     def _artifact_path(self) -> Path:
         """Prefer the active bundle's refreshed parquet, then the baked file."""
 
-        try:
-            from astro_finance.events.store import current_bundle_dir
+        return resolve_bundle_data_file(MACRO_PARQUET_FILENAME, self.artifact_path)
 
-            bundle = current_bundle_dir()
-        except (ImportError, OSError):
-            bundle = None
-        if bundle is not None:
-            candidate = bundle / "data" / "macro_regime_history.parquet"
-            if candidate.is_file():
-                return candidate
-        return self.artifact_path
+    def _meta_path(self) -> Path:
+        """Prefer the active bundle's meta, then the baked file."""
+
+        return resolve_bundle_data_file(MACRO_META_FILENAME, self.meta_path)
+
+    def _patterns_skill_path(self) -> Path:
+        """Prefer the active bundle's Patterns skill, then the baked file."""
+
+        return resolve_bundle_data_file(
+            PATTERNS_SKILL_FILENAME, self.patterns_skill_path
+        )
 
     def _load(self) -> pd.DataFrame:
         with self._lock:
             artifact_path = self._artifact_path()
+            meta_path = self._meta_path()
             if not artifact_path.exists():
                 raise FileNotFoundError(
                     f"Macro regime artifact not found at {artifact_path}. "
                     "Run: python -m scripts.flows.macro_ingestion"
                 )
             mtime = artifact_path.stat().st_mtime
-            meta_mtime = (
-                self.meta_path.stat().st_mtime
-                if self.meta_path.exists()
-                else None
-            )
+            meta_mtime = meta_path.stat().st_mtime if meta_path.exists() else None
             if (
                 self._frame is None
                 or mtime != self._mtime
                 or meta_mtime != self._meta_mtime
                 or artifact_path != self._artifact_used
+                or meta_path != self._meta_used
             ):
                 frame = pd.read_parquet(artifact_path)
                 frame.index = pd.to_datetime(frame.index, utc=True)
@@ -501,7 +508,8 @@ class MacroRegimeService:
                 self._mtime = mtime
                 self._meta_mtime = meta_mtime
                 self._artifact_used = artifact_path
-                self._meta = _read_json(self.meta_path)
+                self._meta_used = meta_path
+                self._meta = _read_json(meta_path)
                 self._crashes = build_crashes(frame)
                 self._cache.clear()
                 self._patterns_engine_cache.clear()
@@ -868,9 +876,10 @@ class MacroRegimeService:
         not cached, so the next request retries.
         """
         try:
-            skill_stamp = patterns_v2.skill_stamp(self.patterns_skill_path)
+            skill_path = self._patterns_skill_path()
+            skill_stamp = patterns_v2.skill_stamp(skill_path)
             with self._lock:
-                key = (self._mtime, skill_stamp)
+                key = (self._mtime, skill_stamp, str(skill_path))
                 current = self._frame is frame
                 cached = self._patterns_engine_cache.get(asset)
             if current and cached is not None and cached[0] == key:
@@ -880,7 +889,7 @@ class MacroRegimeService:
             engine = patterns_v2.engine_for(
                 frame,
                 asset,
-                skill_path=self.patterns_skill_path,
+                skill_path=skill_path,
             )
             if engine is None:
                 return None
@@ -928,6 +937,20 @@ class MacroRegimeService:
             ) from exc
         if not isinstance(card, dict):
             raise ModelUnavailableError("Production model card is not an object.")
+        # A rolled-back bundle can contain a model promoted under an older bar;
+        # re-check the current bar every time the card is loaded.
+        from astro_finance.models.lifecycle import meets_minimum_skill
+
+        try:
+            qualified = meets_minimum_skill(card)
+        except (TypeError, ValueError) as exc:
+            raise ModelUnavailableError(
+                f"Production model card cannot be judged against the skill bar: {exc}"
+            ) from exc
+        if not qualified:
+            raise ModelUnavailableError(
+                "The production model does not clear the current skill bar."
+            )
         features = card.get("features")
         if not isinstance(features, list) or not features:
             raise ModelUnavailableError("Production model card has no features.")

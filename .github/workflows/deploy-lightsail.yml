@@ -70,6 +70,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Copy guard
+        run: npm run check:copy
+
       - name: Build
         run: npm run build
         env:

@@ -37,6 +37,11 @@ import numpy as np
 import pandas as pd
 
 from regime.analytics import CRASH_NAMES, nber_episodes
+from regime.bundle_paths import (
+    MACRO_META_FILENAME,
+    MACRO_PARQUET_FILENAME,
+    resolve_bundle_data_file,
+)
 from regime.crypto_milestones import milestone_definitions
 
 logger = logging.getLogger(__name__)
@@ -1474,17 +1479,27 @@ class CaseStore:
 
     def context(self) -> CaseContext:
         with self._lock:
-            if not self.artifact_path.exists():
+            artifact_path = resolve_bundle_data_file(
+                MACRO_PARQUET_FILENAME, self.artifact_path
+            )
+            meta_path = resolve_bundle_data_file(MACRO_META_FILENAME, self.meta_path)
+            if not artifact_path.exists():
                 raise FileNotFoundError(
-                    f"Macro regime artifact not found at {self.artifact_path}. "
+                    f"Macro regime artifact not found at {artifact_path}. "
                     "Run: python -m scripts.flows.macro_ingestion"
                 )
-            stamp = (_file_stamp(self.artifact_path), _file_stamp(self.meta_path), _file_stamp(self.events_path))
+            stamp = (
+                _file_stamp(artifact_path),
+                _file_stamp(meta_path),
+                _file_stamp(self.events_path),
+                str(artifact_path),
+                str(meta_path),
+            )
             if self._context is None or stamp != self._stamp:
                 started = time.perf_counter()
                 context = build_context(
-                    read_frame(self.artifact_path),
-                    _read_json(self.meta_path),
+                    read_frame(artifact_path),
+                    _read_json(meta_path),
                     load_finance_events(self.events_path),
                     milestone_definitions(),
                 )

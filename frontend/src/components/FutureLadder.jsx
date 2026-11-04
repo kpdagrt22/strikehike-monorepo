@@ -5,6 +5,7 @@ import { categoryTone } from "@/lib/categoryTone";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { UpcomingEvents } from "@/components/UpcomingEvents";
+import { GEOMETRY_MATCH_FOOTNOTE } from "@/lib/astro/definitions";
 
 const getEventsDockButton = () =>
   document.getElementById("chrono-dock-archive");
@@ -25,6 +26,45 @@ function hasThemeFilter(search) {
         .map((part) => part.trim())
         .some(Boolean),
   );
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function isoParts(value) {
+  const match = typeof value === "string" ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  return match
+    ? { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
+    : null;
+}
+
+/** "23 Apr 2027" */
+function formatLadderDate(value) {
+  const parts = isoParts(value);
+  return parts
+    ? `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}`
+    : "—";
+}
+
+/** The past event's four-digit year, always shown on a card. */
+function pastYear(value) {
+  return isoParts(value)?.year ?? null;
+}
+
+function formatMatch(value) {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : "—";
 }
 
 export function FutureLadder() {
@@ -119,11 +159,11 @@ export function FutureLadder() {
               tabIndex={-1}
               className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
             >
-              {view === "sky" ? "Future ladder" : "Upcoming"}
+              {view === "sky" ? "Sky ladder" : "Upcoming"}
             </h2>
             <p className="mt-1 text-meta text-black/60 dark:text-white/60">
               {view === "sky"
-                ? "Next 180 days · top match per category"
+                ? "Dates ahead whose sky resembles a past event"
                 : "Real scheduled events · next 12 months"}
             </p>
           </div>
@@ -139,7 +179,7 @@ export function FutureLadder() {
             <button
               type="button"
               onClick={() => dismissSheet({ restoreFocus: true })}
-              aria-label="Close future ladder"
+              aria-label="Close sky ladder"
               className="grid h-11 w-11 place-items-center rounded-full border border-black/10 text-black/60 dark:border-white/10 dark:text-white/60"
             >
               <svg
@@ -192,7 +232,7 @@ export function FutureLadder() {
 
         <div
           id="chrono-ladder-content"
-          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-33.25rem)))]"
+          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-36.75rem)))]"
         >
           {view === "upcoming" ? (
             <UpcomingEvents />
@@ -204,7 +244,7 @@ export function FutureLadder() {
                 className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#f05d49] align-middle"
                 aria-hidden="true"
               />
-              {"Forecast unavailable · "}
+              {"Sky ladder unavailable · "}
               <button
                 type="button"
                 onClick={() => {
@@ -230,13 +270,17 @@ export function FutureLadder() {
 
           {!error && !loading && matches.length === 0 ? (
             <p className="px-2 py-3 text-meta leading-relaxed text-black/60 dark:text-white/60">
-              No 75%+ geometric echoes in this window.
+              No date in the next 180 days resembles a past event&apos;s sky by
+              75% or more.
             </p>
           ) : null}
 
           {matches.map((match) => {
             const tone = categoryTone(match.event.category);
+            const year = pastYear(match.event.date);
 
+            // One button per card: its text is its accessible name. The match
+            // is defined once, in the always-visible note under the list.
             return (
               <button
                 key={`${match.date}-${match.event.name}`}
@@ -252,14 +296,15 @@ export function FutureLadder() {
                   style={{ backgroundColor: tone.color }}
                 />
                 <span className="min-w-0">
-                  <span className="block text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                    In {match.days_ahead} days · {match.similarity_percent}%
+                  <span className="block text-micro font-medium uppercase tracking-[0.14em] text-black/60 tabular-nums dark:text-white/60">
+                    {formatLadderDate(match.date)} · {match.event.category}
                   </span>
                   <span className="mt-0.5 block text-body leading-snug text-black/75 group-hover:text-[#14121a] dark:text-white/70 dark:group-hover:text-white">
+                    {year ? `Sky resembles ${year} · ` : "Sky resembles "}
                     {match.event.name}
                   </span>
                   <span className="mt-0.5 block text-micro tabular-nums text-black/60 dark:text-white/60">
-                    {match.date} · {match.event.category}
+                    Geometry match {formatMatch(match.similarity_percent)}
                   </span>
                 </span>
               </button>
@@ -268,6 +313,14 @@ export function FutureLadder() {
             </>
           )}
         </div>
+
+        {/* The definition stays visible: an explanation of what a number
+            means is never hidden behind a gesture. */}
+        {view === "sky" && !error && matches.length > 0 ? (
+          <p className="border-t border-(--sh-line-1) px-4 pt-2.5 pb-3 text-micro leading-relaxed text-(--sh-text-3)">
+            {GEOMETRY_MATCH_FOOTNOTE}
+          </p>
+        ) : null}
       </div>
     </div>
   );

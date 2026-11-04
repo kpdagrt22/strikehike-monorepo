@@ -110,8 +110,7 @@ export function MacroHUD({
   marketFlags = [],
 }) {
   const tone = coreIndexTone(point?.core_index_bucket, isDark);
-  // Shown only when the week has them. A warning while Balanced Growth or
-  // Trim leaves the allocation line as it is.
+  // Shown only when the week has them. A warning leaves the band line as it is.
   const flag = coreIndexFlag(point);
   const flagsOn = marketFlags.filter((item) => point?.[item.field] === true);
   // One flag shows its text (naming the week's index); two show their labels.
@@ -123,7 +122,8 @@ export function MacroHUD({
         <div className="flex flex-wrap items-end gap-4 sm:gap-8">
           <div className="min-w-0">
             <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
-              StrikeHike Core Index
+              Core Index
+              {point?.date ? ` · ${formatDate(point.date)}` : ""}
             </p>
             <div className="mt-1 flex items-end gap-1.5 sm:gap-2">
               {/* A fixed five-character box (a signed score with one decimal,
@@ -141,7 +141,7 @@ export function MacroHUD({
             </div>
             <CoreIndexScale value={point?.core_index} color={tone.color} />
             <p className="mt-1 font-mono text-micro text-black/60 dark:text-white/60">
-              −50 ↔ +50 · contrarian sentiment map
+              −50 ↔ +50 · sentiment map
             </p>
           </div>
 
@@ -149,7 +149,7 @@ export function MacroHUD({
               under the score at the same widths for every week. */}
           <div className="min-w-[min(16rem,100%)] max-w-[24.0625rem] flex-1 basis-0 border-l border-black/5 pl-4 dark:border-white/5 sm:min-w-[18.25rem] sm:pl-6">
             <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
-              State · action
+              State
             </p>
             <p
               className="mt-1 text-xl font-semibold leading-none tracking-[-0.05em] sm:text-2xl"
@@ -157,13 +157,26 @@ export function MacroHUD({
             >
               {tone.label}
             </p>
-            {/* Lines reserved for the longest allocation (three below sm, two
+            {/* Lines reserved for the longest band line (three below sm, two
                 from sm), so hovering across buckets never moves the chart. */}
             <p className="mt-1.5 min-h-[4.875em] max-w-[360px] text-micro leading-relaxed text-black/60 dark:text-white/60 sm:min-h-[3.25em]">
-              <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
-                Smart money
-              </span>{" "}
-              {tone.allocation}
+              {tone.description !== "—" ? (
+                <>
+                  Band {tone.description}. What followed similar readings:{" "}
+                  <a
+                    href="#regime-method"
+                    onClick={() => {
+                      // The record sits in a closed <details>: open it, then
+                      // let the link scroll to it.
+                      const method = document.getElementById("regime-method");
+                      if (method && "open" in method) method.open = true;
+                    }}
+                    className="whitespace-nowrap underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
+                  >
+                    Method &amp; record
+                  </a>
+                </>
+              ) : null}
             </p>
             {/* One line, always: the week's Core Index flag when it has one,
                 otherwise the NBER window or the scrub hint. */}

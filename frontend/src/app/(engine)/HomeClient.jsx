@@ -69,15 +69,15 @@ function buildAnnouncement({ focusedDate, focusedTime, energy, parallels }) {
 
   const score = Number(energy?.score);
   if (energy && Number.isFinite(score)) {
-    parts.push(
-      `Energy ${Math.round(score)}${energy.polarity ? `, ${energy.polarity}` : ""}`,
-    );
+    parts.push(`Sky activity ${Math.round(score)} / 100`);
   }
 
   const parallel = bestParallel(parallels);
   const match = Number(parallel?.similarity_percent);
   if (parallel?.name && Number.isFinite(match)) {
-    parts.push(`Most similar: ${parallel.name}, ${match.toFixed(1)}% match`);
+    parts.push(
+      `Closest past sky: ${parallel.name}, geometry match ${match.toFixed(1)}%`,
+    );
   }
 
   return parts.join(" · ");

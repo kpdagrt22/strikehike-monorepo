@@ -16,6 +16,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+import pandas as pd
+
 from .models import (
     THEME_METADATA,
     THEME_ORDER,
@@ -33,6 +35,17 @@ from .registry import SourceSpec
 from .reporting import quality_report_markdown
 from .sqlite_writer import write_sqlite
 
+MACRO_PARQUET_FILENAME = "macro_regime_history.parquet"
+MACRO_META_FILENAME = "macro_regime_history.meta.json"
+PATTERNS_SKILL_FILENAME = "patterns_v2_skill.json"
+CRYPTO_MILESTONES_FILENAME = "crypto_milestones.json"
+MACRO_SIBLING_FILENAMES = (
+    MACRO_META_FILENAME,
+    PATTERNS_SKILL_FILENAME,
+    CRYPTO_MILESTONES_FILENAME,
+)
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetArtifact:
     staging_dir: Path
@@ -40,6 +53,7 @@ class DatasetArtifact:
     sqlite_path: Path
     bundle_version: str
     canonical_events: tuple[dict[str, Any], ...]
+    warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +109,73 @@ def _write_json(path: Path, payload: Any, *, sort_keys: bool = False) -> bytes:
     return data
 
 
+def _parquet_last_date(path: Path) -> str | None:
+    """The last index date in a parquet, reading the index only."""
+
+    try:
+        frame = pd.read_parquet(path, columns=[])
+    except (OSError, ValueError):
+        return None
+    index = pd.to_datetime(frame.index, utc=True, errors="coerce")
+    index = index[~index.isna()]
+    return index.max().date().isoformat() if len(index) else None
+
+
+def macro_bundle_warnings(data_dir: Path) -> tuple[str, ...]:
+    """Warnings for a bundled macro parquet whose siblings are missing or stale.
+
+    These are quality-report warnings, never gate failures: the events bundle
+    still publishes, while /regime and /patterns fall back to the baked files.
+    """
+
+    data_dir = Path(data_dir)
+    parquet = data_dir / MACRO_PARQUET_FILENAME
+    warnings: list[str] = []
+
+    meta_path = data_dir / MACRO_META_FILENAME
+    if not meta_path.is_file():
+        warnings.append(
+            f"WARNING: {MACRO_META_FILENAME} is missing from the bundle's data/"
+            " directory; /regime will fall back to the baked meta."
+        )
+    else:
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            meta = None
+        if not isinstance(meta, dict):
+            warnings.append(
+                f"WARNING: {MACRO_META_FILENAME} is not a readable JSON object;"
+                " /regime will fall back to the baked meta."
+            )
+        else:
+            expected_version = sha256_file(parquet)[:12] if parquet.is_file() else None
+            data_version = meta.get("data_version")
+            if expected_version is None or str(data_version) != expected_version:
+                warnings.append(
+                    f"WARNING: {MACRO_META_FILENAME} data_version "
+                    f"{data_version!r} does not match the bundled parquet "
+                    f"({expected_version!r})."
+                )
+            core_index = meta.get("core_index")
+            latest = core_index.get("latest") if isinstance(core_index, dict) else None
+            meta_date = latest.get("date") if isinstance(latest, dict) else None
+            parquet_date = _parquet_last_date(parquet) if parquet.is_file() else None
+            if meta_date != parquet_date:
+                warnings.append(
+                    f"WARNING: {MACRO_META_FILENAME} latest Core Index date "
+                    f"{meta_date!r} does not match the bundled parquet's last "
+                    f"date ({parquet_date!r})."
+                )
+
+    if not (data_dir / PATTERNS_SKILL_FILENAME).is_file():
+        warnings.append(
+            f"WARNING: {PATTERNS_SKILL_FILENAME} is missing from the bundle's"
+            " data/ directory; /patterns will fall back to the baked skill."
+        )
+    return tuple(warnings)
+
+
 def write_dataset(
     staging_dir: Path,
     events: list[Event],
@@ -123,11 +204,23 @@ def write_dataset(
     write_sqlite(sqlite_path, sqlite_events)
 
     extra_hashes: dict[str, str] = {}
+    warnings: tuple[str, ...] = ()
     if macro_parquet is not None:
-        target = staging_dir / "data" / "macro_regime_history.parquet"
+        macro_source = Path(macro_parquet)
+        target = staging_dir / "data" / MACRO_PARQUET_FILENAME
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(macro_parquet, target)
-        extra_hashes["data/macro_regime_history.parquet"] = sha256_file(target)
+        shutil.copyfile(macro_source, target)
+        extra_hashes[f"data/{MACRO_PARQUET_FILENAME}"] = sha256_file(target)
+        # The ingestion flow writes these beside the parquet.  Copying them
+        # here makes the existing previous-bundle carry-forward carry them too.
+        for filename in MACRO_SIBLING_FILENAMES:
+            sibling = macro_source.parent / filename
+            if not sibling.is_file():
+                continue
+            destination = staging_dir / "data" / filename
+            shutil.copyfile(sibling, destination)
+            extra_hashes[f"data/{filename}"] = sha256_file(destination)
+        warnings = macro_bundle_warnings(staging_dir / "data")
     if model_dir is not None:
         source = Path(model_dir)
         if (source / "models").is_dir():
@@ -148,6 +241,7 @@ def write_dataset(
         sqlite_path=sqlite_path,
         bundle_version=bundle_version_for(ordered, extra_hashes),
         canonical_events=tuple(event.content_dict() for event in ordered),
+        warnings=warnings,
     )
 
 

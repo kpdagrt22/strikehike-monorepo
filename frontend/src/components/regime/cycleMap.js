@@ -10,25 +10,25 @@ export const TRACE_DAYS = 90;
 
 export const QUADRANTS = {
   calm_bullish: {
-    label: "Complacency / Trim Risk",
+    label: "Complacency",
     detail: "low volatility · shallow",
     fill: "#b45309",
     fillDark: "#fbbf24",
   },
   volatile_bullish: {
-    label: "Euphoria / Distribution",
+    label: "Euphoria",
     detail: "high volatility · shallow",
     fill: "#c0442f",
     fillDark: "#fb7185",
   },
   calm_bearish: {
-    label: "Despair / Base Building",
+    label: "Despair",
     detail: "low volatility · deep",
     fill: "#0f766e",
     fillDark: "#5eead4",
   },
   volatile_bearish: {
-    label: "Panic / Accumulation Zone",
+    label: "Panic",
     detail: "high volatility · deep",
     fill: "#047857",
     fillDark: "#34d399",

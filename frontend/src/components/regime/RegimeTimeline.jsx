@@ -145,10 +145,10 @@ const RIBBON_BANDS = [
 ];
 // The chart key's words for the four bands, top to bottom.
 const RIBBON_KEY = [
-  ["strong_bullish", "trim risk"],
-  ["calm_bullish", "balanced"],
-  ["bearish_warning", "preserve"],
-  ["extreme_bearish", "accumulate"],
+  ["strong_bullish", "risk elevated"],
+  ["calm_bullish", "steady"],
+  ["bearish_warning", "stressed"],
+  ["extreme_bearish", "max fear"],
 ];
 // The ribbon's fill alpha at 0, ±25 and ±50: quiet at the neutral line and
 // fuller towards the extremes, so the shape's outer edge reads first.
