@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
 import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { GaugeAura, auraTier } from "@/components/GaugeAura";
+import { GaugeAura } from "@/components/GaugeAura";
 import {
   GEOMETRY_MATCH_DEFINITION,
   SKY_ACTIVITY_DEFINITION,
@@ -95,7 +94,6 @@ export function EnergyGauge({ isDark = true }) {
   const energy = useChronoStore((state) => state.energy);
   const parallels = useChronoStore((state) => state.parallels);
   const status = useChronoStore((state) => state.status);
-  const [auraKey, setAuraKey] = useState(0);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   // A failed read for the focused moment must not show the previous sky's
   // energy as current.
@@ -130,24 +128,14 @@ export function EnergyGauge({ isDark = true }) {
         mobileSheet ? "max-lg:opacity-0" : ""
       }`}
     >
-      {/* From 85 the ring gains a flame aura. Hovering the ring (fine pointers
-          only, so a drag on the orrery is never blocked) relights it. */}
-      <div
-        className="relative h-[116px] w-[116px] pointer-fine:pointer-events-auto"
-        onPointerEnter={(event) => {
-          if (event.pointerType === "mouse") setAuraKey((key) => key + 1);
-        }}
-      >
+      {/* From 85 the ring gains an animated flame aura (GaugeAura.jsx). */}
+      <div className="relative h-[116px] w-[116px]">
         <div
           aria-hidden="true"
           className="absolute inset-3 rounded-full opacity-70 blur-2xl"
           style={{ backgroundColor: tone.glow }}
         />
-        <GaugeAura
-          key={`${auraTier(score)}-${auraKey}`}
-          score={score}
-          isDark={isDark}
-        />
+        <GaugeAura score={score} isDark={isDark} paused={Boolean(mobileSheet)} />
 
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
