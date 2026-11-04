@@ -73,6 +73,9 @@ jobs:
       - name: Copy guard
         run: npm run check:copy
 
+      - name: Route cache tests
+        run: npm run test:route-cache
+
       - name: Build
         run: npm run build
         env:

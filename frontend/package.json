@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:copy": "node scripts/check-copy.mjs"
+    "check:copy": "node scripts/check-copy.mjs",
+    "test:route-cache": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs"
   },
   "dependencies": {
     "@react-spring/three": "^10.1.2",
