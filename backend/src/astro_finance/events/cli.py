@@ -72,6 +72,8 @@ def _build(args: argparse.Namespace) -> int:
         previous=str(args.previous) if args.previous else None,
         offline=str(args.offline) if args.offline else None,
         sources=list(requested or []),
+        macro_parquet=str(args.macro_parquet) if args.macro_parquet else None,
+        model_dir=str(args.model_dir) if args.model_dir else None,
     )
     try:
         result = run_pipeline(
@@ -84,6 +86,9 @@ def _build(args: argparse.Namespace) -> int:
                 requested_sources=requested,
                 execution_id=execution_id,
                 created_at=created_at,
+                macro_parquet=args.macro_parquet,
+                model_dir=args.model_dir,
+                macro_allow_unchanged_reason=args.macro_allow_unchanged_reason,
             ),
             logger=logger,
         )
@@ -265,6 +270,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--log-level",
         default="info",
         choices=("debug", "info", "warning", "error"),
+    )
+    build.add_argument(
+        "--macro-parquet",
+        type=Path,
+        help="refreshed macro parquet to include at data/macro_regime_history.parquet",
+    )
+    build.add_argument(
+        "--model-dir",
+        type=Path,
+        help="model train output containing models/ (candidate or skipped decision)",
+    )
+    build.add_argument(
+        "--macro-allow-unchanged-reason",
+        default=None,
+        help="Explicit reason to allow the macro last date to stay unchanged",
     )
     build.set_defaults(func=_build)
 

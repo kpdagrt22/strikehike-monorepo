@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from regime.schemas import MacroHistoryResponse  # noqa: E402
-from regime.service import MacroRegimeService  # noqa: E402
+from regime.service import MacroRegimeService, ModelUnavailableError  # noqa: E402
 
 
 def _write_artifact(tmp_path: Path) -> tuple[Path, Path]:
@@ -403,22 +403,12 @@ def test_daily_resolution_for_short_window(tmp_path):
     assert payload["range"]["end"] == "2020-06-30"
 
 
-def test_forecast_returns_30_day_disruptive_probability(tmp_path):
+def test_forecast_requires_an_active_production_model(tmp_path):
     artifact, meta_path = _write_artifact(tmp_path)
     service = MacroRegimeService(artifact_path=artifact, meta_path=meta_path)
 
-    payload = service.forecast()
-
-    assert payload["as_of"] == "2020-12-31"
-    assert payload["horizon_days"] == 30
-    assert payload["model"] == "logistic_regression_v2"
-    assert payload["features"] == ["fed_cross", "curve_cross", "sahm_alert"]
-    assert payload["training"]["observations"] > 250
-    assert 0.0 <= payload["disruptive_probability"] <= 1.0
-    assert 0.0 <= payload["risk_pct"] <= 100.0
-    assert payload["current"]["as_of"] == "2020-12-31"
-    assert payload["current"]["features"]["sahm_alert"] is False
-    assert service.forecast() is payload
+    with pytest.raises(ModelUnavailableError):
+        service.forecast()
 
 
 def test_invalid_ranges_raise_value_error(tmp_path):

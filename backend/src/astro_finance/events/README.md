@@ -159,6 +159,11 @@ the bundle and quality reports, and the CLI exits `2`.
 | `manifest.json` | Version, checksums, counts, sources, theme metadata and `publishable`. |
 | `quality_report.json` | Machine-readable gate results and per-theme counts. |
 | `quality_report.md` | The same report in plain language, suitable for the job summary. |
+| `data/macro_regime_history.parquet` | The refreshed macro dataset, when supplied; preferred by the backend over the baked file. |
+| `models/model.joblib` | Production forecast model, when a production model exists. |
+| `models/model_card.json` | Target, training, walk-forward, calibration and segment metrics for the production model. |
+| `models/promotion.json` | Candidate vs production decision and every promotion condition. |
+| `models/registry.json` | Model versions, statuses, promotion dates and previous production references. |
 
 `events.sqlite` columns:
 
@@ -171,7 +176,7 @@ content_hash, days_until, missing_runs`.
 
 - `bundle_version` — first 16 hex of SHA-256 over the canonical event content
   (`event.content_dict()` sorted by event id), excluding run timestamps and
-  `days_until`;
+  `days_until`, plus the hashes of bundled macro/model files when present;
 - `schema_version`, `created_at`, `as_of`, `git_sha`;
 - `sources` — id, kind, url, themes, reliability, verification, freshness,
   count, reject count, `last_success_at`, error;
@@ -179,6 +184,8 @@ content_hash, days_until, missing_runs`.
 - `theme_metadata` — `schedulable` and the Natural Disasters reason;
 - `files` — SHA-256 of every bundle file except `manifest.json` itself;
 - `historical_source_sha256`;
+- `macro_data` — validation result when a refreshed parquet is included;
+- `models` — production version, decision, metrics and registry summary when a model is included;
 - `publishable`.
 
 The manifest cannot contain its own hash; every other file is listed.  The
@@ -188,6 +195,76 @@ so two builds for the same `--today` are byte-identical apart from
 first as `--previous` has a lower `events_updated` count in its quality report;
 its `bundle_version` and canonical event files still match when the facts have
 not changed.
+
+## Macro refresh and model lifecycle (Phase D)
+
+The weekly workflow runs the existing macro ingestion before the events build:
+
+```bash
+python -m scripts.flows.macro_ingestion --source api \
+  --output-dir "$RUNNER_TEMP/macro-refresh"
+```
+
+The refreshed parquet is validated against the previous bundle's parquet (or
+the baked `data/processed/macro_regime_history.parquet` on the first run):
+
+- schema and column order unchanged;
+- row count not decreasing;
+- last date advanced, or deliberately unchanged with an explicit reason;
+- core-column NaN fractions no more than 10 percentage points above baseline;
+- Core Index values within `[-50, 50]`.
+
+A failed check becomes the `macro_data` gate and makes the bundle
+unpublishable. The parquet is then stored in the bundle at
+`data/macro_regime_history.parquet`; `MacroRegimeService` prefers the active
+bundle's copy and falls back to the baked file. The events build receives it
+with `--macro-parquet` and the model output with `--model-dir`.
+
+The model target is **S&P 500 proxy lower 28 calendar days later**. Features
+are `fed_cross`, `curve_cross` and `sahm_alert`. The 28-day purge gap ensures
+training labels do not overlap the test fold. The persistence baseline is the
+trailing 28-day S&P direction continuing.
+
+Training and promotion:
+
+```bash
+python -m astro_finance.models.regime_forecast train \
+  --data macro_regime_history.parquet \
+  --out "$RUNNER_TEMP/model" \
+  [--previous-bundle PREVIOUS_BUNDLE]
+```
+
+Outputs under `<out>/models/`:
+
+- `model.joblib` — production model;
+- `model_card.json` — target, training window, data fingerprint, purged
+  yearly walk-forward metrics, calibration table, Core Index segment metrics and
+  baselines;
+- `promotion.json` — decision, reason, candidate/production/persistence
+  metrics and every condition;
+- `registry.json` — versions with `production`, `candidate`/`retired` status,
+  `promoted_at` and `previous_production`.
+
+Training is skipped, with the reason in `promotion.json`, when the dataset
+fingerprint and model configuration are unchanged.
+
+A candidate becomes production only if all hold:
+
+1. walk-forward balanced accuracy is at least production + 0.01;
+2. Brier score is no worse than production;
+3. it beats the persistence baseline;
+4. no Core Index bucket is worse than production by more than 0.05.
+
+Otherwise production stays and the candidate is marked retired with the failed
+conditions. A first model is promoted if it beats persistence.
+
+The bundle stores `models/model.joblib`, `models/model_card.json`,
+`models/promotion.json` and `models/registry.json`. The
+`GET /api/v1/regime/forecast` endpoint loads the production model from the
+active bundle and never fits in the request path; with no production model it
+returns 503.
+
+
 
 ## Read API
 
