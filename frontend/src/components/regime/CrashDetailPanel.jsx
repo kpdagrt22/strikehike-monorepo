@@ -60,7 +60,7 @@ function PreCrashCard({ label, data, isDark }) {
           Market was in {phase.toLowerCase()}
         </span>
         <span className="font-mono" style={{ color: tone.color }}>
-          {tone.label} · {tone.action}
+          {tone.label}
         </span>
       </div>
 

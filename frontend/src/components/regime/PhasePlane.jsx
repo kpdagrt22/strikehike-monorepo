@@ -481,7 +481,7 @@ export function PhasePlane({
       <div className="grid grid-cols-2 gap-2 border-t border-black/5 px-4 py-3 dark:border-white/5 sm:grid-cols-3">
         <div>
           <p className="text-micro uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
-            Current
+            At cursor
           </p>
           {/* Two lines kept below sm, where the longest zone name wraps. */}
           <p
@@ -528,19 +528,6 @@ export function PhasePlane({
         </div>
       </div>
 
-      <div className="border-t border-black/5 px-4 py-3 dark:border-white/5">
-        <p className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
-          Contrarian playbook
-        </p>
-        {/* Two lines kept below sm for the longest allocation. */}
-        <p
-          className="mt-1 min-h-[3.25em] text-meta leading-relaxed sm:min-h-0"
-          style={{ color: toneForIndex.color }}
-        >
-          {toneForIndex.allocation}
-        </p>
-      </div>
-
       <p className="border-t border-black/5 px-4 py-3 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60">
         <span className="[@media(hover:none)]:hidden">
           Hover the main chart to redraw the glowing 90-day trail.
@@ -548,9 +535,8 @@ export function PhasePlane({
         <span className="hidden [@media(hover:none)]:inline">
           Press and hold the chart to scrub.
         </span>{" "}
-        The quadrants
-        are contrarian risk-posture zones: trim into complacency and euphoria,
-        build into despair and panic. They are not personalised advice.
+        The quadrants describe the last 90 days&apos; volatility and depth of
+        fall.
       </p>
     </section>
   );

@@ -5,6 +5,8 @@ import { categoryTone } from "@/lib/categoryTone";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { UpcomingEvents } from "@/components/UpcomingEvents";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { GEOMETRY_MATCH_DEFINITION } from "@/lib/astro/definitions";
 
 const getEventsDockButton = () =>
   document.getElementById("chrono-dock-archive");
@@ -25,6 +27,45 @@ function hasThemeFilter(search) {
         .map((part) => part.trim())
         .some(Boolean),
   );
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function isoParts(value) {
+  const match = typeof value === "string" ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  return match
+    ? { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }
+    : null;
+}
+
+/** "23 Apr 2027" */
+function formatLadderDate(value) {
+  const parts = isoParts(value);
+  return parts
+    ? `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}`
+    : "—";
+}
+
+/** The past event's four-digit year, always shown on a card. */
+function pastYear(value) {
+  return isoParts(value)?.year ?? null;
+}
+
+function formatMatch(value) {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : "—";
 }
 
 export function FutureLadder() {
@@ -119,11 +160,11 @@ export function FutureLadder() {
               tabIndex={-1}
               className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
             >
-              {view === "sky" ? "Future ladder" : "Upcoming"}
+              {view === "sky" ? "Sky ladder" : "Upcoming"}
             </h2>
             <p className="mt-1 text-meta text-black/60 dark:text-white/60">
               {view === "sky"
-                ? "Next 180 days · top match per category"
+                ? "Dates ahead whose sky resembles a past event"
                 : "Real scheduled events · next 12 months"}
             </p>
           </div>
@@ -139,7 +180,7 @@ export function FutureLadder() {
             <button
               type="button"
               onClick={() => dismissSheet({ restoreFocus: true })}
-              aria-label="Close future ladder"
+              aria-label="Close sky ladder"
               className="grid h-11 w-11 place-items-center rounded-full border border-black/10 text-black/60 dark:border-white/10 dark:text-white/60"
             >
               <svg
@@ -204,7 +245,7 @@ export function FutureLadder() {
                 className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#f05d49] align-middle"
                 aria-hidden="true"
               />
-              {"Forecast unavailable · "}
+              {"Sky ladder unavailable · "}
               <button
                 type="button"
                 onClick={() => {
@@ -230,39 +271,51 @@ export function FutureLadder() {
 
           {!error && !loading && matches.length === 0 ? (
             <p className="px-2 py-3 text-meta leading-relaxed text-black/60 dark:text-white/60">
-              No 75%+ geometric echoes in this window.
+              No date in the next 180 days resembles a past event&apos;s sky by
+              75% or more.
             </p>
           ) : null}
 
           {matches.map((match) => {
             const tone = categoryTone(match.event.category);
+            const year = pastYear(match.event.date);
 
             return (
-              <button
+              <div
                 key={`${match.date}-${match.event.name}`}
-                type="button"
-                onClick={() => {
-                  setFocusedDate(match.date);
-                  if (sheetOpen) dismissSheet({ restoreFocus: true });
-                }}
-                className="group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors duration-[140ms] hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
+                className="group relative flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors duration-[140ms] hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
               >
+                {/* One card-wide target, with the info control above it. */}
+                <button
+                  type="button"
+                  aria-label={`Show the sky for ${formatLadderDate(match.date)}`}
+                  onClick={() => {
+                    setFocusedDate(match.date);
+                    if (sheetOpen) dismissSheet({ restoreFocus: true });
+                  }}
+                  className="absolute inset-0 z-0 rounded-xl focus-visible:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus) dark:focus-visible:bg-white/[0.06]"
+                />
                 <span
-                  className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                  className="pointer-events-none relative z-10 mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ backgroundColor: tone.color }}
                 />
-                <span className="min-w-0">
+                <span className="pointer-events-none relative z-10 min-w-0">
                   <span className="block text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                    In {match.days_ahead} days · {match.similarity_percent}%
+                    {formatLadderDate(match.date)}
                   </span>
                   <span className="mt-0.5 block text-body leading-snug text-black/75 group-hover:text-[#14121a] dark:text-white/70 dark:group-hover:text-white">
-                    {match.event.name}
+                    Sky resembles {year ?? "the past"} · {match.event.name}
                   </span>
-                  <span className="mt-0.5 block text-micro tabular-nums text-black/60 dark:text-white/60">
-                    {match.date} · {match.event.category}
+                  <span className="mt-0.5 flex items-center gap-1.5 text-micro tabular-nums text-black/60 dark:text-white/60">
+                    Geometry match {formatMatch(match.similarity_percent)}
+                    <InfoTip
+                      label="What geometry match means"
+                      description={GEOMETRY_MATCH_DEFINITION}
+                      align="end"
+                    />
                   </span>
                 </span>
-              </button>
+              </div>
             );
               })}
             </>

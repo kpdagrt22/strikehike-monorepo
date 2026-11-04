@@ -5,6 +5,11 @@ import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
 import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
+import { InfoTip } from "@/components/ui/InfoTip";
+import {
+  GEOMETRY_MATCH_DEFINITION,
+  SKY_ACTIVITY_DEFINITION,
+} from "@/lib/astro/definitions";
 
 const SIZE = 116;
 const CENTER = SIZE / 2;
@@ -14,6 +19,27 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 function formatYear(iso) {
   const year = new Date(`${iso}T00:00:00Z`).getUTCFullYear();
   return Number.isFinite(year) ? year : "";
+}
+
+// Neutral words for the existing polarity thresholds: no new threshold and no
+// good/bad label. "Disruptive" reads as high activity, "Favorable" as low.
+function activityLevel(polarity) {
+  const value = String(polarity ?? "").toLowerCase();
+  if (
+    value.includes("disruptive") ||
+    value.includes("negative") ||
+    value.includes("high")
+  ) {
+    return "High";
+  }
+  if (
+    value.includes("favorable") ||
+    value.includes("positive") ||
+    value.includes("low")
+  ) {
+    return "Low";
+  }
+  return "Moderate";
 }
 
 function SelectedDayParallel({ parallels }) {
@@ -39,16 +65,21 @@ function SelectedDayParallel({ parallels }) {
               style={{ backgroundColor: tone.color }}
             />
             <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-              Most Similar Day
+              Closest past sky
             </span>
+            <InfoTip
+              label="What geometry match means"
+              description={GEOMETRY_MATCH_DEFINITION}
+            />
           </span>
           <span className="mt-0.5 flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
             <span className="whitespace-normal">
-              {formatYear(parallel.date)} {parallel.name}
+              {formatYear(parallel.date)} · {parallel.name}
             </span>
             {Number.isFinite(Number(parallel.similarity_percent)) ? (
               <span className="whitespace-nowrap font-mono text-micro font-normal tracking-[0.08em] text-black/60 dark:text-white/60">
-                · {Number(parallel.similarity_percent).toFixed(1)}% Match
+                · geometry match{" "}
+                {Number(parallel.similarity_percent).toFixed(1)}%
               </span>
             ) : null}
           </span>
@@ -83,8 +114,11 @@ export function EnergyGauge({ isDark = true }) {
 
   const label = unavailable
     ? "Unavailable"
-    : (energy?.polarity ??
-      (status === "loading" ? "Reading sky" : "Awaiting data"));
+    : energy?.polarity
+      ? activityLevel(energy.polarity)
+      : status === "loading"
+        ? "Reading sky"
+        : "Awaiting data";
 
   return (
     <div
@@ -107,9 +141,9 @@ export function EnergyGauge({ isDark = true }) {
           aria-label={
             score === null
               ? unavailable
-                ? "Energy score unavailable"
-                : "Energy score pending"
-              : `Energy score ${Math.round(score)} out of 100, ${label}`
+                ? "Sky activity unavailable"
+                : "Sky activity pending"
+              : `Sky activity ${Math.round(score)} out of 100, ${label}`
           }
         >
           <defs>
@@ -154,11 +188,16 @@ export function EnergyGauge({ isDark = true }) {
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[32px] font-light leading-none tabular-nums tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4]">
-            {score === null ? "—" : Math.round(score)}
+          <span className="flex items-baseline gap-1">
+            <span className="text-[32px] font-light leading-none tabular-nums tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4]">
+              {score === null ? "—" : Math.round(score)}
+            </span>
+            <span className="font-mono text-micro text-black/60 dark:text-white/60">
+              / 100
+            </span>
           </span>
           <span className="mt-1 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-            Energy
+            Sky activity
           </span>
         </div>
       </div>
@@ -169,6 +208,10 @@ export function EnergyGauge({ isDark = true }) {
           style={{ backgroundColor: tone.stroke }}
         />
         {label}
+        <InfoTip
+          label="What sky activity means"
+          description={SKY_ACTIVITY_DEFINITION}
+        />
       </div>
 
       <SelectedDayParallel parallels={parallels} />

@@ -8,7 +8,7 @@ export function currentUtcDate() {
 }
 
 // The timeline starts on today's UTC date. The date only changes when the user
-// selects a timeline marker, event, future ladder entry, or precise datetime.
+// selects a timeline marker, event, sky ladder entry, or precise datetime.
 //
 // The home page is prerendered, so its server HTML cannot know the visitor's
 // today, and zustand hydrates every component from the store's initial state

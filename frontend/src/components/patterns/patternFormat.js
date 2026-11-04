@@ -273,6 +273,6 @@ export function mirrorLine(engine) {
   const head = `The 120-year mirror is closer than ${closerThan(exact.closer_than_pct)} of past windows today`;
   const evidence = mirrorNoInformation(engine);
   return evidence
-    ? `${head}; in ${formatCount(evidence.months_tested)} monthly tests it matched no better than chance.`
+    ? `${head}; in ${formatCount(evidence.months_tested)} monthly comparisons at the 120-year offset it matched no better than chance.`
     : `${head}.`;
 }

@@ -65,49 +65,39 @@ export function formatSigned(value, digits = 1) {
   return number >= 0 ? `+${formatted}` : formatted;
 }
 
-// The state colours never repeat an asset colour (assetTargets.js): Balanced
-// Growth is a neutral grey, since gold keeps the yellow. Checked with the
-// dataviz palette validator against the chart surfaces (#06060a dark, #f1ebe2
-// light): every state pair and every state-asset pair at least 15 OKLab ΔE
-// apart for normal vision, every colour at least 3:1 on its surface.
+// The state colours never repeat an asset colour (assetTargets.js): Steady is
+// a neutral grey, since gold keeps the yellow. Checked with the dataviz
+// palette validator against the chart surfaces (#06060a dark, #f1ebe2 light):
+// every state pair and every state-asset pair at least 15 OKLab ΔE apart for
+// normal vision, every colour at least 3:1 on its surface.
 export const CORE_INDEX_BUCKETS = {
   strong_bullish: {
-    label: "Risk Elevated",
+    label: "Risk elevated",
     description: "+25 to +50",
-    action: "Trim risk",
-    allocation:
-      "Risk Elevated. Trim Equities. 70% Defensive (Gold/Bonds) / 30% Equity.",
     dark: "#f43f5e",
     light: "#e11d48",
     darkSoft: "rgba(244, 63, 94, 0.16)",
     lightSoft: "rgba(225, 29, 72, 0.12)",
   },
   calm_bullish: {
-    label: "Balanced Growth",
+    label: "Steady",
     description: "0 to +24",
-    action: "Stay balanced",
-    allocation: "Balanced Growth. 60% Equity / 40% Defensive.",
     dark: "#8a8580",
     light: "#64748b",
     darkSoft: "rgba(138, 133, 128, 0.16)",
     lightSoft: "rgba(100, 116, 139, 0.12)",
   },
   bearish_warning: {
-    label: "Capital Preservation",
+    label: "Stressed",
     description: "-1 to -24",
-    action: "Wait for the bottom",
-    allocation: "Capital Preservation. Wait for bottom.",
     dark: "#ff8a3d",
     light: "#7c2d12",
     darkSoft: "rgba(255, 138, 61, 0.16)",
     lightSoft: "rgba(124, 45, 18, 0.12)",
   },
   extreme_bearish: {
-    label: "Maximum Fear",
+    label: "Maximum fear",
     description: "-25 to -50",
-    action: "Accumulate",
-    allocation:
-      "Maximum Fear. Aggressive Accumulation. 90% Equity / 10% Defensive.",
     dark: "#34d399",
     light: "#15803d",
     darkSoft: "rgba(52, 211, 153, 0.16)",
@@ -128,9 +118,7 @@ export function coreIndexTone(bucket, isDark) {
   if (!meta) {
     return {
       label: "No score",
-      action: "Hold",
-      allocation:
-        "No contrarian allocation while the Core Index is unavailable.",
+      description: "—",
       color: isDark ? "rgba(242,237,228,0.6)" : "rgba(20,18,26,0.6)",
       soft: isDark
         ? "rgba(242,237,228,0.06)"
@@ -140,8 +128,6 @@ export function coreIndexTone(bucket, isDark) {
   return {
     label: meta.label,
     description: meta.description,
-    action: meta.action,
-    allocation: meta.allocation,
     color: isDark ? meta.dark : meta.light,
     soft: isDark ? meta.darkSoft : meta.lightSoft,
   };

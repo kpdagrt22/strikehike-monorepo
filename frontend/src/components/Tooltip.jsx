@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { getEnergyTone } from "@/lib/energyTone";
+import { SKY_ACTIVITY_DEFINITION } from "@/lib/astro/definitions";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
@@ -197,7 +198,7 @@ export function Tooltip() {
           {entity.ml_insight ? (
             <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
               <p className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
-                ML index insight
+                Historical base rate
               </p>
               <p className="mt-1 text-body leading-relaxed text-black/75 dark:text-white/75">
                 {entity.ml_insight}
@@ -209,27 +210,27 @@ export function Tooltip() {
             <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:text-white/60">
-                  Date energy
+                  Sky activity
                 </span>
                 <span className="flex items-center gap-1.5 text-meta font-medium tabular-nums text-black/70 dark:text-white/70">
                   <span
                     className="h-1.5 w-1.5 rounded-full"
                     style={{ backgroundColor: tone.stroke }}
                   />
-                  {Math.round(energy.score)} · {energy.polarity}
+                  {Math.round(energy.score)} / 100
                 </span>
               </div>
               <p className="mt-1.5 text-meta leading-relaxed text-black/60 dark:text-white/60">
-                {energy.description}
+                {SKY_ACTIVITY_DEFINITION}
               </p>
 
               {marketEnergy ? (
                 <div className="mt-2 flex items-center justify-between gap-3 border-t border-black/5 pt-2 dark:border-white/5">
                   <span className="min-w-0 text-micro font-medium uppercase leading-snug tracking-[0.06em] text-black/60 dark:text-white/60">
-                    Financial Market Volatility
+                    Market volatility
                   </span>
                   <span className="shrink-0 text-meta font-medium tabular-nums text-black/60 dark:text-white/60">
-                    {Math.round(marketEnergy.score)} - {marketEnergy.polarity}
+                    {Math.round(marketEnergy.score)} / 100
                   </span>
                 </div>
               ) : null}

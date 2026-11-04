@@ -137,9 +137,6 @@ export function ChartCrosshairLegend({
         >
           {tone.label}
         </p>
-        <p className="mt-0.5 truncate text-micro text-black/60 dark:text-white/60">
-          Contrarian: {tone.action}
-        </p>
         {/* Only for weeks that have them, at the card's foot, so nothing
             above them moves; one line, so it never re-wraps. */}
         {flag ? (

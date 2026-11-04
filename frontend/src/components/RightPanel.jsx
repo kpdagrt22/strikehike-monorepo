@@ -298,7 +298,7 @@ export function RightPanel() {
                               className="mt-1.5 text-meta leading-relaxed text-black/70 dark:text-white/70"
                             >
                               <span className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                                ML index insight
+                                Historical base rate
                               </span>
                               {" · "}
                               {body.ml_insight ?? "—"}

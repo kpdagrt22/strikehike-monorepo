@@ -151,12 +151,11 @@ const FOOTER_LINK =
   "text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]";
 
 // Core Index v2 as the backend contract words it (§5.1), shown only when the
-// payload lacks the backend's own fuller v2 note, and the contrarian reading,
-// kept verbatim.
+// payload lacks the backend's own fuller v2 note, and the band definition.
 const CORE_INDEX_NOTE =
   "Core Index v2 is a weekly trend-and-stress state machine: the equity proxy against its 40-week average and its own volatility, with credit spreads, unemployment and the yield curve as stress inputs, each lagged by its publication delay; it is decided at the Friday close and starts at the end of 1928.";
-const CONTRARIAN_NOTE =
-  "We read it as a contrarian sentiment map: +25 begins the Risk Elevated / trim band; -25 begins the Maximum Fear / accumulation band.";
+const BAND_NOTE =
+  "The Core Index is a descriptive sentiment map: +25 begins the Risk elevated band; -25 begins the Maximum fear band.";
 // The drawn S&P line crosses the 1927 splice of two separate indices.
 const SPLICE_NOTE =
   "The chart joins the Cowles index to the S&P 90 at 30 Dec 1927 for display only; the two indices' levels do not compare across that date.";
@@ -284,22 +283,25 @@ function MethodDetails({ meta }) {
   );
   const allNotes = [
     v2Index >= 0 ? notes[v2Index] : CORE_INDEX_NOTE,
-    CONTRARIAN_NOTE,
+    BAND_NOTE,
     `${firstScored ? `Every weekly reading from ${firstScored} is shown. ` : ""}The rules were designed and tuned on the years from 1971 on, so 1929–71 served as the out-of-sample test, and few stress inputs existed before 1953.`,
     `Severity, shown as the decline class${
       severities.length > 1
         ? ` (${severities.slice(0, -1).join(", ")} or ${severities.at(-1)})`
         : ""
-    }, is the class a decline has reached in the current spell. It only steps up within a spell, so it can still read crash in a recovery; in Maximum Fear it is the class of the decline being bought. A warning can show while Balanced Growth or Trim; it does not change the allocation.`,
+    }, is the class a decline has reached in the current spell. It only steps up within a spell, so it can still read crash in a recovery; in Maximum fear it is the class of the decline being measured. A warning can show while Steady or Risk elevated; it does not change the band.`,
     trendNote(meta?.core_index_trend_warning),
     fastNote(meta?.core_index_fast_warning),
     ...notes.filter((_, index) => index !== v2Index),
   ].filter(Boolean);
 
   return (
-    <details className="group mt-4 rounded-[1.4rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/25 sm:p-6">
+    <details
+      id="regime-method"
+      className="group mt-4 scroll-mt-24 rounded-[1.4rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/25 sm:p-6"
+    >
       <summary className="-m-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
-        Method & limits
+        Method &amp; record
         <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60" aria-hidden="true">
           +
         </span>
@@ -532,7 +534,7 @@ export default function RegimeClient({
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-micro uppercase tracking-[0.2em] text-[#a83a27] dark:text-[#ff8b77]">
-              Regime Intelligence
+              Macro atlas
             </p>
             <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl">
               The −50 to +50 macro atlas.
@@ -542,9 +544,11 @@ export default function RegimeClient({
               S&amp;P 500&apos;s trend and volatility against credit,
               unemployment and yield-curve stress each Friday; every NBER window
               carries its own drawdown and score. Compare the S&amp;P 500, gold,
-              Treasuries and Nifty 50 on a single percentage scale. The score is read
-              contrarian: trim into euphoria, accumulate into fear. Research,
-              not investment advice.
+              Treasuries and Nifty 50 on a single percentage scale. Readings near
+              +50 mark euphoric markets; readings near −50 mark maximum fear.
+              Method &amp; record shows how its warnings lined up with every 20%
+              fall since 1928, misses included. Descriptive research, not
+              investment advice.
             </p>
           </div>
 
@@ -563,7 +567,7 @@ export default function RegimeClient({
         {latestCoreIndex || coverage ? (
           <div className="mt-5 grid grid-cols-2 gap-x-4 border-y border-(--sh-line-1) sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-(--sh-line-1)">
             <Stat
-              label="Latest Core Index"
+              label="Latest weekly reading"
               value={formatSigned(latestCoreIndex?.score)}
               suffix="/ +50"
               detail={

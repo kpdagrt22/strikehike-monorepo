@@ -132,7 +132,7 @@ const FutureLane = memo(function FutureLane({
 
       {error ? (
         <p className="mt-2 text-meta text-black/60 dark:text-white/60">
-          Upcoming events are unavailable.
+          Sky ladder unavailable.
         </p>
       ) : loading ? (
         <div className="mt-2 h-10 animate-pulse rounded-full bg-black/[0.05] dark:bg-white/[0.06]" />

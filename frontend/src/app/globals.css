@@ -133,7 +133,7 @@
 
   /* From lg the planet readout docks 20rem wide at 15.5rem from the top
      (Tooltip.jsx): up to 1712 px it can reach the gauge's 23rem column, so
-     the "Most Similar Day" line steps back while a readout is up. The ring
+     the "Closest past sky" line steps back while a readout is up. The ring
      and the polarity above it stay. */
   [data-hud="gauge"] [data-hud-part="parallel"] {
     transition: opacity var(--sh-dur-reveal) var(--sh-ease-out);
@@ -146,7 +146,7 @@
   }
 
   /* Short windows below lg (landscape phones): the gauge starts under the
-     header row, so its "Most Similar Day" line would run under the mobile
+     header row, so its "Closest past sky" line would run under the mobile
      dock. It steps out there; the score, the ring and the polarity stay. */
   @media (max-width: 1023.98px) and (max-height: 26rem) {
     [data-hud="gauge"] [data-hud-part="parallel"] {

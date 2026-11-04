@@ -198,7 +198,7 @@ export function PatternMirror({ engine, assetKey, onOpenMirror }) {
                   label="The 120-year offset, tested"
                   value="No better than chance"
                   words
-                  detail={`average rank ${ordinal(evidence.mean_rank_pct)} percentile in ${formatCount(evidence.months_tested)} monthly tests (chance: ${ordinal(evidence.chance_rank_pct)})`}
+                  detail={`average rank ${ordinal(evidence.mean_rank_pct)} percentile in ${formatCount(evidence.months_tested)} monthly 120-year-offset comparisons (chance: ${ordinal(evidence.chance_rank_pct)})`}
                 />
               ) : null}
               {aligned ? (

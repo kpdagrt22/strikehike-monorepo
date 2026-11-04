@@ -73,7 +73,7 @@ function trackRecord(engine, k) {
   const cadence = CADENCE_INTRO[skill.cadence];
   if (cadence && skill.period?.[1] && finite(skill.forecasts) && finite(skill.independent_years)) {
     lines.push(
-      `${cadence} from ${formatMonth(skill.period[0])} to ${formatMonth(skill.period[1])}, this comparison was re-run using only the history available at the time, then checked against what followed: ${formatCount(skill.forecasts)} tests, about ${Math.round(Number(skill.independent_years))} independent years.`,
+      `${cadence} from ${formatMonth(skill.period[0])} to ${formatMonth(skill.period[1])}, this comparison was re-run using only the history available at the time, then checked against what followed: ${formatCount(skill.forecasts)} walk-forward tests, about ${Math.round(Number(skill.independent_years))} independent years.`,
     );
   }
   const direction = skill.direction;

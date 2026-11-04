@@ -17,7 +17,7 @@ const STEPS = [
   {
     number: "2",
     title: "The Score",
-    body: "The Core Index reads US market trend and stress each week, from −50 (Maximum Fear) to +50 (Risk Elevated). We read it contrarian: trim into strength, accumulate into panic.",
+    body: "The Core Index reads US market trend and stress each week, from −50 (Maximum fear) to +50 (Risk elevated). The record shows how often its warnings came before large falls, and how often they did not.",
     dot: "bg-[#a16207] dark:bg-[#facc15]",
   },
   {

@@ -48,13 +48,15 @@ export default function DisclaimerPage() {
             context. It sets the US macro record and market history beside
             the planetary sky, date by date, so patterns can be examined without
             mistaking correlation for certainty. It is not investment advice
-            and not a forecast.
+            and not a forecast. StrikeHike is not registered with SEBI (India)
+            or any other regulator as an investment adviser or research
+            analyst, and nothing on this site is a recommendation to buy, sell
+            or hold any security.
           </p>
           <p>
             The Core Index, its warnings and the pattern comparisons describe
-            history, and they can be wrong. The allocation wording that goes
-            with each Core Index band reads the score contrarian, trimming
-            into euphoria and accumulating into fear: research, not investment
+            history, and they can be wrong. The Core Index bands are descriptive
+            states, not allocations or actions: research, not investment
             advice. Where a view shows how past readings fared, it is a
             historical record, not a forecast; past scoring does not carry
             into the future.
