@@ -3,6 +3,9 @@ name: Deploy to Lightsail
 on:
   push:
     branches: [main]
+  # Pull requests run the test jobs only; the deploy job never runs for them.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       rehearse_rollback:
@@ -15,8 +18,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: lightsail-production
-  cancel-in-progress: false
+  # PR runs get their own group so they never queue behind (or cancel) a deploy.
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || 'lightsail-production' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test-backend:
@@ -179,6 +183,8 @@ jobs:
   deploy:
     name: Deploy monorepo to Lightsail
     needs: [test-backend, test-frontend, test-frontend-smoke]
+    # Production only: pushes to main, or a manual run started from main.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -226,6 +232,17 @@ jobs:
             # Tag the running images before the new build can replace their
             # names. The running containers keep the old image IDs.
             tag_rollback_images
+
+            # A rehearsal must never reach the cutover without images to go
+            # back to; stop here, before anything has changed.
+            if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+              for service in backend frontend; do
+                if ! docker image inspect "strikehike-rollback-${service}:rollback" > /dev/null 2>&1; then
+                  echo "::error::Cannot rehearse: no :rollback image for ${service}. Nothing was changed."
+                  exit 1
+                fi
+              done
+            fi
 
             # Build the new stack while the existing site is still serving.
             docker compose -p strikehike-chrono build
@@ -276,11 +293,12 @@ jobs:
                 {
                   docker compose -p strikehike-chrono ps -q \
                     | xargs -r docker inspect --format '{{.Image}}' || true
-                  docker image ls --format '{{.ID}} {{.Repository}}:{{.Tag}}' \
+                  docker image ls --no-trunc --format '{{.ID}} {{.Repository}}:{{.Tag}}' \
                     | awk '$2 ~ /:rollback$/ {print $1}'
                 } | sort -u
               )"
-              for id in $(docker image ls --format '{{.ID}}' --filter "until=24h" | sort -u); do
+              # Full sha256 IDs on both sides, so the protected list matches.
+              for id in $(docker image ls --no-trunc --format '{{.ID}}' --filter "until=24h" | sort -u); do
                 if printf '%s\n' "$protected" | grep -qx "$id"; then
                   continue
                 fi
@@ -335,6 +353,18 @@ jobs:
               return 1
             }
 
+            probe_chrono() {
+              "${CURL[@]}" "$BASE_URL/api/chrono/positions?date=2008-09-15" > /dev/null
+            }
+
+            # Containers take a while to start and Caddy may still be
+            # provisioning TLS, so wait (up to ~4 min) before the strict probes.
+            wait_ready() {
+              probe_backend \
+                && "${CURL[@]}" --retry 36 --retry-delay 5 --retry-connrefused --retry-all-errors \
+                  "$BASE_URL/" > /dev/null
+            }
+
             warm_up() {
               probe_atlas \
                 && probe_upcoming \
@@ -345,9 +375,15 @@ jobs:
             run_probes() {
               probe_backend \
                 && probe_events \
+                && probe_chrono \
                 && probe_atlas \
                 && probe_home \
                 && probe_regime
+            }
+
+            show_caddy_logs() {
+              echo "--- caddy logs ---"
+              docker compose -p strikehike-chrono logs --tail=120 caddy || true
             }
 
             # Free ports 80/443 only after the new images are built.
@@ -364,7 +400,7 @@ jobs:
             fi
 
             if ! docker compose -p strikehike-chrono up -d --remove-orphans; then
-              if ! rollback_images; then
+              if ! rollback_images && [ -n "$OLD_IDS" ]; then
                 legacy_rollback
               fi
               exit 1
@@ -378,24 +414,29 @@ jobs:
             if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
               echo "::warning::Rollback rehearsal requested; the probe gate is forced to fail after this same-commit deploy."
               PROBES_OK=1
-            elif warm_up && run_probes; then
+            elif wait_ready && warm_up && run_probes; then
               PROBES_OK=0
             else
               PROBES_OK=1
+              show_caddy_logs
             fi
 
             if [ "$PROBES_OK" -ne 0 ]; then
               echo "::error::The new release failed its probes; restoring the :rollback images."
               if rollback_images; then
-                sleep 5
-                if run_probes; then
+                if wait_ready && warm_up && run_probes; then
                   echo "::error::Previous images restored and passed the probes; failing this job because the new release did not."
                 else
                   echo "::error::Previous images were restored but the probes still fail."
+                  show_caddy_logs
                 fi
-              else
+              elif [ -n "$OLD_IDS" ]; then
                 echo "::error::No :rollback images are available."
                 legacy_rollback
+              else
+                # Nothing older to start: taking the stack down would only
+                # turn a degraded site into an offline one.
+                echo "::error::No :rollback images and no legacy stack; leaving the new release running."
               fi
               exit 1
             fi

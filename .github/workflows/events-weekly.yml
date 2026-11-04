@@ -410,7 +410,7 @@ jobs:
             BASE_URL="https://strikehike.com"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
 
-            "${CURL[@]}" \
+            "${CURL[@]}" --retry 6 --retry-delay 5 --retry-all-errors \
               "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
               > /dev/null
 

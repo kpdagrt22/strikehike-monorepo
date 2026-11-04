@@ -2,8 +2,8 @@
 // Next proxy supplies the client key and the daily flag; this module only does
 // the arithmetic and the eviction.
 
-export const API_LIMIT_PER_MINUTE = 120;
-export const DAILY_LIMIT_PER_MINUTE = 30;
+export const API_LIMIT_PER_MINUTE = 240;
+export const DAILY_LIMIT_PER_MINUTE = 60;
 export const IDLE_BUCKET_MS = 10 * 60_000;
 export const MAX_BUCKETS = 10_000;
 const SWEEP_INTERVAL_MS = 60_000;

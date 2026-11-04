@@ -8,7 +8,7 @@ import {
   API_LIMIT_PER_MINUTE,
 } from "./rateLimit.js";
 
-test("the general API bucket allows 120 requests a minute", () => {
+test("the general API bucket allows 240 requests a minute", () => {
   let time = 0;
   const limiter = createRateLimiter({ now: () => time });
 
@@ -23,7 +23,7 @@ test("the general API bucket allows 120 requests a minute", () => {
   assert.equal(limiter.consume("1.2.3.4").allowed, true);
 });
 
-test("daily requests have their own 30-request bucket", () => {
+test("daily requests have their own 60-request bucket", () => {
   let time = 0;
   const limiter = createRateLimiter({ now: () => time });
 
