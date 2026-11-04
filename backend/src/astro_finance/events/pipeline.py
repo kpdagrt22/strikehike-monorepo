@@ -322,6 +322,7 @@ def stage_quality(ctx: PipelineContext) -> StageOutcome:
         ctx.source_runs[source_id] = replace(
             run, rejected_count=ctx.rejected_counts.get(source_id, run.rejected_count)
         )
+    notes.extend(ctx.artifact.warnings)
     if ctx.previous_manifest is None:
         notes.append("No previous bundle was supplied; lifecycle started fresh.")
     if (
