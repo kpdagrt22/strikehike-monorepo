@@ -312,19 +312,99 @@
   border-radius: 9999px;
 }
 
-/* Sky activity fire (GaugeAura.jsx): a particle fire on a canvas from 85.
-   The canvas holds its last frame after a ~3 s burst, so nothing runs at
-   rest; the container only fades in. */
+/* Sky activity aura (GaugeAura.jsx): animated-style vector flames from 85.
+   Continuous by the owner's choice: transform and opacity only, each tongue
+   on its own rhythm. Paused while a phone sheet covers the gauge; the
+   reduced-motion rule below stops every one on a still frame. */
 .sh-aura {
-  animation: sh-aura-in 320ms var(--sh-ease-out) both;
+  animation: sh-aura-in 420ms var(--sh-ease-out) both;
+}
+
+.sh-aura[data-paused="true"] * {
+  animation-play-state: paused;
+}
+
+.sh-tongue {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation-name: sh-tongue;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.sh-aura-halo {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: sh-aura-halo 2.6s ease-in-out infinite alternate;
+}
+
+.sh-aura-core {
+  animation: sh-aura-core 1.5s ease-in-out infinite alternate;
+}
+
+.sh-ember {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation-name: sh-ember;
+  animation-timing-function: var(--sh-ease-out);
+  animation-iteration-count: infinite;
 }
 
 @keyframes sh-aura-in {
   from {
     opacity: 0;
+    transform: scale(0.9);
   }
   to {
     opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sh-tongue {
+  0% {
+    transform: scaleY(0.8) scaleX(1.06) skewX(-5deg);
+  }
+  45% {
+    transform: scaleY(1.14) scaleX(0.92) skewX(3deg);
+  }
+  100% {
+    transform: scaleY(0.94) scaleX(1) skewX(6deg);
+  }
+}
+
+@keyframes sh-aura-halo {
+  from {
+    transform: scale(0.97);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes sh-aura-core {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.9;
+  }
+}
+
+@keyframes sh-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sh-ember-dx, 0px), var(--sh-ember-rise, -30px)) scale(0.35);
   }
 }
 
