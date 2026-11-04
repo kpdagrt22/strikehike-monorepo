@@ -123,6 +123,9 @@ Lifecycle rules, applied against `--previous`:
   status and increments `missing_runs`; on the second consecutive miss it
   becomes `unverified`;
 - a source that failed or is disabled does not advance `missing_runs`;
+- events from a source removed from the registry are retired in the same run:
+  future events become `unverified` with `missing_runs = 2`, past events become
+  `completed`; they are never deleted;
 - records are never deleted, including archived snapshots;
 - historical events are immutable while `historical_events.json` is unchanged.
   If the seed file's SHA-256 changes, the explicit owner edit is adopted: new
@@ -250,13 +253,24 @@ fingerprint and model configuration are unchanged.
 
 A candidate becomes production only if all hold:
 
-1. walk-forward balanced accuracy is at least production + 0.01;
-2. Brier score is no worse than production;
-3. it beats the persistence baseline;
-4. no Core Index bucket is worse than production by more than 0.05.
+1. walk-forward balanced accuracy is at least **0.52** (the minimum skill bar,
+   including the first model);
+2. its Brier score is better than always predicting the historical average;
+3. walk-forward balanced accuracy is at least production + 0.01;
+4. Brier score is no worse than production;
+5. it beats the persistence baseline;
+6. no Core Index bucket is worse than production by more than 0.05.
 
-Otherwise production stays and the candidate is marked retired with the failed
-conditions. A first model is promoted if it beats persistence.
+Conditions 1–2 apply to the first model too. Otherwise production stays (or no
+production model exists yet) and the candidate is marked retired with the
+failed conditions. With no qualifying production model the events bundle can
+still publish; the forecast endpoint returns 503.
+
+A failed macro refresh or macro validation skips only the data/model portion of
+the weekly run: events still publish from the event sources, using the baked
+macro parquet and no new model. A model training failure likewise leaves the
+events bundle publishable without a new model. With no qualifying production
+model the forecast endpoint returns 503.
 
 The bundle stores `models/model.joblib`, `models/model_card.json`,
 `models/promotion.json` and `models/registry.json`. The

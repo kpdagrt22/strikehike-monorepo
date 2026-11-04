@@ -28,6 +28,7 @@ class LifecycleResult:
     updated_count: int
     added_ids: tuple[str, ...]
     changed_ids: tuple[str, ...]
+    retired_ids: tuple[str, ...] = ()
 
 
 def base_event_id(event_id: str) -> str:
@@ -124,9 +125,16 @@ def merge_with_previous(
     now: datetime,
     successful_source_ids: set[str],
     historical_source_changed: bool,
+    available_source_ids: set[str] | None = None,
 ) -> LifecycleResult:
     """Apply the lifecycle rules and return the complete, sorted set."""
 
+    available = (
+        available_source_ids
+        if available_source_ids is not None
+        else {event.source_id for event in previous}
+    )
+    retired_ids: list[str] = []
     previous_by_id = {event.event_id: event for event in previous}
     used_ids: set[str] = set(previous_by_id)
     consumed_previous: set[str] = set()
@@ -250,6 +258,26 @@ def merge_with_previous(
         if base_event_id(old.event_id) != old.event_id:
             output.append(old)  # archived snapshots are never revisited
             continue
+        if old.source_id not in available:
+            if old.status in (EventStatus.SCHEDULED, EventStatus.TENTATIVE, EventStatus.UNVERIFIED):
+                status = (
+                    EventStatus.COMPLETED
+                    if old.start_date < today
+                    else EventStatus.UNVERIFIED
+                )
+                output.append(
+                    replace_event(
+                        old,
+                        status=status,
+                        missing_runs=2,
+                        last_updated_at=now,
+                        collected_at=now,
+                    )
+                )
+                retired_ids.append(old.event_id)
+            else:
+                output.append(old)
+            continue
         if old.source_id not in successful_source_ids:
             output.append(old)  # a failed source must not erase confidence
             continue
@@ -327,4 +355,5 @@ def merge_with_previous(
         updated_count=len(set(added) | set(changed)),
         added_ids=added,
         changed_ids=changed,
+        retired_ids=tuple(retired_ids),
     )

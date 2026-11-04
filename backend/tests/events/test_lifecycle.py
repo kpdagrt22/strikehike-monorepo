@@ -11,7 +11,7 @@ from astro_finance.events.models import EventKind, EventStatus
 from conftest import NOW, TODAY, build_event
 
 
-def _merge(current, previous, *, successful=None, changed=False):
+def _merge(current, previous, *, successful=None, changed=False, available=None):
     return merge_with_previous(
         current,
         previous,
@@ -21,6 +21,7 @@ def _merge(current, previous, *, successful=None, changed=False):
             {"test_source"} if successful is None else successful
         ),
         historical_source_changed=changed,
+        available_source_ids=available,
     )
 
 
@@ -129,6 +130,19 @@ def test_missing_count_does_not_advance_when_the_source_failed():
     previous = build_event(event_id=base, start_date=TODAY + timedelta(days=10))
     result = _merge([], [previous], successful=set())
     assert result.events[0] == previous
+
+
+def test_removed_source_is_retired_in_the_same_run():
+    base = "science:removed_source:gone-2027"
+    previous = build_event(
+        event_id=base,
+        source_id="removed_source",
+        start_date=TODAY + timedelta(days=10),
+    )
+    result = _merge([], [previous], successful=set(), available={"test_source"})
+    assert result.events[0].status is EventStatus.UNVERIFIED
+    assert result.events[0].missing_runs == 2
+    assert result.retired_ids == (base,)
 
 
 def test_returning_event_resets_missing_state():

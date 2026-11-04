@@ -83,6 +83,9 @@ def summary(ctx: "PipelineContext") -> dict[str, int]:
         "events_discovered": sum(ctx.extracted_counts.values()),
         "events_updated": ctx.lifecycle.updated_count if ctx.lifecycle else 0,
         "events_rejected": sum(ctx.rejected_counts.values()),
+        "events_retired": (
+            len(ctx.lifecycle.retired_ids) if ctx.lifecycle else 0
+        ),
         "duplicates_removed": ctx.dedup.duplicates if ctx.dedup else 0,
         "events_total": len(ctx.events),
         "historical_total": historical,

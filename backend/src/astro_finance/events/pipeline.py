@@ -18,7 +18,7 @@ from .io_utils import summary, write_raw, write_rejects
 from .lifecycle import merge_with_previous
 from .macro_data import MacroDataError, validate_macro_refresh
 from .model_bundle import model_gate, model_info
-from .models import EventKind, SourceRun, iso_utc, parse_utc, replace_event
+from .models import EventKind, EventStatus, SourceRun, iso_utc, parse_utc, replace_event
 from .registry import default_data_dir, load_registry, select_sources
 from .reporting import quality_report_payload
 from .runtime import (
@@ -221,6 +221,11 @@ def stage_lifecycle(ctx: PipelineContext) -> StageOutcome:
         ctx.previous_historical_source_sha256 is not None
         and ctx.previous_historical_source_sha256 != ctx.historical_source_sha256
     )
+    available = (
+        {source.id for source in ctx.registry.sources}
+        if ctx.registry is not None
+        else set(ctx.source_specs)
+    )
     ctx.lifecycle = merge_with_previous(
         ctx.dedup.events,
         ctx.previous_events,
@@ -228,6 +233,7 @@ def stage_lifecycle(ctx: PipelineContext) -> StageOutcome:
         now=ctx.options.now,
         successful_source_ids=successful,
         historical_source_changed=changed,
+        available_source_ids=available,
     )
     ctx.events = ctx.lifecycle.events
     ctx.logger.info(
@@ -236,6 +242,7 @@ def stage_lifecycle(ctx: PipelineContext) -> StageOutcome:
         previous=len(ctx.previous_events),
         current=len(ctx.events),
         updated=ctx.lifecycle.updated_count,
+        retired=len(ctx.lifecycle.retired_ids),
         historical_seed_changed=changed,
     )
     return StageOutcome(len(ctx.dedup.events), len(ctx.events))
@@ -258,6 +265,13 @@ def stage_classification(ctx: PipelineContext) -> StageOutcome:
     for event in ctx.events:
         source = ctx.source_specs.get(event.source_id)
         if source is None:
+            if event.status in (
+                EventStatus.UNVERIFIED,
+                EventStatus.COMPLETED,
+                EventStatus.CANCELLED,
+                EventStatus.RESCHEDULED,
+            ):
+                continue
             raise PipelineError(f"event {event.event_id} has no enabled source")
         if event.theme not in source.themes:
             raise PipelineError(
