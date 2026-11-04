@@ -1,5 +1,6 @@
 "use client";
 
+import { assetCompared, cycleMapToggled } from "@/lib/analytics/events";
 import {
   coreIndexTone,
   formatDate,
@@ -241,7 +242,14 @@ export function MacroHUD({
                       aria-disabled={locked ? "true" : undefined}
                       title={locked ? "At least one asset stays on the chart" : undefined}
                       onClick={() => {
-                        if (!locked) onShownToggle?.(key);
+                        if (!locked) {
+                          assetCompared(
+                            checked ? "remove" : "add",
+                            key === "nifty" ? "nifty50" : key,
+                            checked ? shownAssets.length - 1 : shownAssets.length + 1,
+                          );
+                          onShownToggle?.(key);
+                        }
                       }}
                       className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-colors duration-200 aria-disabled:cursor-default lg:gap-1.5 lg:px-2.5 ${
                         checked
@@ -260,7 +268,13 @@ export function MacroHUD({
                   <button
                     key={key}
                     type="button"
-                    onClick={() => onAssetChange?.(key)}
+                    onClick={() => {
+                      assetCompared(
+                        "select",
+                        key === "nifty" ? "nifty50" : key,
+                      );
+                      onAssetChange?.(key);
+                    }}
                     aria-pressed={selected}
                     className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-[background-color,color] duration-200 lg:gap-1.5 lg:px-2.5 ${
                       selected
@@ -278,7 +292,14 @@ export function MacroHUD({
 
             <button
               type="button"
-              onClick={onCompareToggle}
+              onClick={() => {
+                assetCompared(
+                  compareAssets ? "compare_off" : "compare_on",
+                  "",
+                  shownAssets.length,
+                );
+                onCompareToggle?.();
+              }}
               aria-pressed={compareAssets}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-micro font-medium transition-colors ${
                 compareAssets
@@ -333,7 +354,10 @@ export function MacroHUD({
                 map below the chart stays). */}
             <button
               type="button"
-              onClick={onCycleToggle}
+              onClick={() => {
+                cycleMapToggled(cycleOn ? "off" : "on");
+                onCycleToggle?.();
+              }}
               aria-pressed={cycleOn}
               title="The 90-day cycle map in the hover card"
               className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-micro font-medium transition-colors ${

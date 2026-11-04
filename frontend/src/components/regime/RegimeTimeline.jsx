@@ -17,6 +17,7 @@ import {
   PriceScaleMode,
   createChart,
 } from "lightweight-charts";
+import { dateTravelled } from "@/lib/analytics/events";
 import {
   CARD_LEFT,
   CARD_WIDTH,
@@ -1859,6 +1860,7 @@ export function RegimeTimeline({
         if (!crash) return;
         event.preventDefault();
         openerRef.current = event.currentTarget;
+        dateTravelled("crash_band", crash.start);
         onSelect?.(crash);
         return;
       }
@@ -1876,7 +1878,12 @@ export function RegimeTimeline({
         return;
     }
     event.preventDefault();
-    moveSliderTo(Math.max(0, Math.min(last, next)));
+    const index = Math.max(0, Math.min(last, next));
+    const time = navTimes[index];
+    if (time) {
+      dateTravelled("market_tape", chartTimeToIso(time));
+    }
+    moveSliderTo(index);
   };
 
   // Keyboard focus reveals what hover reveals: the crosshair and the snapshot.
@@ -2203,7 +2210,10 @@ export function RegimeTimeline({
 
     const handleClick = (param) => {
       const crash = crashForTime(param?.time);
-      if (crash) onSelect?.(crash);
+      if (crash) {
+        dateTravelled("crash_band", crash.start);
+        onSelect?.(crash);
+      }
     };
 
     chart.subscribeCrosshairMove(handleCrosshair);
@@ -2604,6 +2614,7 @@ export function RegimeTimeline({
                     (item) => item.id === event.target.value,
                   );
                   if (crash) {
+                    dateTravelled("nber_select", crash.start);
                     openerRef.current = event.currentTarget;
                     onSelect?.(crash);
                   }

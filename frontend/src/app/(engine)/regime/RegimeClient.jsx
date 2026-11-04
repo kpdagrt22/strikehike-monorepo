@@ -14,6 +14,7 @@ import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
 import { PhasePlane } from "@/components/regime/PhasePlane";
 import { OnboardingModal } from "@/components/ui/OnboardingModal";
 import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
+import { dateTravelled, methodOpened } from "@/lib/analytics/events";
 import { MARKET_FLAGS, sourcePeriods } from "@/components/regime/regimeChart";
 import {
   coreIndexTone,
@@ -298,6 +299,9 @@ function MethodDetails({ meta }) {
   return (
     <details
       id="regime-method"
+      onToggle={(event) => {
+        if (event.currentTarget.open) methodOpened("method_limits", "/regime");
+      }}
       className="group mt-4 scroll-mt-24 rounded-[1.4rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/25 sm:p-6"
     >
       <summary className="-m-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
@@ -438,7 +442,10 @@ export default function RegimeClient({
     const date = new URLSearchParams(window.location.search).get("d");
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     const store = useChronoStore.getState();
-    if (store.focusedDate !== date) store.setFocusedDate(date);
+    if (store.focusedDate !== date) {
+      dateTravelled("deep_link", date);
+      store.setFocusedDate(date);
+    }
   }, []);
 
   const data = state.data;
@@ -624,9 +631,10 @@ export default function RegimeClient({
             <div className="mt-4 flex flex-wrap justify-end gap-3 text-micro">
               <button
                 type="button"
-                onClick={() =>
-                  window.dispatchEvent(new Event("strikehike:show-onboarding"))
-                }
+                onClick={() => {
+                  methodOpened("how_it_works", "/regime");
+                  window.dispatchEvent(new Event("strikehike:show-onboarding"));
+                }}
                 className={FOOTER_LINK}
               >
                 How it works
@@ -693,11 +701,12 @@ export default function RegimeClient({
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  methodOpened("how_it_works", "/regime");
                   window.dispatchEvent(
                     new Event("strikehike:show-onboarding"),
-                  )
-                }
+                  );
+                }}
                 className={FOOTER_LINK}
               >
                 How it works

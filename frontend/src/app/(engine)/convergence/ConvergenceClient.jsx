@@ -16,6 +16,7 @@ import { CasePicker, CaseTriggerPlaceholder } from "@/components/regime/CasePick
 import { ASSET_TARGETS } from "@/components/regime/assetTargets";
 import { coreIndexTone } from "@/components/regime/regimeUtils";
 import { OnboardingModal } from "@/components/ui/OnboardingModal";
+import { caseOpened, methodOpened } from "@/lib/analytics/events";
 import { getRegimeToneColor, getRegimeToneLabel } from "@/lib/regimeTone";
 import {
   SERIES_OPTIONS,
@@ -834,7 +835,14 @@ function MethodDetails({ data }) {
   const cowlesEnd = segments[0]?.end;
   const ephemeris = coverage.ephemeris ?? {};
   return (
-    <details className={`group mt-4 rounded-[1.4rem] border border-(--sh-line-1) bg-(--sh-surface-card) p-5 sm:p-6`}>
+    <details
+      onToggle={(event) => {
+        if (event.currentTarget.open) {
+          methodOpened("method_limits", "/convergence");
+        }
+      }}
+      className={`group mt-4 rounded-[1.4rem] border border-(--sh-line-1) bg-(--sh-surface-card) p-5 sm:p-6`}
+    >
       <summary className="-m-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 text-micro font-medium uppercase tracking-[0.16em] text-black/60 pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden dark:text-white/60">
         Method & limits
         <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60">
@@ -918,6 +926,16 @@ export default function ConvergenceClient({
   // Bumped when a shared link's pair replaces the server's default pair:
   // everything under the bar then mounts afresh (new nodes, not layout shifts).
   const [linkMount, setLinkMount] = useState(0);
+  const deepLinkTracked = useRef(false);
+  useEffect(() => {
+    if (deepLinkTracked.current) return;
+    deepLinkTracked.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const a = params.get("a");
+    const b = params.get("b");
+    if (a) caseOpened("/convergence", "a", "deep_link", a);
+    if (b) caseOpened("/convergence", "b", "deep_link", b);
+  }, []);
   const [note, setNote] = useState(null);
   // { key, content }: what the read showed when a change made it wait for
   // paths; it stays on screen while the read for `key` loads.
@@ -1142,6 +1160,7 @@ export default function ConvergenceClient({
 
   const chooseCase = (side, id) => {
     if (!sel || sel[side] === id) return;
+    caseOpened("/convergence", side, "picker", id);
     const other = side === "a" ? "b" : "a";
     if (sel[other] === id) {
       applySelection({ a: sel.b, b: sel.a }, [], ["Swapped A and B."]);
@@ -1152,6 +1171,13 @@ export default function ConvergenceClient({
 
   const choosePair = ([a, b]) => {
     if (!sel) return;
+    caseOpened(
+      "/convergence",
+      "pair",
+      sel.a === b && sel.b === a ? "swap" : "suggested_pair",
+      a,
+      b,
+    );
     if (sel.a === b && sel.b === a) {
       applySelection({ a, b }, [], ["Swapped A and B."]);
       return;
@@ -1164,6 +1190,7 @@ export default function ConvergenceClient({
 
   const swap = () => {
     if (!sel) return;
+    caseOpened("/convergence", "pair", "swap", sel.b, sel.a);
     applySelection({ a: sel.b, b: sel.a }, [], ["Swapped A and B."]);
   };
 
@@ -1570,9 +1597,10 @@ export default function ConvergenceClient({
           <div className="mt-4 flex justify-end gap-4">
             <button
               type="button"
-              onClick={() =>
-                window.dispatchEvent(new Event("strikehike:show-onboarding"))
-              }
+              onClick={() => {
+                methodOpened("how_it_works", "/convergence");
+                window.dispatchEvent(new Event("strikehike:show-onboarding"));
+              }}
               className={QUIET_LINK}
             >
               How it works

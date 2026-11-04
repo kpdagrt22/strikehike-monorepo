@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { viewOpened } from "@/lib/analytics/events";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -257,11 +258,17 @@ export function RightPanel() {
                                 type="button"
                                 aria-expanded={expanded}
                                 aria-controls={expanded ? insightId : undefined}
-                                onClick={() =>
+                                onClick={(event) => {
+                                  if (!expanded) {
+                                    viewOpened(
+                                      "alignment_insight",
+                                      event.detail === 0 ? "keyboard" : "click",
+                                    );
+                                  }
                                   setOpenRow((current) =>
                                     current === name ? null : name,
-                                  )
-                                }
+                                  );
+                                }}
                                 className="text-left outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-(--sh-focus)"
                               >
                                 {name}

@@ -12,6 +12,7 @@ import {
   CATEGORY_ORDER,
   categoryTone,
 } from "@/lib/categoryTone";
+import { dateTravelled, viewOpened } from "@/lib/analytics/events";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -132,11 +133,13 @@ export function FilterControls() {
       ? categories[activeCategory]
       : [];
 
-  const toggleCategory = (category) => {
+  const toggleCategory = (category, method = "click") => {
+    if (activeCategory !== category) viewOpened("archive", method);
     setActiveCategory((current) => (current === category ? null : category));
   };
 
   const travelToEvent = (eventDate) => {
+    dateTravelled("archive_event", eventDate);
     setFocusedDate(eventDate);
     // Hand focus back rather than dropping it with the closing list: to the
     // category on desktop, to the dock's Events button when the sheet closes.
@@ -148,6 +151,7 @@ export function FilterControls() {
   };
 
   const showLadder = () => {
+    viewOpened("ladder_sheet", "tap");
     setActiveCategory(null);
     setMobileSheet("future");
     // Focus follows the swap to the ladder sheet's matching control.
@@ -321,7 +325,10 @@ export function FilterControls() {
                       if (event.detail === 0 && isDesktop && !isActive) {
                         focusFirstEvent.current = true;
                       }
-                      toggleCategory(category);
+                      toggleCategory(
+                        category,
+                        event.detail === 0 ? "keyboard" : "click",
+                      );
                     }}
                     aria-expanded={isActive}
                     aria-controls={isActive ? "chrono-category-events" : undefined}

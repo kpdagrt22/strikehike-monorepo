@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { viewOpened } from "@/lib/analytics/events";
 import { RegimeOverlayButton } from "@/components/ViewControls";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -82,9 +83,15 @@ export function MobileDock() {
               key={button.id}
               id={`chrono-dock-${button.id}`}
               type="button"
-              onClick={() =>
-                setMobileSheet(active ? null : button.id)
-              }
+              onClick={(event) => {
+                if (!active) {
+                  viewOpened(
+                    button.id === "archive" ? "mobile_events" : "mobile_data",
+                    event.detail === 0 ? "keyboard" : "tap",
+                  );
+                }
+                setMobileSheet(active ? null : button.id);
+              }}
               aria-label={`${button.label} panel`}
               aria-controls={button.controls}
               aria-expanded={active}

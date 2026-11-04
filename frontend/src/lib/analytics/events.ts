@@ -1,0 +1,188 @@
+import { trackEvent, trackPageView } from "./track";
+
+type NavType = "load" | "client" | "back_forward";
+type ViewPanel =
+  | "nav"
+  | "info"
+  | "archive"
+  | "ladder_sheet"
+  | "alignment_insight"
+  | "planet_pinned"
+  | "timeline"
+  | "precise_picker"
+  | "regime_overlay"
+  | "mobile_events"
+  | "mobile_data"
+  | "feedback"
+  | "nber_table"
+  | "catalogue_table";
+type ViewMethod = "click" | "tap" | "keyboard" | "hover_intent" | "hash";
+type TravelMethod =
+  | "scrub"
+  | "crash_marker"
+  | "page_key"
+  | "today"
+  | "precise_picker"
+  | "archive_event"
+  | "sky_ladder"
+  | "ladder_lane"
+  | "crash_band"
+  | "nber_select"
+  | "market_tape"
+  | "deep_link";
+type Asset = "sp500" | "gold" | "bonds" | "nifty50";
+type CasePage = "/convergence" | "/patterns";
+type CaseSlot = "a" | "b" | "pair" | "compare";
+type CaseMethod =
+  | "picker"
+  | "picker_search"
+  | "suggested_pair"
+  | "swap"
+  | "cross_link"
+  | "deep_link";
+type Theme =
+  | "politics"
+  | "science"
+  | "finance"
+  | "culture-religion"
+  | "natural-disasters";
+
+function ordinary(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 64);
+}
+
+function yearOf(value: string | number | Date) {
+  if (typeof value === "number") return value;
+  const date = value instanceof Date ? value : new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) ? date.getUTCFullYear() : new Date().getUTCFullYear();
+}
+
+export function pageViewed(path: string, navType: NavType) {
+  trackPageView(path, navType);
+}
+
+export function onboardingDismissed(method: "enter" | "escape", msShown?: "<3s" | "3–10s" | ">10s") {
+  trackEvent("onboarding_dismissed", { method, ...(msShown ? { ms_shown: msShown } : {}) });
+}
+
+export function viewOpened(panel: ViewPanel, method: ViewMethod) {
+  trackEvent("view_opened", { panel, method });
+}
+
+export function dateTravelled(method: TravelMethod, target: string | number, targetRef?: string) {
+  const year = yearOf(target);
+  const future =
+    typeof target === "string"
+      ? Date.parse(`${target.slice(0, 10)}T00:00:00Z`) > Date.now()
+      : year > new Date().getUTCFullYear();
+  trackEvent("date_travelled", {
+    method,
+    target_year: year,
+    is_future: future ? 1 : 0,
+    ...(targetRef ? { target_ref: targetRef.slice(0, 64) } : {}),
+  });
+}
+
+export function assetCompared(
+  action: "select" | "add" | "remove" | "compare_on" | "compare_off",
+  asset: Asset | "",
+  assetsOn?: number,
+) {
+  trackEvent("asset_compared", {
+    action,
+    asset,
+    ...(Number.isFinite(assetsOn) ? { assets_on: assetsOn } : {}),
+  });
+}
+
+export function cycleMapToggled(state: "on" | "off") {
+  trackEvent("cycle_map_toggled", { state });
+}
+
+export function caseOpened(
+  page: CasePage,
+  slot: CaseSlot,
+  method: CaseMethod,
+  caseId: string,
+  caseIdB?: string,
+) {
+  trackEvent("case_opened", {
+    page,
+    slot,
+    method,
+    case_id: caseId,
+    ...(caseIdB ? { case_id_b: caseIdB } : {}),
+  });
+}
+
+export function upcomingOpened(method: "tab" | "mobile_sheet" | "deep_link" | "page", eventsShown?: number) {
+  trackEvent("upcoming_opened", {
+    method,
+    ...(Number.isFinite(eventsShown) ? { events_shown: eventsShown } : {}),
+  });
+}
+
+export function themeSelected(
+  theme: Theme | "all" | "clear",
+  state: "on" | "off",
+  selectedCount?: number,
+  shownCount?: number,
+) {
+  trackEvent("theme_selected", {
+    theme,
+    state,
+    ...(Number.isFinite(selectedCount) ? { selected_count: selectedCount } : {}),
+    ...(Number.isFinite(shownCount) ? { shown_count: shownCount } : {}),
+  });
+}
+
+export function eventSourceClicked(
+  eventId: string,
+  theme: Theme,
+  daysUntil?: number,
+  sourceUrl?: string,
+) {
+  const bucket =
+    daysUntil == null
+      ? undefined
+      : daysUntil <= 7
+        ? "0–7"
+        : daysUntil <= 30
+          ? "8–30"
+          : daysUntil <= 90
+            ? "31–90"
+            : "91–365";
+  let sourceHost;
+  try {
+    sourceHost = sourceUrl ? new URL(sourceUrl).host.slice(0, 160) : undefined;
+  } catch {
+    sourceHost = undefined;
+  }
+  trackEvent("event_source_clicked", {
+    event_id: eventId.slice(0, 64),
+    theme,
+    ...(bucket ? { days_until_bucket: bucket } : {}),
+    ...(sourceHost ? { source_host: sourceHost } : {}),
+  });
+}
+
+export function methodOpened(which: "method_limits" | "how_it_works", page: "/regime" | "/convergence") {
+  trackEvent("method_opened", { which, page });
+}
+
+export function supportOpened(trigger: "click" | "tap" | "keyboard" | "footer_link") {
+  trackEvent("support_opened", { trigger });
+}
+
+export function supportLinkClicked(target: "paypal" = "paypal") {
+  trackEvent("support_link_clicked", { target });
+}
+
+export function feedbackSubmitted(length: number) {
+  const bucket = length < 50 ? "<50" : length <= 200 ? "50–200" : ">200";
+  trackEvent("feedback_submitted", { length_bucket: bucket });
+}
+
+export function themeSlug(theme: string) {
+  return ordinary(theme);
+}

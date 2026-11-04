@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  eventSourceClicked,
+  themeSelected,
+  themeSlug,
+} from "@/lib/analytics/events";
 import { categoryTone } from "@/lib/categoryTone";
 
 const THEMES = [
@@ -150,16 +155,21 @@ export function UpcomingEvents() {
     : THEMES.filter((theme) => selected.includes(theme));
 
   const toggleTheme = (theme) => {
-    setSelected((current) => {
-      const next =
-        current.length === 0
-          ? [theme]
-          : current.includes(theme)
-            ? current.filter((item) => item !== theme)
-            : [...current, theme];
-      // Keep the shareable URL in the fixed theme order, not click order.
-      return THEMES.filter((item) => next.includes(item));
-    });
+    const wasOn = selected.includes(theme);
+    const next =
+      selected.length === 0
+        ? [theme]
+        : wasOn
+          ? selected.filter((item) => item !== theme)
+          : [...selected, theme];
+    // Keep the shareable URL in the fixed theme order, not click order.
+    const ordered = THEMES.filter((item) => next.includes(item));
+    themeSelected(
+      themeSlug(theme),
+      wasOn ? "off" : "on",
+      ordered.length,
+    );
+    setSelected(ordered);
   };
 
   const chipClass = (active) =>
@@ -191,7 +201,10 @@ export function UpcomingEvents() {
         <button
           type="button"
           aria-pressed={allSelected}
-          onClick={() => setSelected([])}
+          onClick={() => {
+            themeSelected("all", "on", 0);
+            setSelected([]);
+          }}
           onFocus={focusChip}
           className={chipClass(allSelected)}
         >
@@ -221,7 +234,10 @@ export function UpcomingEvents() {
         })}
         <button
           type="button"
-          onClick={() => setSelected([])}
+          onClick={() => {
+            themeSelected("clear", "off", 0);
+            setSelected([]);
+          }}
           onFocus={focusChip}
           className={chipClass(false)}
         >
@@ -343,6 +359,14 @@ export function UpcomingEvents() {
                                 href={event.source_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() =>
+                                  eventSourceClicked(
+                                    event.event_id || event.id,
+                                    themeSlug(theme),
+                                    event.days_until,
+                                    event.source_url,
+                                  )
+                                }
                                 aria-label={`Source for ${event.name}`}
                                 className="mt-1.5 inline-flex items-center gap-1 text-micro text-black/55 underline decoration-current/30 underline-offset-2 transition-colors hover:text-black/80 hover:decoration-current dark:text-white/55 dark:hover:text-white/80"
                               >

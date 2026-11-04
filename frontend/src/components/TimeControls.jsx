@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import crashMarkers from "@/data/astro/crash_markers.json";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { dateTravelled, viewOpened } from "@/lib/analytics/events";
 import { categoryTone } from "@/lib/categoryTone";
 import { namedTithi } from "@/lib/tithi";
 import {
@@ -232,10 +233,18 @@ export function TimeControls() {
   const closePicker = useCallback(() => setPickerOpen(false), []);
   const applyPicker = useCallback(
     (date, time) => {
+      dateTravelled("precise_picker", date);
       setFocusedDateTime(date, time);
       setPickerOpen(false);
     },
     [setFocusedDateTime],
+  );
+  const selectLane = useCallback(
+    (date) => {
+      dateTravelled("ladder_lane", date);
+      setFocusedDate(date);
+    },
+    [setFocusedDate],
   );
   const today = currentUtcDate();
   const isToday = focusedDate === today && focusedTime === "00:00";
@@ -321,7 +330,10 @@ export function TimeControls() {
     if (event.key !== "PageUp" && event.key !== "PageDown") return;
     event.preventDefault();
     const marker = adjacentMarker(value, event.key === "PageUp" ? 1 : -1);
-    if (marker) setFocusedDate(marker.date);
+    if (marker) {
+      dateTravelled("page_key", marker.date);
+      setFocusedDate(marker.date);
+    }
   };
 
   // Pointer shortcuts only: keyboard users jump between markers with Page Up /
@@ -336,7 +348,10 @@ export function TimeControls() {
           key={marker.date}
           type="button"
           tabIndex={-1}
-          onClick={() => setFocusedDate(marker.date)}
+          onClick={() => {
+            dateTravelled("crash_marker", marker.date);
+            setFocusedDate(marker.date);
+          }}
           style={{ left: `${marker.left}%` }}
           title={marker.title}
           aria-label={marker.label}
@@ -405,7 +420,15 @@ export function TimeControls() {
       <div className="flex items-stretch">
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={(event) => {
+            if (!expanded) {
+              viewOpened(
+                "timeline",
+                event.detail === 0 ? "keyboard" : "click",
+              );
+            }
+            setExpanded(true);
+          }}
           aria-expanded={expanded}
           aria-controls={expanded ? "chrono-timeline-controls" : undefined}
           // Name follows the on-screen reading order (label, tithi, date), so
@@ -455,7 +478,11 @@ export function TimeControls() {
 
         <button
           type="button"
-          onClick={() => setFocusedDateTime(currentUtcDate(), "00:00")}
+          onClick={() => {
+            const today = currentUtcDate();
+            dateTravelled("today", today);
+            setFocusedDateTime(today, "00:00");
+          }}
           aria-label="Jump to today's UTC date"
           aria-current={isToday ? "date" : undefined}
           className="group flex min-h-11 shrink-0 items-center px-1.5 focus-visible:outline-none"
@@ -520,7 +547,10 @@ export function TimeControls() {
                   }
                   onKeyDown={onRangeKeyDown}
                   onPointerDown={() => setScrubbing(true)}
-                  onPointerUp={() => setScrubbing(false)}
+                  onPointerUp={() => {
+                    dateTravelled("scrub", focusedDate);
+                    setScrubbing(false);
+                  }}
                   onPointerCancel={() => setScrubbing(false)}
                   onBlur={() => setScrubbing(false)}
                   aria-label="Focused date"
@@ -539,7 +569,11 @@ export function TimeControls() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(event) => {
+                    viewOpened(
+                      "precise_picker",
+                      event.detail === 0 ? "keyboard" : "click",
+                    );
                     setExpanded(true);
                     setPickerOpen(true);
                   }}
@@ -623,7 +657,7 @@ export function TimeControls() {
                 matches={ladderMatches}
                 status={ladderStatus}
                 activeDate={laneActiveDate}
-                onSelect={setFocusedDate}
+                onSelect={selectLane}
               />
             </div>
           </motion.div>

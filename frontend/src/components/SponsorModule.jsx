@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { supportLinkClicked, supportOpened } from "@/lib/analytics/events";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
@@ -39,7 +40,18 @@ export function SponsorModule() {
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          if (!open) {
+            supportOpened(
+              event.detail === 0
+                ? "keyboard"
+                : window.matchMedia("(pointer: coarse)").matches
+                  ? "tap"
+                  : "click",
+            );
+          }
+          setOpen((value) => !value);
+        }}
         aria-label="Open sponsorship and support"
         aria-expanded={open}
         aria-controls="strikehike-sponsor-panel"
@@ -148,6 +160,7 @@ export function SponsorModule() {
                 href={PAYPAL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => supportLinkClicked("paypal")}
                 className="mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-black/10 px-4 text-[13px] font-medium tracking-[-0.01em] text-[#14121a] transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] lg:min-h-9 dark:border-white/10 dark:text-[#f2ede4] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
                 Buy me a drink · PayPal

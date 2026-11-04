@@ -68,7 +68,7 @@ export function useDialogFocus(open, { containerRef, initialFocusRef, onClose } 
         // The topmost layer owns Escape: panels behind the dialog stay put.
         event.preventDefault();
         event.stopPropagation();
-        onCloseRef.current?.();
+        onCloseRef.current?.("escape");
         return;
       }
       if (event.key !== "Tab") return;

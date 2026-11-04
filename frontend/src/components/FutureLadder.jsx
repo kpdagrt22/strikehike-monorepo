@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { dateTravelled, upcomingOpened } from "@/lib/analytics/events";
 import { categoryTone } from "@/lib/categoryTone";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
@@ -78,9 +79,21 @@ export function FutureLadder() {
   // A shared ?themes= link opens Upcoming after hydration. The server render
   // uses the empty server snapshot, so it still emits the default Sky ladder;
   // the no-JS page keeps that default too.
-  const view =
-    viewChoice ?? (hasThemeFilter(locationSearch) ? "upcoming" : "sky");
-  const selectView = (next) => setViewChoice(next);
+  const deepLinked = hasThemeFilter(locationSearch);
+  const view = viewChoice ?? (deepLinked ? "upcoming" : "sky");
+  const announcedDeepLink = useRef(false);
+  const selectView = (next) => {
+    if (next === "upcoming" && view !== "upcoming") {
+      upcomingOpened(sheetOpen ? "mobile_sheet" : "tab");
+    }
+    setViewChoice(next);
+  };
+
+  useEffect(() => {
+    if (view !== "upcoming" || announcedDeepLink.current) return;
+    announcedDeepLink.current = true;
+    if (deepLinked) upcomingOpened("deep_link");
+  }, [deepLinked, view]);
   const sheetRef = useRef(null);
   const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
@@ -286,6 +299,7 @@ export function FutureLadder() {
                 key={`${match.date}-${match.event.name}`}
                 type="button"
                 onClick={() => {
+                  dateTravelled("sky_ladder", match.date);
                   setFocusedDate(match.date);
                   if (sheetOpen) dismissSheet({ restoreFocus: true });
                 }}

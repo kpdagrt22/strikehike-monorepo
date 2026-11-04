@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useAnimationControls } from "framer-motion";
+import { viewOpened } from "@/lib/analytics/events";
 import { CONTACT_URL } from "@/lib/contact";
 import { INTENT, reveal } from "@/lib/motion";
 
@@ -44,6 +45,10 @@ export function InfoModule() {
   const show = useCallback((via, at) => {
     openVia.current = via;
     openedAt.current = at;
+    viewOpened(
+      "info",
+      via === "hover" ? "hover_intent" : via === "tab" ? "keyboard" : via === "hash" ? "hash" : "click",
+    );
     setPanelHidden(false);
     setOpen(true);
   }, []);
@@ -81,7 +86,7 @@ export function InfoModule() {
   // enquiry form) arrives with the panel open.
   useEffect(() => {
     const openFromHash = () => {
-      if (window.location.hash === "#contact") show("click", performance.now());
+      if (window.location.hash === "#contact") show("hash", performance.now());
     };
     const frame = window.requestAnimationFrame(openFromHash);
     window.addEventListener("hashchange", openFromHash);
