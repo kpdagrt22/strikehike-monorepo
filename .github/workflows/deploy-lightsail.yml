@@ -197,7 +197,10 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           port: 22
-          script_stop: true
+          # No script_stop: it appends an exit-code check after every line,
+          # which exits at the top of any function called just after a false
+          # test (and in every else branch). The script's own
+          # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
           envs: REHEARSE_ROLLBACK
           script: |
