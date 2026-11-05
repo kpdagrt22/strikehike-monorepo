@@ -35,14 +35,26 @@ STATUS_CLASSES = ("2xx", "3xx", "4xx", "5xx")
 STATIC_SUFFIX = re.compile(
     r"\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf)$", re.IGNORECASE
 )
+WEEK = re.compile(r"(\d{4})-W(\d{2})")
+SMALL_CELL = 5
+FEED_NETWORKS_NOTE = "distinct masked networks, not people"
+
+
+def people_cell(value: int) -> dict[str, Any]:
+    """A count of people, or of a proxy for them, suppressed below five."""
+    if value < SMALL_CELL:
+        return {"value": None, "reason": "insufficient data (n<5)"}
+    return {"value": value}
 
 
 def week_bounds(week: str) -> tuple[datetime, datetime]:
     """Monday 00:00 to next Monday 00:00 in IST for YYYY-Www."""
+    match = WEEK.fullmatch(week) if isinstance(week, str) else None
     try:
-        year_text, number_text = week.split("-W", 1)
-        start_date = date.fromisocalendar(int(year_text), int(number_text), 1)
-    except (AttributeError, TypeError, ValueError) as exc:
+        if match is None:
+            raise ValueError(week)
+        start_date = date.fromisocalendar(int(match[1]), int(match[2]), 1)
+    except ValueError as exc:
         raise ValueError("week must be YYYY-Www") from exc
     start = datetime.combine(start_date, time.min, tzinfo=IST)
     return start, start + timedelta(days=7)
@@ -215,9 +227,10 @@ def aggregate(log_dir: str | Path, week: str) -> dict[str, Any]:
         "calendar_feeds": {
             feed: {
                 "fetches": values["fetches"],
-                "subscribers_approx": len(values["networks"]),
+                "feed_networks_approx": people_cell(len(values["networks"])),
             }
             for feed, values in feeds.items()
         },
+        "notes": {"feed_networks_approx": FEED_NETWORKS_NOTE},
         "not_found": not_found,
     }

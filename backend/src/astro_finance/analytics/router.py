@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from .botfilter import is_bot
 from .schema import PayloadTooLarge, ValidationError, load_schema, validate_batch
 from .store import get_store
-from .weekly import build_weekly_export
+from .weekly import cached_weekly_export
 
 router = APIRouter(prefix="/usage", tags=["analytics"])
 feedback_router = APIRouter(prefix="/feedback", tags=["feedback"])
@@ -112,7 +112,7 @@ async def weekly(request: Request, week: str) -> Response:
     log_dir = Path(os.environ.get("CADDY_LOG_DIR", "/app/data/caddy-logs"))
     try:
         payload = await run_in_threadpool(
-            build_weekly_export, get_store(), week, log_dir
+            cached_weekly_export, get_store(), week, log_dir
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -83,13 +83,14 @@ def test_aggregate_reads_active_and_rolled_logs_and_keeps_no_identifiers(tmp_pat
     assert result["bot_requests"] == 1
     assert result["human_requests"] == 8
     assert result["bot_share"] == 11.1
+    suppressed = {"value": None, "reason": "insufficient data (n<5)"}
     assert result["calendar_feeds"]["science"] == {
         "fetches": 1,
-        "subscribers_approx": 1,
+        "feed_networks_approx": suppressed,
     }
     assert result["calendar_feeds"]["finance"] == {
         "fetches": 1,
-        "subscribers_approx": 1,
+        "feed_networks_approx": suppressed,
     }
     assert result["not_found"] == 1
 
@@ -103,6 +104,36 @@ def test_aggregate_reads_active_and_rolled_logs_and_keeps_no_identifiers(tmp_pat
         "Chrome",
     ):
         assert forbidden not in text
+
+
+def test_feed_networks_are_labelled_and_suppressed_below_five(tmp_path):
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    rows = [
+        line("/calendar/science.ics", ts=stamp(3), remote=f"198.51.{n}.0")
+        for n in range(5)
+    ]
+    rows += [line("/calendar/science.ics", ts=stamp(4), remote="198.51.0.0")]
+    rows += [
+        line("/calendar/finance.ics", ts=stamp(3), remote=f"203.0.{n}.0")
+        for n in range(4)
+    ]
+    write_lines(logs / "strikehike.access.log", rows)
+
+    result = aggregate(logs, "2026-W45")
+
+    feeds = result["calendar_feeds"]
+    assert feeds["science"] == {"fetches": 6, "feed_networks_approx": {"value": 5}}
+    assert feeds["finance"] == {
+        "fetches": 4,
+        "feed_networks_approx": {"value": None, "reason": "insufficient data (n<5)"},
+    }
+    assert result["notes"] == {
+        "feed_networks_approx": "distinct masked networks, not people"
+    }
+    text = json.dumps(result)
+    assert "subscribers_approx" not in text
+    assert "198.51." not in text and "203.0." not in text
 
 
 def test_origin_only_referers_from_the_caddy_filter_still_classify(tmp_path):

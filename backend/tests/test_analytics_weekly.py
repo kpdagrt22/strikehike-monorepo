@@ -9,10 +9,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from astro_finance.analytics import router as router_module
+from astro_finance.analytics import weekly as weekly_module
 from astro_finance.analytics.router import router
 from astro_finance.analytics.schema import validate_batch
 from astro_finance.analytics.store import AnalyticsStore
-from astro_finance.analytics.weekly import build_weekly_export
+from astro_finance.analytics.weekly import build_weekly_export, clear_weekly_cache
 
 IST = ZoneInfo("Asia/Kolkata")
 WEEK = "2026-W45"
@@ -132,8 +133,16 @@ def test_weekly_export_aggregates_and_suppresses_small_cells(tmp_path):
     assert payload["data_quality"]["bot_share"] == 20.0
     assert payload["data_quality"]["suspect_bot_count"] == 1
     assert payload["server"]["requests"] == 0
+    assert payload["server"]["calendar_feeds"]["science"]["feed_networks_approx"] == {
+        "value": None,
+        "reason": "insufficient data (n<5)",
+    }
+    assert payload["server"]["notes"]["feed_networks_approx"] == (
+        "distinct masked networks, not people"
+    )
 
     text = json.dumps(payload)
+    assert "subscribers_approx" not in text
     for forbidden in ("A" * 22, "B" * 22, "C" * 22, "S" * 16, "T" * 16, "a" * 12, "b" * 12):
         assert forbidden not in text
 
@@ -146,9 +155,11 @@ def api(tmp_path, monkeypatch):
     monkeypatch.setattr(router_module, "get_store", lambda: store)
     monkeypatch.setenv("GROWTH_EXPORT_TOKEN", TOKEN)
     monkeypatch.setenv("CADDY_LOG_DIR", str(logs))
+    clear_weekly_cache()
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
     yield TestClient(app), store
+    clear_weekly_cache()
     store.close()
 
 
@@ -205,10 +216,88 @@ def test_export_uses_constant_time_comparison(api, monkeypatch):
     assert calls
 
 
-def test_invalid_week_is_422(api):
+@pytest.mark.parametrize("week", ["not-a-week", "2026-W5", "2026-W45 ", "2026-W54", "26-W45"])
+def test_invalid_week_is_422(api, week):
     client, _store = api
     response = client.get(
-        "/api/v1/usage/weekly?week=not-a-week",
+        "/api/v1/usage/weekly",
+        params={"week": week},
         headers={"Authorization": f"Bearer {TOKEN}"},
     )
     assert response.status_code == 422
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = 1_000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+@pytest.fixture
+def counted(monkeypatch):
+    clock = Clock()
+    builds: list[str] = []
+    original = weekly_module.build_weekly_export
+
+    def build(store, week, log_dir):
+        builds.append(week)
+        return original(store, week, log_dir)
+
+    monkeypatch.setattr(weekly_module, "_clock", clock)
+    monkeypatch.setattr(weekly_module, "build_weekly_export", build)
+    return clock, builds
+
+
+def test_export_is_cached_for_ten_minutes_per_week(api, counted):
+    client, store = api
+    clock, builds = counted
+    first = weekly(client)
+    assert first.status_code == 200
+    assert builds == [WEEK]
+
+    # New data inside the window is not rescanned.
+    put(store, "D" * 22, "W" * 16, [event("page_viewed", NOW, "e" * 12)], NOW)
+    clock.now += 599
+    second = weekly(client)
+    assert second.status_code == 200
+    assert second.json() == first.json()
+    assert builds == [WEEK]
+
+    other = client.get(
+        "/api/v1/usage/weekly?week=2026-W44",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+    )
+    assert other.status_code == 200
+    assert builds == [WEEK, "2026-W44"]
+
+    clock.now += 1
+    third = weekly(client)
+    assert third.status_code == 200
+    assert builds == [WEEK, "2026-W44", WEEK]
+    assert third.json()["product"]["events"]["page_viewed"]["count"] == 1
+
+
+def test_cached_export_still_requires_the_token(api, counted, monkeypatch):
+    client, _store = api
+    _clock, builds = counted
+    assert weekly(client).status_code == 200
+    assert weekly(client, {"Authorization": "Bearer wrong"}).status_code == 401
+    assert weekly(client, {"Authorization": ""}).status_code == 401
+    monkeypatch.setenv("GROWTH_EXPORT_TOKEN", "")
+    assert weekly(client).status_code == 404
+    assert builds == [WEEK]
+
+
+def test_invalid_weeks_are_not_cached(api, counted):
+    client, _store = api
+    _clock, builds = counted
+    for _ in range(2):
+        response = client.get(
+            "/api/v1/usage/weekly?week=2026-W99",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+        )
+        assert response.status_code == 422
+    assert builds == ["2026-W99", "2026-W99"]
+    assert weekly_module._cache == {}

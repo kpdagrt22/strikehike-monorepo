@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -10,7 +12,7 @@ from typing import Any
 
 from .routes import PAGE_TEMPLATES, page_template
 from .serverlogs import aggregate as aggregate_server_logs
-from .serverlogs import week_bounds
+from .serverlogs import people_cell, week_bounds
 from .store import AnalyticsStore
 
 MEANINGFUL = frozenset(
@@ -27,12 +29,11 @@ MEANINGFUL = frozenset(
     }
 )
 NON_MEANINGFUL_METHODS = frozenset({"deep_link", "page"})
+CACHE_SECONDS = 600
 
-
-def _people(value: int) -> dict[str, Any]:
-    if value < 5:
-        return {"value": None, "reason": "insufficient data (n<5)"}
-    return {"value": value}
+_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+_cache_lock = threading.Lock()
+_clock = time.monotonic
 
 
 def _rate(numerator: int, denominator: int) -> dict[str, Any]:
@@ -254,19 +255,19 @@ def build_weekly_export(
     page_export = {
         template: {
             "views": values["views"],
-            "visitors": _people(len(values["ids"])),
+            "visitors": people_cell(len(values["ids"])),
         }
         for template, values in page_views.items()
     }
     event_export = {
         name: {
             "count": values["count"],
-            "visitors": _people(len(values["ids"])),
+            "visitors": people_cell(len(values["ids"])),
         }
         for name, values in sorted(event_counts.items())
     }
     wre_cell = (
-        _people(len(wre))
+        people_cell(len(wre))
         if prior
         else {"value": None, "reason": "insufficient data (no earlier week)"}
     )
@@ -275,14 +276,14 @@ def build_weekly_export(
         "week": week,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "product": {
-            "visitors": _people(visitors),
-            "new": _people(len(new_ids)),
-            "returning": _people(returning),
+            "visitors": people_cell(visitors),
+            "new": people_cell(len(new_ids)),
+            "returning": people_cell(returning),
             "sessions": sessions,
             "page_views": page_export,
             "events": event_export,
             "activation_rate": _rate(activated, len(new_ids)),
-            "weekly_explorers": _people(len(meaningful_we)),
+            "weekly_explorers": people_cell(len(meaningful_we)),
             "weekly_returning_explorers": wre_cell,
             "retention": retention,
         },
@@ -307,3 +308,29 @@ def build_weekly_export(
             "suspect_bot_count": sums["dropped_bot"],
         },
     }
+
+
+def cached_weekly_export(
+    store: AnalyticsStore, week: str, log_dir: str | Path = "/app/data/caddy-logs"
+) -> dict[str, Any]:
+    """build_weekly_export, kept in memory for 10 minutes per week key.
+
+    Repeated calls do not rescan the logs. Data that arrives inside the window
+    appears once the entry expires. Invalid weeks raise and are not cached.
+    """
+    now = _clock()
+    with _cache_lock:
+        hit = _cache.get(week)
+        if hit is not None and now - hit[0] < CACHE_SECONDS:
+            return hit[1]
+    payload = build_weekly_export(store, week, log_dir)
+    with _cache_lock:
+        for key in [k for k, (at, _) in _cache.items() if now - at >= CACHE_SECONDS]:
+            del _cache[key]
+        _cache[week] = (now, payload)
+    return payload
+
+
+def clear_weekly_cache() -> None:
+    with _cache_lock:
+        _cache.clear()
