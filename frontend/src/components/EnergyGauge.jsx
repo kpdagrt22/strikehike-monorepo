@@ -124,9 +124,9 @@ export function EnergyGauge({ isDark = true, homeIntro = false }) {
   return (
     <div
       data-hud="gauge"
-      className={`pointer-events-none absolute left-1/2 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:w-[min(23rem,calc(100vw-2rem))] ${
+      className={`pointer-events-none absolute left-1/2 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:w-[min(21rem,calc(100vw-2rem))] xl:w-[min(23rem,calc(100vw-2rem))] ${
         homeIntro
-          ? "top-[28rem] sm:top-[24rem] lg:top-(--sh-header-clear)"
+          ? "top-[28rem] sm:top-[27rem] lg:top-[8.5rem]"
           : "top-[4.5rem] sm:top-(--sh-header-clear)"
       } ${
         mobileSheet ? "max-lg:opacity-0" : ""

@@ -163,13 +163,19 @@ export function SiteHeader() {
       {/* Desktop: the five views, always present, centred in the space
           between the brand and the menu. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-[4.5rem] items-start justify-center pl-[11rem] pr-[7rem] pt-3 sm:flex lg:pr-[11rem]">
-        <div className="pointer-events-auto rounded-full border border-(--sh-line-1) bg-(--sh-surface-float) p-1 shadow-(--sh-shadow-float) backdrop-blur-xl">
+        <div
+          data-shell="nav-pill"
+          className="pointer-events-auto rounded-full border border-(--sh-line-1) bg-(--sh-surface-float) p-1 shadow-(--sh-shadow-float) backdrop-blur-xl"
+        >
           <ModeSwitch layout="row" onNavigate={handleNavClick} />
         </div>
       </div>
 
       {/* Phone: a compact, scrollable row under the header. */}
-      <div className="pointer-events-auto absolute inset-x-0 top-[4.25rem] z-[69] border-b border-(--sh-line-1) bg-(--sh-surface-float) backdrop-blur-xl sm:hidden">
+      <div
+        data-shell="nav-row"
+        className="pointer-events-auto absolute inset-x-0 top-[4.25rem] z-[69] border-b border-(--sh-line-1) bg-(--sh-surface-float) backdrop-blur-xl sm:hidden"
+      >
         <ModeSwitch layout="scroll" onNavigate={handleNavClick} />
       </div>
 
