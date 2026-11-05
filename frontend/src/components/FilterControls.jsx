@@ -319,7 +319,7 @@ export function FilterControls() {
                 className="flex min-h-11 w-full items-center gap-1.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
                 <span>Event archive</span>
-                <span className="ml-1 text-micro font-normal normal-case tracking-[0.02em] text-black/45 dark:text-white/45">
+                <span className="ml-1 text-micro font-normal normal-case tracking-[0.02em] text-black/60 dark:text-white/60">
                   ·{" "}
                   {roster?.total
                     ? `${roster.total} moments`

@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const H1 = "The market record beside the sky, tested in public.";
@@ -24,16 +25,367 @@ async function home(page: Page) {
   await expect(page.locator("[data-home-intro]")).toBeVisible();
 }
 
-function overlaps(
-  left: { x: number; y: number; width: number; height: number },
-  right: { x: number; y: number; width: number; height: number },
-) {
+type Box = { x: number; y: number; width: number; height: number };
+
+function overlaps(left: Box, right: Box) {
   return (
     left.x < right.x + right.width &&
     left.x + left.width > right.x &&
     left.y < right.y + right.height &&
     left.y + left.height > right.y
   );
+}
+
+const MOCK_CATEGORIES = [
+  "Science",
+  "Politics",
+  "Finance",
+  "Culture/Religion",
+  "Natural Disasters",
+];
+const MOCK_COUNTS = [43, 46, 28, 22, 20];
+const SURFACE_VIEWPORTS = [
+  ["1024x768", 1024, 768],
+  ["1280x720", 1280, 720],
+  ["1440x900", 1440, 900],
+  ["390x844", 390, 844],
+] as const;
+const MOCK_BODIES = {
+  Sun: { lon: 198.35, rashi: "Tula", nakshatra: "Swati", retro: false },
+  Moon: {
+    lon: 147.76,
+    rashi: "Simha",
+    nakshatra: "Uttara Phalguni",
+    retro: false,
+  },
+  Mercury: { lon: 197.16, rashi: "Tula", nakshatra: "Swati", retro: true },
+  Venus: { lon: 180.43, rashi: "Tula", nakshatra: "Chitra", retro: true },
+  Mars: { lon: 116.36, rashi: "Karka", nakshatra: "Ashlesha", retro: false },
+  Jupiter: { lon: 120.31, rashi: "Simha", nakshatra: "Magha", retro: false },
+  Saturn: {
+    lon: 344.94,
+    rashi: "Meena",
+    nakshatra: "Uttara Bhadrapada",
+    retro: true,
+  },
+  Rahu: { lon: 301.62, rashi: "Kumbha", nakshatra: "Dhanishta", retro: true },
+  Ketu: { lon: 121.62, rashi: "Simha", nakshatra: "Magha", retro: true },
+};
+const MOCK_MATCHES = [
+  {
+    date: "2027-04-23",
+    similarity_percent: 89.7,
+    event: {
+      name: "India-Pakistan military strikes",
+      category: "Politics",
+      date: "2025-04-23",
+    },
+  },
+  {
+    date: "2027-03-31",
+    similarity_percent: 86.5,
+    event: {
+      name: "US national bank holiday",
+      category: "Finance",
+      date: "1933-03-31",
+    },
+  },
+  {
+    date: "2026-11-14",
+    similarity_percent: 83.2,
+    event: {
+      name: "Bhola cyclone",
+      category: "Natural Disasters",
+      date: "1970-11-14",
+    },
+  },
+  {
+    date: "2027-01-15",
+    similarity_percent: 78.1,
+    event: {
+      name: "A science echo",
+      category: "Science",
+      date: "1960-01-15",
+    },
+  },
+];
+
+function mockRoster() {
+  const total = MOCK_COUNTS.reduce((sum, count) => sum + count, 0);
+  return {
+    total,
+    categories: Object.fromEntries(
+      MOCK_CATEGORIES.map((category, index) => [
+        category,
+        Array.from({ length: MOCK_COUNTS[index] }, (_, event) => ({
+          date: `2000-01-${String((event % 28) + 1).padStart(2, "0")}`,
+          name: `${category} event ${event}`,
+        })),
+      ]),
+    ),
+  };
+}
+
+function mockPositions(url: string) {
+  const datetime =
+    new URL(url).searchParams.get("datetime") ?? "2026-10-28T00:00";
+  return {
+    datetime,
+    date: datetime.slice(0, 10),
+    source: "Swiss Ephemeris · Lahiri",
+    bodies: MOCK_BODIES,
+    energy: { score: 99, polarity: "disruptive" },
+    parallels: [
+      {
+        date: "1970-11-12",
+        name: "Bhola cyclone",
+        category: "Natural Disasters",
+        similarity_percent: 80.3,
+      },
+    ],
+  };
+}
+
+async function mockHomeData(page: Page) {
+  await page.route("**/api/events", (route) =>
+    route.fulfill({ json: mockRoster() }),
+  );
+  await page.route("**/api/chrono/positions*", (route) =>
+    route.fulfill({ json: mockPositions(route.request().url()) }),
+  );
+  await page.route("**/api/forecast-ladder", (route) =>
+    route.fulfill({ json: { matches: MOCK_MATCHES } }),
+  );
+  await page.route("**/api/v1/events/upcoming", (route) =>
+    route.fulfill({ json: { themes: {} } }),
+  );
+}
+
+async function setupHome(
+  page: Page,
+  {
+    width,
+    height,
+    theme = "dark",
+    returning = false,
+    archiveOpen = false,
+  }: {
+    width: number;
+    height: number;
+    theme?: "dark" | "light";
+    returning?: boolean;
+    archiveOpen?: boolean;
+  },
+) {
+  await page.addInitScript(
+    ({ theme: nextTheme, seen, open }) => {
+      localStorage.setItem("strikehike-theme", nextTheme);
+      localStorage.setItem("strikehike:home:archive-open", open ? "1" : "0");
+      if (seen) localStorage.setItem("hasSeenIntro", "1");
+      else localStorage.removeItem("hasSeenIntro");
+    },
+    { theme, seen: returning, open: archiveOpen },
+  );
+  await page.emulateMedia({ colorScheme: theme });
+  await page.setViewportSize({ width, height });
+  await mockHomeData(page);
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.locator("[data-home-intro]")).toBeVisible();
+  await expect(page.locator('[data-hud="gauge"]')).toBeVisible();
+  if (width >= 1024) {
+    await expect(page.locator("#chrono-events-sheet")).toBeVisible();
+    await expect(page.locator("#chrono-events-sheet")).toContainText(
+      "159 moments",
+    );
+    await expect(page.locator("#chrono-archive-toggle")).toHaveAttribute(
+      "aria-expanded",
+      archiveOpen ? "true" : "false",
+    );
+  }
+  if (returning && width < 640) {
+    await expect(
+      page.locator("[data-home-intro][data-compact='true']"),
+    ).toBeVisible();
+  }
+}
+
+async function readSurfaceBoxes(
+  page: Page,
+  width: number,
+): Promise<Record<string, Box>> {
+  const nav =
+    width >= 640 ? '[data-shell="nav-pill"]' : '[data-shell="nav-row"]';
+  const specs: Array<[string, string, boolean?]> = [
+    ["intro", "[data-home-intro]"],
+    ["nav", nav],
+    ["gauge", '[data-hud="gauge"]', true],
+    ["archive", "#chrono-events-sheet"],
+    ["ladder", "#chrono-ladder-sheet"],
+    ["footnote", "[data-ladder-footnote]"],
+    ["right", "#chrono-alignment-sheet"],
+    ["hint", "[data-home-hint]"],
+    ["feedback", "[data-home-feedback]"],
+    ["sponsor", "[data-home-sponsor]"],
+    ["dock", '[data-hud="dock"]'],
+    ["timeline", '[data-hud="timeline"]'],
+  ];
+  const boxes: Record<string, Box> = {};
+  for (const [name, selector, includeAura] of specs) {
+    const locator = page.locator(selector).first();
+    if (!(await locator.isVisible().catch(() => false))) continue;
+    const box = await locator.boundingBox();
+    if (!box) continue;
+    boxes[name] = { ...box };
+    if (includeAura) {
+      const aura = page.locator(".sh-aura").first();
+      if (await aura.isVisible().catch(() => false)) {
+        const auraBox = await aura.boundingBox();
+        if (auraBox) {
+          const left = Math.min(box.x, auraBox.x);
+          const top = Math.min(box.y, auraBox.y);
+          const right = Math.max(box.x + box.width, auraBox.x + auraBox.width);
+          const bottom = Math.max(
+            box.y + box.height,
+            auraBox.y + auraBox.height,
+          );
+          boxes[name] = {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+          };
+        }
+      }
+    }
+  }
+  return boxes;
+}
+
+function assertNoOverlaps(boxes: Record<string, Box>) {
+  const names = Object.keys(boxes);
+  for (let left = 0; left < names.length; left += 1) {
+    for (let right = left + 1; right < names.length; right += 1) {
+      const a = names[left];
+      const b = names[right];
+      // The footnote is the last child of the ladder panel by design.
+      if (
+        (a === "ladder" && b === "footnote") ||
+        (a === "footnote" && b === "ladder")
+      ) {
+        continue;
+      }
+      expect(
+        overlaps(boxes[a], boxes[b]),
+        `${a} overlaps ${b}: ${JSON.stringify({ [a]: boxes[a], [b]: boxes[b] })}`,
+      ).toBe(false);
+    }
+  }
+}
+
+async function assertFootnoteAndFeedback(page: Page) {
+  const ladder = page.locator("#chrono-ladder-sheet");
+  const feedback = page.locator("[data-home-feedback]");
+  if (
+    !(await ladder.isVisible().catch(() => false)) ||
+    !(await feedback.isVisible().catch(() => false))
+  ) {
+    return;
+  }
+  const ladderBox = await ladder.boundingBox();
+  const feedbackBox = await feedback.boundingBox();
+  expect(ladderBox).not.toBeNull();
+  expect(feedbackBox).not.toBeNull();
+  expect(ladderBox!.y + ladderBox!.height).toBeLessThanOrEqual(
+    feedbackBox!.y - 12,
+  );
+
+  const footnote = page.locator("[data-ladder-footnote]");
+  if (!(await footnote.isVisible().catch(() => false))) return;
+  const footnoteBox = await footnote.boundingBox();
+  expect(footnoteBox).not.toBeNull();
+  expect(footnoteBox!.y + footnoteBox!.height).toBeLessThanOrEqual(
+    feedbackBox!.y - 12,
+  );
+  const hit = await page.evaluate(
+    ({ x, y }) => {
+      const element = document.elementFromPoint(x, y);
+      return Boolean(element?.closest("[data-ladder-footnote]"));
+    },
+    {
+      x: footnoteBox!.x + footnoteBox!.width / 2,
+      y: footnoteBox!.y + footnoteBox!.height / 2,
+    },
+  );
+  expect(hit).toBe(true);
+}
+
+async function assertAuraClearsNav(page: Page, width: number) {
+  if (width < 1024) return;
+  const nav = page.locator('[data-shell="nav-pill"]');
+  const aura = page.locator(".sh-aura").first();
+  await expect(nav).toBeVisible();
+  await expect(aura).toBeVisible();
+  const navBox = await nav.boundingBox();
+  const auraBox = await aura.boundingBox();
+  expect(navBox).not.toBeNull();
+  expect(auraBox).not.toBeNull();
+  expect(auraBox!.y).toBeGreaterThanOrEqual(navBox!.y + navBox!.height + 8);
+}
+
+function rgbChannels(value: string): [number, number, number] {
+  const parts = value.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0];
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+}
+
+function linearChannel(value: number) {
+  const channel = value / 255;
+  return channel <= 0.03928
+    ? channel / 12.92
+    : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function luminance(value: string) {
+  const [red, green, blue] = rgbChannels(value);
+  return (
+    0.2126 * linearChannel(red) +
+    0.7152 * linearChannel(green) +
+    0.0722 * linearChannel(blue)
+  );
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const first = luminance(foreground);
+  const second = luminance(background);
+  const lighter = Math.max(first, second);
+  const darker = Math.min(first, second);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+async function assertPrimaryContrast(page: Page) {
+  const primary = page.getByRole("link", { name: PRIMARY });
+  const colors = () =>
+    primary.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { color: style.color, background: style.backgroundColor };
+    });
+  const check = async (label: string) => {
+    const value = await colors();
+    expect(
+      contrastRatio(value.color, value.background),
+      `${label}: ${JSON.stringify(value)}`,
+    ).toBeGreaterThanOrEqual(4.5);
+  };
+
+  await check("rest");
+  await primary.hover();
+  await page.waitForTimeout(250);
+  await check("hover");
+  await page.mouse.move(2, 2);
+  await primary.focus();
+  await page.waitForTimeout(250);
+  expect(await primary.evaluate((element) => element.matches(":focus-visible")))
+    .toBe(true);
+  await check("focus");
 }
 
 test.describe("home first paint", () => {
@@ -142,6 +494,151 @@ test.describe("home layout", () => {
   }
 });
 
+test.describe("home overlap matrix", () => {
+  for (const [label, width, height] of SURFACE_VIEWPORTS) {
+    for (const returning of [false, true]) {
+      test(`${label}, ${returning ? "returning" : "first visit"}`, async ({
+        page,
+      }) => {
+        const errors = watchErrors(page);
+        await setupHome(page, { width, height, returning });
+
+        const closed = await readSurfaceBoxes(page, width);
+        console.log(
+          `home boxes ${label} ${returning ? "returning" : "first"} closed`,
+          JSON.stringify(closed),
+        );
+        assertNoOverlaps(closed);
+        await assertFootnoteAndFeedback(page);
+
+        if (width >= 1024) {
+          await assertAuraClearsNav(page, width);
+          const toggle = page.locator("#chrono-archive-toggle");
+          await toggle.click();
+          await expect(toggle).toHaveAttribute("aria-expanded", "true");
+          await page.waitForTimeout(150);
+          const open = await readSurfaceBoxes(page, width);
+          console.log(
+            `home boxes ${label} ${returning ? "returning" : "first"} open`,
+            JSON.stringify(open),
+          );
+          assertNoOverlaps(open);
+          await assertFootnoteAndFeedback(page);
+        }
+
+        if (width < 640 && returning) {
+          const intro = page.locator("[data-home-intro]");
+          const h1 = intro.locator("h1");
+          await expect(intro).toHaveAttribute("data-compact", "true");
+          await expect(h1).toHaveText(H1);
+          await expect(page.locator("[data-home-promise]")).toHaveCount(0);
+          await expect(page.locator("[data-home-secondary]")).toHaveCount(0);
+          await expect(page.getByRole("link", { name: PRIMARY })).toBeVisible();
+          const fontSize = await h1.evaluate((element) =>
+            Number.parseFloat(getComputedStyle(element).fontSize),
+          );
+          expect(fontSize).toBeCloseTo(20, 0);
+          const h1Box = await h1.boundingBox();
+          expect(h1Box).not.toBeNull();
+          expect(h1Box!.height).toBeLessThanOrEqual(48);
+          const gauge = closed.gauge;
+          expect(gauge).toBeDefined();
+          // The camera looks at the Sun at [0, 0, 0], so the Sun projects
+          // to the centre of the viewport.
+          expect(gauge!.y + gauge!.height).toBeLessThanOrEqual(
+            height / 2 - 24,
+          );
+        }
+
+        if (width < 640 && !returning) {
+          await expect(page.locator("[data-home-hint]")).toBeVisible();
+          await expect(page.locator("[data-home-promise]")).toHaveCount(1);
+          await expect(page.locator("[data-home-secondary]")).toHaveCount(1);
+        }
+
+        expect(errors).toEqual([]);
+      });
+    }
+  }
+});
+
+test("the desktop archive is closed by default and remembers its state", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("strikehike-theme", "dark");
+  });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockHomeData(page);
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const toggle = page.locator("#chrono-archive-toggle");
+  const body = page.locator("#chrono-archive-body");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(body).toBeHidden();
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(body).toBeVisible();
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(body).toBeVisible();
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(body).toBeHidden();
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(body).toBeHidden();
+});
+
+test.describe("home axe", () => {
+  for (const scheme of ["dark", "light"] as const) {
+    test(`/ has no serious or critical violations, ${scheme}`, async ({
+      page,
+    }) => {
+      await setupHome(page, {
+        width: 1440,
+        height: 900,
+        theme: scheme,
+      });
+      const results = await new AxeBuilder({ page }).analyze();
+      const serious = results.violations.filter(
+        (violation) =>
+          violation.impact === "serious" || violation.impact === "critical",
+      );
+      expect(
+        serious,
+        JSON.stringify(
+          serious.map((violation) => ({
+            id: violation.id,
+            impact: violation.impact,
+            targets: violation.nodes.map((node) => node.target),
+          })),
+        ),
+      ).toEqual([]);
+    });
+  }
+});
+
+test.describe("home primary contrast", () => {
+  for (const scheme of ["dark", "light"] as const) {
+    test(`primary action meets 4.5:1 at rest, hover and focus, ${scheme}`, async ({
+      page,
+    }) => {
+      await setupHome(page, {
+        width: 1440,
+        height: 900,
+        theme: scheme,
+      });
+      await assertPrimaryContrast(page);
+    });
+  }
+});
+
 test.describe("navigation is one action", () => {
   for (const [label, width, height] of [
     ["desktop", 1440, 900],
@@ -230,6 +727,7 @@ test.describe("home review screenshots", () => {
       test(`first visit with hint, ${scheme} ${label}`, async ({ page }) => {
         await page.addInitScript((theme) => {
           localStorage.setItem("strikehike-theme", theme);
+          localStorage.setItem("strikehike:home:archive-open", "0");
         }, scheme);
         await page.emulateMedia({ colorScheme: scheme });
         await page.setViewportSize({ width, height });
@@ -244,17 +742,42 @@ test.describe("home review screenshots", () => {
         await page.addInitScript((theme) => {
           localStorage.setItem("strikehike-theme", theme);
           localStorage.setItem("hasSeenIntro", "1");
+          localStorage.setItem("strikehike:home:archive-open", "0");
         }, scheme);
         await page.emulateMedia({ colorScheme: scheme });
         await page.setViewportSize({ width, height });
         await home(page);
         await expect(page.locator("[data-home-hint]")).toHaveCount(0);
+        if (width < 640) {
+          await expect(
+            page.locator("[data-home-intro][data-compact='true']"),
+          ).toBeVisible();
+        }
         await page.screenshot({
           path: `smoke-screens/home-return-${scheme}-${label}.png`,
         });
       });
     }
   }
+});
+
+test("archive open, light desktop", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("strikehike-theme", "light");
+    localStorage.setItem("hasSeenIntro", "1");
+    localStorage.setItem("strikehike:home:archive-open", "1");
+  });
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await expect(page.locator("#chrono-archive-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await expect(page.locator("#chrono-archive-body")).toBeVisible();
+  await page.screenshot({
+    path: "smoke-screens/home-archive-open-light-desktop.png",
+  });
 });
 
 test.describe("navigation review screenshots", () => {

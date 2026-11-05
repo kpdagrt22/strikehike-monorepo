@@ -168,7 +168,7 @@ export function FutureLadder() {
           : "hidden"
       } pointer-events-auto lg:static lg:z-auto ${
         activeEventCategory ? "lg:hidden" : "lg:flex"
-      } lg:min-h-[13rem] lg:flex-1 lg:flex-col lg:w-full lg:max-h-none lg:overflow-visible`}
+      } lg:min-h-[12rem] lg:flex-1 lg:flex-col lg:w-full lg:max-h-none lg:overflow-visible`}
     >
       <div
         id="chrono-ladder-sheet"
@@ -184,7 +184,7 @@ export function FutureLadder() {
             >
               {view === "sky" ? "Sky ladder" : "Upcoming"}
             </h2>
-            <p className="mt-1 text-meta text-black/60 dark:text-white/60">
+            <p className="mt-1 text-meta text-black/60 dark:text-white/60 lg:text-[11px] lg:leading-snug">
               {view === "sky"
                 ? "Dates ahead whose sky resembles a past event"
                 : "Real scheduled events · next 12 months"}
@@ -255,7 +255,7 @@ export function FutureLadder() {
 
         <div
           id="chrono-ladder-content"
-          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-none lg:min-h-0 lg:flex-1"
+          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-none lg:min-h-0 lg:flex-1 lg:pt-0 lg:pb-0"
         >
           {view === "upcoming" ? (
             <UpcomingEvents />

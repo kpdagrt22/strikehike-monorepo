@@ -110,6 +110,7 @@ export function FeedbackModule() {
       <button
         ref={triggerRef}
         type="button"
+        data-home-feedback
         onClick={(event) => {
           if (!open) viewOpened("feedback", event.detail === 0 ? "keyboard" : "click");
           setOpen((value) => !value);

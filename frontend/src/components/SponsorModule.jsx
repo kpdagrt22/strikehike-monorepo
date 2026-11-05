@@ -40,6 +40,7 @@ export function SponsorModule() {
       <button
         ref={triggerRef}
         type="button"
+        data-home-sponsor
         onClick={(event) => {
           if (!open) {
             supportOpened(
