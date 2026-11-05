@@ -245,9 +245,37 @@ jobs:
           path: frontend/test-results
           if-no-files-found: ignore
 
+  test-caddy:
+    name: Caddy config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate with an empty sites directory
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/caddy-empty
+          mkdir -p /tmp/caddy-empty/sites
+          cp deploy/caddy/Caddyfile /tmp/caddy-empty/Caddyfile
+          docker run --rm -v /tmp/caddy-empty:/etc/caddy:ro \
+            caddy:2.11.1 caddy validate \
+            --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: Validate with the thisiskp snippet
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/caddy-fixture
+          mkdir -p /tmp/caddy-fixture/sites
+          cp deploy/caddy/Caddyfile /tmp/caddy-fixture/Caddyfile
+          cp tests/fixtures/caddy/thisiskp.caddy /tmp/caddy-fixture/sites/
+          docker run --rm -v /tmp/caddy-fixture:/etc/caddy:ro \
+            caddy:2.11.1 caddy validate \
+            --config /etc/caddy/Caddyfile --adapter caddyfile
+
   deploy:
     name: Deploy monorepo to Lightsail
-    needs: [test-backend, test-frontend, test-frontend-smoke]
+    needs: [test-backend, test-frontend, test-frontend-smoke, test-caddy]
     # Production only: pushes to main, or a manual run started from main.
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04

@@ -1,0 +1,41 @@
+strikehike.com, www.strikehike.com {
+	encode gzip
+
+	@static path_regexp ^/(?:_next/static/|_next/image|.*\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf)$)
+
+	log {
+		output file /var/log/caddy/strikehike.access.log {
+			roll_size 10MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>remote_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+				request>client_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+				request>headers>Cookie delete
+				request>headers>Authorization delete
+				request>headers>X-Forwarded-For delete
+				request>headers>Forwarded delete
+				request>headers>Cf-Connecting-Ip delete
+				request>headers>True-Client-Ip delete
+				request>headers>X-Real-Ip delete
+				resp_headers>Set-Cookie delete
+				request>headers>User-Agent regexp "(?i)^(?:.*(bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora link preview|whatsapp|telegrambot|discordbot|slackbot|twitterbot|linkedinbot|googlebot|google-inspectiontool|adsbot|applebot|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|perplexitybot|ccbot|bytespider|amazonbot|yandex|baiduspider|petalbot|semrush|ahrefs|mj12bot|dotbot|headless|python-requests|aiohttp|curl|wget|go-http-client|java/|okhttp|axios|node-fetch|scrapy|uptimerobot|pingdom).*|.*)$" "${1}"
+			}
+		}
+	}
+
+	log_skip @static
+
+	reverse_proxy frontend:3000
+}
+
+import sites/*.caddy
