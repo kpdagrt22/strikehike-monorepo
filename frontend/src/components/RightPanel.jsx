@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { viewOpened } from "@/lib/analytics/events";
+import { useMounted } from "@/hooks/useMounted";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -59,6 +60,7 @@ export function RightPanel() {
   const positions = useChronoStore((state) => state.positions);
   const positionsDateTime = useChronoStore((state) => state.positionsDateTime);
   const focusedDate = useChronoStore((state) => state.focusedDate);
+  const mounted = useMounted();
   const focusedTime = useChronoStore((state) => state.focusedTime);
   const status = useChronoStore((state) => state.status);
   const retryPositions = useChronoStore((state) => state.retryPositions);
@@ -109,7 +111,9 @@ export function RightPanel() {
     }
   }, []);
 
-  const momentLabel = formatMoment(focusedDate, focusedTime);
+  const momentLabel = mounted
+    ? formatMoment(focusedDate, focusedTime)
+    : "Today";
   const skyError = status === "error";
   // The panel still holds an earlier moment's sky: say so and dim it.
   const stale =

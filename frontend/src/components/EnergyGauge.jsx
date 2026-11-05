@@ -90,7 +90,7 @@ function SelectedDayParallel({ parallels }) {
   );
 }
 
-export function EnergyGauge({ isDark = true }) {
+export function EnergyGauge({ isDark = true, homeIntro = false }) {
   const energy = useChronoStore((state) => state.energy);
   const parallels = useChronoStore((state) => state.parallels);
   const status = useChronoStore((state) => state.status);
@@ -124,7 +124,11 @@ export function EnergyGauge({ isDark = true }) {
   return (
     <div
       data-hud="gauge"
-      className={`pointer-events-none absolute left-1/2 top-[4.5rem] z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:top-(--sh-header-clear) sm:w-[min(23rem,calc(100vw-2rem))] ${
+      className={`pointer-events-none absolute left-1/2 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:w-[min(23rem,calc(100vw-2rem))] ${
+        homeIntro
+          ? "top-[28rem] sm:top-[24rem] lg:top-(--sh-header-clear)"
+          : "top-[4.5rem] sm:top-(--sh-header-clear)"
+      } ${
         mobileSheet ? "max-lg:opacity-0" : ""
       }`}
     >

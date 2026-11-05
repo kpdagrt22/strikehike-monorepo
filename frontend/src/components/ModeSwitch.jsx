@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMounted } from "@/hooks/useMounted";
 import { useChronoStore } from "@/store/chronoStore";
 
 // The four engine views in nav order; "short" is the label where room is
@@ -60,10 +61,12 @@ function tabClass(active, layout) {
 export function ModeSwitch({ layout = "list", onNavigate }) {
   const pathname = usePathname();
   const focusedDate = useChronoStore((state) => state.focusedDate);
+  const mounted = useMounted();
   const current = viewForPath(pathname);
   const row = layout === "row";
   const classes = LAYOUT[layout] ?? LAYOUT.list;
-  const dateQuery = focusedDate ? `?d=${encodeURIComponent(focusedDate)}` : "";
+  const dateQuery =
+    mounted && focusedDate ? `?d=${encodeURIComponent(focusedDate)}` : "";
 
   return (
     <nav aria-label="Engine views" className={classes.nav}>

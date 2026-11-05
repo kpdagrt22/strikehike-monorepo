@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import crashMarkers from "@/data/astro/crash_markers.json";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { useMounted } from "@/hooks/useMounted";
 import { dateTravelled, viewOpened } from "@/lib/analytics/events";
 import { categoryTone } from "@/lib/categoryTone";
 import { namedTithi } from "@/lib/tithi";
@@ -228,6 +229,7 @@ export function TimeControls() {
   const [expanded, setExpanded] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const mounted = useMounted();
   const selectedDateTime = `${focusedDate}T${focusedTime}`;
 
   const closePicker = useCallback(() => setPickerOpen(false), []);
@@ -309,7 +311,9 @@ export function TimeControls() {
 
   const value = dateToValue(focusedDate);
   const progress = (value / TOTAL_DAYS) * 100;
-  const dateTimeLabel = formatDateTime(focusedDate, focusedTime);
+  const dateTimeLabel = mounted
+    ? formatDateTime(focusedDate, focusedTime)
+    : "Today";
 
   // Easter egg "Tithi moon": Purnima or Amavasya at the focused moment, from
   // the Sun and Moon longitudes of positions that describe exactly it.
@@ -325,17 +329,19 @@ export function TimeControls() {
   // An error label always wins over the egg.
   const edgeShown = (atStart || atEnd) && status !== "error";
   const markerHere = MARKER_BY_DATE.get(focusedDate);
-  const valueText = [
-    formatDate(focusedDate),
-    markerHere?.name,
-    atStart
-      ? "start of the timeline"
-      : atEnd
-        ? "end of the timeline"
-        : null,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const valueText = mounted
+    ? [
+        formatDate(focusedDate),
+        markerHere?.name,
+        atStart
+          ? "start of the timeline"
+          : atEnd
+            ? "end of the timeline"
+            : null,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "Today";
 
   const onRangeKeyDown = (event) => {
     if (event.key !== "PageUp" && event.key !== "PageDown") return;
@@ -422,6 +428,7 @@ export function TimeControls() {
         }
       }}
       transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+      data-hud="timeline"
       className={`pointer-events-auto fixed bottom-3 left-1/2 z-30 -translate-x-1/2 overflow-hidden rounded-2xl border border-black/10 bg-white/40 shadow-[0_18px_60px_rgba(20,18,26,0.16)] backdrop-blur-md backdrop-saturate-150 sm:bottom-5 dark:border-white/15 dark:bg-white/10 dark:shadow-[0_18px_60px_rgba(0,0,0,0.55)] ${
         expanded
           ? "w-[min(44rem,calc(100vw-1.5rem))]"

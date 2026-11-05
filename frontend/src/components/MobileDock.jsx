@@ -73,7 +73,10 @@ export function MobileDock() {
       : mobileSheet === id;
 
   return (
-    <div className="pointer-events-auto fixed bottom-[4.5rem] left-1/2 z-40 -translate-x-1/2 lg:hidden">
+    <div
+      data-hud="dock"
+      className="pointer-events-auto fixed bottom-[4.5rem] left-1/2 z-40 -translate-x-1/2 lg:hidden"
+    >
       <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/60 p-1 shadow-[0_16px_50px_rgba(20,18,26,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-black/55 dark:shadow-[0_16px_50px_rgba(0,0,0,0.55)]">
         {PANEL_BUTTONS.map((button) => {
           const active = isPanelActive(button.id);

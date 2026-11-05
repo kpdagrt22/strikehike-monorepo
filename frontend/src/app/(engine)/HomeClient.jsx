@@ -1,13 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { dateTravelled } from "@/lib/analytics/events";
 import { bestParallel } from "@/lib/parallelEpoch";
@@ -16,6 +10,7 @@ import { EnergyGauge } from "@/components/EnergyGauge";
 import { FeedbackModule } from "@/components/FeedbackModule";
 import { FilterControls } from "@/components/FilterControls";
 import { FutureLadder } from "@/components/FutureLadder";
+import { HomeIntro } from "@/components/HomeIntro";
 import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
@@ -150,25 +145,9 @@ function DateChangeAnnouncer() {
 const subscribe = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
-const getIntroSeen = () =>
-  typeof window !== "undefined" &&
-  window.sessionStorage.getItem("strikehike-intro-seen") === "1";
-const getIntroServerSnapshot = () => false;
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
-  const [introComplete, setIntroComplete] = useState(false);
-  const introSeen = useSyncExternalStore(
-    subscribe,
-    getIntroSeen,
-    getIntroServerSnapshot,
-  );
-  const introDone = introComplete || introSeen;
-
-  const handleIntroComplete = useCallback(() => {
-    setIntroComplete(true);
-    window.sessionStorage.setItem("strikehike-intro-seen", "1");
-  }, []);
 
   useEffect(() => {
     const date = new URLSearchParams(window.location.search).get("d");
@@ -194,17 +173,11 @@ export default function Home() {
 
   return (
     <main className="relative h-full w-full overflow-hidden border-0 p-0">
-      <h1 className="sr-only">StrikeHike Universal Chrono-Spatial Engine</h1>
+      <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} />
 
-      <Canvas3D
-        isDark={isDark}
-        mounted={mounted}
-        onIntroComplete={handleIntroComplete}
-        regimeTone={regimeTone}
-      />
-
+      <HomeIntro />
       <RegimeOverlaySync />
-      <EnergyGauge isDark={isDark} />
+      <EnergyGauge isDark={isDark} homeIntro />
       <Tooltip />
       {/* Before the tray in DOM order: forward Tab reaches the dock before the
           tray's focus-expansion hides it. */}
@@ -217,7 +190,7 @@ export default function Home() {
       <InfoModule />
       <FeedbackModule />
       <SponsorModule />
-      <OnboardingOverlay introComplete={introDone} />
+      <OnboardingOverlay />
       <DateChangeAnnouncer />
     </main>
   );
