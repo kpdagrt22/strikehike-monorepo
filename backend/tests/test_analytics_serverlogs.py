@@ -26,7 +26,7 @@ def line(
     method: str = "GET",
 ) -> dict:
     headers = {"User-Agent": [agent]}
-    if referer:
+    if referer is not None:
         headers["Referer"] = [referer]
     return {
         "ts": ts,
@@ -103,3 +103,23 @@ def test_aggregate_reads_active_and_rolled_logs_and_keeps_no_identifiers(tmp_pat
         "Chrome",
     ):
         assert forbidden not in text
+
+
+def test_origin_only_referers_from_the_caddy_filter_still_classify(tmp_path):
+    # Caddy logs only the Referer's origin; anything else is logged as "".
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    write_lines(
+        logs / "strikehike.access.log",
+        [
+            line("/", ts=stamp(3), referer="https://www.google.com"),
+            line("/", ts=stamp(3), referer="https://news.ycombinator.com"),
+            line("/regime", ts=stamp(3), referer="https://strikehike.com"),
+            line("/", ts=stamp(3), referer=""),
+        ],
+    )
+    classes = aggregate(logs, "2026-W45")["referrer_classes"]
+    assert classes["search"] == 1
+    assert classes["community"] == 1
+    assert classes["internal"] == 1
+    assert classes["direct"] == 1
