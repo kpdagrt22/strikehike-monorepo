@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+import requests
 
 from astro_finance.events.activate import (
     ActivationError,
@@ -20,6 +21,7 @@ from astro_finance.events.bundle import count_matrix, write_dataset
 from astro_finance.events.cli import main
 from astro_finance.events.models import Theme
 from astro_finance.events.release import (
+    _download,
     expected_rows,
     parse_sha256sums,
     safe_extract,
@@ -89,6 +91,22 @@ def _make_release(
 
 def _runtime(tmp_path: Path) -> Path:
     return tmp_path / "runtime"
+
+
+class _FakeResponse:
+    def __init__(self, status_code: int, body: bytes = b"") -> None:
+        self.status_code = status_code
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def iter_content(self, chunk_size: int = 1024 * 1024):
+        for start in range(0, len(self._body), chunk_size):
+            yield self._body[start : start + chunk_size]
 
 
 def test_activate_writes_the_runtime_relative_pointer(tmp_path):
@@ -328,3 +346,154 @@ def test_failed_rollback_keeps_the_current_bundle_active(tmp_path):
         rollback_bundle(runtime)
     assert (runtime / "current").read_text("utf-8") == f"bundles/{VERSION_B}\n"
     assert current_bundle_dir(runtime) == runtime / "bundles" / VERSION_B
+
+
+def test_activation_retries_504_twice_then_succeeds(
+    tmp_path, monkeypatch, caplog
+):
+    runtime = _runtime(tmp_path)
+    release = _make_release(tmp_path, VERSION_A, _events())
+    tarball_name = f"events-bundle-{VERSION_A}.tar.gz"
+    tarball_tries = 0
+    calls: list[str] = []
+    sleeps: list[int] = []
+
+    def fake_get(url, **kwargs):
+        nonlocal tarball_tries
+        name = url.rsplit("/", 1)[-1]
+        calls.append(name)
+        if name == tarball_name:
+            tarball_tries += 1
+            if tarball_tries <= 2:
+                return _FakeResponse(504)
+        return _FakeResponse(200, (release / name).read_bytes())
+
+    monkeypatch.setattr("astro_finance.events.release.requests.get", fake_get)
+    monkeypatch.setattr("astro_finance.events.release.time.sleep", sleeps.append)
+    with caplog.at_level("WARNING", logger="astro_finance.events.release"):
+        result = activate_bundle(version=VERSION_A, runtime_dir=runtime)
+
+    assert result.version == VERSION_A
+    assert current_bundle_dir(runtime) == runtime / "bundles" / VERSION_A
+    assert tarball_tries == 3
+    assert len(calls) == 5  # tarball, tarball, tarball, manifest, SHA256SUMS
+    assert sleeps == [5, 15]
+    assert "HTTP 504" in caplog.text
+    assert tarball_name in caplog.text
+    assert "attempt 1/4" in caplog.text
+    assert "attempt 2/4" in caplog.text
+    assert "https://" not in caplog.text
+
+
+def test_activation_does_not_retry_http_404(tmp_path, monkeypatch):
+    runtime = _runtime(tmp_path)
+    calls: list[str] = []
+    sleeps: list[int] = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        return _FakeResponse(404)
+
+    monkeypatch.setattr("astro_finance.events.release.requests.get", fake_get)
+    monkeypatch.setattr("astro_finance.events.release.time.sleep", sleeps.append)
+
+    with pytest.raises(ActivationError, match="HTTP 404"):
+        activate_bundle(version=VERSION_A, runtime_dir=runtime)
+
+    assert len(calls) == 1
+    assert sleeps == []
+    assert not (runtime / "current").exists()
+
+
+def test_four_503s_fail_and_keep_the_previous_pointer(
+    tmp_path, monkeypatch, caplog
+):
+    runtime = _runtime(tmp_path)
+    release_a = _make_release(tmp_path, VERSION_A, _events())
+    activate_bundle(version=VERSION_A, runtime_dir=runtime, release_dir=release_a)
+    calls: list[str] = []
+    sleeps: list[int] = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        return _FakeResponse(503)
+
+    monkeypatch.setattr("astro_finance.events.release.requests.get", fake_get)
+    monkeypatch.setattr("astro_finance.events.release.time.sleep", sleeps.append)
+    with caplog.at_level("WARNING", logger="astro_finance.events.release"):
+        with pytest.raises(
+            ActivationError, match="HTTP 503 after 4 attempts"
+        ):
+            activate_bundle(version=VERSION_B, runtime_dir=runtime)
+
+    assert len(calls) == 4
+    assert sleeps == [5, 15, 30]
+    assert (runtime / "current").read_text("utf-8") == f"bundles/{VERSION_A}\n"
+    assert current_bundle_dir(runtime) == runtime / "bundles" / VERSION_A
+    assert not (runtime / "bundles" / VERSION_B).exists()
+    assert "attempt 1/4" in caplog.text
+    assert "attempt 3/4" in caplog.text
+    assert "HTTP 503" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        429,
+        requests.ConnectionError("connection reset"),
+        requests.Timeout("timed out"),
+    ],
+)
+def test_download_retries_429_connections_and_timeouts(
+    tmp_path, monkeypatch, failure
+):
+    destination = tmp_path / "asset.bin"
+    calls: list[str] = []
+    sleeps: list[int] = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            if isinstance(failure, int):
+                return _FakeResponse(failure)
+            raise failure
+        return _FakeResponse(200, b"payload")
+
+    monkeypatch.setattr("astro_finance.events.release.requests.get", fake_get)
+    monkeypatch.setattr("astro_finance.events.release.time.sleep", sleeps.append)
+
+    _download("https://example.test/asset", destination)
+
+    assert destination.read_bytes() == b"payload"
+    assert len(calls) == 2
+    assert sleeps == [5]
+
+
+def test_retry_then_checksum_mismatch_still_fails(tmp_path, monkeypatch):
+    runtime = _runtime(tmp_path)
+    release = _make_release(tmp_path, VERSION_A, _events())
+    tarball_name = f"events-bundle-{VERSION_A}.tar.gz"
+    tarball_tries = 0
+    sleeps: list[int] = []
+
+    def fake_get(url, **kwargs):
+        nonlocal tarball_tries
+        name = url.rsplit("/", 1)[-1]
+        if name == tarball_name:
+            tarball_tries += 1
+            if tarball_tries == 1:
+                return _FakeResponse(504)
+            body = bytearray((release / name).read_bytes())
+            body[-1] ^= 0xFF
+            return _FakeResponse(200, bytes(body))
+        return _FakeResponse(200, (release / name).read_bytes())
+
+    monkeypatch.setattr("astro_finance.events.release.requests.get", fake_get)
+    monkeypatch.setattr("astro_finance.events.release.time.sleep", sleeps.append)
+
+    with pytest.raises(ActivationError, match="checksum mismatch"):
+        activate_bundle(version=VERSION_A, runtime_dir=runtime)
+
+    assert tarball_tries == 2
+    assert sleeps == [5]
+    assert not (runtime / "current").exists()
