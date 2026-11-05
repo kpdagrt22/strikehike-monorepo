@@ -54,26 +54,22 @@ test.describe("first-party measurement", () => {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   });
 
-  test("a normal browser posts one 204 batch with only allow-listed fields", async ({
+  test("a normal browser posts one batch with only allow-listed fields", async ({
     page,
   }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     });
-    const bodies: string[] = [];
-    await page.route("**/api/v1/usage", async (route) => {
-      bodies.push(route.request().postData() ?? "");
-      await route.fulfill({ status: 204, body: "" });
-    });
-
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-    await page.waitForRequest(
+    // No page.route here: Chromium does not reliably hand sendBeacon requests
+    // to the interceptor. The batch goes to the real server, and CI then
+    // checks that the backend stored it.
+    const beacon = page.waitForRequest(
       (request) =>
         request.method() === "POST" && request.url().includes("/api/v1/usage"),
       { timeout: 15_000 },
     );
-    expect(bodies.length).toBeGreaterThan(0);
-    const payload = JSON.parse(bodies[0]);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const payload = JSON.parse((await beacon).postData() ?? "{}");
     const allowedTop = new Set([
       "v",
       "aid",
@@ -111,9 +107,10 @@ test.describe("first-party measurement", () => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     });
     const posts: string[] = [];
-    await page.route("**/api/v1/usage", async (route) => {
-      posts.push(route.request().postData() ?? "");
-      await route.fulfill({ status: 204, body: "" });
+    page.on("request", (request) => {
+      if (request.method() === "POST" && request.url().includes("/api/v1/usage")) {
+        posts.push(request.postData() ?? "");
+      }
     });
 
     await page.goto("/disclaimer", { waitUntil: "domcontentloaded" });

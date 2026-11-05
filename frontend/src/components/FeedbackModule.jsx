@@ -7,6 +7,15 @@ import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
 
+// Only known page templates are stored with a message, never a raw URL.
+const FEEDBACK_PATHS = new Set([
+  "/",
+  "/regime",
+  "/convergence",
+  "/patterns",
+  "/disclaimer",
+]);
+
 export function FeedbackModule() {
   const [open, setOpen] = useState(false);
   const [thoughts, setThoughts] = useState("");
@@ -51,7 +60,9 @@ export function FeedbackModule() {
         body: JSON.stringify({
           message,
           website,
-          path: window.location.pathname,
+          path: FEEDBACK_PATHS.has(window.location.pathname)
+            ? window.location.pathname
+            : "404",
           app_version: (process.env.NEXT_PUBLIC_BUILD_SHA || "dev").slice(0, 7),
         }),
       });
@@ -62,7 +73,15 @@ export function FeedbackModule() {
         feedbackSubmitted(message.length);
         textareaRef.current?.focus({ preventScroll: true });
       } else if (response.status === 422) {
-        setStatus("Please leave out email addresses and links.");
+        const detail = await response
+          .json()
+          .then((payload) => payload?.detail)
+          .catch(() => "");
+        setStatus(
+          detail === "email_or_url"
+            ? "Please leave out email addresses and links."
+            : "Please write between 3 and 1,000 characters.",
+        );
       } else if (response.status === 429) {
         setStatus("Too many messages from here. Please try again later.");
       } else {

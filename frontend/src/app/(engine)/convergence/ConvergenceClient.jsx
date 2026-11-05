@@ -926,16 +926,9 @@ export default function ConvergenceClient({
   // Bumped when a shared link's pair replaces the server's default pair:
   // everything under the bar then mounts afresh (new nodes, not layout shifts).
   const [linkMount, setLinkMount] = useState(0);
+  // A shared link's cases are counted once, and only after the catalogue
+  // confirms them: a hand-edited id is never sent.
   const deepLinkTracked = useRef(false);
-  useEffect(() => {
-    if (deepLinkTracked.current) return;
-    deepLinkTracked.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const a = params.get("a");
-    const b = params.get("b");
-    if (a) caseOpened("/convergence", "a", "deep_link", a);
-    if (b) caseOpened("/convergence", "b", "deep_link", b);
-  }, []);
   const [note, setNote] = useState(null);
   // { key, content }: what the read showed when a change made it wait for
   // paths; it stays on screen while the read for `key` loads.
@@ -1014,6 +1007,18 @@ export default function ConvergenceClient({
           throw new Error("The case archive is empty.");
         }
         const initial = readSelection(payload, window.location.search);
+        if (!deepLinkTracked.current) {
+          deepLinkTracked.current = true;
+          const params = new URLSearchParams(window.location.search);
+          if (!initial.unknown) {
+            if (params.get("a")) {
+              caseOpened("/convergence", "a", "deep_link", initial.selection.a);
+            }
+            if (params.get("b")) {
+              caseOpened("/convergence", "b", "deep_link", initial.selection.b);
+            }
+          }
+        }
         setCatalogue({ status: "ready", data: payload, error: null });
         setSel(initial.selection);
         setNote(initial.unknown ? UNKNOWN_NOTE : null);

@@ -32,7 +32,7 @@ def batch(aid="A" * 22, events=None, vis=None):
 
 
 def put(store, envelope, *, net="net", now_ms=1_700_000_000_000):
-    parsed, events, stripped, vis = validate_batch(envelope)
+    parsed, events, stripped, vis, _invalid = validate_batch(envelope)
     return store.ingest(
         parsed,
         events,
@@ -49,9 +49,9 @@ def test_net_and_aid_rate_limits(tmp_path):
     try:
         accepted = sum(
             put(store, batch(aid=f"{i:022d}"[0:22]), net="same", now_ms=1_700_000_000_000)["accepted"]
-            for i in range(121)
+            for i in range(store_module.NET_REQUESTS_PER_MINUTE + 1)
         )
-        assert accepted == 120
+        assert accepted == store_module.NET_REQUESTS_PER_MINUTE
 
         store2 = AnalyticsStore(tmp_path / "analytics2.sqlite")
         for index in range(3):
@@ -188,3 +188,58 @@ def test_daily_counter_resets_on_a_new_ist_day():
     assert counter.take("a", 2, "2026-11-04")
     assert not counter.take("a", 1, "2026-11-04")
     assert counter.take("a", 2, "2026-11-05")
+
+
+def test_missing_web_vitals_stay_null(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        put(store, batch(events=[event("page_viewed", {"nav_type": "load", "landing": 1})]))
+        put(store, batch(events=[], vis=[{"pv": "a" * 12, "ms": 1500}]))
+        row = store.connection.execute(
+            "SELECT visible_ms, rum_lcp_ms, rum_inp_ms, rum_cls_x1000 FROM events"
+        ).fetchone()
+        assert row["visible_ms"] == 1500
+        assert row["rum_lcp_ms"] is None
+        assert row["rum_inp_ms"] is None
+        assert row["rum_cls_x1000"] is None
+    finally:
+        store.close()
+
+
+def test_visibility_only_requests_count_against_the_network_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(store_module, "NET_REQUESTS_PER_MINUTE", 3)
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        put(store, batch(events=[event("page_viewed", {"nav_type": "load", "landing": 1})]), net="vis")
+        for ms in (1000, 2000, 3000):  # the third visibility update is over the limit
+            put(store, batch(events=[], vis=[{"pv": "a" * 12, "ms": ms}]), net="vis")
+        row = store.connection.execute("SELECT visible_ms FROM events").fetchone()
+        assert row["visible_ms"] == 2000
+    finally:
+        store.close()
+
+
+def test_region_buckets_match_their_names():
+    assert store_module._geo("Asia/Kolkata") == "IN"
+    assert store_module._geo("Europe/London") == "UK"
+    assert store_module._geo("Europe/Berlin") == "EU"
+    assert store_module._geo("Europe/Zurich") == "other"
+    assert store_module._geo("Europe/Istanbul") == "other"
+    assert store_module._geo("America/Chicago") == "US"
+    assert store_module._geo("America/Indiana/Indianapolis") == "US"
+    assert store_module._geo("America/Sao_Paulo") == "other"
+    assert store_module._geo("America/Toronto") == "other"
+    assert store_module._geo("") == "unknown"
+
+
+def test_limit_maps_stay_bounded():
+    bucket = TokenBucket(5, 60)
+    bucket.MAX_KEYS = 100
+    for index in range(1_000):
+        bucket.take(f"key-{index}", 1, now=1_000.0 + index * 0.001)
+    assert len(bucket.buckets) <= 100
+    counter = DailyCounter(10)
+    counter.MAX_KEYS = 100
+    for index in range(1_000):
+        counter.take(f"key-{index}", 1, "2026-11-05")
+    assert len(counter.counts) <= 100

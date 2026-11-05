@@ -1,107 +1,72 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushAnalytics, resetIdentity } from "@/lib/analytics/track";
 
 const KEY = "strikehike:analytics:v1";
 const OPTOUT = "strikehike:analytics:optout";
+const ENABLED = process.env.NEXT_PUBLIC_ANALYTICS_ENABLED === "1";
 
-function code(bytes, length) {
-  const alphabet =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  return Array.from(bytes, (byte) => alphabet[byte % 64])
-    .join("")
-    .slice(0, length);
-}
-
-function freshId() {
+// Everything below reads the browser, so it runs after mount only: the
+// server render (and the first client render) show a neutral, inert switch.
+function readState() {
+  let out = false;
+  let id = null;
   try {
-    const aidBytes = new Uint8Array(16);
-    const sidBytes = new Uint8Array(12);
-    crypto.getRandomValues(aidBytes);
-    crypto.getRandomValues(sidBytes);
-    const now = Date.now();
-    const value = {
-      aid: code(aidBytes, 22),
-      created: now,
-      sid: code(sidBytes, 16),
-      last: now,
-    };
-    window.localStorage.setItem(KEY, JSON.stringify(value));
-    return value.aid;
-  } catch {
-    return null;
-  }
-}
-
-function optedOut() {
-  try {
-    return window.localStorage.getItem("strikehike:analytics:optout") === "1";
-  } catch {
-    return false;
-  }
-}
-
-function blockedByBrowser() {
-  return (
-    navigator.globalPrivacyControl === true || navigator.doNotTrack === "1"
-  );
-}
-
-function readId() {
-  try {
+    out = window.localStorage.getItem(OPTOUT) === "1";
     const value = JSON.parse(window.localStorage.getItem(KEY) || "null");
-    return typeof value?.aid === "string" ? value.aid : null;
+    id = typeof value?.aid === "string" ? value.aid : null;
   } catch {
-    return null;
+    // Storage blocked: the tracker counts this visit with a temporary ID.
   }
+  const blocked =
+    navigator.globalPrivacyControl === true || navigator.doNotTrack === "1";
+  return { out, id, blocked };
 }
 
 export function MeasurementToggle() {
-  const [enabled] = useState(
-    () => process.env.NEXT_PUBLIC_ANALYTICS_ENABLED === "1",
-  );
-  const [blocked] = useState(() => blockedByBrowser());
-  const [out, setOut] = useState(() => optedOut());
-  const [id, setId] = useState(null);
+  const [state, setState] = useState(null);
   const [copied, setCopied] = useState(false);
   const timer = useRef(0);
 
   useEffect(() => {
-    const queued = window.setTimeout(() => setId(readId()), 0);
-    return () => window.clearTimeout(queued);
+    const queued = window.setTimeout(() => setState(readState()), 0);
+    return () => {
+      window.clearTimeout(queued);
+      if (timer.current) window.clearTimeout(timer.current);
+    };
   }, []);
 
-  useEffect(
-    () => () => {
-      if (timer.current) window.clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const counting = enabled && !blocked && !out;
-  const status = blocked
-    ? "Not counted: your browser asks sites not to track"
-    : counting
-      ? "Counting this browser"
-      : "Not counted";
+  const ready = state !== null;
+  const blocked = Boolean(state?.blocked);
+  const id = state?.id ?? null;
+  const counting = ready && ENABLED && !blocked && !state.out;
+  const status = !ready
+    ? ""
+    : blocked
+      ? "Not counted: your browser asks sites not to track"
+      : counting
+        ? "Counting this browser"
+        : "Not counted";
 
   const toggle = () => {
-    if (blocked || !enabled) return;
-    const next = !out;
+    if (!ready || blocked || !ENABLED) return;
+    const out = !state.out;
+    let nextId = null;
     try {
-      if (next) {
+      if (out) {
         window.localStorage.setItem(OPTOUT, "1");
         window.localStorage.removeItem(KEY);
-        // Makes the tracker discard anything already queued.
-        window.dispatchEvent(new Event("pagehide"));
+        // Opted out now, so this discards anything still queued.
+        flushAnalytics();
       } else {
         window.localStorage.removeItem(OPTOUT);
+        nextId = resetIdentity().aid;
       }
     } catch {
       return;
     }
-    setOut(next);
-    setId(next ? null : freshId());
+    setState({ ...state, out, id: nextId });
     setCopied(false);
   };
 
@@ -147,14 +112,14 @@ export function MeasurementToggle() {
           type="button"
           role="switch"
           aria-checked={counting}
-          disabled={blocked || !enabled}
+          disabled={!ready || blocked || !ENABLED}
           onClick={toggle}
           className="inline-flex min-h-11 items-center gap-2.5 rounded-full border border-(--sh-line-2) px-3 text-meta font-medium text-(--sh-text-1) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover) disabled:cursor-not-allowed disabled:opacity-[0.38]"
         >
           <span
             aria-hidden="true"
             className={`relative h-6 w-11 rounded-full transition-colors ${
-              counting ? "bg-(--sh-signal)" : "bg-(--sh-line-2)"
+              counting ? "bg-(--sh-text-1)" : "bg-(--sh-line-2)"
             }`}
           >
             <span

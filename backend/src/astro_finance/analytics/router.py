@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from starlette.concurrency import run_in_threadpool
 
 from .botfilter import is_bot
 from .schema import PayloadTooLarge, ValidationError, load_schema, validate_batch
@@ -30,8 +31,9 @@ def _origin_ok(request: Request) -> bool:
     return origin is None or origin == ALLOWED_ORIGIN
 
 
-def _drop(request: Request, kind: str, count: int) -> None:
-    get_store().record_drop(kind, count)
+async def _drop(request: Request, kind: str, count: int) -> None:
+    # SQLite can wait up to its 2 s busy timeout; never on the event loop.
+    await run_in_threadpool(get_store().record_drop, kind, count)
 
 
 def _enabled() -> bool:
@@ -46,33 +48,36 @@ def _privacy_headers(request: Request) -> bool:
 async def ingest(request: Request) -> Response:
     raw = await request.body()
     if len(raw) > int(load_schema()["limits"]["max_body_bytes"]):
-        _drop(request, "size", 0)
+        await _drop(request, "size", 0)
         raise HTTPException(status_code=413, detail="Payload too large")
     if not _origin_ok(request):
-        _drop(request, "origin", 0)
+        await _drop(request, "origin", 0)
         raise HTTPException(status_code=403, detail="Forbidden")
     if _privacy_headers(request) or not _enabled():
         return Response(status_code=204)
     try:
         payload: Any = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        _drop(request, "schema", 0)
+        await _drop(request, "schema", 0)
         raise HTTPException(status_code=422, detail="Invalid JSON") from exc
 
     count = len(payload.get("ev", [])) if isinstance(payload, dict) else 0
     if is_bot(request.headers.get("user-agent")):
-        _drop(request, "bot", count)
+        await _drop(request, "bot", count)
         return Response(status_code=204)
     try:
-        envelope, events, stripped, vis = validate_batch(payload, len(raw))
+        envelope, events, stripped, vis, invalid = validate_batch(payload, len(raw))
     except PayloadTooLarge as exc:
-        _drop(request, "size", count)
+        await _drop(request, "size", count)
         raise HTTPException(status_code=413, detail="Payload too large") from exc
     except ValidationError as exc:
-        _drop(request, "schema", count)
+        await _drop(request, "schema", count)
         raise HTTPException(status_code=422, detail="Invalid event payload") from exc
 
-    get_store().ingest(
+    if invalid:
+        await _drop(request, "schema", invalid)
+    await run_in_threadpool(
+        get_store().ingest,
         envelope,
         events,
         vis,
@@ -90,8 +95,11 @@ async def feedback(request: Request) -> Response:
         raise HTTPException(status_code=413, detail="Payload too large")
     if not _origin_ok(request):
         raise HTTPException(status_code=403, detail="Forbidden")
-    if _privacy_headers(request) or not _enabled():
-        return Response(status_code=204)
+    # Feedback is sent on purpose and carries no identifier, so tracking
+    # signals (GPC/DNT) do not apply. A disabled store answers 503, so the
+    # form says "Couldn't send" rather than "Sent".
+    if not _enabled():
+        raise HTTPException(status_code=503, detail="feedback_unavailable")
     try:
         payload: Any = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -107,7 +115,8 @@ async def feedback(request: Request) -> Response:
         raise HTTPException(status_code=422, detail="email_or_url")
     path = str(payload.get("path") or "")[:128]
     app_version = str(payload.get("app_version") or "")[:7]
-    stored = get_store().add_feedback(
+    stored = await run_in_threadpool(
+        get_store().add_feedback,
         message,
         path,
         app_version,

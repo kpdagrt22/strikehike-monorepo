@@ -190,8 +190,15 @@ def validate_batch(
         raise ValidationError("invalid event list")
     checked: list[dict[str, Any]] = []
     stripped = 0
+    invalid = 0
+    # One malformed event is dropped and counted; it does not cost the rest of
+    # the batch (a landing page view, its referrer and UTMs).
     for event in events:
-        checked_event, removed = _check_event(event, schema)
+        try:
+            checked_event, removed = _check_event(event, schema)
+        except ValidationError:
+            invalid += 1
+            continue
         checked.append(checked_event)
         stripped += removed
     vis = _check_vis(payload.get("vis"), schema)
@@ -205,4 +212,4 @@ def validate_batch(
         "app": ctx["app"],
         "exp": exp,
     }
-    return envelope, checked, stripped, vis
+    return envelope, checked, stripped, vis, invalid

@@ -113,3 +113,39 @@ def test_feedback_validation_honeypot_and_rate_limit(client):
     for _ in range(4):
         assert send("Another useful message").status_code == 204
     assert send("One too many").status_code == 429
+
+
+def test_feedback_is_kept_with_gpc_and_unavailable_when_disabled(client, monkeypatch):
+    api, store = client
+    headers = {
+        "Origin": "https://strikehike.com",
+        "User-Agent": "Mozilla/5.0 Chrome/124",
+        "X-SH-Net": "gpc-net",
+        "Sec-GPC": "1",
+        "DNT": "1",
+    }
+    body = {"message": "Sent from a privacy browser", "website": "", "path": "/"}
+    assert api.post("/api/v1/feedback", json=body, headers=headers).status_code == 204
+    assert store.connection.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] == 1
+    monkeypatch.setenv("ANALYTICS_INGEST_ENABLED", "0")
+    assert api.post("/api/v1/feedback", json=body, headers=headers).status_code == 503
+    assert store.connection.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] == 1
+
+
+def test_one_bad_event_does_not_cost_the_batch(client):
+    api, store = client
+    body = batch()
+    body["ev"].append(
+        {
+            "n": "date_travelled",
+            "t": 1_700_000_000_000,
+            "pv": "a" * 12,
+            "p": "/",
+            "pr": {"method": "deep_link", "target_year": 1700, "is_future": 0},
+        }
+    )
+    assert post(api, body).status_code == 204
+    names = [row[0] for row in store.connection.execute("SELECT name FROM events")]
+    assert names == ["page_viewed"]
+    dropped = store.connection.execute("SELECT dropped_schema FROM ingest_stats").fetchone()[0]
+    assert dropped == 1

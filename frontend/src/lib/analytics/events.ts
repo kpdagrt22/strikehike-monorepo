@@ -71,6 +71,8 @@ export function viewOpened(panel: ViewPanel, method: ViewMethod) {
 
 export function dateTravelled(method: TravelMethod, target: string | number, targetRef?: string) {
   const year = yearOf(target);
+  // The schema accepts 1800-2200; a hand-edited ?d= outside it is not sent.
+  if (!(year >= 1800 && year <= 2200)) return;
   const future =
     typeof target === "string"
       ? Date.parse(`${target.slice(0, 10)}T00:00:00Z`) > Date.now()
@@ -99,6 +101,8 @@ export function cycleMapToggled(state: "on" | "off") {
   trackEvent("cycle_map_toggled", { state });
 }
 
+const CASE_ID = /^[a-z0-9-]{3,48}$/;
+
 export function caseOpened(
   page: CasePage,
   slot: CaseSlot,
@@ -106,6 +110,8 @@ export function caseOpened(
   caseId: string,
   caseIdB?: string,
 ) {
+  // Only catalogue-shaped ids, the same grammar the backend enforces.
+  if (!CASE_ID.test(caseId) || (caseIdB !== undefined && !CASE_ID.test(caseIdB))) return;
   trackEvent("case_opened", {
     page,
     slot,

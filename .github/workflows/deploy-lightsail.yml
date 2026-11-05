@@ -154,6 +154,7 @@ jobs:
           (
             cd ../backend
             PYTHONPATH="src:." LOAD_ML_MODELS=0 \
+              ANALYTICS_INGEST_ENABLED=1 ANALYTICS_DB=/tmp/smoke-analytics.sqlite \
               nohup uvicorn api_server:app --host 127.0.0.1 --port 8010 \
               > /tmp/backend.log 2>&1 &
           )
@@ -180,6 +181,9 @@ jobs:
             sleep 2
           done
           npx playwright test
+          # The normal-browser test must have reached the backend's store.
+          sleep 2
+          python -c 'import sqlite3; n = sqlite3.connect("/tmp/smoke-analytics.sqlite").execute("SELECT COUNT(*) FROM events").fetchone()[0]; print("stored events:", n); assert n > 0, "no event reached the store"'
 
       - name: Upload Playwright results
         if: failure()

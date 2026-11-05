@@ -26,6 +26,11 @@ let inp = 0;
 let cls = 0;
 let lastKey = "";
 let lastAt = 0;
+// Web Vitals describe the hard load only: they ride on the first page view.
+let rumPv = "";
+// Visibility-only beacons: at most one a minute, and only when time moved.
+let sentMs = 0;
+let sentAt = 0;
 
 function storage(): Storage | null {
   try {
@@ -44,9 +49,9 @@ function readIdent(): Ident | null {
     if (!raw) return memory;
     const value = JSON.parse(raw);
     if (
-      typeof value?.aid === "string" &&
+      /^[\w-]{22}$/.test(value?.aid) &&
       typeof value?.created === "number" &&
-      typeof value?.sid === "string" &&
+      /^[\w-]{16}$/.test(value?.sid) &&
       typeof value?.last === "number"
     ) {
       return value;
@@ -71,19 +76,12 @@ function writeIdent(value: Ident) {
   }
 }
 
-function randomText(bytes: number, length: number, hex = false) {
-  const data = new Uint8Array(bytes);
-  crypto.getRandomValues(data);
-  if (hex) {
-    return Array.from(data, (byte) => byte.toString(16).padStart(2, "0"))
-      .join("")
-      .slice(0, length);
-  }
-  const alphabet =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  return Array.from(data, (byte) => alphabet[byte % 64])
-    .join("")
-    .slice(0, length);
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+// One random byte per character; 64 and 16 both divide 256, so no bias.
+function randomText(length: number, alphabet = B64) {
+  const data = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(data, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
 function rotated(created: number, now: number) {
@@ -92,27 +90,27 @@ function rotated(created: number, now: number) {
   return now >= date.getTime();
 }
 
+/** A fresh anonymous ID and session (the opt-in switch calls this too). */
+export function resetIdentity(now = Date.now()) {
+  const value = { aid: randomText(22), created: now, sid: randomText(16), last: now };
+  writeIdent(value);
+  return value;
+}
+
 function identity(now: number) {
   let value = readIdent();
   createdNow = 0;
   sessionNew = 0;
   if (!value || rotated(value.created, now)) {
-    value = {
-      aid: randomText(16, 22),
-      created: now,
-      sid: randomText(12, 16),
-      last: now,
-    };
+    value = resetIdentity(now);
     createdNow = 1;
     sessionNew = 1;
-    writeIdent(value);
   } else if (now - value.last >= 1_800_000) {
-    value = { ...value, sid: randomText(12, 16), last: now };
+    value = { ...value, sid: randomText(16), last: now };
     sessionNew = 1;
     writeIdent(value);
-  } else {
-    writeIdent(value);
   }
+  // An unchanged identity needs no write: touch() refreshes `last`.
   return value;
 }
 
@@ -223,40 +221,45 @@ function send(body: unknown) {
       const blob = new Blob([text], { type: "text/plain" });
       if (navigator.sendBeacon("/api/v1/usage", blob)) return;
     }
-    fetch("/api/v1/usage", {
-      method: "POST",
-      body: text,
-      keepalive: true,
-      credentials: "omit",
-      headers: { "Content-Type": "text/plain" },
-    }).catch(() => {});
+    // A string body is sent as text/plain, and the site sets no cookies.
+    fetch("/api/v1/usage", { method: "POST", body: text, keepalive: true }).catch(
+      () => {},
+    );
   } catch {
     // A lost batch is acceptable.
   }
 }
 
-export function flushAnalytics() {
+// `final`: the page is being hidden, left or replaced, so send visible time
+// now. Otherwise visible time goes out at most once a minute.
+export function flushAnalytics(final?: unknown) {
   if (!allowed()) {
     queue = [];
     return;
   }
   const now = Date.now();
   tick(now);
+  const ms = Math.round(visible);
+  const rum = pv === rumPv;
+  const vis: Vis | null =
+    pv && ms - sentMs >= 1000 && (final === true || now - sentAt >= 60_000)
+      ? {
+          pv,
+          ms,
+          ...(rum && lcp ? { lcp } : {}),
+          ...(rum && inp ? { inp } : {}),
+          ...(rum && cls ? { cls: Math.round(cls * 1000) } : {}),
+        }
+      : null;
+  if (!queue.length && !vis) return;
   const value = touch(now);
   if (!value) return;
   const events = queue.slice(0, 25);
   queue = queue.slice(25);
-  const vis: Vis | null =
-    pv && (visible > 0 || lcp || inp || cls)
-      ? {
-          pv,
-          ms: Math.round(visible),
-          ...(lcp ? { lcp } : {}),
-          ...(inp ? { inp } : {}),
-          ...(cls ? { cls: Math.round(cls * 1000) } : {}),
-        }
-      : null;
-  if (!events.length && !vis) return;
+  if (vis) {
+    sentMs = ms;
+    sentAt = now;
+  }
   send({
     v: 1,
     aid: value.aid,
@@ -284,11 +287,11 @@ function start() {
   started = true;
   window.setInterval(flushAnalytics, 5000);
   const hidden = () => {
-    if (document.visibilityState === "hidden") flushAnalytics();
+    if (document.visibilityState === "hidden") flushAnalytics(true);
     else if (pv) visibleSince = Date.now();
   };
   document.addEventListener("visibilitychange", hidden);
-  window.addEventListener("pagehide", flushAnalytics);
+  window.addEventListener("pagehide", () => flushAnalytics(true));
   if (typeof PerformanceObserver !== "undefined") {
     import("./rum")
       .then(({ observeRum }) =>
@@ -314,12 +317,17 @@ export function trackPageView(nextPath: string, navType: "load" | "client" | "ba
     return;
   }
   if (!allowed()) return;
+  // Close out the page being left before its counters reset.
+  if (pv) flushAnalytics(true);
   const now = Date.now();
   identity(now);
-  pv = randomText(6, 12, true);
+  pv = randomText(12, "0123456789abcdef");
+  rumPv ||= pv;
   path = nextPath;
   visible = 0;
   visibleSince = now;
+  sentMs = 0;
+  sentAt = now;
   const first = createdNow || sessionNew;
   queue.push({
     n: "page_viewed",

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import crashMarkers from "@/data/astro/crash_markers.json";
 import { DateTimePicker } from "@/components/DateTimePicker";
@@ -283,6 +283,17 @@ export function TimeControls() {
     };
   }, [selectedDateTime, positionsRetryKey, setPositions, setStatus]);
 
+  // A scrub counts once, when it ends anywhere (on or off the track), and
+  // only if it moved the date.
+  const scrubFrom = useRef(null);
+  useEffect(() => {
+    if (scrubbing || scrubFrom.current === null) return;
+    const from = scrubFrom.current;
+    scrubFrom.current = null;
+    const to = useChronoStore.getState().focusedDate;
+    if (to && to !== from) dateTravelled("scrub", to);
+  }, [scrubbing]);
+
   useEffect(() => {
     if (!scrubbing) return;
 
@@ -546,11 +557,11 @@ export function TimeControls() {
                     setFocusedDate(valueToDate(Number(event.target.value)))
                   }
                   onKeyDown={onRangeKeyDown}
-                  onPointerDown={() => setScrubbing(true)}
-                  onPointerUp={() => {
-                    dateTravelled("scrub", focusedDate);
-                    setScrubbing(false);
+                  onPointerDown={() => {
+                    scrubFrom.current = focusedDate;
+                    setScrubbing(true);
                   }}
+                  onPointerUp={() => setScrubbing(false)}
                   onPointerCancel={() => setScrubbing(false)}
                   onBlur={() => setScrubbing(false)}
                   aria-label="Focused date"

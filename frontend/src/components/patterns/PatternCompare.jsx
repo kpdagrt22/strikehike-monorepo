@@ -1158,13 +1158,6 @@ export function PatternCompare({ engine, assetKey, linkedCase: linkedId = null }
     first: linkedCase,
   }));
   const linkedTracked = useRef(false);
-  useEffect(() => {
-    if (linkedTracked.current || !linkedId) return;
-    linkedTracked.current = true;
-    if (linkedId !== "today") {
-      caseOpened("/patterns", "compare", "deep_link", linkedId);
-    }
-  }, [linkedId]);
   // The reader's view, for the prefetch (which runs outside render).
   const alignRef = useRef(choice.align);
   useEffect(() => {
@@ -1172,6 +1165,16 @@ export function PatternCompare({ engine, assetKey, linkedCase: linkedId = null }
   }, [choice.align]);
   const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
   const casesEntry = useSyncExternalStore(store.subscribe, getCasesEntry, getNoEntry);
+  // A shared link's case is counted once, and only when the archive has it:
+  // a hand-edited id is never sent.
+  useEffect(() => {
+    if (linkedTracked.current || !linkedId || linkedId === "today") return;
+    if (casesEntry?.status !== "ready") return;
+    linkedTracked.current = true;
+    if (casesEntry.data.cases.some((item) => item.id === linkedId)) {
+      caseOpened("/patterns", "compare", "deep_link", linkedId);
+    }
+  }, [linkedId, casesEntry]);
 
   const count = useMemo(() => {
     const cases = casesEntry?.status === "ready" ? casesEntry.data.cases : null;

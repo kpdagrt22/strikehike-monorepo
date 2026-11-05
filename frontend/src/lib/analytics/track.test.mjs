@@ -194,3 +194,61 @@ test("a blocked localStorage falls back to an ephemeral ID", async () => {
   assert.ok(payload.aid);
   assert.ok(storage);
 });
+
+test("a fresh visitor's beacon matches the schema's ID grammars", async () => {
+  const { readFileSync } = await import("node:fs");
+  const schema = JSON.parse(
+    readFileSync(new URL("./schema.json", import.meta.url), "utf8"),
+  );
+  const { sent } = install();
+  const track = await import("./track.ts?grammar");
+  track.trackPageView("/", "load");
+  track.flushAnalytics();
+  const payload = await body(sent);
+  assert.match(payload.aid, new RegExp(schema.ids.aid));
+  assert.match(payload.sid, new RegExp(schema.ids.sid));
+  assert.match(payload.ev[0].pv, new RegExp(schema.ids.pv));
+});
+
+test("a client navigation sends the page it leaves, with its visible time", async () => {
+  let now = Date.UTC(2026, 10, 5, 9);
+  const original = Date.now;
+  Date.now = () => now;
+  try {
+    const { sent } = install();
+    const track = await import("./track.ts?navigate");
+    track.trackPageView("/", "load");
+    now += 7_000;
+    track.trackPageView("/regime", "client");
+    const payload = await body(sent);
+    assert.equal(payload.ev[0].p, "/");
+    assert.equal(payload.vis[0].pv, payload.ev[0].pv);
+    assert.equal(payload.vis[0].ms, 7_000);
+  } finally {
+    Date.now = original;
+  }
+});
+
+test("visible time alone is sent at most once a minute", async () => {
+  let now = Date.UTC(2026, 10, 5, 10);
+  const original = Date.now;
+  Date.now = () => now;
+  try {
+    const { sent } = install();
+    const track = await import("./track.ts?throttle");
+    track.trackPageView("/", "load");
+    track.flushAnalytics(); // the page view itself
+    assert.equal(sent.length, 1);
+    now += 5_000;
+    track.flushAnalytics(); // only 5 s of visible time: wait
+    assert.equal(sent.length, 1);
+    now += 60_000;
+    track.flushAnalytics();
+    assert.equal(sent.length, 2);
+    const payload = JSON.parse(await sent[1].blob.text());
+    assert.equal(payload.ev.length, 0);
+    assert.equal(payload.vis[0].ms, 65_000);
+  } finally {
+    Date.now = original;
+  }
+});

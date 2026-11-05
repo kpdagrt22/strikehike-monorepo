@@ -17,6 +17,9 @@ from .schema import load_schema
 IST = ZoneInfo("Asia/Kolkata")
 DEFAULT_DB = "/app/data/runtime/analytics/analytics.sqlite"
 GLOBAL_DAILY_CAP = 50_000
+# Per masked network (/24 or /48), per minute. Mobile carriers put many
+# visitors behind one /48, so this is an abuse ceiling, not a per-person cap.
+NET_REQUESTS_PER_MINUTE = 600
 RETENTION_DAYS = 395
 
 
@@ -33,16 +36,46 @@ def _device(width: int) -> str:
     return "phone" if width < 640 else "tablet" if width < 1024 else "desktop"
 
 
+# IANA zones of the United States (zone1970.tab, plus common links).
+US_ZONES = frozenset(
+    """America/New_York America/Detroit America/Kentucky/Louisville
+    America/Kentucky/Monticello America/Indiana/Indianapolis America/Indiana/Vincennes
+    America/Indiana/Winamac America/Indiana/Marengo America/Indiana/Petersburg
+    America/Indiana/Vevay America/Indiana/Tell_City America/Indiana/Knox
+    America/Chicago America/Menominee America/North_Dakota/Center
+    America/North_Dakota/New_Salem America/North_Dakota/Beulah America/Denver
+    America/Boise America/Phoenix America/Los_Angeles America/Anchorage
+    America/Juneau America/Sitka America/Metlakatla America/Yakutat America/Nome
+    America/Adak Pacific/Honolulu America/Indianapolis America/Louisville
+    America/Fort_Wayne America/Knox_IN America/Shiprock America/Atka
+    US/Eastern US/Central US/Mountain US/Pacific US/Alaska US/Hawaii US/Arizona
+    US/East-Indiana US/Indiana-Starke US/Michigan US/Aleutian""".split()
+)
+# Capitals and other zones of the 27 EU member states.
+EU_ZONES = frozenset(
+    """Europe/Vienna Europe/Brussels Europe/Sofia Europe/Zagreb Asia/Nicosia
+    Asia/Famagusta Europe/Nicosia Europe/Prague Europe/Copenhagen Europe/Tallinn
+    Europe/Helsinki Europe/Mariehamn Europe/Paris Europe/Berlin Europe/Busingen
+    Europe/Athens Europe/Budapest Europe/Dublin Europe/Rome Europe/Riga
+    Europe/Vilnius Europe/Luxembourg Europe/Malta Europe/Amsterdam Europe/Warsaw
+    Europe/Lisbon Atlantic/Azores Atlantic/Madeira Europe/Bucharest
+    Europe/Bratislava Europe/Ljubljana Europe/Madrid Africa/Ceuta
+    Atlantic/Canary Europe/Stockholm""".split()
+)
+
+
 def _geo(tz: str) -> str:
+    if not tz:
+        return "unknown"
     if tz in {"Asia/Kolkata", "Asia/Calcutta"}:
         return "IN"
-    if tz == "Europe/London":
+    if tz in {"Europe/London", "Europe/Belfast", "GB"}:
         return "UK"
-    if tz.startswith("Europe/"):
+    if tz in EU_ZONES:
         return "EU"
-    if tz.startswith(("America/", "US/")):
+    if tz in US_ZONES:
         return "US"
-    return "other" if tz else "unknown"
+    return "other"
 
 
 def _families(ua: str) -> tuple[str, str]:
@@ -107,15 +140,31 @@ def _referrer_class(props: dict[str, Any]) -> str | None:
 class TokenBucket:
     """A small in-memory token bucket; tests can advance its clock."""
 
+    MAX_KEYS = 20_000
+
     def __init__(self, capacity: int, window_seconds: float):
         self.capacity = float(capacity)
         self.rate = capacity / window_seconds
+        self.window = float(window_seconds)
         self.buckets: dict[str, tuple[float, float]] = {}
         self.lock = threading.Lock()
+
+    def _sweep(self, current: float) -> None:
+        # A key idle for a whole window is back at full capacity: forget it.
+        idle = [k for k, (_, at) in self.buckets.items() if current - at >= self.window]
+        for key in idle:
+            del self.buckets[key]
+        # Still too many (a burst of fresh keys): drop the oldest half.
+        if len(self.buckets) >= self.MAX_KEYS:
+            ordered = sorted(self.buckets, key=lambda k: self.buckets[k][1])
+            for key in ordered[: len(ordered) // 2]:
+                del self.buckets[key]
 
     def take(self, key: str, amount: int, now: float | None = None) -> bool:
         with self.lock:
             current = time.time() if now is None else now
+            if key not in self.buckets and len(self.buckets) >= self.MAX_KEYS:
+                self._sweep(current)
             tokens, updated = self.buckets.get(key, (self.capacity, current))
             tokens = min(self.capacity, tokens + (current - updated) * self.rate)
             if tokens < amount:
@@ -131,8 +180,15 @@ class DailyCounter:
         self.counts: dict[str, tuple[str, int]] = {}
         self.lock = threading.Lock()
 
+    MAX_KEYS = 20_000
+
     def take(self, key: str, amount: int, day: str) -> bool:
         with self.lock:
+            if key not in self.counts and len(self.counts) >= self.MAX_KEYS:
+                # Yesterday's counts no longer limit anything.
+                self.counts = {k: v for k, v in self.counts.items() if v[0] == day}
+                if len(self.counts) >= self.MAX_KEYS:
+                    self.counts.clear()
             current_day, count = self.counts.get(key, (day, 0))
             if current_day != day:
                 count = 0
@@ -153,7 +209,7 @@ class AnalyticsStore:
         self.connection.execute("PRAGMA busy_timeout=2000")
         self.connection.execute("PRAGMA synchronous=NORMAL")
         self.lock = threading.RLock()
-        self.net_limit = TokenBucket(120, 60)
+        self.net_limit = TokenBucket(NET_REQUESTS_PER_MINUTE, 60)
         self.aid_minute = TokenBucket(60, 60)
         self.aid_day = DailyCounter(1_500)
         self.feedback_limit = TokenBucket(5, 3_600)
@@ -291,10 +347,10 @@ class AnalyticsStore:
         day = _day(moment)
         week = _week(moment)
         count = len(events)
-        if count and not self.net_limit.take(net_key, 1):
+        if not self.net_limit.take(net_key, 1, now_ms / 1000):
             self.record_drop("rate", count, moment)
             return {"accepted": 0, "dropped_rate": count}
-        if count and not self.aid_minute.take(envelope["aid"], count):
+        if count and not self.aid_minute.take(envelope["aid"], count, now_ms / 1000):
             self.record_drop("rate", count, moment)
             return {"accepted": 0, "dropped_rate": count}
         if count and not self.aid_day.take(envelope["aid"], count, day):
@@ -370,15 +426,21 @@ class AnalyticsStore:
                     """
                     UPDATE events SET
                       visible_ms=MAX(COALESCE(visible_ms,0), ?),
-                      rum_lcp_ms=MAX(COALESCE(rum_lcp_ms,0), COALESCE(?,0)),
-                      rum_inp_ms=MAX(COALESCE(rum_inp_ms,0), COALESCE(?,0)),
-                      rum_cls_x1000=MAX(COALESCE(rum_cls_x1000,0), COALESCE(?,0))
+                      rum_lcp_ms=CASE WHEN ? IS NULL THEN rum_lcp_ms
+                        ELSE MAX(COALESCE(rum_lcp_ms,0), ?) END,
+                      rum_inp_ms=CASE WHEN ? IS NULL THEN rum_inp_ms
+                        ELSE MAX(COALESCE(rum_inp_ms,0), ?) END,
+                      rum_cls_x1000=CASE WHEN ? IS NULL THEN rum_cls_x1000
+                        ELSE MAX(COALESCE(rum_cls_x1000,0), ?) END
                     WHERE pv_id=? AND anon_id=? AND name='page_viewed'
                     """,
                     (
                         update["ms"],
                         update.get("lcp"),
+                        update.get("lcp"),
                         update.get("inp"),
+                        update.get("inp"),
+                        update.get("cls"),
                         update.get("cls"),
                         update["pv"],
                         envelope["aid"],
@@ -403,7 +465,7 @@ class AnalyticsStore:
     ) -> bool:
         now_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
         moment = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
-        if not self.feedback_limit.take(net_key, 1):
+        if not self.feedback_limit.take(net_key, 1, now_ms / 1000):
             return False
         with self.lock, self.connection:
             self.connection.execute(

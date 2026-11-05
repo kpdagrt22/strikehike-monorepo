@@ -1878,11 +1878,8 @@ export function RegimeTimeline({
         return;
     }
     event.preventDefault();
+    // The keyboard crosshair only moves the readout (like hover): not counted.
     const index = Math.max(0, Math.min(last, next));
-    const time = navTimes[index];
-    if (time) {
-      dateTravelled("market_tape", chartTimeToIso(time));
-    }
     moveSliderTo(index);
   };
 

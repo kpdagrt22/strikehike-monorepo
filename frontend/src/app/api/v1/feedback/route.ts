@@ -31,9 +31,8 @@ export async function POST(request: Request) {
     return json(413, { detail: "Payload too large" });
   }
   if (!sameOrigin(request)) return json(403, { detail: "Forbidden" });
-  if (request.headers.get("sec-gpc") === "1" || request.headers.get("dnt") === "1") {
-    return new Response(null, { status: 204 });
-  }
+  // No GPC/DNT drop here: a message is sent on purpose and carries no
+  // identifier, and dropping it would show "Sent" for a lost message.
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);

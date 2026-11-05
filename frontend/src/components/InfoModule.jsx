@@ -42,13 +42,12 @@ export function InfoModule() {
     window.clearTimeout(closeTimer.current);
   }, []);
 
-  const show = useCallback((via, at) => {
+  // `trackAs` separates the counted method from `via`, which drives the
+  // click guard. Hover and Tab previews are not counted; a click is.
+  const show = useCallback((via, at, trackAs = via) => {
     openVia.current = via;
     openedAt.current = at;
-    viewOpened(
-      "info",
-      via === "hover" ? "hover_intent" : via === "tab" ? "keyboard" : via === "hash" ? "hash" : "click",
-    );
+    if (trackAs === "click" || trackAs === "hash") viewOpened("info", trackAs);
     setPanelHidden(false);
     setOpen(true);
   }, []);
@@ -86,7 +85,9 @@ export function InfoModule() {
   // enquiry form) arrives with the panel open.
   useEffect(() => {
     const openFromHash = () => {
-      if (window.location.hash === "#contact") show("hash", performance.now());
+      if (window.location.hash === "#contact") {
+        show("click", performance.now(), "hash");
+      }
     };
     const frame = window.requestAnimationFrame(openFromHash);
     window.addEventListener("hashchange", openFromHash);
@@ -157,6 +158,7 @@ export function InfoModule() {
       event.timeStamp - openedAt.current < INTENT.clickGuardMs
     ) {
       openVia.current = "click";
+      viewOpened("info", "click");
       return;
     }
     hide();
