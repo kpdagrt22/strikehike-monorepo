@@ -8,16 +8,16 @@ import { SITE_URL } from "@/lib/seo/site";
 
 const MENU_LINK =
   "flex min-h-11 items-center rounded-xl px-3 text-meta text-(--sh-text-1) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)";
+const GUTTER = 16;
+const DESKTOP_WIDTH = 288;
 
-export function SubscribeControl({
-  scope,
-  label = "Subscribe",
-}) {
+export function SubscribeControl({ scope, label = "Subscribe" }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const timer = useRef(0);
   const triggerRef = useRef(null);
   const containerRef = useRef(null);
+  const panelRef = useRef(null);
   const panelId = useId();
   const slug = calendarSlug(scope);
   const name = calendarName(scope);
@@ -40,6 +40,53 @@ export function SubscribeControl({
     [],
   );
 
+  // The panel is fixed so a narrow list or a wrapped header can never push it
+  // past the viewport. On phones it is full width minus the 16 px gutters; from
+  // 640 px it is a compact panel pinned to the trigger's right edge.
+  useEffect(() => {
+    if (!open) return undefined;
+    const panel = panelRef.current;
+    const trigger = triggerRef.current;
+    if (!panel || !trigger) return undefined;
+
+    const place = () => {
+      const width =
+        window.innerWidth < 640
+          ? window.innerWidth - GUTTER * 2
+          : Math.min(DESKTOP_WIDTH, window.innerWidth - GUTTER * 2);
+      panel.style.width = `${width}px`;
+      panel.style.maxHeight = `${window.innerHeight - GUTTER * 2}px`;
+
+      const rect = trigger.getBoundingClientRect();
+      const height = panel.offsetHeight;
+      const left = Math.min(
+        Math.max(GUTTER, rect.right - width),
+        window.innerWidth - width - GUTTER,
+      );
+      let top = rect.bottom + 8;
+      if (top + height > window.innerHeight - GUTTER) {
+        top = rect.top - height - 8;
+      }
+      top = Math.max(
+        GUTTER,
+        Math.min(top, window.innerHeight - height - GUTTER),
+      );
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      panel.style.visibility = "visible";
+    };
+
+    place();
+    const first = panel.querySelector("a, button");
+    first?.focus({ preventScroll: true });
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
   const track = (method) => calendarSubscribed(scope, method);
 
   const copy = async () => {
@@ -59,6 +106,7 @@ export function SubscribeControl({
       <button
         ref={triggerRef}
         type="button"
+        data-subscribe-trigger={scope}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((value) => !value)}
@@ -79,8 +127,12 @@ export function SubscribeControl({
 
       {open ? (
         <div
+          ref={panelRef}
           id={panelId}
-          className="absolute right-0 z-50 mt-2 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-overlay) p-1.5 shadow-(--sh-shadow-overlay)"
+          data-subscribe-menu={scope}
+          aria-label={`${label} options`}
+          style={{ position: "fixed", visibility: "hidden" }}
+          className="z-[80] overflow-y-auto rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-overlay) p-1.5 shadow-(--sh-shadow-overlay)"
         >
           <a
             href={webcalUrl}
@@ -107,7 +159,11 @@ export function SubscribeControl({
           >
             Outlook.com
           </a>
-          <button type="button" onClick={copy} className={`${MENU_LINK} w-full text-left`}>
+          <button
+            type="button"
+            onClick={copy}
+            className={`${MENU_LINK} w-full text-left`}
+          >
             {copied ? "Copied" : "Copy link"}
           </button>
           <a

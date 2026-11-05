@@ -96,6 +96,86 @@ test.describe("upcoming calendar", () => {
   });
 });
 
+test.describe("subscribe menus", () => {
+  for (const width of [320, 390, 1440]) {
+    test(`stay inside the viewport at ${width}px`, async ({ page, request }) => {
+      await waitForUpcoming(request);
+      const height = width === 1440 ? 900 : 844;
+      await page.setViewportSize({ width, height });
+      await page.goto("/upcoming", { waitUntil: "networkidle" });
+
+      const triggers = page.locator("[data-subscribe-trigger]");
+      const count = await triggers.count();
+      expect(count).toBeGreaterThan(1);
+
+      for (let index = 0; index < count; index += 1) {
+        const trigger = triggers.nth(index);
+        await trigger.scrollIntoViewIfNeeded();
+        await trigger.click();
+        const menu = page.locator("[data-subscribe-menu]");
+        await expect(menu).toBeVisible();
+        const first = menu.locator("a, button").first();
+        await expect(first).toBeFocused();
+
+        for (const item of await menu.locator("a, button").all()) {
+          const box = await item.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box!.height).toBeGreaterThanOrEqual(43.5);
+        }
+
+        const box = await menu.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(15.5);
+        expect(box!.y).toBeGreaterThanOrEqual(15.5);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width - 15.5);
+        expect(box!.y + box!.height).toBeLessThanOrEqual(height - 15.5);
+
+        await page.keyboard.press("Escape");
+        await expect(menu).toBeHidden();
+        await expect(trigger).toBeFocused();
+      }
+    });
+  }
+
+  test("an outside tap closes the menu", async ({ page, request }) => {
+    await waitForUpcoming(request);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/upcoming", { waitUntil: "networkidle" });
+    await page.locator('[data-subscribe-trigger="all"]').click();
+    const menu = page.locator('[data-subscribe-menu="all"]');
+    await expect(menu).toBeVisible();
+    await page.mouse.click(5, 5);
+    await expect(menu).toBeHidden();
+  });
+
+  for (const scheme of ["dark", "light"] as const) {
+    test(`both menus on phone, ${scheme}`, async ({ page, request }) => {
+      await waitForUpcoming(request);
+      await page.addInitScript((theme) => {
+        localStorage.setItem("strikehike-theme", theme);
+      }, scheme);
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/upcoming", { waitUntil: "networkidle" });
+
+      await page.locator('[data-subscribe-trigger="all"]').click();
+      await expect(page.locator('[data-subscribe-menu="all"]')).toBeVisible();
+      await page.screenshot({
+        path: `smoke-screens/upcoming-subscribe-all-${scheme}-phone.png`,
+      });
+      await page.keyboard.press("Escape");
+
+      const finance = page.locator('[data-subscribe-trigger="finance"]');
+      await finance.scrollIntoViewIfNeeded();
+      await finance.click();
+      await expect(page.locator('[data-subscribe-menu="finance"]')).toBeVisible();
+      await page.screenshot({
+        path: `smoke-screens/upcoming-subscribe-finance-${scheme}-phone.png`,
+      });
+    });
+  }
+});
+
 test.describe("first-party measurement", () => {
   test.use({
     userAgent:
@@ -227,16 +307,6 @@ test.describe("upcoming review screenshots", () => {
     }
   }
 
-  test("opened Subscribe menu on phone", async ({ page, request }) => {
-    await waitForUpcoming(request);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/upcoming", { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: "Subscribe to all" }).click();
-    await expect(page.getByRole("link", { name: "Google Calendar" })).toBeVisible();
-    await page.screenshot({
-      path: "smoke-screens/upcoming-subscribe-phone.png",
-    });
-  });
 });
 
 // Review screenshots (uploaded by CI as an artifact): the privacy switch in
