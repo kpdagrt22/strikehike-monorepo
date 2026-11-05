@@ -255,6 +255,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # docker-compose.yml is the only place the Caddy tag is written.
+      - name: Read the pinned Caddy image
+        run: |
+          set -euo pipefail
+          images="$(docker compose config --images)"
+          image="$(printf '%s\n' "$images" | grep '^caddy:' || true)"
+          if ! printf '%s\n' "$image" | grep -Eqx 'caddy:[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::docker-compose.yml must pin the caddy service to an exact version (found '${image}')."
+            exit 1
+          fi
+          echo "CADDY_IMAGE=$image" >> "$GITHUB_ENV"
+          echo "Pinned Caddy image: $image"
+
       - name: Validate with an empty sites directory
         run: |
           set -euo pipefail
@@ -262,7 +275,7 @@ jobs:
           mkdir -p /tmp/caddy-empty/sites
           cp deploy/caddy/Caddyfile /tmp/caddy-empty/Caddyfile
           docker run --rm -v /tmp/caddy-empty:/etc/caddy:ro \
-            caddy:2.11.1 caddy validate \
+            "$CADDY_IMAGE" caddy validate \
             --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Validate with the thisiskp snippet
@@ -273,7 +286,7 @@ jobs:
           cp deploy/caddy/Caddyfile /tmp/caddy-fixture/Caddyfile
           cp tests/fixtures/caddy/thisiskp.caddy /tmp/caddy-fixture/sites/
           docker run --rm -v /tmp/caddy-fixture:/etc/caddy:ro \
-            caddy:2.11.1 caddy validate \
+            "$CADDY_IMAGE" caddy validate \
             --config /etc/caddy/Caddyfile --adapter caddyfile
 
   deploy:
@@ -343,8 +356,14 @@ jobs:
 
             MARKER="NBER recession windows from FRED"
             BASE_URL="https://strikehike.com"
-            CADDY_IMAGE="caddy:2.11.1"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
+
+            # The Caddy tag is pinned once, in docker-compose.yml.
+            CADDY_IMAGE="$(docker compose config --images | grep '^caddy:' || true)"
+            if [ -z "$CADDY_IMAGE" ]; then
+              echo "::error::Could not read the caddy image from docker-compose.yml; nothing was rebuilt and the old stack is still serving."
+              exit 1
+            fi
 
             # Validate the new directory mount and the migrated/fixture snippets
             # in a throwaway container before touching the running stack.
