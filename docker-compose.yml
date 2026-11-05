@@ -13,6 +13,7 @@ services:
       HISTORICAL_EVENTS_SEED: /app/data/historical_events.json
       ANALYTICS_DB: /app/data/runtime/analytics/analytics.sqlite
       ANALYTICS_INGEST_ENABLED: "1"
+      GROWTH_EXPORT_TOKEN: "${GROWTH_EXPORT_TOKEN:-}"
       PYTHONUNBUFFERED: "1"
     ports:
       # Host-loopback only. The frontend reaches it over the internal network.

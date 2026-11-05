@@ -137,6 +137,11 @@ def _referrer_class(props: dict[str, Any]) -> str | None:
     return "referral"
 
 
+def referrer_class(props: dict[str, Any]) -> str | None:
+    """Public reuse of the §7.3 classifier for server-log aggregation."""
+    return _referrer_class(props)
+
+
 class TokenBucket:
     """A small in-memory token bucket; tests can advance its clock."""
 
