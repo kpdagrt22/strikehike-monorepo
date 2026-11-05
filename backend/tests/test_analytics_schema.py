@@ -72,7 +72,7 @@ def test_depth_and_size_limits_are_enforced():
         validate_batch(payload(), 9000)
 
 
-def test_schema_has_the_fourteen_live_events_and_no_future_ones():
+def test_schema_has_the_fifteen_live_events_and_no_future_ones():
     names = set(load_schema()["events"])
     assert names == {
         "page_viewed",
@@ -89,7 +89,38 @@ def test_schema_has_the_fourteen_live_events_and_no_future_ones():
         "support_opened",
         "support_link_clicked",
         "feedback_submitted",
+        "calendar_subscribed",
     }
     assert "link_shared" not in names
-    assert "calendar_subscribed" not in names
-    assert set(load_schema()["paths"]) == {"/", "/regime", "/convergence", "/patterns", "/disclaimer", "404"}
+    assert set(load_schema()["paths"]) == {
+        "/",
+        "/regime",
+        "/convergence",
+        "/patterns",
+        "/disclaimer",
+        "/upcoming",
+        "404",
+    }
+
+
+def test_calendar_subscribed_accepts_only_the_known_scopes_and_methods():
+    good = {
+        "n": "calendar_subscribed",
+        "t": 1,
+        "pv": "a" * 12,
+        "p": "/upcoming",
+        "pr": {"scope": "finance", "method": "copy"},
+    }
+    _, events, _, _, invalid = validate_batch(payload(ev=[good]))
+    assert invalid == 0
+    assert events[0]["props"] == {"scope": "finance", "method": "copy"}
+
+    for props in (
+        {"scope": "all", "method": "email"},
+        {"scope": "politics", "method": "copy"},
+        {"scope": "finance"},
+    ):
+        bad = {**good, "pr": props}
+        _, events, _, _, invalid = validate_batch(payload(ev=[bad]))
+        assert events == []
+        assert invalid == 1

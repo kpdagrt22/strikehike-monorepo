@@ -14,6 +14,7 @@ const FEEDBACK_PATHS = new Set([
   "/convergence",
   "/patterns",
   "/disclaimer",
+  "/upcoming",
 ]);
 
 export function FeedbackModule() {

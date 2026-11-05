@@ -189,6 +189,13 @@ export function feedbackSubmitted(length: number) {
   trackEvent("feedback_submitted", { length_bucket: bucket });
 }
 
+export function calendarSubscribed(
+  scope: "all" | "science" | "finance" | "culture-religion",
+  method: "apple" | "google" | "outlook" | "copy" | "download",
+) {
+  trackEvent("calendar_subscribed", { scope, method });
+}
+
 export function themeSlug(theme: string) {
   return ordinary(theme);
 }
