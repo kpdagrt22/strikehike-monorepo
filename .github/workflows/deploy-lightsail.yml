@@ -148,6 +148,7 @@ jobs:
           from pathlib import Path
 
           from astro_finance.events.pipeline import PipelineOptions, run_pipeline
+          from astro_finance.events.store import upcoming_totals_by_theme
 
           now = datetime.now(timezone.utc)
           result = run_pipeline(
@@ -165,6 +166,18 @@ jobs:
               str(result.bundle_dir) + "\n", encoding="utf-8"
           )
           print(f"smoke bundle: {result.bundle_dir} ({result.bundle_version})")
+          counts = upcoming_totals_by_theme(
+              result.bundle_dir / "events.sqlite", None, today=now.date()
+          )
+          print(
+              "upcoming by theme: "
+              + ", ".join(f"{theme}={count}" for theme, count in counts.items())
+          )
+          if counts.get("Finance", 0) < 5 or counts.get("Science", 0) < 2:
+              print(
+                  "::warning::Smoke fixture is running out of future dates: "
+                  "refresh backend/tests/events/fixtures/offline"
+              )
           PY
 
       - name: Start the smoke backend
