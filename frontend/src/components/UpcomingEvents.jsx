@@ -172,7 +172,7 @@ export function UpcomingEvents() {
   };
 
   const chipClass = (active) =>
-    `inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-micro font-medium transition-colors duration-[140ms] ${
+    `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-micro font-medium transition-colors duration-[140ms] ${
       active
         ? "border-black/10 bg-black/[0.07] text-[#14121a] dark:border-white/10 dark:bg-white/[0.08] dark:text-[#f2ede4]"
         : "border-transparent text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"

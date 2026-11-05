@@ -60,6 +60,22 @@ async function waitForUpcoming(request: {
     .toContain("Employment Situation");
 }
 
+async function assertHomeUpcoming(page: import("@playwright/test").Page) {
+  const panel = page.locator("#chrono-ladder-sheet");
+  await expect(panel.locator("#upcoming-finance")).toBeVisible({ timeout: 30_000 });
+  const headings = panel.locator('h3[id^="upcoming-"]');
+  await expect(headings.first()).toHaveText("Finance");
+  expect((await headings.allTextContents()).map((text) => text.trim())).toEqual([
+    "Finance",
+    "Science",
+    "Culture/Religion",
+  ]);
+  await expect(panel.getByText("Politics", { exact: true })).toHaveCount(0);
+  await expect(
+    panel.getByRole("link", { name: /All upcoming dates/ }),
+  ).toHaveAttribute("href", "/upcoming");
+}
+
 test.describe("upcoming calendar", () => {
   test("the server HTML carries events without JavaScript", async ({ request }) => {
     await waitForUpcoming(request);
@@ -378,6 +394,44 @@ test.describe("upcoming review screenshots", () => {
     }
   }
 
+});
+
+test.describe("home Upcoming review screenshots", () => {
+  for (const scheme of ["dark", "light"] as const) {
+    test(`desktop 1440 ${scheme}`, async ({ page, request }) => {
+      await waitForUpcoming(request);
+      await page.addInitScript((theme) => {
+        localStorage.setItem("strikehike-theme", theme);
+        localStorage.setItem("hasSeenIntro", "1");
+      }, scheme);
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/", { waitUntil: "networkidle" });
+      await page.getByRole("button", { name: "Upcoming", exact: true }).click();
+      await assertHomeUpcoming(page);
+      await page.screenshot({
+        path: `smoke-screens/home-upcoming-${scheme}-desktop.png`,
+      });
+    });
+
+    test(`phone 390 ${scheme}`, async ({ page, request }) => {
+      await waitForUpcoming(request);
+      await page.addInitScript((theme) => {
+        localStorage.setItem("strikehike-theme", theme);
+        localStorage.setItem("hasSeenIntro", "1");
+      }, scheme);
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/", { waitUntil: "networkidle" });
+      await page.locator("#chrono-dock-archive").click();
+      await page.locator("#chrono-archive-to-ladder").click();
+      await page.getByRole("button", { name: "Upcoming", exact: true }).click();
+      await assertHomeUpcoming(page);
+      await page.screenshot({
+        path: `smoke-screens/home-upcoming-${scheme}-phone.png`,
+      });
+    });
+  }
 });
 
 test.describe("Kolkata review screenshot", () => {
