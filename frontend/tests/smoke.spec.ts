@@ -193,6 +193,56 @@ test.describe("subscribe menus", () => {
   }
 });
 
+test.describe("local time zones", () => {
+  test.describe("Asia/Kolkata", () => {
+    test.use({ timezoneId: "Asia/Kolkata" });
+
+    test("the December solstice crosses into the next day", async ({ page, request }) => {
+      const errors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      page.on("pageerror", (error) => errors.push(error.message));
+      await waitForUpcoming(request);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/upcoming", { waitUntil: "networkidle" });
+
+      const row = page
+        .getByRole("listitem")
+        .filter({ hasText: "December solstice" })
+        .first();
+      await expect(row).toBeVisible();
+      await expect(row).toContainText("Tue 22 Dec");
+      await expect(row).toContainText("02:20 IST");
+      await expect(row.locator("time")).toHaveAttribute("title", /20:50 UTC/);
+      expect(errors).toEqual([]);
+    });
+  });
+
+  test.describe("America/New_York", () => {
+    test.use({ timezoneId: "America/New_York" });
+
+    test("the Employment Situation stays at 08:30 Eastern", async ({ page, request }) => {
+      const errors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      page.on("pageerror", (error) => errors.push(error.message));
+      await waitForUpcoming(request);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/upcoming", { waitUntil: "networkidle" });
+
+      const row = page
+        .getByRole("listitem")
+        .filter({ hasText: "Employment Situation (December 2026)" })
+        .first();
+      await expect(row).toBeVisible();
+      await expect(row).toContainText("08:30 EST");
+      expect(errors).toEqual([]);
+    });
+  });
+});
+
 test.describe("first-party measurement", () => {
   test.use({
     userAgent:
@@ -324,6 +374,39 @@ test.describe("upcoming review screenshots", () => {
     }
   }
 
+});
+
+test.describe("Kolkata review screenshot", () => {
+  test.use({ timezoneId: "Asia/Kolkata" });
+
+  test("/upcoming light phone", async ({ page, request }) => {
+    await waitForUpcoming(request);
+    await page.addInitScript(() => {
+      localStorage.setItem("strikehike-theme", "light");
+    });
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/upcoming", { waitUntil: "networkidle" });
+    await page.evaluate(() => {
+      const main = document.querySelector("main");
+      if (!main) return;
+      main.style.height = "auto";
+      main.style.overflow = "visible";
+      const shell = main.parentElement;
+      if (shell) {
+        shell.style.height = "auto";
+        shell.style.overflow = "visible";
+      }
+      document.documentElement.style.height = "auto";
+      document.body.style.height = "auto";
+      document.body.style.overflow = "visible";
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: "smoke-screens/upcoming-kolkata-phone.png",
+      fullPage: true,
+    });
+  });
 });
 
 // Review screenshots (uploaded by CI as an artifact): the privacy switch in
