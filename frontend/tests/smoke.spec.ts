@@ -249,21 +249,65 @@ test.describe("upcoming calendar", () => {
     await expect(download).toHaveAttribute("href", /\/calendar\/all\.ics$/);
   });
 
-  test("the count matches the listed events and Show all reveals the rest", async ({
+  test("every theme count and Show all match the data", async ({
     page,
     request,
   }) => {
     await waitForUpcoming(request);
+    const data = await fetchUpcoming(request);
     await page.goto("/upcoming", { waitUntil: "networkidle" });
-    const heading = page.getByRole("heading", { level: 2, name: /^Finance/ });
-    await expect(heading).toContainText("Finance (62)");
-    const section = page.locator("section").filter({ has: heading });
-    await expect(section.locator("li:visible")).toHaveCount(5);
-    const details = section.locator("details");
-    await expect(details.locator("summary")).toContainText("Show all 62");
-    await details.locator("summary").click();
-    await expect(details).toHaveJSProperty("open", true);
-    await expect(section.locator("li:visible")).toHaveCount(62);
+
+    const themes = Object.entries(data.themes).filter(
+      ([name, entry]) =>
+        name !== "Politics" &&
+        name !== "Natural Disasters" &&
+        entry.events.length > 0,
+    );
+    expect(themes.length).toBeGreaterThan(0);
+
+    for (const [name, entry] of themes) {
+      const count = entry.events.length;
+      const heading = page.getByRole("heading", {
+        level: 2,
+        name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+      });
+      await expect(heading).toContainText(`${name} (${count})`);
+      const section = page.locator("section").filter({ has: heading });
+      await expect(section.locator("li:visible")).toHaveCount(
+        Math.min(5, count),
+      );
+
+      if (count > 5) {
+        const details = section.locator("details");
+        await expect(details.locator("summary")).toContainText(
+          `Show all ${count}`,
+        );
+        await details.locator("summary").click();
+        await expect(details).toHaveJSProperty("open", true);
+        await expect(section.locator("li:visible")).toHaveCount(count);
+      } else {
+        await expect(section.locator("details")).toHaveCount(0);
+      }
+
+      const more = Math.max(0, entry.total_available - count);
+      const feedLink = section.getByRole("link", { name: "calendar feed" });
+      if (more > 0) {
+        const slug = {
+          Science: "science",
+          Finance: "finance",
+          "Culture/Religion": "culture-religion",
+        }[name];
+        await expect(section).toContainText(
+          new RegExp(`${more} more dates? after`),
+        );
+        await expect(feedLink).toHaveAttribute(
+          "href",
+          `/calendar/${slug}.ics`,
+        );
+      } else {
+        await expect(feedLink).toHaveCount(0);
+      }
+    }
   });
 
   test("the finance feed is a calendar", async ({ request }) => {
