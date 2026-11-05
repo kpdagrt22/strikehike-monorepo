@@ -92,6 +92,8 @@ export function UpcomingEvents() {
   });
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({ status: "loading", payload: null });
+  const payload = state.payload;
+  const message = payload?.message;
   const chipRowRef = useRef(null);
   const didInitialScroll = useRef(false);
 
@@ -184,9 +186,6 @@ export function UpcomingEvents() {
       inline: "nearest",
     });
   };
-
-  const payload = state.payload;
-  const message = payload?.message;
 
   return (
     <div className="px-2.5 pb-4">

@@ -435,6 +435,7 @@ function applyChartLines(parts, next) {
 }
 
 function createRecessionBandsPrimitive(bands, initialSelectedId) {
+  let primitive;
   const renderer = {
     draw: (target) => {
       target.useMediaCoordinateSpace(({ context, mediaSize }) => {
@@ -468,7 +469,7 @@ function createRecessionBandsPrimitive(bands, initialSelectedId) {
   };
   const views = [view];
 
-  const primitive = {
+  primitive = {
     selectedId: initialSelectedId ?? null,
     hoveredId: null,
     requestUpdate: () => {},
@@ -691,6 +692,7 @@ function windowExtremes(points, windows) {
 // a new run starts, and the line is not joined across them. A hidden line
 // (an asset unchecked in compare mode) draws nothing and takes no mark.
 function createLevelOfDetailLinePrimitive({ color, lineWidth, windows }) {
+  let primitive;
   let points = [];
   let levels = new Float64Array(0);
   let every = new Int32Array(0);
@@ -791,7 +793,7 @@ function createLevelOfDetailLinePrimitive({ color, lineWidth, windows }) {
     },
   };
   const views = [{ renderer: () => renderer }];
-  const primitive = {
+  primitive = {
     chart: null,
     series: null,
     attached({ chart, series }) {
@@ -860,6 +862,7 @@ function pointsThrough(count, xAt, yAt) {
 // weeks are 2 px or more apart (a crash zoom) the shape follows the weekly
 // values. Any −50…+50 series works.
 function createCoreIndexRibbonPrimitive(points, isDark) {
+  let primitive;
   const allValues = Float64Array.from(points, (point) =>
     clamp(Number(point.value), -50, 50),
   );
@@ -1005,7 +1008,7 @@ function createCoreIndexRibbonPrimitive(points, isDark) {
     },
   };
   const views = [{ renderer: () => renderer }];
-  const primitive = {
+  primitive = {
     chart: null,
     attached({ chart }) {
       primitive.chart = chart;
@@ -1032,6 +1035,7 @@ function createCoreIndexRibbonPrimitive(points, isDark) {
 // animated. Runs of consecutive weeks are found once; a paint draws only the
 // runs in view.
 function createFlagStripPrimitive(timeline, lanes) {
+  let primitive;
   let runs = null;
 
   const ensureRuns = (timeScale) => {
@@ -1089,7 +1093,7 @@ function createFlagStripPrimitive(timeline, lanes) {
     },
   };
   const views = [{ renderer: () => renderer }];
-  const primitive = {
+  primitive = {
     chart: null,
     attached({ chart }) {
       primitive.chart = chart;
@@ -1127,6 +1131,7 @@ function axisRow(y, pixelRatio) {
 // only: an open NBER window reads as change since its first week. The lines
 // and the data do not move.
 function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = null }) {
+  let primitive;
   let labels = [];
   let labelsKey = "";
   const captionRenderer = (context, horizontalPixelRatio, verticalPixelRatio) => {
@@ -1183,7 +1188,7 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = nul
   };
   const paneViews = [{ zOrder: () => "bottom", renderer: () => gridRenderer }];
   const axisPaneViews = [{ renderer: () => labelRenderer }];
-  const primitive = {
+  primitive = {
     chart: null,
     series: null,
     base: base > 0 ? base : null,
@@ -1265,6 +1270,7 @@ function createIndexAxisPrimitive({ textColor, gridColor, fontWeight, base = nul
 // the crosshair (on the line as drawn, so it never floats beside it) and a
 // dot on the ribbon at the week's Core Index, in its band's tone.
 function createCrosshairMarksPrimitive({ lines, ribbon, weeks, ringColor }) {
+  let primitive;
   const dot = (context, x, y, radius, fill) => {
     context.beginPath();
     context.arc(x, y, radius + 1.5, 0, Math.PI * 2);
@@ -1293,7 +1299,7 @@ function createCrosshairMarksPrimitive({ lines, ribbon, weeks, ringColor }) {
     },
   };
   const views = [{ zOrder: () => "top", renderer: () => renderer }];
-  const primitive = {
+  primitive = {
     chart: null,
     // The week under the crosshair ("YYYY-MM-DD"), or null when it is hidden.
     time: null,

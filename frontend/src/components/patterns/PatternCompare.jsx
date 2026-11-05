@@ -510,6 +510,11 @@ function withSoFar(tokens, todayKey) {
   return [...tokens.slice(0, at + 3), words(" so far"), ...tokens.slice(at + 3)];
 }
 
+const SIDE_INK = {
+  a: "text-[#14121a] dark:text-[#f2ede4]",
+  b: "text-[#c0442f] dark:text-[#ff8b77]",
+};
+
 function Sentence({ tokens }) {
   return tokens.map((token, index) => {
     if (token.kind === "subject") {
@@ -534,11 +539,6 @@ function Sentence({ tokens }) {
 }
 
 // ------------------------------------------------------------- the look
-
-const SIDE_INK = {
-  a: "text-[#14121a] dark:text-[#f2ede4]",
-  b: "text-[#c0442f] dark:text-[#ff8b77]",
-};
 
 const SEGMENT =
   "inline-flex shrink-0 items-center gap-0.5 rounded-full border border-(--sh-line-1) bg-black/[0.025] p-0.5 dark:bg-white/[0.035]";

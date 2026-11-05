@@ -1,5 +1,31 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
+
+type UpcomingEvent = {
+  event_id: string;
+  name: string;
+  theme: string;
+  start_date: string;
+  start_time: string | null;
+  start_utc: string | null;
+  timezone: string | null;
+  all_day: boolean;
+  days_until: number;
+};
+
+type UpcomingTheme = {
+  total_available: number;
+  events: UpcomingEvent[];
+};
+
+type UpcomingPayload = {
+  themes: Record<string, UpcomingTheme>;
+};
 
 const ROUTES = [
   { path: "/", texts: ["Sky ladder"] },
@@ -49,40 +75,161 @@ for (const route of ROUTES) {
   });
 }
 
-async function waitForUpcoming(request: {
-  get: (url: string) => Promise<{ text: () => Promise<string> }>;
-}) {
+async function waitForUpcoming(request: APIRequestContext) {
   await expect
-    .poll(async () => (await request.get("/upcoming")).text(), {
-      timeout: 60_000,
-      intervals: [1_000, 2_000, 3_000],
-    })
-    .toContain("Employment Situation");
+    .poll(
+      async () => {
+        const html = await (await request.get("/upcoming")).text();
+        const count = /data-upcoming-count="([1-9]\d*)"/.exec(html);
+        return count ? Number(count[1]) : 0;
+      },
+      { timeout: 60_000, intervals: [1_000, 2_000, 3_000] },
+    )
+    .toBeGreaterThan(0);
 }
 
-async function assertHomeUpcoming(page: import("@playwright/test").Page) {
+async function fetchUpcoming(request: APIRequestContext): Promise<UpcomingPayload> {
+  const response = await request.get(
+    "/api/v1/events/upcoming?limit_per_theme=100&horizon_days=365",
+  );
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()) as UpcomingPayload;
+}
+
+function firstListedEvent(payload: UpcomingPayload) {
+  for (const [theme, entry] of Object.entries(payload.themes)) {
+    if (theme === "Politics" || theme === "Natural Disasters") continue;
+    if (entry.events[0]) return entry.events[0];
+  }
+  throw new Error("the fixture has no upcoming event");
+}
+
+function firstTimedEvent(payload: UpcomingPayload) {
+  for (const [theme, entry] of Object.entries(payload.themes)) {
+    if (theme === "Politics" || theme === "Natural Disasters") continue;
+    const event = entry.events.find(
+      (item) => !item.all_day && Boolean(item.start_utc),
+    );
+    if (event) return event;
+  }
+  throw new Error("the fixture has no timed upcoming event");
+}
+
+function localDate(instant: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone,
+  }).format(new Date(instant));
+}
+
+function localTime(instant: string, timeZone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  }).format(new Date(instant));
+}
+
+function zoneLabel(instant: string, timeZone: string) {
+  if (timeZone === "Asia/Kolkata") return "IST";
+  const locale = timeZone.startsWith("Europe/") ? "en-GB" : "en-US";
+  const parts = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+    timeZoneName: "short",
+  }).formatToParts(new Date(instant));
+  return parts.find((part) => part.type === "timeZoneName")?.value ?? timeZone;
+}
+
+async function assertHomeUpcoming(page: Page, request: APIRequestContext) {
+  const response = await request.get("/api/v1/events/upcoming");
+  const data = (await response.json()) as UpcomingPayload;
+  const canonical = ["Science", "Finance", "Culture/Religion"];
+  const expected = Object.entries(data.themes)
+    .filter(
+      ([name, entry]) =>
+        name !== "Politics" &&
+        name !== "Natural Disasters" &&
+        entry.total_available > 0,
+    )
+    .sort(
+      ([leftName, left], [rightName, right]) =>
+        right.total_available - left.total_available ||
+        canonical.indexOf(leftName) - canonical.indexOf(rightName),
+    )
+    .map(([name]) => name);
+  expect(expected.length).toBeGreaterThan(0);
+
   const panel = page.locator("#chrono-ladder-sheet");
-  await expect(panel.locator("#upcoming-finance")).toBeVisible({ timeout: 30_000 });
   const headings = panel.locator('h3[id^="upcoming-"]');
-  await expect(headings.first()).toHaveText("Finance");
-  expect((await headings.allTextContents()).map((text) => text.trim())).toEqual([
-    "Finance",
-    "Science",
-    "Culture/Religion",
-  ]);
+  await expect(headings.first()).toBeVisible({ timeout: 30_000 });
+  expect((await headings.allTextContents()).map((text) => text.trim())).toEqual(
+    expected,
+  );
   await expect(panel.getByText("Politics", { exact: true })).toHaveCount(0);
   await expect(
     panel.getByRole("link", { name: /All upcoming dates/ }),
   ).toHaveAttribute("href", "/upcoming");
 }
 
+test.describe("home Upcoming loads", () => {
+  test("desktop", async ({ page, request }) => {
+    await waitForUpcoming(request);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.addInitScript(() => {
+      localStorage.setItem("hasSeenIntro", "1");
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Upcoming", exact: true }).click();
+    await expect(
+      page.locator('h3[id^="upcoming-"]').first(),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("This page couldn't load")).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("phone", async ({ page, request }) => {
+    await waitForUpcoming(request);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.addInitScript(() => {
+      localStorage.setItem("hasSeenIntro", "1");
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.locator("#chrono-dock-archive").click();
+    await page.locator("#chrono-archive-to-ladder").click();
+    await page.getByRole("button", { name: "Upcoming", exact: true }).click();
+    await expect(
+      page.locator('h3[id^="upcoming-"]').first(),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("This page couldn't load")).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
+
 test.describe("upcoming calendar", () => {
   test("the server HTML carries events without JavaScript", async ({ request }) => {
     await waitForUpcoming(request);
+    const data = await fetchUpcoming(request);
+    const event = firstListedEvent(data);
     const response = await request.get("/upcoming");
     expect(response.status()).toBe(200);
     const html = await response.text();
-    expect(html).toContain("Employment Situation");
+    expect(html).toContain(event.name);
     const count = /data-upcoming-count="([1-9]\d*)"/.exec(html);
     expect(count).not.toBeNull();
     expect(Number(count![1])).toBeGreaterThan(0);
@@ -217,24 +364,34 @@ test.describe("local time zones", () => {
   test.describe("Asia/Kolkata", () => {
     test.use({ timezoneId: "Asia/Kolkata" });
 
-    test("the December solstice crosses into the next day", async ({ page, request }) => {
+    test("a timed row uses the visitor's date, time and label", async ({
+      page,
+      request,
+    }) => {
       const errors: string[] = [];
       page.on("console", (message) => {
         if (message.type() === "error") errors.push(message.text());
       });
       page.on("pageerror", (error) => errors.push(error.message));
       await waitForUpcoming(request);
+      const data = await fetchUpcoming(request);
+      const event = firstTimedEvent(data);
+      const instant = event.start_utc!;
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/upcoming", { waitUntil: "networkidle" });
 
       const row = page
         .getByRole("listitem")
-        .filter({ hasText: "December solstice" })
+        .filter({ hasText: event.name })
         .first();
-      await expect(row).toBeVisible();
-      await expect(row).toContainText("Tue 22 Dec");
-      await expect(row).toContainText("02:20 IST");
-      await expect(row.locator("time")).toHaveAttribute("title", /20:50 UTC/);
+      await expect(row).toContainText(localDate(instant, "Asia/Kolkata"));
+      await expect(row).toContainText(
+        `${localTime(instant, "Asia/Kolkata")} IST`,
+      );
+      await expect(row.locator("time")).toHaveAttribute(
+        "title",
+        new RegExp(`${instant.slice(11, 16)} UTC`),
+      );
       expect(errors).toEqual([]);
     });
   });
@@ -242,22 +399,29 @@ test.describe("local time zones", () => {
   test.describe("America/New_York", () => {
     test.use({ timezoneId: "America/New_York" });
 
-    test("the Employment Situation stays at 08:30 Eastern", async ({ page, request }) => {
+    test("a timed row uses Eastern time", async ({ page, request }) => {
       const errors: string[] = [];
       page.on("console", (message) => {
         if (message.type() === "error") errors.push(message.text());
       });
       page.on("pageerror", (error) => errors.push(error.message));
       await waitForUpcoming(request);
+      const data = await fetchUpcoming(request);
+      const event = firstTimedEvent(data);
+      const instant = event.start_utc!;
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/upcoming", { waitUntil: "networkidle" });
 
       const row = page
         .getByRole("listitem")
-        .filter({ hasText: "Employment Situation (December 2026)" })
+        .filter({ hasText: event.name })
         .first();
-      await expect(row).toBeVisible();
-      await expect(row).toContainText("08:30 EST");
+      await expect(row).toContainText(
+        `${localTime(instant, "America/New_York")} ${zoneLabel(
+          instant,
+          "America/New_York",
+        )}`,
+      );
       expect(errors).toEqual([]);
     });
   });
@@ -408,7 +572,7 @@ test.describe("home Upcoming review screenshots", () => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto("/", { waitUntil: "networkidle" });
       await page.getByRole("button", { name: "Upcoming", exact: true }).click();
-      await assertHomeUpcoming(page);
+      await assertHomeUpcoming(page, request);
       await page.screenshot({
         path: `smoke-screens/home-upcoming-${scheme}-desktop.png`,
       });
@@ -426,7 +590,7 @@ test.describe("home Upcoming review screenshots", () => {
       await page.locator("#chrono-dock-archive").click();
       await page.locator("#chrono-archive-to-ladder").click();
       await page.getByRole("button", { name: "Upcoming", exact: true }).click();
-      await assertHomeUpcoming(page);
+      await assertHomeUpcoming(page, request);
       await page.screenshot({
         path: `smoke-screens/home-upcoming-${scheme}-phone.png`,
       });

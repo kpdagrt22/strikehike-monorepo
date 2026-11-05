@@ -82,6 +82,8 @@ export function FutureLadder() {
   const deepLinked = hasThemeFilter(locationSearch);
   const view = viewChoice ?? (deepLinked ? "upcoming" : "sky");
   const announcedDeepLink = useRef(false);
+  const mobileSheet = useChronoStore((state) => state.mobileSheet);
+  const sheetOpen = mobileSheet === "future";
   const selectView = (next) => {
     if (next === "upcoming" && view !== "upcoming") {
       upcomingOpened(sheetOpen ? "mobile_sheet" : "tab");
@@ -95,7 +97,6 @@ export function FutureLadder() {
     if (deepLinked) upcomingOpened("deep_link");
   }, [deepLinked, view]);
   const sheetRef = useRef(null);
-  const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const activeEventCategory = useChronoStore(
     (state) => state.activeEventCategory,
@@ -104,7 +105,6 @@ export function FutureLadder() {
   const ladderMatches = useChronoStore((state) => state.ladderMatches);
   const ladderStatus = useChronoStore((state) => state.ladderStatus);
   const setLadder = useChronoStore((state) => state.setLadder);
-  const sheetOpen = mobileSheet === "future";
   const dismissSheet = useDismissable(sheetOpen, {
     onClose: () => setMobileSheet(null),
     triggerRef: getEventsDockButton,
