@@ -357,6 +357,7 @@ jobs:
             MARKER="NBER recession windows from FRED"
             BASE_URL="https://strikehike.com"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
+            THISISKP_SNIPPET="$PWD/deploy/caddy/sites/thisiskp.caddy"
 
             # The Caddy tag is pinned once, in docker-compose.yml.
             CADDY_IMAGE="$(docker compose config --images | grep '^caddy:' || true)"
@@ -494,13 +495,38 @@ jobs:
               "${CURL[@]}" "$BASE_URL/" > /dev/null
             }
 
+            # Proves this Caddy still routes thisiskp.in. A down thisiskp app
+            # (502/503/504 from its upstream) is not a StrikeHike problem.
+            # Only connection/TLS errors are retried: 12 retries, 5 s apart.
             probe_thisiskp() {
-              if ! curl --fail --silent --show-error \
-                --retry 12 --retry-delay 5 --retry-connrefused --retry-all-errors \
-                --resolve thisiskp.in:443:127.0.0.1 https://thisiskp.in/ > /dev/null; then
-                echo "::error::thisiskp.in did not return 200 after the StrikeHike cutover."
-                return 1
+              if [ ! -f "$THISISKP_SNIPPET" ]; then
+                echo "::warning::no thisiskp.in snippet on this host; skipping its probe"
+                return 0
               fi
+              thisiskp_code=""
+              for attempt in $(seq 1 13); do
+                if thisiskp_code="$(curl --silent --show-error --output /dev/null \
+                  --write-out '%{http_code}' --max-time 20 \
+                  --resolve thisiskp.in:443:127.0.0.1 https://thisiskp.in/)"; then
+                  break
+                fi
+                thisiskp_code=""
+                if [ "$attempt" -lt 13 ]; then
+                  sleep 5
+                fi
+              done
+              case "$thisiskp_code" in
+                2??|3??)
+                  return 0
+                  ;;
+                502|503|504)
+                  echo "::warning::thisiskp.in upstream is down (Caddy routes it; not a StrikeHike config problem)"
+                  return 0
+                  ;;
+              esac
+              echo "thisiskp.in probe result: ${thisiskp_code:-no HTTP response (TLS or connection error)}"
+              echo "::error::thisiskp.in did not return 200 after the StrikeHike cutover."
+              return 1
             }
 
             probe_regime() {
