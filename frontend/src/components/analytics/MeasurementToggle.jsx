@@ -116,15 +116,17 @@ export function MeasurementToggle() {
           onClick={toggle}
           className="inline-flex min-h-11 items-center gap-2.5 rounded-full border border-(--sh-line-2) px-3 text-meta font-medium text-(--sh-text-1) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover) disabled:cursor-not-allowed disabled:opacity-[0.38]"
         >
+          {/* The knob is a flex child sliding inside a padded track, so it
+              can never leave its box (no absolute positioning). */}
           <span
             aria-hidden="true"
-            className={`relative h-6 w-11 rounded-full transition-colors ${
+            className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors motion-reduce:transition-none ${
               counting ? "bg-(--sh-text-1)" : "bg-(--sh-line-2)"
             }`}
           >
             <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-(--sh-surface-overlay) shadow-(--sh-shadow-float) transition-transform motion-reduce:transition-none ${
-                counting ? "translate-x-5" : "translate-x-0.5"
+              className={`h-5 w-5 rounded-full bg-(--sh-surface-overlay) shadow-(--sh-shadow-float) transition-transform motion-reduce:transition-none ${
+                counting ? "translate-x-5" : "translate-x-0"
               }`}
             />
           </span>

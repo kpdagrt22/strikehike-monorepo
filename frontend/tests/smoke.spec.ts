@@ -59,17 +59,31 @@ test.describe("first-party measurement", () => {
   }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
+      // Playwright can't read a sendBeacon body in Chromium (and route()
+      // misses beacons), so keep a copy in the page and still send it: the
+      // batch reaches the real server, and CI then checks it was stored.
+      const sink: Promise<string>[] = [];
+      (window as unknown as { __beacons: Promise<string>[] }).__beacons = sink;
+      const original = navigator.sendBeacon.bind(navigator);
+      navigator.sendBeacon = (url, data) => {
+        if (String(url).includes("/api/v1/usage") && data instanceof Blob) {
+          sink.push(data.text());
+        }
+        return original(url, data);
+      };
     });
-    // No page.route here: Chromium does not reliably hand sendBeacon requests
-    // to the interceptor. The batch goes to the real server, and CI then
-    // checks that the backend stored it.
     const beacon = page.waitForRequest(
       (request) =>
         request.method() === "POST" && request.url().includes("/api/v1/usage"),
       { timeout: 15_000 },
     );
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    const payload = JSON.parse((await beacon).postData() ?? "{}");
+    await beacon;
+    const bodies = await page.evaluate(() =>
+      Promise.all((window as unknown as { __beacons: Promise<string>[] }).__beacons),
+    );
+    expect(bodies.length).toBeGreaterThan(0);
+    const payload = JSON.parse(bodies[0]);
     const allowedTop = new Set([
       "v",
       "aid",
