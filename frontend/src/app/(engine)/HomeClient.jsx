@@ -183,8 +183,13 @@ export default function Home() {
           tray's focus-expansion hides it. */}
       <MobileDock />
       <TimeControls />
-      <FilterControls />
-      <FutureLadder />
+      <div
+        data-home-left-column
+        className="contents lg:fixed lg:bottom-20 lg:left-5 lg:z-30 lg:flex lg:w-[min(18rem,calc(100vw-1.5rem))] lg:flex-col lg:gap-2 lg:top-[23.5rem] xl:top-[21rem]"
+      >
+        <FilterControls />
+        <FutureLadder />
+      </div>
       <RightPanel />
       <ViewControls />
       <InfoModule />
