@@ -65,7 +65,11 @@ test.describe("upcoming calendar", () => {
     await waitForUpcoming(request);
     const response = await request.get("/upcoming");
     expect(response.status()).toBe(200);
-    expect(await response.text()).toContain("Employment Situation");
+    const html = await response.text();
+    expect(html).toContain("Employment Situation");
+    const count = /data-upcoming-count="([1-9]\d*)"/.exec(html);
+    expect(count).not.toBeNull();
+    expect(Number(count![1])).toBeGreaterThan(0);
   });
 
   test("Show all opens and a subscribe link points at the feed", async ({ page, request }) => {

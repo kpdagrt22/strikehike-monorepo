@@ -193,9 +193,16 @@ export default async function UpcomingPage({
     ? themes.filter((theme) => selected.includes(theme.slug))
     : themes;
   const unavailable = !payload || Boolean(payload.message);
+  const listedCount = shown.reduce(
+    (total, theme) => total + (theme.data.events?.length ?? 0),
+    0,
+  );
 
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24">
+    <main
+      data-upcoming-count={listedCount > 0 ? listedCount : undefined}
+      className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24"
+    >
       <UpcomingPageTracker />
       <div className="w-full max-w-3xl px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
         <header>

@@ -267,7 +267,6 @@ jobs:
             git pull --ff-only origin main
 
             MARKER="NBER recession windows from FRED"
-            UPCOMING_MARKER="Employment Situation"
             BASE_URL="https://strikehike.com"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
 
@@ -414,7 +413,7 @@ jobs:
               page="$(mktemp)"
               for attempt in $(seq 1 30); do
                 if "${CURL[@]}" "$BASE_URL/upcoming" -o "$page" \
-                  && grep -qF "$UPCOMING_MARKER" "$page"; then
+                  && grep -Eq 'data-upcoming-count="[1-9]' "$page"; then
                   rm -f "$page"
                   return 0
                 fi
