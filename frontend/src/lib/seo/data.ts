@@ -196,3 +196,50 @@ export function patternsAsOf(payload: PatternsPayload | null | undefined): strin
   const asOf = payload?.engine?.as_of;
   return typeof asOf === "string" && asOf ? asOf.slice(0, 10) : undefined;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Upcoming events. The server page reads the backend directly (not through /api), like the
+// other server data here, so the first HTML carries every listed event.
+// ---------------------------------------------------------------------------------------------
+
+export interface UpcomingEventPayload {
+  event_id: string;
+  name: string;
+  theme: string;
+  start_date: string;
+  start_time: string | null;
+  timezone: string | null;
+  start_utc: string | null;
+  all_day: boolean;
+  status: string;
+  verification: string;
+  source_url: string;
+  days_until: number;
+  [key: string]: unknown;
+}
+
+export interface UpcomingThemePayload {
+  schedulable: boolean;
+  total_available: number;
+  events: UpcomingEventPayload[];
+  [key: string]: unknown;
+}
+
+export interface UpcomingPayload {
+  as_of: string;
+  bundle_version: string | null;
+  message?: string | null;
+  themes: Record<string, UpcomingThemePayload>;
+  [key: string]: unknown;
+}
+
+export const getUpcoming = cache(async (): Promise<UpcomingPayload | null> => {
+  const payload = await getJson(
+    "/api/v1/events/upcoming?limit_per_theme=50&horizon_days=365",
+  );
+  if (!payload) return null;
+  if (!payload.themes || typeof payload.themes !== "object") {
+    throw new Error("upcoming shape");
+  }
+  return payload as unknown as UpcomingPayload;
+});

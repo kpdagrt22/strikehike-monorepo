@@ -9,8 +9,8 @@ export const revalidate = 3600;
 // ISO dates (YYYY-MM-DD) compare as strings.
 const later = (a: string, b?: string | null) => (b && b > a ? b : a);
 
-// Five URLs. lastmod is the later of the day the page's copy last changed and the day its data
-// run to, never the build time. No changefreq or priority: Google ignores both.
+// Every indexable page. lastmod is the later of the day the page's copy last changed and the
+// day its data run to, never the build time. No changefreq or priority: Google ignores both.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [regime, cases, patterns] = await Promise.all([
     getRegimeSummary().catch(() => null),
