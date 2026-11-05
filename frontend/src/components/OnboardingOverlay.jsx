@@ -37,6 +37,7 @@ export function OnboardingOverlay() {
       // Storage can be unavailable in privacy modes; the hint still closes.
     }
     onboardingDismissed(method);
+    window.dispatchEvent(new Event("strikehike:intro-dismissed"));
     setDismissed(true);
   }, []);
 

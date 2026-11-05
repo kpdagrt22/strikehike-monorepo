@@ -142,9 +142,39 @@ function DateChangeAnnouncer() {
   );
 }
 
-const subscribe = () => () => {};
+const subscribeMounted = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
+
+const PHONE_QUERY = "(max-width: 639.98px)";
+
+function subscribePhone(onChange) {
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+const getPhone = () => window.matchMedia(PHONE_QUERY).matches;
+const getPhoneServer = () => false;
+
+function subscribeIntroSeen(onChange) {
+  window.addEventListener("strikehike:intro-dismissed", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("strikehike:intro-dismissed", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function getIntroSeen() {
+  try {
+    return Boolean(window.localStorage.getItem("hasSeenIntro"));
+  } catch {
+    return false;
+  }
+}
+
+const getIntroSeenServer = () => false;
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
@@ -161,10 +191,17 @@ export default function Home() {
 
   // false during SSR/hydration, true after: avoids a dark-material flash on a light theme.
   const mounted = useSyncExternalStore(
-    subscribe,
+    subscribeMounted,
     getClientSnapshot,
     getServerSnapshot,
   );
+  const phone = useSyncExternalStore(subscribePhone, getPhone, getPhoneServer);
+  const introSeen = useSyncExternalStore(
+    subscribeIntroSeen,
+    getIntroSeen,
+    getIntroSeenServer,
+  );
+  const compactIntro = phone && introSeen;
   // Dark until mounted, so the server HTML and the hydration render agree; the
   // post-mount render then patches the light colours (React 19 does not patch
   // mismatched attributes during hydration).
@@ -175,9 +212,9 @@ export default function Home() {
     <main className="relative h-full w-full overflow-hidden border-0 p-0">
       <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} />
 
-      <HomeIntro />
+      <HomeIntro compact={compactIntro} />
       <RegimeOverlaySync />
-      <EnergyGauge isDark={isDark} homeIntro />
+      <EnergyGauge isDark={isDark} homeIntro compactIntro={compactIntro} />
       <Tooltip />
       {/* Before the tray in DOM order: forward Tab reaches the dock before the
           tray's focus-expansion hides it. */}

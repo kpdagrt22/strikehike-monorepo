@@ -43,14 +43,21 @@ function activityLevel(polarity) {
   return "Moderate";
 }
 
-function SelectedDayParallel({ parallels }) {
+function SelectedDayParallel({ parallels, compact = false }) {
   const parallel = bestParallel(parallels);
   if (!parallel) return null;
 
   const tone = categoryTone(parallel.category);
 
   return (
-    <div data-hud-part="parallel" className="mt-3 w-full text-center pointer-coarse:mt-7">
+    <div
+      data-hud-part="parallel"
+      className={
+        compact
+          ? "w-full text-left"
+          : "mt-3 w-full text-center pointer-coarse:mt-7"
+      }
+    >
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={`${parallel.date}-${parallel.name}-${parallel.similarity_percent}`}
@@ -58,7 +65,11 @@ function SelectedDayParallel({ parallels }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="flex min-w-0 max-w-full flex-col items-center rounded-2xl px-3.5 py-1.5"
+          className={
+            compact
+              ? "flex min-w-0 flex-col items-start"
+              : "flex min-w-0 max-w-full flex-col items-center rounded-2xl px-3.5 py-1.5"
+          }
         >
           <span className="flex items-center gap-1.5">
             <span
@@ -73,7 +84,11 @@ function SelectedDayParallel({ parallels }) {
               description={GEOMETRY_MATCH_DEFINITION}
             />
           </span>
-          <span className="mt-0.5 flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70">
+          <span
+            className={`mt-0.5 flex max-w-full flex-wrap gap-x-2 gap-y-0.5 text-meta font-medium leading-snug tracking-[-0.01em] text-black/70 dark:text-white/70 ${
+              compact ? "items-start text-left" : "items-center justify-center text-center"
+            }`}
+          >
             <span className="whitespace-normal">
               {formatYear(parallel.date)} · {parallel.name}
             </span>
@@ -90,7 +105,11 @@ function SelectedDayParallel({ parallels }) {
   );
 }
 
-export function EnergyGauge({ isDark = true, homeIntro = false }) {
+export function EnergyGauge({
+  isDark = true,
+  homeIntro = false,
+  compactIntro = false,
+}) {
   const energy = useChronoStore((state) => state.energy);
   const parallels = useChronoStore((state) => state.parallels);
   const status = useChronoStore((state) => state.status);
@@ -124,9 +143,13 @@ export function EnergyGauge({ isDark = true, homeIntro = false }) {
   return (
     <div
       data-hud="gauge"
-      className={`pointer-events-none absolute left-1/2 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none flex-col items-center transition-opacity duration-200 motion-reduce:transition-none sm:w-[min(21rem,calc(100vw-2rem))] xl:w-[min(23rem,calc(100vw-2rem))] ${
+      className={`pointer-events-none absolute left-1/2 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none transition-opacity duration-200 motion-reduce:transition-none sm:w-[min(21rem,calc(100vw-2rem))] xl:w-[min(23rem,calc(100vw-2rem))] ${
+        compactIntro ? "flex-row items-center gap-3" : "flex-col items-center"
+      } ${
         homeIntro
-          ? "top-[28rem] sm:top-[27rem] lg:top-[8.5rem]"
+          ? compactIntro
+            ? "top-[15.625rem] sm:top-[27rem] lg:top-[8.5rem]"
+            : "top-[27rem] sm:top-[27rem] lg:top-[8.5rem]"
           : "top-[4.5rem] sm:top-(--sh-header-clear)"
       } ${
         mobileSheet ? "max-lg:opacity-0" : ""
@@ -139,7 +162,12 @@ export function EnergyGauge({ isDark = true, homeIntro = false }) {
           className="absolute inset-3 rounded-full opacity-70 blur-2xl"
           style={{ backgroundColor: tone.glow }}
         />
-        <GaugeAura score={score} isDark={isDark} paused={Boolean(mobileSheet)} />
+        <GaugeAura
+          score={score}
+          isDark={isDark}
+          paused={Boolean(mobileSheet)}
+          compact={compactIntro}
+        />
 
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -206,19 +234,37 @@ export function EnergyGauge({ isDark = true, homeIntro = false }) {
         </div>
       </div>
 
-      <div className="mt-2.5 flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-        <span
-          className="h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: tone.stroke }}
-        />
-        {score === null ? label : `Sky activity · ${label}`}
-        <InfoTip
-          label="What sky activity means"
-          description={SKY_ACTIVITY_DEFINITION}
-        />
-      </div>
-
-      <SelectedDayParallel parallels={parallels} />
+      {compactIntro ? (
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left">
+          <div className="flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: tone.stroke }}
+            />
+            {score === null ? label : `Sky activity · ${label}`}
+            <InfoTip
+              label="What sky activity means"
+              description={SKY_ACTIVITY_DEFINITION}
+            />
+          </div>
+          <SelectedDayParallel parallels={parallels} compact />
+        </div>
+      ) : (
+        <>
+          <div className="mt-2.5 flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: tone.stroke }}
+            />
+            {score === null ? label : `Sky activity · ${label}`}
+            <InfoTip
+              label="What sky activity means"
+              description={SKY_ACTIVITY_DEFINITION}
+            />
+          </div>
+          <SelectedDayParallel parallels={parallels} />
+        </>
+      )}
     </div>
   );
 }
