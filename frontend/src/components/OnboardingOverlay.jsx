@@ -56,7 +56,7 @@ export function OnboardingOverlay() {
   return (
     <div
       data-home-hint
-      className="pointer-events-auto fixed bottom-[8.5rem] left-1/2 z-40 flex w-[min(36rem,calc(100vw-1.5rem))] -translate-x-1/2 items-center gap-2 rounded-full border border-(--sh-line-1) bg-(--sh-surface-overlay) py-1.5 pl-4 pr-1.5 text-meta leading-snug text-(--sh-text-2) shadow-(--sh-shadow-float) backdrop-blur-xl sm:bottom-24"
+      className="pointer-events-auto fixed bottom-[8.5rem] left-1/2 z-40 flex w-[calc(100vw-8rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-(--sh-line-1) bg-(--sh-surface-overlay) py-1.5 pl-4 pr-1.5 text-meta leading-snug text-(--sh-text-2) shadow-(--sh-shadow-float) backdrop-blur-xl sm:bottom-24 sm:w-[21rem]"
     >
       <p className="min-w-0 flex-1">
         Drag to turn the sky. Pick any date on the timeline below.
