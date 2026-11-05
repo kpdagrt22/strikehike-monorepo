@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import shutil
 import sqlite3
 import tarfile
+import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -16,6 +18,11 @@ MAX_ASSET_BYTES = 100 * 1024 * 1024
 MAX_TAR_MEMBERS = 500
 MAX_TAR_BYTES = 250 * 1024 * 1024
 TIMEOUT_SECONDS = 30
+# The initial request plus three retries. The delays apply after attempts 1-3.
+RETRY_DELAYS_SECONDS = (5, 15, 30)
+MAX_DOWNLOAD_ATTEMPTS = len(RETRY_DELAYS_SECONDS) + 1
+
+logger = logging.getLogger(__name__)
 
 
 class ActivationError(RuntimeError):
@@ -45,24 +52,84 @@ def _safe_relative(name: str) -> PurePosixPath:
     return pure
 
 
+def _retryable_status(status: int) -> bool:
+    return status == 429 or 500 <= status <= 599
+
+
+def _write_response(response: requests.Response, destination: Path) -> None:
+    written = 0
+    with destination.open("wb") as handle:
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if not chunk:
+                continue
+            written += len(chunk)
+            if written > MAX_ASSET_BYTES:
+                raise ActivationError("release asset exceeds the size limit")
+            handle.write(chunk)
+
+
 def _download(url: str, destination: Path) -> None:
-    try:
-        with requests.get(url, stream=True, timeout=TIMEOUT_SECONDS) as response:
-            if response.status_code != 200:
+    """Download one asset, retrying transient failures.
+
+    HTTP 5xx, 429, connection errors and timeouts get three retries with
+    backoff. Every other HTTP 4xx fails at once. The destination is truncated
+    on each successful response, so a partial attempt can never be mistaken
+    for the final asset; the caller verifies checksums after this returns.
+    """
+    for attempt in range(1, MAX_DOWNLOAD_ATTEMPTS + 1):
+        retry_reason = None
+        last_status = None
+        last_exception = None
+        try:
+            with requests.get(url, stream=True, timeout=TIMEOUT_SECONDS) as response:
+                status = response.status_code
+                if status == 200:
+                    _write_response(response, destination)
+                    return
+                if not _retryable_status(status):
+                    raise ActivationError(
+                        f"release asset download returned HTTP {status}"
+                    )
+                last_status = status
+                retry_reason = f"HTTP {status}"
+        except requests.RequestException as exc:
+            retryable = isinstance(
+                exc,
+                (
+                    requests.ConnectionError,
+                    requests.Timeout,
+                    requests.exceptions.ChunkedEncodingError,
+                ),
+            )
+            if not retryable:
                 raise ActivationError(
-                    f"release asset download returned HTTP {response.status_code}"
-                )
-            written = 0
-            with destination.open("wb") as handle:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if not chunk:
-                        continue
-                    written += len(chunk)
-                    if written > MAX_ASSET_BYTES:
-                        raise ActivationError("release asset exceeds the size limit")
-                    handle.write(chunk)
-    except requests.RequestException as exc:
-        raise ActivationError(f"release asset download failed: {exc}") from exc
+                    f"release asset download failed: {type(exc).__name__}"
+                ) from exc
+            last_exception = exc
+            retry_reason = type(exc).__name__
+
+        if attempt == MAX_DOWNLOAD_ATTEMPTS:
+            if last_exception is not None:
+                raise ActivationError(
+                    "release asset download failed after "
+                    f"{MAX_DOWNLOAD_ATTEMPTS} attempts: "
+                    f"{type(last_exception).__name__}"
+                ) from last_exception
+            raise ActivationError(
+                "release asset download returned HTTP "
+                f"{last_status} after {MAX_DOWNLOAD_ATTEMPTS} attempts"
+            )
+
+        delay = RETRY_DELAYS_SECONDS[attempt - 1]
+        logger.warning(
+            "release asset %s attempt %d/%d failed (%s); retrying in %ds",
+            destination.name,
+            attempt,
+            MAX_DOWNLOAD_ATTEMPTS,
+            retry_reason,
+            delay,
+        )
+        time.sleep(delay)
 
 
 def fetch_assets(

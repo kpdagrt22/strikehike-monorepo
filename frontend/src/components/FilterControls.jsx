@@ -19,6 +19,7 @@ import { useChronoStore } from "@/store/chronoStore";
 // Desktop keeps the flyout beside the archive; below lg the category's events
 // open inline under the tapped row, inside the visible sheet.
 const DESKTOP_QUERY = "(min-width: 1024px)";
+const ARCHIVE_OPEN_KEY = "strikehike:home:archive-open";
 
 function subscribeDesktop(onChange) {
   const query = window.matchMedia(DESKTOP_QUERY);
@@ -28,6 +29,22 @@ function subscribeDesktop(onChange) {
 
 const getDesktop = () => window.matchMedia(DESKTOP_QUERY).matches;
 const getDesktopOnServer = () => true;
+
+function subscribeArchive(onChange) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
+function getArchiveOpen() {
+  try {
+    const saved = window.localStorage.getItem(ARCHIVE_OPEN_KEY);
+    return saved === "1" || saved === "true";
+  } catch {
+    return false;
+  }
+}
+
+const getArchiveOpenOnServer = () => false;
 
 const categoryButtonId = (category) =>
   `chrono-category-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
@@ -44,6 +61,13 @@ export function FilterControls() {
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [activeCategory, setActiveCategory] = useState(null);
+  const storedArchiveOpen = useSyncExternalStore(
+    subscribeArchive,
+    getArchiveOpen,
+    getArchiveOpenOnServer,
+  );
+  const [archiveOverride, setArchiveOverride] = useState(null);
+  const archiveOpen = archiveOverride ?? storedArchiveOpen;
   const sheetRef = useRef(null);
   const regionRef = useRef(null);
   // Set when the keyboard opens a category's flyout on desktop, so focus can
@@ -133,6 +157,17 @@ export function FilterControls() {
       ? categories[activeCategory]
       : [];
 
+  const toggleArchive = () => {
+    const next = !archiveOpen;
+    if (!next) setActiveCategory(null);
+    setArchiveOverride(next);
+    try {
+      window.localStorage.setItem(ARCHIVE_OPEN_KEY, next ? "1" : "0");
+    } catch {
+      // The toggle still works for this visit.
+    }
+  };
+
   const toggleCategory = (category, method = "click") => {
     if (activeCategory !== category) viewOpened("archive", method);
     setActiveCategory((current) => (current === category ? null : category));
@@ -153,6 +188,9 @@ export function FilterControls() {
   const showLadder = () => {
     viewOpened("ladder_sheet", "tap");
     setActiveCategory(null);
+    window.dispatchEvent(
+      new CustomEvent("strikehike:ladder-view", { detail: "upcoming" }),
+    );
     setMobileSheet("future");
     // Focus follows the swap to the ladder sheet's matching control.
     requestAnimationFrame(() =>
@@ -258,59 +296,101 @@ export function FilterControls() {
         mobileSheet === "archive"
           ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block"
           : "hidden"
-      } pointer-events-auto lg:fixed lg:left-5 lg:top-[6.75rem] lg:z-30 lg:block lg:w-[min(18rem,calc(100vw-1.5rem))] lg:max-h-none lg:overflow-visible`}
+      } pointer-events-auto lg:static lg:z-auto lg:flex lg:min-h-0 lg:w-full lg:max-h-none lg:flex-col`}
     >
-      <div className="relative">
+      <div className="relative lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
         <div
           id="chrono-events-sheet"
-          className="rounded-2xl border border-black/10 bg-white/92 p-1.5 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/45 lg:dark:bg-black/25"
+          data-home-archive
+          className="rounded-2xl border border-black/10 bg-white/92 p-1.5 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:bg-white/45 lg:dark:bg-black/25"
         >
-          <div className="flex items-start justify-between gap-2 px-2.5 pb-2 pt-2">
-            <div>
-              <h2
-                id="chrono-archive-title"
-                tabIndex={-1}
-                className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
-              >
-                Event archive
-              </h2>
-              <p className="mt-0.5 text-meta tabular-nums text-black/60 dark:text-white/60">
-                {roster?.total
-                  ? `${roster.total} curated moments`
-                  : "Curated moments"}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 lg:hidden">
+          {isDesktop ? (
+            <h2
+              id="chrono-archive-title"
+              tabIndex={-1}
+              className="shrink-0 text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
+            >
               <button
-                id="chrono-archive-to-ladder"
+                id="chrono-archive-toggle"
                 type="button"
-                onClick={showLadder}
-                className="h-11 rounded-full border border-black/10 px-3 text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:border-white/10 dark:text-white/60"
+                onClick={toggleArchive}
+                aria-expanded={archiveOpen}
+                aria-controls="chrono-archive-body"
+                className="flex min-h-11 w-full items-center gap-1.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
-                Ladder
-              </button>
-              <button
-                type="button"
-                onClick={() => dismissSheet({ restoreFocus: true })}
-                aria-label="Close event archive"
-                className="grid h-11 w-11 place-items-center rounded-full border border-black/10 text-black/60 dark:border-white/10 dark:text-white/60"
-              >
+                <span>Event archive</span>
+                <span className="ml-1 text-micro font-normal normal-case tracking-[0.02em] text-black/60 dark:text-white/60">
+                  ·{" "}
+                  {roster?.total
+                    ? `${roster.total} moments`
+                    : "curated moments"}
+                </span>
                 <svg
-                  viewBox="0 0 16 16"
-                  className="h-3.5 w-3.5"
+                  viewBox="0 0 12 12"
+                  className={`ml-auto h-2.5 w-2.5 shrink-0 transition-transform motion-reduce:transition-none ${
+                    archiveOpen ? "rotate-180" : ""
+                  }`}
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
+                  strokeWidth="1.3"
                   aria-hidden="true"
                 >
-                  <path d="M4 4l8 8M12 4l-8 8" />
+                  <path d="M2.5 4.5 6 8l3.5-3.5" />
                 </svg>
               </button>
+            </h2>
+          ) : (
+            <div className="flex shrink-0 items-start justify-between gap-2 px-2.5 pb-2 pt-2">
+              <div>
+                <h2
+                  id="chrono-archive-title"
+                  tabIndex={-1}
+                  className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 focus:outline-none dark:text-white/60"
+                >
+                  Event archive
+                </h2>
+                <p className="mt-0.5 text-meta tabular-nums text-black/60 dark:text-white/60">
+                  {roster?.total
+                    ? `${roster.total} curated moments`
+                    : "Curated moments"}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 lg:hidden">
+                <button
+                  id="chrono-archive-to-ladder"
+                  type="button"
+                  onClick={showLadder}
+                  className="h-11 rounded-full border border-black/10 px-3 text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:border-white/10 dark:text-white/60"
+                >
+                  Upcoming
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dismissSheet({ restoreFocus: true })}
+                  aria-label="Close event archive"
+                  className="grid h-11 w-11 place-items-center rounded-full border border-black/10 text-black/60 dark:border-white/10 dark:text-white/60"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 4l8 8M12 4l-8 8" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="space-y-1">
+          <div
+            id="chrono-archive-body"
+            hidden={isDesktop && !archiveOpen}
+            className="space-y-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+          >
             {CATEGORY_ORDER.map((category) => {
               const isActive = activeCategory === category;
               const count = categories[category]?.length ?? 0;
@@ -351,29 +431,29 @@ export function FilterControls() {
                 </Fragment>
               );
             })}
-          </div>
 
-          {error ? (
-            <p className="px-2 pb-1 pt-1 text-meta leading-relaxed text-black/80 dark:text-white/80">
-              <span
-                className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#f05d49] align-middle"
-                aria-hidden="true"
-              />
-              {"Archive unavailable · "}
-              <button
-                type="button"
-                onClick={retryRoster}
-                className="-my-3 inline-block py-3 font-medium underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current lg:-my-1 lg:py-1"
-              >
-                Retry
-              </button>
-            </p>
-          ) : null}
+            {error ? (
+              <p className="px-2 pb-1 pt-1 text-meta leading-relaxed text-black/80 dark:text-white/80">
+                <span
+                  className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#f05d49] align-middle"
+                  aria-hidden="true"
+                />
+                {"Archive unavailable · "}
+                <button
+                  type="button"
+                  onClick={retryRoster}
+                  className="-my-3 inline-block py-3 font-medium underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current lg:-my-1 lg:py-1"
+                >
+                  Retry
+                </button>
+              </p>
+            ) : null}
+          </div>
         </div>
 
         {isDesktop ? (
           <AnimatePresence>
-            {activeCategory ? renderEvents(false) : null}
+            {archiveOpen && activeCategory ? renderEvents(false) : null}
           </AnimatePresence>
         ) : null}
       </div>

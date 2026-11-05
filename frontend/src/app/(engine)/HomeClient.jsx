@@ -1,13 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { dateTravelled } from "@/lib/analytics/events";
 import { bestParallel } from "@/lib/parallelEpoch";
@@ -16,6 +10,7 @@ import { EnergyGauge } from "@/components/EnergyGauge";
 import { FeedbackModule } from "@/components/FeedbackModule";
 import { FilterControls } from "@/components/FilterControls";
 import { FutureLadder } from "@/components/FutureLadder";
+import { HomeIntro } from "@/components/HomeIntro";
 import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
@@ -147,28 +142,42 @@ function DateChangeAnnouncer() {
   );
 }
 
-const subscribe = () => () => {};
+const subscribeMounted = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
-const getIntroSeen = () =>
-  typeof window !== "undefined" &&
-  window.sessionStorage.getItem("strikehike-intro-seen") === "1";
-const getIntroServerSnapshot = () => false;
+
+const PHONE_QUERY = "(max-width: 639.98px)";
+
+function subscribePhone(onChange) {
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+const getPhone = () => window.matchMedia(PHONE_QUERY).matches;
+const getPhoneServer = () => false;
+
+function subscribeIntroSeen(onChange) {
+  window.addEventListener("strikehike:intro-dismissed", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("strikehike:intro-dismissed", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function getIntroSeen() {
+  try {
+    return Boolean(window.localStorage.getItem("hasSeenIntro"));
+  } catch {
+    return false;
+  }
+}
+
+const getIntroSeenServer = () => false;
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
-  const [introComplete, setIntroComplete] = useState(false);
-  const introSeen = useSyncExternalStore(
-    subscribe,
-    getIntroSeen,
-    getIntroServerSnapshot,
-  );
-  const introDone = introComplete || introSeen;
-
-  const handleIntroComplete = useCallback(() => {
-    setIntroComplete(true);
-    window.sessionStorage.setItem("strikehike-intro-seen", "1");
-  }, []);
 
   useEffect(() => {
     const date = new URLSearchParams(window.location.search).get("d");
@@ -182,10 +191,17 @@ export default function Home() {
 
   // false during SSR/hydration, true after: avoids a dark-material flash on a light theme.
   const mounted = useSyncExternalStore(
-    subscribe,
+    subscribeMounted,
     getClientSnapshot,
     getServerSnapshot,
   );
+  const phone = useSyncExternalStore(subscribePhone, getPhone, getPhoneServer);
+  const introSeen = useSyncExternalStore(
+    subscribeIntroSeen,
+    getIntroSeen,
+    getIntroSeenServer,
+  );
+  const compactIntro = phone && introSeen;
   // Dark until mounted, so the server HTML and the hydration render agree; the
   // post-mount render then patches the light colours (React 19 does not patch
   // mismatched attributes during hydration).
@@ -194,30 +210,29 @@ export default function Home() {
 
   return (
     <main className="relative h-full w-full overflow-hidden border-0 p-0">
-      <h1 className="sr-only">StrikeHike Universal Chrono-Spatial Engine</h1>
+      <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} />
 
-      <Canvas3D
-        isDark={isDark}
-        mounted={mounted}
-        onIntroComplete={handleIntroComplete}
-        regimeTone={regimeTone}
-      />
-
+      <HomeIntro compact={compactIntro} />
       <RegimeOverlaySync />
-      <EnergyGauge isDark={isDark} />
+      <EnergyGauge isDark={isDark} homeIntro compactIntro={compactIntro} />
       <Tooltip />
       {/* Before the tray in DOM order: forward Tab reaches the dock before the
           tray's focus-expansion hides it. */}
       <MobileDock />
       <TimeControls />
-      <FilterControls />
-      <FutureLadder />
+      <div
+        data-home-left-column
+        className="contents lg:fixed lg:bottom-20 lg:left-5 lg:z-30 lg:flex lg:w-[min(18rem,calc(100vw-1.5rem))] lg:flex-col lg:gap-2 lg:top-[23.5rem] xl:top-[21rem]"
+      >
+        <FilterControls />
+        <FutureLadder />
+      </div>
       <RightPanel />
       <ViewControls />
       <InfoModule />
       <FeedbackModule />
       <SponsorModule />
-      <OnboardingOverlay introComplete={introDone} />
+      <OnboardingOverlay />
       <DateChangeAnnouncer />
     </main>
   );

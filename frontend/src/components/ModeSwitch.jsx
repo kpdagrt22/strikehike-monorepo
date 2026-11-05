@@ -2,27 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useMounted } from "@/hooks/useMounted";
 import { useChronoStore } from "@/store/chronoStore";
 
-// The four engine views in nav order; "short" is the label where room is
-// short (the phone cue, the header's row below lg). "rowShort" is for the
-// row only: the cue is labelled "{label}, StrikeHike navigation", so the
-// words it shows must be words of its label (WCAG 2.5.3), and "Conv." is not.
-const VIEWS = [
+// The five views in nav order.
+export const VIEWS = [
   { href: "/", label: "Orrery", prefetch: false },
   { href: "/regime", label: "Regime" },
-  { href: "/convergence", label: "Convergence", rowShort: "Conv." },
-  { href: "/patterns", label: "Study of Patterns", short: "Patterns" },
+  { href: "/convergence", label: "Convergence" },
+  { href: "/patterns", label: "Patterns" },
+  { href: "/upcoming", label: "Upcoming" },
 ];
 
-// Pages outside the four views: the cue names the page and no view is active.
-const PAGES = [
-  { href: "/upcoming", label: "Upcoming dates" },
-  { href: "/disclaimer", label: "Disclaimer" },
-];
+// Pages outside the five views: only the menu carries these.
+const PAGES = [{ href: "/disclaimer", label: "Disclaimer" }];
 
-// The view (or page) a pathname belongs to; anything else outside the three
-// data views is the Orrery.
+// The view (or page) a pathname belongs to; anything else outside the five
+// views is the Orrery.
 export function viewForPath(pathname) {
   return (
     [...VIEWS, ...PAGES].find(
@@ -33,40 +30,55 @@ export function viewForPath(pathname) {
   );
 }
 
-// The header's views: a short list of 44 px rows under the cue, or one row
-// in the top line (a mouse with room beside the brand). The header's panel
-// draws the glass and owns the pointer events.
 const LAYOUT = {
   list: {
     nav: "flex flex-col gap-0.5",
-    tab: "flex h-11 items-center gap-2.5 rounded-xl px-3.5",
+    tab: "flex min-h-11 items-center gap-2.5 rounded-xl px-3.5 text-micro tracking-[0.1em]",
   },
   row: {
-    nav: "flex items-center",
-    tab: "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 lg:px-3",
+    nav: "flex items-center gap-0.5",
+    // The five full labels share the top line with the brand and the menu.
+    // Below lg they step down one size so 640 px still clears both.
+    tab: "inline-flex min-h-11 items-center rounded-full px-0 text-[0.6875rem] tracking-[0.06em] lg:px-3 lg:text-micro lg:tracking-[0.1em]",
+  },
+  scroll: {
+    nav: "flex items-center gap-1 overflow-x-auto px-3 [mask-image:linear-gradient(to_right,transparent,#000_1rem,#000_calc(100%_-_2rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+    tab: "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-2.5 text-micro tracking-[0.1em]",
   },
 };
 
 function tabClass(active, layout) {
   return [
-    layout.tab,
-    "text-micro font-medium uppercase tracking-[0.1em] transition-colors duration-(--sh-dur-micro)",
+    LAYOUT[layout]?.tab ?? LAYOUT.list.tab,
+    "font-medium uppercase transition-colors duration-(--sh-dur-micro)",
     active
-      ? "bg-[#f05d49]/15 text-[#c0442f] dark:bg-[#f05d49]/20 dark:text-[#ff8b77]"
-      : "text-black/60 hover:bg-black/[0.04] hover:text-black/80 focus-visible:bg-black/[0.04] focus-visible:text-black/80 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/80 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/80",
+      ? "bg-(--sh-selected) text-(--sh-text-1)"
+      : "text-(--sh-text-2) hover:bg-(--sh-hover) hover:text-(--sh-text-1) focus-visible:bg-(--sh-hover) focus-visible:text-(--sh-text-1)",
   ].join(" ");
 }
 
 export function ModeSwitch({ layout = "list", onNavigate }) {
   const pathname = usePathname();
   const focusedDate = useChronoStore((state) => state.focusedDate);
+  const mounted = useMounted();
   const current = viewForPath(pathname);
-  const row = layout === "row";
-  const classes = LAYOUT[layout] ?? LAYOUT.list;
-  const dateQuery = focusedDate ? `?d=${encodeURIComponent(focusedDate)}` : "";
+  const navRef = useRef(null);
+  const dateQuery =
+    mounted && focusedDate ? `?d=${encodeURIComponent(focusedDate)}` : "";
+
+  useEffect(() => {
+    if (layout !== "scroll") return;
+    navRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [layout, pathname]);
 
   return (
-    <nav aria-label="Engine views" className={classes.nav}>
+    <nav
+      ref={navRef}
+      aria-label="Engine views"
+      className={LAYOUT[layout]?.nav ?? LAYOUT.list.nav}
+    >
       {VIEWS.map((view) => {
         const active = view === current;
         return (
@@ -76,29 +88,50 @@ export function ModeSwitch({ layout = "list", onNavigate }) {
             prefetch={view.prefetch}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            className={tabClass(active, classes)}
+            className={tabClass(active, layout)}
           >
-            <span
-              className={`h-1 w-1 shrink-0 rounded-full ${
-                active ? "bg-current" : "bg-black/20 dark:bg-white/20"
-              }`}
-              aria-hidden="true"
-            />
-            {/* The row shows the short label until lg; the full one stays
-                the link's name. */}
-            {row && (view.rowShort ?? view.short) ? (
-              <>
-                <span aria-hidden="true" className="lg:hidden">
-                  {view.rowShort ?? view.short}
-                </span>
-                <span className="sr-only lg:not-sr-only">{view.label}</span>
-              </>
-            ) : (
-              view.label
-            )}
+            {layout === "list" ? (
+              <span
+                className={`h-1 w-1 shrink-0 rounded-full ${
+                  active ? "bg-current" : "bg-(--sh-text-4)"
+                }`}
+                aria-hidden="true"
+              />
+            ) : null}
+            {view.label}
           </Link>
         );
       })}
+
+      {layout === "list" ? (
+        <>
+          <span
+            aria-hidden="true"
+            className="my-1 h-px bg-(--sh-line-1)"
+          />
+          {PAGES.map((view) => {
+            const active = view === current;
+            return (
+              <Link
+                key={view.href}
+                href={`${view.href}${dateQuery}`}
+                prefetch={false}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={tabClass(active, "list")}
+              >
+                <span
+                  className={`h-1 w-1 shrink-0 rounded-full ${
+                    active ? "bg-current" : "bg-(--sh-text-4)"
+                  }`}
+                  aria-hidden="true"
+                />
+                {view.label}
+              </Link>
+            );
+          })}
+        </>
+      ) : null}
     </nav>
   );
 }

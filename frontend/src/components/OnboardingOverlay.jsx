@@ -1,135 +1,85 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { onboardingDismissed } from "@/lib/analytics/events";
-import { DUR, EASE } from "@/lib/motion";
+import { useMounted } from "@/hooks/useMounted";
 
 const STORAGE_KEY = "hasSeenIntro";
+const subscribe = () => () => {};
 
-const GUIDE = [
-  {
-    label: "Hover or tap a planet to reveal its data",
-    icon: (
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
-    ),
-  },
-  {
-    label: "Drag the timeline to travel through history",
-    icon: <path d="M4 12h16M7 8l-4 4 4 4M17 8l4 4-4 4" />,
-  },
-  {
-    label: "Rotate the cosmos to explore",
-    icon: (
-      <>
-        <ellipse cx="12" cy="12" rx="9" ry="4.5" />
-        <circle cx="12" cy="12" r="2" />
-      </>
-    ),
-  },
-];
+function hasSeen() {
+  try {
+    return Boolean(window.localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
 
-export function OnboardingOverlay({ introComplete = false }) {
-  const [hasSeenIntro, setHasSeenIntro] = useState(() => {
+const serverHasSeen = () => false;
+
+/**
+ * One first-visit hint, in place of the old multi-step modal. It does not block
+ * the scene and never returns once dismissed in this browser.
+ */
+export function OnboardingOverlay() {
+  const mounted = useMounted();
+  const seen = useSyncExternalStore(subscribe, hasSeen, serverHasSeen);
+  const [dismissed, setDismissed] = useState(false);
+  // Render nothing until the browser has read storage: the server cannot know
+  // whether this is a returning visit, so showing the hint in the HTML would
+  // flash it once per load for people who already dismissed it.
+  const visible = mounted && !seen && !dismissed;
+
+  const close = useCallback((method) => {
     try {
-      return (
-        typeof window !== "undefined" &&
-        Boolean(localStorage.getItem(STORAGE_KEY))
-      );
+      window.localStorage.setItem(STORAGE_KEY, "1");
     } catch {
-      return false;
+      // Storage can be unavailable in privacy modes; the hint still closes.
     }
-  });
+    onboardingDismissed(method);
+    window.dispatchEvent(new Event("strikehike:intro-dismissed"));
+    setDismissed(true);
+  }, []);
 
-  const visible = introComplete && !hasSeenIntro;
-  const dialogRef = useRef(null);
-  const enterRef = useRef(null);
+  useEffect(() => {
+    if (!visible) return undefined;
+    const onKey = (event) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      close("escape");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible, close]);
 
-  const enter = (method = "enter") => {
-    try {
-      localStorage.setItem(STORAGE_KEY, "1");
-    } catch {
-      // Storage can be unavailable in privacy modes; the overlay still closes.
-    }
-    onboardingDismissed(method === "escape" ? "escape" : "enter");
-    setHasSeenIntro(true);
-  };
-
-  // Escape is the same as Enter: the visitor has seen the note.
-  useDialogFocus(visible, {
-    containerRef: dialogRef,
-    initialFocusRef: enterRef,
-    onClose: (method) => enter(method || "escape"),
-  });
+  if (!visible) return null;
 
   return (
-    <AnimatePresence>
-      {visible ? (
-        <motion.div
-          className="fixed inset-0 z-[90] grid place-items-center bg-[#e3dbcf]/45 p-4 backdrop-blur-[2px] dark:bg-black/25"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: DUR.backdrop, ease: EASE.out }}
+    <div
+      data-home-hint
+      className="pointer-events-auto fixed bottom-[8.5rem] left-1/2 z-40 flex w-[calc(100vw-8rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-(--sh-line-1) bg-(--sh-surface-overlay) py-1.5 pl-4 pr-1.5 text-meta leading-snug text-(--sh-text-2) shadow-(--sh-shadow-float) backdrop-blur-xl sm:bottom-24 sm:w-[21rem]"
+    >
+      <p className="min-w-0 flex-1">
+        Drag to turn the sky. Pick any date on the timeline below.
+      </p>
+      <button
+        type="button"
+        onClick={() => close("enter")}
+        aria-label="Dismiss hint"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) hover:text-(--sh-text-1) focus-visible:bg-(--sh-hover) focus-visible:text-(--sh-text-1)"
+      >
+        <svg
+          viewBox="0 0 16 16"
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          aria-hidden="true"
         >
-          <motion.section
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="onboarding-title"
-            initial={{ opacity: 0, y: 18, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ duration: DUR.modal, ease: EASE.out }}
-            className="w-full max-w-md overflow-hidden rounded-[1.75rem] border border-black/[0.08] bg-white/85 p-7 text-[#14121a] shadow-[0_30px_100px_rgba(20,18,26,0.22)] backdrop-blur-2xl dark:border-white/15 dark:bg-black/45 dark:text-[#f2ede4] dark:shadow-[0_30px_100px_rgba(0,0,0,0.6)]"
-          >
-            <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
-              StrikeHike · First Contact
-            </p>
-            <h2
-              id="onboarding-title"
-              className="mt-3 max-w-sm text-[26px] font-light leading-[1.1] tracking-[-0.04em] sm:text-[30px]"
-            >
-              Welcome to the Universal Chrono-Spatial Engine.
-            </h2>
-
-            <div className="mt-7 space-y-4">
-              {GUIDE.map((item) => (
-                <div key={item.label} className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-black/10 bg-black/[0.035] dark:border-white/15 dark:bg-white/[0.06]">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-3.5 w-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.25"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      {item.icon}
-                    </svg>
-                  </span>
-                  <p className="text-[14px] leading-relaxed text-black/70 dark:text-white/70 lg:text-[15px]">
-                    {item.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <button
-              ref={enterRef}
-              type="button"
-              autoFocus
-              onClick={() => enter("enter")}
-              className="mt-8 min-h-11 w-full rounded-full border border-black/10 bg-[#14121a] px-5 py-3 text-meta font-medium uppercase tracking-[0.18em] text-white transition-colors hover:bg-black dark:border-white/10 dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-white"
-            >
-              Enter
-            </button>
-          </motion.section>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+          <path d="M4 4l8 8M12 4l-8 8" />
+        </svg>
+      </button>
+    </div>
   );
 }

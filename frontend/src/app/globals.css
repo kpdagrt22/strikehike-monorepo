@@ -101,6 +101,13 @@
   }
 }
 
+/* The phone's always-visible view row sits between the brand and the page. */
+@media (max-width: 639.98px) {
+  :root {
+    --sh-header-clear: 7.5rem;
+  }
+}
+
 .dark {
   --sh-signal-ink: #ff8b77;
   --sh-text-1: rgb(242 237 228 / 0.92);

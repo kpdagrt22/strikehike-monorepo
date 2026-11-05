@@ -92,20 +92,26 @@ function Tongue({ item, color, scale = 1, opacity = 1 }) {
   );
 }
 
-export function GaugeAura({ score, isDark = true, paused = false }) {
+export function GaugeAura({
+  score,
+  isDark = true,
+  paused = false,
+  compact = false,
+}) {
   const tier = auraTier(score);
   if (!tier) return null;
   const colors = isDark ? PALETTE.dark : PALETTE.light;
   // Rendered only once a score has arrived (client side), so this is safe.
-  const compact =
+  const compactTongues =
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 639.98px)").matches;
+  const box = compact ? 160 : BOX;
 
   return (
     <div
       aria-hidden="true"
       className="sh-aura pointer-events-none absolute left-1/2 top-1/2"
-      style={{ width: BOX, height: BOX, marginLeft: -BOX / 2, marginTop: -BOX / 2 }}
+      style={{ width: box, height: box, marginLeft: -box / 2, marginTop: -box / 2 }}
       data-tier={tier}
       data-paused={paused ? "true" : undefined}
     >
@@ -124,7 +130,7 @@ export function GaugeAura({ score, isDark = true, paused = false }) {
         />
 
         {LAYERS[tier].map((layer) =>
-          tongues(layer, compact).map((item) => (
+          tongues(layer, compactTongues).map((item) => (
             <Tongue
               key={item.key}
               item={item}
@@ -157,7 +163,7 @@ export function GaugeAura({ score, isDark = true, paused = false }) {
                   animationDelay: `${-index * 0.37}s`,
                   animationDuration: `${1.8 + (index % 3) * 0.4}s`,
                   "--sh-ember-dx": `${(index - 3) * 2}px`,
-                  "--sh-ember-rise": compact ? "-20px" : "-30px",
+                  "--sh-ember-rise": compactTongues ? "-20px" : "-30px",
                 }}
               />
             ))}

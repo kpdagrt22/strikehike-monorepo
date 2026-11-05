@@ -96,6 +96,15 @@ export function FutureLadder() {
     announcedDeepLink.current = true;
     if (deepLinked) upcomingOpened("deep_link");
   }, [deepLinked, view]);
+
+  useEffect(() => {
+    const selectUpcoming = (event) => {
+      if (event.detail === "upcoming") setViewChoice("upcoming");
+    };
+    window.addEventListener("strikehike:ladder-view", selectUpcoming);
+    return () =>
+      window.removeEventListener("strikehike:ladder-view", selectUpcoming);
+  }, []);
   const sheetRef = useRef(null);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const activeEventCategory = useChronoStore(
@@ -157,15 +166,16 @@ export function FutureLadder() {
         mobileSheet === "future"
           ? "animate-sheet-up fixed inset-x-3 bottom-[8.5rem] z-50 block max-h-[70dvh] overflow-y-auto"
           : "hidden"
-      } pointer-events-auto lg:fixed lg:left-5 lg:top-[23.5rem] lg:z-30 ${
-        activeEventCategory ? "lg:hidden" : "lg:block"
-      } lg:w-[min(18rem,calc(100vw-1.5rem))] lg:max-h-none lg:overflow-visible`}
+      } pointer-events-auto lg:static lg:z-auto ${
+        activeEventCategory ? "lg:hidden" : "lg:flex"
+      } lg:min-h-[12rem] lg:flex-1 lg:flex-col lg:w-full lg:max-h-none lg:overflow-visible`}
     >
       <div
         id="chrono-ladder-sheet"
-        className="overflow-hidden rounded-2xl border border-black/10 bg-white/92 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:bg-white/35 lg:dark:bg-black/25"
+        data-home-ladder
+        className="overflow-hidden rounded-2xl border border-black/10 bg-white/92 shadow-[0_18px_60px_rgba(20,18,26,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgb(11_11_18/0.92)] dark:shadow-[0_18px_60px_rgba(0,0,0,0.5)] lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:bg-white/35 lg:dark:bg-black/25"
       >
-        <div className="flex items-start justify-between gap-2 border-b border-black/10 px-4 py-3.5 dark:border-white/10">
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-black/10 px-4 py-3.5 dark:border-white/10">
           <div>
             <h2
               id="chrono-ladder-title"
@@ -174,7 +184,7 @@ export function FutureLadder() {
             >
               {view === "sky" ? "Sky ladder" : "Upcoming"}
             </h2>
-            <p className="mt-1 text-meta text-black/60 dark:text-white/60">
+            <p className="mt-1 text-meta text-black/60 dark:text-white/60 lg:text-[11px] lg:leading-snug">
               {view === "sky"
                 ? "Dates ahead whose sky resembles a past event"
                 : "Real scheduled events · next 12 months"}
@@ -213,7 +223,7 @@ export function FutureLadder() {
         <div
           role="group"
           aria-label="Events view"
-          className="flex items-center gap-1 border-b border-black/10 px-3 py-2 dark:border-white/10"
+          className="flex shrink-0 items-center gap-1 border-b border-black/10 px-3 py-2 dark:border-white/10"
         >
           <button
             type="button"
@@ -245,7 +255,7 @@ export function FutureLadder() {
 
         <div
           id="chrono-ladder-content"
-          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-[max(6rem,min(26rem,calc(100dvh-40.5rem)))]"
+          className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-none lg:min-h-0 lg:flex-1 lg:pt-0 lg:pb-0"
         >
           {view === "upcoming" ? (
             <UpcomingEvents />
@@ -331,7 +341,10 @@ export function FutureLadder() {
         {/* The definition stays visible: an explanation of what a number
             means is never hidden behind a gesture. */}
         {view === "sky" && !error && matches.length > 0 ? (
-          <p className="border-t border-(--sh-line-1) px-4 pt-2.5 pb-3 text-micro leading-relaxed text-(--sh-text-3)">
+          <p
+            data-ladder-footnote
+            className="shrink-0 border-t border-(--sh-line-1) px-4 pt-2.5 pb-3 text-micro leading-relaxed text-(--sh-text-3)"
+          >
             {GEOMETRY_MATCH_FOOTNOTE}
           </p>
         ) : null}
