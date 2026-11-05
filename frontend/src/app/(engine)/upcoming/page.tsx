@@ -33,6 +33,17 @@ export const metadata: Metadata = {
 };
 
 const VISIBLE_SLUGS = new Set(["science", "finance", "culture-religion"]);
+const DATE_LABEL = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function lastDateLabel(value: string | undefined) {
+  if (!value) return "";
+  return DATE_LABEL.format(new Date(`${value}T00:00:00Z`));
+}
 
 function parseFilter(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value.join(",") : value ?? "";
@@ -102,6 +113,8 @@ function ThemeSection({ theme }: { theme: OrderedTheme }) {
   const events = theme.data.events ?? [];
   const first = events.slice(0, 5);
   const rest = events.slice(5);
+  const more = Math.max(0, theme.available - events.length);
+  const last = events[events.length - 1];
   const headingId = `upcoming-${theme.slug}`;
   return (
     <section
@@ -114,7 +127,7 @@ function ThemeSection({ theme }: { theme: OrderedTheme }) {
           className="text-strong font-semibold tracking-[-0.02em] text-(--sh-text-1)"
         >
           {theme.name}{" "}
-          <span className="font-normal text-(--sh-text-3)">({theme.count})</span>
+          <span className="font-normal text-(--sh-text-3)">({events.length})</span>
         </h2>
         <SubscribeControl scope={theme.slug} />
       </div>
@@ -146,6 +159,20 @@ function ThemeSection({ theme }: { theme: OrderedTheme }) {
             ))}
           </ul>
         </details>
+      ) : null}
+
+      {more > 0 && last ? (
+        <p className="mt-2 text-micro leading-relaxed text-(--sh-text-3)">
+          {more} more {more === 1 ? "date" : "dates"} after{" "}
+          {lastDateLabel(last.start_date)} are in the{" "}
+          <Link
+            href={`/calendar/${theme.slug}.ics`}
+            className="inline-flex min-h-11 items-center underline decoration-current/30 underline-offset-2 hover:decoration-current focus-visible:decoration-current sm:min-h-0"
+          >
+            calendar feed
+          </Link>
+          .
+        </p>
       ) : null}
     </section>
   );

@@ -113,7 +113,7 @@ def get_upcoming(
         None,
         description="Comma-separated theme names; omit for all five.",
     ),
-    limit_per_theme: int = Query(5, ge=1, le=50),
+    limit_per_theme: int = Query(5, ge=1, le=100),
     horizon_days: int = Query(365, ge=1, le=730),
     bundle_dir: Path | None = Depends(get_active_bundle),
     today: date = Depends(get_today),

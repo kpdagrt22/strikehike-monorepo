@@ -235,7 +235,7 @@ export interface UpcomingPayload {
 
 export const getUpcoming = cache(async (): Promise<UpcomingPayload | null> => {
   const payload = await getJson(
-    "/api/v1/events/upcoming?limit_per_theme=50&horizon_days=365",
+    "/api/v1/events/upcoming?limit_per_theme=100&horizon_days=365",
   );
   if (!payload) return null;
   if (!payload.themes || typeof payload.themes !== "object") {

@@ -24,7 +24,7 @@ CALENDAR_STATUSES = (
     EventStatus.RESCHEDULED.value,
     EventStatus.CANCELLED.value,
 )
-MAX_LIMIT_PER_THEME = 50
+MAX_LIMIT_PER_THEME = 100
 
 # The pointer format is deliberately simple: a small text file named
 # ``current`` containing a bundle directory (absolute, relative to the runtime

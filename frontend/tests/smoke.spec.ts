@@ -82,6 +82,23 @@ test.describe("upcoming calendar", () => {
     await expect(download).toHaveAttribute("href", /\/calendar\/all\.ics$/);
   });
 
+  test("the count matches the listed events and Show all reveals the rest", async ({
+    page,
+    request,
+  }) => {
+    await waitForUpcoming(request);
+    await page.goto("/upcoming", { waitUntil: "networkidle" });
+    const heading = page.getByRole("heading", { level: 2, name: /^Finance/ });
+    await expect(heading).toContainText("Finance (62)");
+    const section = page.locator("section").filter({ has: heading });
+    await expect(section.locator("li:visible")).toHaveCount(5);
+    const details = section.locator("details");
+    await expect(details.locator("summary")).toContainText("Show all 62");
+    await details.locator("summary").click();
+    await expect(details).toHaveJSProperty("open", true);
+    await expect(section.locator("li:visible")).toHaveCount(62);
+  });
+
   test("the finance feed is a calendar", async ({ request }) => {
     const response = await request.get("/calendar/finance.ics");
     expect(response.status()).toBe(200);

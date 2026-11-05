@@ -273,8 +273,8 @@ def test_unknown_theme_and_out_of_range_params_are_422(client, tmp_path, monkeyp
     monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(_make_runtime(tmp_path, _events())))
     assert client.get("/api/v1/events/upcoming?themes=Astrology").status_code == 422
     assert client.get("/api/v1/events/upcoming?limit_per_theme=0").status_code == 422
-    assert client.get("/api/v1/events/upcoming?limit_per_theme=50").status_code == 200
-    assert client.get("/api/v1/events/upcoming?limit_per_theme=51").status_code == 422
+    assert client.get("/api/v1/events/upcoming?limit_per_theme=100").status_code == 200
+    assert client.get("/api/v1/events/upcoming?limit_per_theme=101").status_code == 422
     assert client.get("/api/v1/events/upcoming?horizon_days=0").status_code == 422
     assert client.get("/api/v1/events/upcoming?horizon_days=731").status_code == 422
 

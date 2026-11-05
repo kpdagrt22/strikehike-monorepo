@@ -126,8 +126,8 @@ def test_upcoming_by_theme_caps_the_limit_and_respects_the_horizon(tmp_path):
     db = _db(tmp_path)
     limited = upcoming_by_theme(db, ["Science"], 1, today=TODAY)
     assert len(limited["Science"]) == 1
-    capped = upcoming_by_theme(db, ["Science"], 99, today=TODAY)
-    assert len(capped["Science"]) <= 50
+    capped = upcoming_by_theme(db, ["Science"], 999, today=TODAY)
+    assert len(capped["Science"]) <= 100
     far = upcoming_by_theme(db, ["Finance"], 5, today=TODAY, horizon_days=400)
     assert [event["event_id"] for event in far["Finance"]] == ["finance:test:far"]
     near = upcoming_by_theme(db, ["Finance"], 5, today=TODAY, horizon_days=365)
@@ -142,19 +142,19 @@ def test_upcoming_by_theme_accepts_a_theme_filter_and_rejects_unknown(tmp_path):
         upcoming_by_theme(db, ["Astrology"], 5, today=TODAY)
 
 
-def test_upcoming_by_theme_caps_at_fifty(tmp_path):
+def test_upcoming_by_theme_caps_at_one_hundred(tmp_path):
     events = [
         build_event(
             event_id=f"science:test:{index}",
             name=f"Event {index}",
             theme=Theme.SCIENCE,
-            start_date=TODAY + timedelta(days=index % 50),
+            start_date=TODAY + timedelta(days=index % 100),
         )
-        for index in range(55)
+        for index in range(105)
     ]
     artifact = write_dataset(tmp_path / "many", events, today=TODAY)
-    result = upcoming_by_theme(artifact.sqlite_path, ["Science"], 99, today=TODAY)
-    assert len(result["Science"]) == 50
+    result = upcoming_by_theme(artifact.sqlite_path, ["Science"], 999, today=TODAY)
+    assert len(result["Science"]) == 100
 
 
 def test_the_connection_is_read_only(tmp_path):
