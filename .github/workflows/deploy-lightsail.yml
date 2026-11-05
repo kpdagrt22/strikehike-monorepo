@@ -140,24 +140,42 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-minimal.txt
 
-      - name: Build frontend
-        run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
-          TURBO_TELEMETRY_DISABLED: "1"
-          NEXT_PUBLIC_ANALYTICS_ENABLED: "1"
-          NEXT_PUBLIC_BUILD_SHA: "smoke01"
+      - name: Prepare a smoke events bundle
+        working-directory: backend
+        run: |
+          PYTHONPATH="src:." python - <<'PY'
+          from datetime import datetime, timezone
+          from pathlib import Path
 
-      - name: Start the stack and run the smoke tests
+          from astro_finance.events.pipeline import PipelineOptions, run_pipeline
+
+          now = datetime.now(timezone.utc)
+          result = run_pipeline(
+              PipelineOptions(
+                  out_dir=Path("/tmp/smoke-events-build"),
+                  offline_dir=Path("tests/events/fixtures/offline"),
+                  now=now,
+                  created_at=now,
+                  execution_id="smoke-bundle",
+              )
+          )
+          runtime = Path("/tmp/smoke-events")
+          runtime.mkdir(parents=True, exist_ok=True)
+          (runtime / "current").write_text(
+              str(result.bundle_dir) + "\n", encoding="utf-8"
+          )
+          print(f"smoke bundle: {result.bundle_dir} ({result.bundle_version})")
+          PY
+
+      - name: Start the smoke backend
+        working-directory: backend
         run: |
           set -euo pipefail
-          (
-            cd ../backend
-            PYTHONPATH="src:." LOAD_ML_MODELS=0 \
-              ANALYTICS_INGEST_ENABLED=1 ANALYTICS_DB=/tmp/smoke-analytics.sqlite \
-              nohup uvicorn api_server:app --host 127.0.0.1 --port 8010 \
-              > /tmp/backend.log 2>&1 &
-          )
+          PYTHONPATH="src:." LOAD_ML_MODELS=0 \
+            ANALYTICS_INGEST_ENABLED=1 ANALYTICS_DB=/tmp/smoke-analytics.sqlite \
+            EVENTS_RUNTIME_DIR=/tmp/smoke-events \
+            nohup uvicorn api_server:app --host 127.0.0.1 --port 8010 \
+            > /tmp/backend.log 2>&1 &
           for attempt in $(seq 1 60); do
             if curl --fail --silent --show-error http://127.0.0.1:8010/health > /dev/null; then
               break
@@ -168,6 +186,19 @@ jobs:
             fi
             sleep 2
           done
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          CHRONO_API_URL: "http://127.0.0.1:8010"
+          NEXT_TELEMETRY_DISABLED: "1"
+          TURBO_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "1"
+          NEXT_PUBLIC_BUILD_SHA: "smoke01"
+
+      - name: Start the frontend and run the smoke tests
+        run: |
+          set -euo pipefail
           CHRONO_API_URL=http://127.0.0.1:8010 PORT=3000 HOSTNAME=127.0.0.1 \
             nohup npm run start > /tmp/frontend.log 2>&1 &
           for attempt in $(seq 1 60); do
@@ -236,6 +267,7 @@ jobs:
             git pull --ff-only origin main
 
             MARKER="NBER recession windows from FRED"
+            UPCOMING_MARKER="Employment Situation"
             BASE_URL="https://strikehike.com"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
 
@@ -378,6 +410,23 @@ jobs:
               return 1
             }
 
+            probe_upcoming_page() {
+              page="$(mktemp)"
+              for attempt in $(seq 1 30); do
+                if "${CURL[@]}" "$BASE_URL/upcoming" -o "$page" \
+                  && grep -qF "$UPCOMING_MARKER" "$page"; then
+                  rm -f "$page"
+                  return 0
+                fi
+                if [ "$attempt" -eq 30 ]; then
+                  rm -f "$page"
+                  return 1
+                fi
+                sleep 3
+              done
+              return 1
+            }
+
             probe_chrono() {
               "${CURL[@]}" "$BASE_URL/api/chrono/positions?date=2008-09-15" > /dev/null
             }
@@ -394,7 +443,8 @@ jobs:
               probe_atlas \
                 && probe_upcoming \
                 && probe_home \
-                && probe_regime
+                && probe_regime \
+                && probe_upcoming_page
             }
 
             run_probes() {
@@ -403,7 +453,8 @@ jobs:
                 && probe_chrono \
                 && probe_atlas \
                 && probe_home \
-                && probe_regime
+                && probe_regime \
+                && probe_upcoming_page
             }
 
             show_caddy_logs() {

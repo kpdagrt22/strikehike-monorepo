@@ -7,6 +7,7 @@ const ROUTES = [
   { path: "/convergence", texts: ["Two events. One macro lens."] },
   { path: "/patterns", texts: ["The 120-year mirror."] },
   { path: "/disclaimer", texts: ["not registered with SEBI"] },
+  { path: "/upcoming", texts: ["Upcoming dates"] },
 ];
 
 for (const route of ROUTES) {
@@ -47,6 +48,53 @@ for (const route of ROUTES) {
     expect(usagePosts).toEqual([]);
   });
 }
+
+async function waitForUpcoming(request: {
+  get: (url: string) => Promise<{ text: () => Promise<string> }>;
+}) {
+  await expect
+    .poll(async () => (await request.get("/upcoming")).text(), {
+      timeout: 60_000,
+      intervals: [1_000, 2_000, 3_000],
+    })
+    .toContain("Employment Situation");
+}
+
+test.describe("upcoming calendar", () => {
+  test("the server HTML carries events without JavaScript", async ({ request }) => {
+    await waitForUpcoming(request);
+    const response = await request.get("/upcoming");
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain("Employment Situation");
+  });
+
+  test("Show all opens and a subscribe link points at the feed", async ({ page, request }) => {
+    await waitForUpcoming(request);
+    await page.goto("/upcoming", { waitUntil: "domcontentloaded" });
+    const details = page.locator("details").filter({ hasText: "Show all" }).first();
+    await expect(details).toBeVisible();
+    await details.locator("summary").click();
+    await expect(details).toHaveJSProperty("open", true);
+
+    await page.getByRole("button", { name: "Subscribe to all" }).click();
+    const download = page.getByRole("link", { name: "Download .ics" });
+    await expect(download).toBeVisible();
+    await expect(download).toHaveAttribute("href", /\/calendar\/all\.ics$/);
+  });
+
+  test("the finance feed is a calendar", async ({ request }) => {
+    const response = await request.get("/calendar/finance.ics");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("text/calendar");
+    expect(await response.text()).toContain("BEGIN:VCALENDAR\r\n");
+    const etag = response.headers()["etag"];
+    expect(etag).toBeTruthy();
+    const cached = await request.get("/calendar/finance.ics", {
+      headers: { "if-none-match": etag },
+    });
+    expect(cached.status()).toBe(304);
+  });
+});
 
 test.describe("first-party measurement", () => {
   test.use({
@@ -135,6 +183,59 @@ test.describe("first-party measurement", () => {
     await page.goto("/patterns", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(6_000);
     expect(posts.length).toBe(before);
+  });
+});
+
+// Review screenshots (uploaded by CI as an artifact): /upcoming in both
+// themes at desktop and phone width, and its Subscribe menu on a phone.
+test.describe("upcoming review screenshots", () => {
+  for (const scheme of ["dark", "light"] as const) {
+    for (const [label, width, height] of [
+      ["desktop", 1440, 900],
+      ["phone", 390, 844],
+    ] as const) {
+      test(`/upcoming ${scheme} ${label}`, async ({ page, request }) => {
+        await waitForUpcoming(request);
+        await page.addInitScript((theme) => {
+          localStorage.setItem("strikehike-theme", theme);
+        }, scheme);
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.setViewportSize({ width, height });
+        await page.goto("/upcoming", { waitUntil: "networkidle" });
+        // The engine layout scrolls inside <main>; let the screenshot show the
+        // whole page instead of one viewport.
+        await page.evaluate(() => {
+          const main = document.querySelector("main");
+          if (!main) return;
+          main.style.height = "auto";
+          main.style.overflow = "visible";
+          const shell = main.parentElement;
+          if (shell) {
+            shell.style.height = "auto";
+            shell.style.overflow = "visible";
+          }
+          document.documentElement.style.height = "auto";
+          document.body.style.height = "auto";
+          document.body.style.overflow = "visible";
+        });
+        await page.waitForTimeout(300);
+        await page.screenshot({
+          path: `smoke-screens/upcoming-${scheme}-${label}.png`,
+          fullPage: true,
+        });
+      });
+    }
+  }
+
+  test("opened Subscribe menu on phone", async ({ page, request }) => {
+    await waitForUpcoming(request);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/upcoming", { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Subscribe to all" }).click();
+    await expect(page.getByRole("link", { name: "Google Calendar" })).toBeVisible();
+    await page.screenshot({
+      path: "smoke-screens/upcoming-subscribe-phone.png",
+    });
   });
 });
 
