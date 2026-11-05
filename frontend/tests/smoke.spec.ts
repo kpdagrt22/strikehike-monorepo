@@ -123,3 +123,28 @@ test.describe("first-party measurement", () => {
     expect(posts.length).toBe(before);
   });
 });
+
+// Review screenshots (uploaded by CI as an artifact): the privacy switch in
+// both themes, at desktop and phone width.
+test.describe("review screenshots", () => {
+  for (const scheme of ["dark", "light"] as const) {
+    for (const [label, width, height] of [
+      ["desktop", 1440, 900],
+      ["phone", 390, 844],
+    ] as const) {
+      test(`/disclaimer privacy section, ${scheme} ${label}`, async ({ page }) => {
+        await page.addInitScript((theme) => {
+          localStorage.setItem("strikehike-theme", theme);
+        }, scheme);
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.setViewportSize({ width, height });
+        await page.goto("/disclaimer", { waitUntil: "domcontentloaded" });
+        const section = page.locator('section[aria-labelledby="privacy-measurement-heading"]');
+        await section.scrollIntoViewIfNeeded();
+        await expect(page.getByRole("switch", { name: "Count my visits" })).toBeEnabled();
+        await page.waitForTimeout(400);
+        await section.screenshot({ path: `smoke-screens/disclaimer-${scheme}-${label}.png` });
+      });
+    }
+  }
+});
