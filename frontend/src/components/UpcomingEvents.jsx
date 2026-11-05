@@ -193,7 +193,7 @@ export function UpcomingEvents() {
         ref={chipRowRef}
         role="group"
         aria-label="Filter upcoming events by theme"
-        className="flex items-center gap-1 overflow-x-auto py-2 [mask-image:linear-gradient(to_right,#000_calc(100%_-_2rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-center gap-1 overflow-x-auto py-2 [mask-image:linear-gradient(to_right,#000_calc(100%_-_2rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:flex-wrap max-sm:overflow-visible max-sm:[mask-image:none]"
       >
         <button
           type="button"

@@ -153,6 +153,9 @@ export function FilterControls() {
   const showLadder = () => {
     viewOpened("ladder_sheet", "tap");
     setActiveCategory(null);
+    window.dispatchEvent(
+      new CustomEvent("strikehike:ladder-view", { detail: "upcoming" }),
+    );
     setMobileSheet("future");
     // Focus follows the swap to the ladder sheet's matching control.
     requestAnimationFrame(() =>
@@ -287,7 +290,7 @@ export function FilterControls() {
                 onClick={showLadder}
                 className="h-11 rounded-full border border-black/10 px-3 text-micro font-medium uppercase tracking-[0.1em] text-black/60 dark:border-white/10 dark:text-white/60"
               >
-                Ladder
+                Upcoming
               </button>
               <button
                 type="button"

@@ -96,6 +96,15 @@ export function FutureLadder() {
     announcedDeepLink.current = true;
     if (deepLinked) upcomingOpened("deep_link");
   }, [deepLinked, view]);
+
+  useEffect(() => {
+    const selectUpcoming = (event) => {
+      if (event.detail === "upcoming") setViewChoice("upcoming");
+    };
+    window.addEventListener("strikehike:ladder-view", selectUpcoming);
+    return () =>
+      window.removeEventListener("strikehike:ladder-view", selectUpcoming);
+  }, []);
   const sheetRef = useRef(null);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const activeEventCategory = useChronoStore(
