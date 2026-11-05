@@ -197,8 +197,8 @@ export default async function UpcomingPage({
   return (
     <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24">
       <UpcomingPageTracker />
-      <div className="mx-auto w-full max-w-[1600px] px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
-        <header className="max-w-2xl">
+      <div className="w-full max-w-3xl px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
+        <header>
           <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
             Calendar
           </p>
