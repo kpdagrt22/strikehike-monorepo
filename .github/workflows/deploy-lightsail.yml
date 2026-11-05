@@ -61,6 +61,9 @@ jobs:
             tests/test_analytics_store.py \
             tests/test_analytics_api.py \
             tests/test_analytics_activation.py \
+            tests/test_analytics_serverlogs.py \
+            tests/test_analytics_weekly.py \
+            tests/test_caddy_snippet.py \
             -q
 
   test-frontend:
