@@ -48,6 +48,14 @@ export async function POST(request: Request) {
         "User-Agent": request.headers.get("user-agent") || "",
       },
     });
+    // 204 (stored) must go out with no body: `new Response("", {status: 204})`
+    // throws, which turned every stored message into a "Couldn't send".
+    if (response.status === 204) {
+      return new Response(null, {
+        status: 204,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     const text = await response.text();
     return new Response(text, {
       status: response.status,

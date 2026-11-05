@@ -162,3 +162,20 @@ test.describe("review screenshots", () => {
     }
   }
 });
+
+// Through the real Next route and backend (CI runs the backend with the
+// store enabled): a stored message answers 204, a link answers 422.
+test("feedback reaches the store through the Next route", async ({ request, baseURL }) => {
+  const headers = { Origin: new URL(baseURL ?? "http://127.0.0.1:3000").origin };
+  const ok = await request.post("/api/v1/feedback", {
+    headers,
+    data: { message: "Smoke test message", website: "", path: "/", app_version: "smoke01" },
+  });
+  expect(ok.status()).toBe(204);
+  const link = await request.post("/api/v1/feedback", {
+    headers,
+    data: { message: "see https://example.com", website: "", path: "/", app_version: "smoke01" },
+  });
+  expect(link.status()).toBe(422);
+  expect((await link.json()).detail).toBe("email_or_url");
+});
