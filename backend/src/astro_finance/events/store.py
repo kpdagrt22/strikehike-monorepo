@@ -18,7 +18,13 @@ from .models import (
 )
 
 UPCOMING_STATUSES = (EventStatus.SCHEDULED.value, EventStatus.TENTATIVE.value)
-MAX_LIMIT_PER_THEME = 20
+CALENDAR_STATUSES = (
+    EventStatus.SCHEDULED.value,
+    EventStatus.TENTATIVE.value,
+    EventStatus.RESCHEDULED.value,
+    EventStatus.CANCELLED.value,
+)
+MAX_LIMIT_PER_THEME = 100
 
 # The pointer format is deliberately simple: a small text file named
 # ``current`` containing a bundle directory (absolute, relative to the runtime
@@ -145,6 +151,54 @@ def upcoming_by_theme(
                     today.isoformat(),
                     horizon_end.isoformat(),
                     limit,
+                ),
+            ).fetchall()
+            result[theme.value] = [
+                _row_to_dict(row, today=today) for row in rows
+            ]
+    finally:
+        connection.close()
+    return result
+
+
+def calendar_by_theme(
+    db_path: Path,
+    themes: list[str] | None = None,
+    *,
+    today: date,
+    horizon_days: int = 365,
+) -> dict[str, list[dict[str, Any]]]:
+    """Every calendar event per theme: no display cap, cancelled dates kept."""
+
+    if not isinstance(db_path, Path):
+        db_path = Path(db_path)
+    horizon_end = today + timedelta(days=max(0, int(horizon_days)))
+    selected = _normalise_themes(themes)
+    result: dict[str, list[dict[str, Any]]] = {theme.value: [] for theme in selected}
+    connection = _read_only_connection(db_path)
+    try:
+        query = """
+            SELECT event_id, name, theme, kind, start_date, start_time, timezone,
+                   all_day, status, description, source_id, external_id,
+                   source_url, first_discovered_at, last_updated_at, collected_at,
+                   verification, supersedes, content_hash, days_until, missing_runs
+            FROM events
+            WHERE kind = ? AND theme = ?
+              AND status IN (?, ?, ?, ?)
+              AND start_date >= ? AND start_date <= ?
+            ORDER BY start_date ASC,
+                     COALESCE(start_time, '00:00:00') ASC,
+                     event_id ASC
+        """
+        for theme in selected:
+            rows = connection.execute(
+                query,
+                (
+                    EventKind.UPCOMING.value,
+                    theme.value,
+                    *CALENDAR_STATUSES,
+                    today.isoformat(),
+                    horizon_end.isoformat(),
                 ),
             ).fetchall()
             result[theme.value] = [

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import time, timedelta
+from datetime import date, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -26,7 +26,7 @@ def client():
 def _make_runtime(tmp_path: Path, events) -> Path:
     runtime = tmp_path / "runtime"
     bundle = runtime / "bundles" / "2026-11-03-test"
-    artifact = write_dataset(bundle, events, today=TODAY)
+    write_dataset(bundle, events, today=TODAY)
     (bundle / "manifest.json").write_text(
         json.dumps(
             {
@@ -210,11 +210,71 @@ def test_horizon_excludes_later_events(client, tmp_path, monkeypatch):
     assert payload["themes"]["Culture/Religion"]["events"] == []
 
 
+def test_start_utc_is_dst_correct_and_null_for_all_day(client, tmp_path, monkeypatch):
+    events = [
+        build_event(
+            event_id="science:test:est",
+            name="March before the change",
+            theme=Theme.SCIENCE,
+            start_date=date(2027, 3, 5),
+            all_day=False,
+            start_time=time(8, 30),
+            timezone_name="America/New_York",
+        ),
+        build_event(
+            event_id="science:test:edt",
+            name="March after the change",
+            theme=Theme.SCIENCE,
+            start_date=date(2027, 3, 15),
+            all_day=False,
+            start_time=time(8, 30),
+            timezone_name="America/New_York",
+        ),
+        build_event(
+            event_id="science:test:nov-edt",
+            name="November before the change",
+            theme=Theme.SCIENCE,
+            start_date=date(2027, 11, 1),
+            all_day=False,
+            start_time=time(8, 30),
+            timezone_name="America/New_York",
+        ),
+        build_event(
+            event_id="science:test:nov-est",
+            name="November after the change",
+            theme=Theme.SCIENCE,
+            start_date=date(2027, 11, 8),
+            all_day=False,
+            start_time=time(8, 30),
+            timezone_name="America/New_York",
+        ),
+        build_event(
+            event_id="science:test:all-day",
+            name="All-day event",
+            theme=Theme.SCIENCE,
+            start_date=date(2027, 3, 5),
+        ),
+    ]
+    monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(_make_runtime(tmp_path, events)))
+    payload = client.get(
+        "/api/v1/events/upcoming?themes=Science&limit_per_theme=50&horizon_days=400"
+    ).json()
+    by_id = {
+        event["event_id"]: event for event in payload["themes"]["Science"]["events"]
+    }
+    assert by_id["science:test:est"]["start_utc"] == "2027-03-05T13:30:00Z"
+    assert by_id["science:test:edt"]["start_utc"] == "2027-03-15T12:30:00Z"
+    assert by_id["science:test:nov-edt"]["start_utc"] == "2027-11-01T12:30:00Z"
+    assert by_id["science:test:nov-est"]["start_utc"] == "2027-11-08T13:30:00Z"
+    assert by_id["science:test:all-day"]["start_utc"] is None
+
+
 def test_unknown_theme_and_out_of_range_params_are_422(client, tmp_path, monkeypatch):
     monkeypatch.setenv("EVENTS_RUNTIME_DIR", str(_make_runtime(tmp_path, _events())))
     assert client.get("/api/v1/events/upcoming?themes=Astrology").status_code == 422
     assert client.get("/api/v1/events/upcoming?limit_per_theme=0").status_code == 422
-    assert client.get("/api/v1/events/upcoming?limit_per_theme=21").status_code == 422
+    assert client.get("/api/v1/events/upcoming?limit_per_theme=100").status_code == 200
+    assert client.get("/api/v1/events/upcoming?limit_per_theme=101").status_code == 422
     assert client.get("/api/v1/events/upcoming?horizon_days=0").status_code == 422
     assert client.get("/api/v1/events/upcoming?horizon_days=731").status_code == 422
 

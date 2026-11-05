@@ -19,13 +19,14 @@ export const PERSON_SAME_AS = [
 ] as const;
 
 // Hand-maintained: the day each page's own copy last changed (YYYY-MM-DD).
-// Set all five to the SEO merge date; bump one when that page's copy changes.
+// Set every page to the SEO merge date; bump one when that page's copy changes.
 export const CONTENT_DATES = {
   "/": "2026-11-03",
   "/regime": "2026-11-03",
   "/convergence": "2026-11-03",
   "/patterns": "2026-11-03",
   "/disclaimer": "2026-11-03",
+  "/upcoming": "2026-11-05",
 } as const;
 export type SitePath = keyof typeof CONTENT_DATES;
 
@@ -59,6 +60,12 @@ export const PAGES: Record<SitePath, { title: string; description: string; crumb
     description:
       "StrikeHike is descriptive historical research, not investment advice. Where its data come from: FRED, NBER, Yahoo Finance, the World Bank, Blockchain.com.",
     crumb: "Disclaimer",
+  },
+  "/upcoming": {
+    title: "Upcoming dates",
+    description:
+      "Scheduled US economic releases, central-bank decisions, eclipses, solstices and religious festivals for the next 12 months, from official calendars. Subscribe in your calendar.",
+    crumb: "Upcoming dates",
   },
 };
 

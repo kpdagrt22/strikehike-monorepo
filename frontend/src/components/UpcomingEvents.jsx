@@ -1,21 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   eventSourceClicked,
   themeSelected,
   themeSlug,
 } from "@/lib/analytics/events";
+import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
+import { orderedThemes } from "@/lib/events/upcoming";
 import { categoryTone } from "@/lib/categoryTone";
 
-const THEMES = [
-  "Politics",
-  "Science",
-  "Finance",
-  "Culture/Religion",
-  "Natural Disasters",
-];
+// D-12: Politics has no source yet and natural disasters cannot be scheduled.
+const THEMES = ["Science", "Finance", "Culture/Religion"];
 const THEME_SET = new Set(THEMES);
+const THEME_BY_SLUG = {
+  science: "Science",
+  finance: "Finance",
+  "culture-religion": "Culture/Religion",
+};
 const STATUS_LABELS = {
   tentative: "Tentative",
   rescheduled: "Rescheduled",
@@ -36,6 +39,7 @@ function parseThemes(value) {
   const selected = value
     .split(",")
     .map((part) => part.trim())
+    .map((part) => THEME_BY_SLUG[part.toLowerCase()] ?? part)
     .filter((part) => THEME_SET.has(part));
   return THEMES.filter((theme) => selected.includes(theme));
 }
@@ -44,12 +48,6 @@ function formatDate(value) {
   if (!value) return "";
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
-}
-
-function timeLabel(event) {
-  if (event.all_day) return "All day";
-  const time = (event.start_time ?? "").slice(0, 5);
-  return `${time || "Time TBC"} ${event.timezone ?? "UTC"}`;
 }
 
 function daysLabel(days) {
@@ -94,6 +92,8 @@ export function UpcomingEvents() {
   });
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({ status: "loading", payload: null });
+  const payload = state.payload;
+  const message = payload?.message;
   const chipRowRef = useRef(null);
   const didInitialScroll = useRef(false);
 
@@ -150,9 +150,10 @@ export function UpcomingEvents() {
   }, [reloadKey]);
 
   const allSelected = selected.length === 0;
+  const ordered = orderedThemes(payload);
   const visibleThemes = allSelected
-    ? THEMES
-    : THEMES.filter((theme) => selected.includes(theme));
+    ? ordered
+    : ordered.filter((theme) => selected.includes(theme.name));
 
   const toggleTheme = (theme) => {
     const wasOn = selected.includes(theme);
@@ -173,7 +174,7 @@ export function UpcomingEvents() {
   };
 
   const chipClass = (active) =>
-    `inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-micro font-medium transition-colors duration-[140ms] ${
+    `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-micro font-medium transition-colors duration-[140ms] ${
       active
         ? "border-black/10 bg-black/[0.07] text-[#14121a] dark:border-white/10 dark:bg-white/[0.08] dark:text-[#f2ede4]"
         : "border-transparent text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
@@ -185,10 +186,6 @@ export function UpcomingEvents() {
       inline: "nearest",
     });
   };
-
-  const payload = state.payload;
-  const themes = payload?.themes ?? {};
-  const message = payload?.message;
 
   return (
     <div className="px-2.5 pb-4">
@@ -274,22 +271,19 @@ export function UpcomingEvents() {
 
       {state.status === "ready" && !message
         ? visibleThemes.map((theme) => {
-            const data = themes[theme];
-            if (!data) return null;
-            const tone = categoryTone(theme);
-            const events = data.events ?? [];
-            const total = data.total_available ?? events.length;
-            const schedulable = data.schedulable !== false;
+            const tone = categoryTone(theme.name);
+            const events = theme.data.events ?? [];
+            const total = theme.data.total_available ?? events.length;
 
             return (
               <section
-                key={theme}
-                aria-labelledby={`upcoming-${theme.replace(/[^a-z0-9]+/gi, "-")}`}
+                key={theme.name}
+                aria-labelledby={`upcoming-${theme.slug}`}
                 className="mt-2 first:mt-0"
               >
                 <div className="flex items-baseline justify-between gap-2 px-1">
                   <h3
-                    id={`upcoming-${theme.replace(/[^a-z0-9]+/gi, "-")}`}
+                    id={`upcoming-${theme.slug}`}
                     className="flex items-center gap-1.5 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60"
                   >
                     <span
@@ -297,102 +291,117 @@ export function UpcomingEvents() {
                       style={{ backgroundColor: tone.color }}
                       aria-hidden="true"
                     />
-                    {theme}
+                    {theme.name}
                   </h3>
-                  {schedulable ? (
-                    <span className="text-micro tabular-nums text-black/45 dark:text-white/45">
-                      {total}
-                    </span>
-                  ) : null}
+                  <span className="text-micro tabular-nums text-black/45 dark:text-white/45">
+                    {total}
+                  </span>
                 </div>
 
-                {!schedulable ? (
-                  <p className="mt-1 px-1 text-meta leading-relaxed text-black/60 dark:text-white/60">
-                    Natural disasters cannot be scheduled; this theme shows
-                    history only.
-                  </p>
-                ) : (
-                  <>
-                    <p className="mt-0.5 px-1 text-micro text-black/50 dark:text-white/50">
-                      {countLabel(total, events.length)}
-                    </p>
-                    {events.length === 0 ? null : (
-                      <ul className="mt-1.5 space-y-1.5">
-                        {events.map((event) => {
-                          const status = STATUS_LABELS[event.status];
-                          return (
-                            <li
-                              key={event.event_id}
-                              className="rounded-xl border border-black/5 bg-white/45 p-2.5 dark:border-white/5 dark:bg-white/[0.03]"
+                <p className="mt-0.5 px-1 text-micro text-black/50 dark:text-white/50">
+                  {countLabel(total, events.length)}
+                </p>
+                {events.length === 0 ? null : (
+                  <ul className="mt-1.5 space-y-1.5">
+                    {events.map((event) => {
+                      const status = STATUS_LABELS[event.status];
+                      const linkLabel =
+                        event.verification === "computed" ? "Method" : "Source";
+                      return (
+                        <li
+                          key={event.event_id}
+                          className="rounded-xl border border-black/5 bg-white/45 p-2.5 dark:border-white/5 dark:bg-white/[0.03]"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-body font-medium leading-snug text-black/80 dark:text-white/80">
+                              {event.name}
+                            </p>
+                            {status ? (
+                              <span className="shrink-0 rounded-full border border-black/10 px-1.5 py-0.5 text-micro text-black/60 dark:border-white/10 dark:text-white/60">
+                                {status}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-micro text-black/60 dark:text-white/60">
+                            <span
+                              className="rounded-full px-1.5 py-0.5"
+                              style={{
+                                backgroundColor: tone.soft,
+                                color: tone.color,
+                              }}
                             >
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-body font-medium leading-snug text-black/80 dark:text-white/80">
-                                  {event.name}
-                                </p>
-                                {status ? (
-                                  <span className="shrink-0 rounded-full border border-black/10 px-1.5 py-0.5 text-micro text-black/60 dark:border-white/10 dark:text-white/60">
-                                    {status}
-                                  </span>
-                                ) : null}
-                              </div>
+                              {theme.name}
+                            </span>
+                            <LocalDateTime
+                              startDate={event.start_date}
+                              startTime={event.start_time}
+                              startUtc={event.start_utc}
+                              timezone={event.timezone}
+                              allDay={event.all_day}
+                              part="date"
+                            />
+                            <LocalDateTime
+                              startDate={event.start_date}
+                              startTime={event.start_time}
+                              startUtc={event.start_utc}
+                              timezone={event.timezone}
+                              allDay={event.all_day}
+                              part="time"
+                            />
+                            <span className="tabular-nums">
+                              {daysLabel(event.days_until)}
+                            </span>
+                          </div>
 
-                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-micro text-black/60 dark:text-white/60">
-                                <span
-                                  className="rounded-full px-1.5 py-0.5"
-                                  style={{
-                                    backgroundColor: tone.soft,
-                                    color: tone.color,
-                                  }}
-                                >
-                                  {theme}
-                                </span>
-                                <span className="tabular-nums">
-                                  {formatDate(event.start_date)}
-                                </span>
-                                <span>{timeLabel(event)}</span>
-                                <span className="tabular-nums">
-                                  {daysLabel(event.days_until)}
-                                </span>
-                              </div>
-
-                              <a
-                                href={event.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() =>
-                                  eventSourceClicked(
-                                    event.event_id || event.id,
-                                    themeSlug(theme),
-                                    event.days_until,
-                                    event.source_url,
-                                  )
-                                }
-                                aria-label={`Source for ${event.name}`}
-                                className="mt-1.5 inline-flex items-center gap-1 text-micro text-black/55 underline decoration-current/30 underline-offset-2 transition-colors hover:text-black/80 hover:decoration-current dark:text-white/55 dark:hover:text-white/80"
-                              >
-                                Source
-                                <svg
-                                  viewBox="0 0 12 12"
-                                  className="h-2.5 w-2.5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.2"
-                                  aria-hidden="true"
-                                >
-                                  <path d="M4 2h6v6M10 2L2 10" />
-                                </svg>
-                              </a>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </>
+                          <a
+                            href={event.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() =>
+                              eventSourceClicked(
+                                event.event_id || event.id,
+                                themeSlug(theme.name),
+                                event.days_until,
+                                event.source_url,
+                              )
+                            }
+                            aria-label={`${linkLabel} for ${event.name}`}
+                            className="mt-1.5 inline-flex min-h-11 items-center gap-1 text-micro text-black/55 underline decoration-current/30 underline-offset-2 transition-colors hover:text-black/80 hover:decoration-current dark:text-white/55 dark:hover:text-white/80 lg:min-h-0"
+                          >
+                            {linkLabel}
+                            <svg
+                              viewBox="0 0 12 12"
+                              className="h-2.5 w-2.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.2"
+                              aria-hidden="true"
+                            >
+                              <path d="M4 2h6v6M10 2L2 10" />
+                            </svg>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
               </section>
             );
           })
         : null}
+
+      {state.status === "ready" && !message ? (
+        <div className="mt-3 px-1">
+          <Link
+            href="/upcoming"
+            prefetch={false}
+            className="inline-flex min-h-11 items-center text-micro font-medium text-black/60 underline decoration-current/30 underline-offset-2 transition-colors hover:text-black/80 hover:decoration-current dark:text-white/60 dark:hover:text-white/80 lg:min-h-0"
+          >
+            All upcoming dates →
+          </Link>
+        </div>
+      ) : null}
 
       {state.status === "ready" && payload?.as_of ? (
         <p className="mt-3 px-1 text-micro text-black/40 dark:text-white/40">

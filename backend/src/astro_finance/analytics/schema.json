@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "404"],
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "404"],
   "limits": {
     "max_body_bytes": 8192,
     "max_events": 25,
@@ -141,6 +141,13 @@
     "feedback_submitted": {
       "required": ["length_bucket"],
       "properties": { "length_bucket": { "type": "enum", "values": ["<50", "50–200", ">200"] } }
+    },
+    "calendar_subscribed": {
+      "required": ["scope", "method"],
+      "properties": {
+        "scope": { "type": "enum", "values": ["all", "science", "finance", "culture-religion"] },
+        "method": { "type": "enum", "values": ["apple", "google", "outlook", "copy", "download"] }
+      }
     }
   }
 }

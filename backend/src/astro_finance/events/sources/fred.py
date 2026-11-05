@@ -232,8 +232,8 @@ def _release_records(
                 description=(
                     ("Offline test fixture date, not a live FRED response. " if offline else "")
                     + f"Scheduled release date from FRED release {release.release_id} "
-                    f"({release.name}). FRED publishes the date only; no time is "
-                    "published."
+                    f"({release.name}). FRED publishes the date only; any release "
+                    "time is confirmed on the issuing agency's calendar."
                 ),
                 external_id=f"{release.release_id}-{month}{suffix}",
                 start_time=None,

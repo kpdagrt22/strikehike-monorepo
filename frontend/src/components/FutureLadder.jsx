@@ -82,6 +82,8 @@ export function FutureLadder() {
   const deepLinked = hasThemeFilter(locationSearch);
   const view = viewChoice ?? (deepLinked ? "upcoming" : "sky");
   const announcedDeepLink = useRef(false);
+  const mobileSheet = useChronoStore((state) => state.mobileSheet);
+  const sheetOpen = mobileSheet === "future";
   const selectView = (next) => {
     if (next === "upcoming" && view !== "upcoming") {
       upcomingOpened(sheetOpen ? "mobile_sheet" : "tab");
@@ -95,7 +97,6 @@ export function FutureLadder() {
     if (deepLinked) upcomingOpened("deep_link");
   }, [deepLinked, view]);
   const sheetRef = useRef(null);
-  const mobileSheet = useChronoStore((state) => state.mobileSheet);
   const setMobileSheet = useChronoStore((state) => state.setMobileSheet);
   const activeEventCategory = useChronoStore(
     (state) => state.activeEventCategory,
@@ -104,7 +105,6 @@ export function FutureLadder() {
   const ladderMatches = useChronoStore((state) => state.ladderMatches);
   const ladderStatus = useChronoStore((state) => state.ladderStatus);
   const setLadder = useChronoStore((state) => state.setLadder);
-  const sheetOpen = mobileSheet === "future";
   const dismissSheet = useDismissable(sheetOpen, {
     onClose: () => setMobileSheet(null),
     triggerRef: getEventsDockButton,
@@ -220,7 +220,7 @@ export function FutureLadder() {
             aria-pressed={view === "sky"}
             aria-controls="chrono-ladder-content"
             onClick={() => selectView("sky")}
-            className={`h-8 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
+            className={`min-h-11 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
               view === "sky"
                 ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
                 : "text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
@@ -233,7 +233,7 @@ export function FutureLadder() {
             aria-pressed={view === "upcoming"}
             aria-controls="chrono-ladder-content"
             onClick={() => selectView("upcoming")}
-            className={`h-8 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
+            className={`min-h-11 rounded-full px-3 text-micro font-medium transition-colors duration-[140ms] ${
               view === "upcoming"
                 ? "bg-black/[0.07] text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
                 : "text-black/60 hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"

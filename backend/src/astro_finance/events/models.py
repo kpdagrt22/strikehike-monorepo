@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timezone
 from enum import Enum
 from typing import Any, Iterable, Mapping
+from zoneinfo import ZoneInfo
 
 
 SCHEMA_VERSION = 1
@@ -138,6 +139,23 @@ def parse_utc(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("timestamp must include a UTC offset")
     return parsed.astimezone(timezone.utc)
+
+
+def start_instant(
+    start_date: date,
+    start_time: time | None,
+    timezone_name: str | None,
+) -> datetime | None:
+    """The UTC instant of a timed event, or ``None`` for an all-day event.
+
+    ``ZoneInfo`` applies the zone's daylight-saving rules for that date, so an
+    08:30 New York release is 13:30Z in winter and 12:30Z in summer.
+    """
+
+    if start_time is None or not timezone_name:
+        return None
+    local = datetime.combine(start_date, start_time, tzinfo=ZoneInfo(timezone_name))
+    return local.astimezone(timezone.utc)
 
 
 def canonical_json(payload: Any) -> str:

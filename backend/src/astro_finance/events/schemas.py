@@ -15,6 +15,7 @@ class UpcomingEvent(BaseModel):
     start_date: date
     start_time: str | None = None
     timezone: str | None = None
+    start_utc: str | None = None
     all_day: bool
     status: str
     verification: str

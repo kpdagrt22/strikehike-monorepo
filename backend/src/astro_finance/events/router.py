@@ -11,14 +11,23 @@ the ``current`` pointer written by the activation step, with a mtime cache in
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from .models import THEME_METADATA, THEME_ORDER, SCHEMA_VERSION, Theme
+from .calendar import build_calendar
+from .models import (
+    THEME_METADATA,
+    THEME_ORDER,
+    SCHEMA_VERSION,
+    Theme,
+    iso_utc,
+    start_instant,
+)
 from .schemas import HealthResponse, ThemeUpcoming, UpcomingEvent, UpcomingResponse
 from .store import (
+    calendar_by_theme,
     current_bundle_dir,
     empty_event_counts,
     event_counts,
@@ -42,6 +51,20 @@ def get_active_bundle() -> Path | None:
 
 def get_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def start_utc_for(event: dict) -> str | None:
+    """The event's UTC instant, or ``None`` when it is all-day."""
+
+    start_time = event.get("start_time")
+    if not start_time:
+        return None
+    instant = start_instant(
+        date.fromisoformat(str(event["start_date"])),
+        time.fromisoformat(str(start_time)),
+        event.get("timezone"),
+    )
+    return iso_utc(instant) if instant else None
 
 
 def parse_themes(value: str | None) -> list[Theme]:
@@ -90,7 +113,7 @@ def get_upcoming(
         None,
         description="Comma-separated theme names; omit for all five.",
     ),
-    limit_per_theme: int = Query(5, ge=1, le=20),
+    limit_per_theme: int = Query(5, ge=1, le=100),
     horizon_days: int = Query(365, ge=1, le=730),
     bundle_dir: Path | None = Depends(get_active_bundle),
     today: date = Depends(get_today),
@@ -153,6 +176,7 @@ def get_upcoming(
                     start_date=event["start_date"],
                     start_time=event.get("start_time"),
                     timezone=event.get("timezone"),
+                    start_utc=start_utc_for(event),
                     all_day=bool(event["all_day"]),
                     status=str(event["status"]),
                     verification=str(event["verification"]),
@@ -167,6 +191,61 @@ def get_upcoming(
         as_of=as_of,
         bundle_version=info.get("bundle_version"),
         themes=theme_payload,
+    )
+
+
+@router.get(
+    "/calendar.ics",
+    summary="RFC 5545 calendar feed for the active upcoming events",
+    description=(
+        "Returns a text/calendar feed for the next 365 days from the active "
+        "bundle, with no per-theme display cap. `themes` is a comma-separated "
+        "list; omit it for all five. Cancelled future dates stay in the feed so "
+        "a subscribed calendar can update them. This endpoint never calls an "
+        "upstream service."
+    ),
+)
+def get_calendar(
+    themes: str | None = Query(
+        None,
+        description="Comma-separated theme names; omit for all five.",
+    ),
+    bundle_dir: Path | None = Depends(get_active_bundle),
+    today: date = Depends(get_today),
+) -> Response:
+    if bundle_dir is None:
+        raise HTTPException(status_code=503, detail=BUNDLE_UNAVAILABLE)
+    selected = parse_themes(themes)
+    try:
+        info = bundle_info(bundle_dir)
+        rows = calendar_by_theme(
+            bundle_dir / "events.sqlite",
+            [theme.value for theme in selected],
+            today=today,
+            horizon_days=365,
+        )
+    except (FileNotFoundError, sqlite3.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail=BUNDLE_UNAVAILABLE) from exc
+
+    events = [
+        event
+        for theme in selected
+        for event in rows.get(theme.value, [])
+    ]
+    body = build_calendar(
+        events,
+        selected,
+        created_at=info.get("created_at"),
+    )
+    theme_key = "-".join(theme.slug for theme in selected)
+    etag = f'"{info.get("bundle_version") or "none"}-{theme_key}"'
+    return Response(
+        content=body,
+        headers={
+            "Content-Type": "text/calendar; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            "ETag": etag,
+        },
     )
 
 

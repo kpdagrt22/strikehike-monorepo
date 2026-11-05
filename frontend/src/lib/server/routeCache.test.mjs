@@ -43,6 +43,32 @@ test("an unchanged bundle version keeps the cache", async () => {
   assert.equal(loads.calls, 1);
 });
 
+test("response headers survive a cache hit", async () => {
+  let time = 0;
+  const cache = createRouteCache({
+    backendUrl: "http://backend",
+    now: () => time,
+    fetchImpl: async () => health({ active_version: "v1" }),
+  });
+  const loader = async () => ({
+    status: 200,
+    body: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+    headers: {
+      "Content-Type": "text/calendar; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+      ETag: '"bundle-finance"',
+    },
+  });
+
+  const first = await cache.cachedRoute("calendar", { ttlMs: 300_000 }, loader);
+  assert.equal(first.cache, "miss");
+  time = 1_000;
+  const second = await cache.cachedRoute("calendar", { ttlMs: 300_000 }, loader);
+  assert.equal(second.cache, "hit");
+  assert.equal(second.headers?.ETag, '"bundle-finance"');
+  assert.equal(second.headers?.["Content-Type"], "text/calendar; charset=utf-8");
+});
+
 test("a changed bundle version clears every entry exactly once", async () => {
   let time = 0;
   let version = "v1";

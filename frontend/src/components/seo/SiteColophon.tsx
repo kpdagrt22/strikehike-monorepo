@@ -7,6 +7,7 @@ const VIEWS: { href: SitePath; label: string }[] = [
   { href: "/regime", label: "Regime" },
   { href: "/convergence", label: "Convergence" },
   { href: "/patterns", label: "Study of Patterns" },
+  { href: "/upcoming", label: "Upcoming dates" },
   { href: "/disclaimer", label: "Disclaimer" },
 ];
 

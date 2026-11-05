@@ -1,8 +1,9 @@
 # Verified non-US central-bank decisions (Finance).
 #
 # Every date below was read on the official page in source_url on the
-# verified_on date.  The pages publish dates but not decision times, so these
-# entries are all-day.  Add new entries only after opening the official page.
+# verified_on date.  The decision times are confirmed on the agencies' own
+# pages and applied by the bundle builder (events/release_times.py, which cites
+# each page).  Add new entries only after opening the official page.
 #
 # Schema:
 #   [[events]]

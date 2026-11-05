@@ -16,7 +16,10 @@ const VIEWS = [
 ];
 
 // Pages outside the four views: the cue names the page and no view is active.
-const PAGES = [{ href: "/disclaimer", label: "Disclaimer" }];
+const PAGES = [
+  { href: "/upcoming", label: "Upcoming dates" },
+  { href: "/disclaimer", label: "Disclaimer" },
+];
 
 // The view (or page) a pathname belongs to; anything else outside the three
 // data views is the Orrery.
