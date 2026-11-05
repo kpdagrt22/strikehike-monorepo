@@ -21,6 +21,8 @@
 export type RouteLoadResult = {
   status: number;
   body: string;
+  /** Optional response headers to pass through with a cached body. */
+  headers?: Record<string, string>;
 };
 
 export type RouteCachePolicy = {
@@ -43,7 +45,12 @@ export type RouteCacheOptions = {
   fetchImpl?: typeof fetch;
 };
 
-type Entry = { body: string; cost: number; storedAt: number };
+type Entry = {
+  body: string;
+  cost: number;
+  storedAt: number;
+  headers?: Record<string, string>;
+};
 
 const MAX_ENTRY_BYTES = 4 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 48 * 1024 * 1024;
@@ -92,12 +99,16 @@ export function createRouteCache(options: RouteCacheOptions = {}) {
     return `${generation}\u0000${key}`;
   }
 
-  function store(key: string, body: string) {
+  function store(
+    key: string,
+    body: string,
+    headers?: Record<string, string>,
+  ) {
     remove(key);
     if (Buffer.byteLength(body, "utf8") > MAX_ENTRY_BYTES) return;
     // Heap cost, not wire size; remove() subtracts the same amount.
     const cost = 2 * (body.length + key.length);
-    entries.set(key, { body, cost, storedAt: now() });
+    entries.set(key, { body, cost, storedAt: now(), headers });
     totalBytes += cost;
     // Map iteration follows insertion order, so the first keys are the least
     // recently used ones.
@@ -119,7 +130,7 @@ export function createRouteCache(options: RouteCacheOptions = {}) {
     const next = loader()
       .then((result) => {
         if (result.status === 200 && startGeneration === generation) {
-          store(key, result.body);
+          store(key, result.body, result.headers);
         }
         return result;
       })
@@ -189,14 +200,24 @@ export function createRouteCache(options: RouteCacheOptions = {}) {
         entries.delete(key);
         entries.set(key, entry);
         if (age < policy.ttlMs) {
-          return { status: 200, body: entry.body, cache: "hit" };
+          return {
+            status: 200,
+            body: entry.body,
+            headers: entry.headers,
+            cache: "hit",
+          };
         }
         if (!inflight.has(inflightKey(key))) {
           load(key, loader).catch(() => {
             // Keep serving the stale entry; the next request tries again.
           });
         }
-        return { status: 200, body: entry.body, cache: "stale" };
+        return {
+          status: 200,
+          body: entry.body,
+          headers: entry.headers,
+          cache: "stale",
+        };
       }
       remove(key);
     }
@@ -221,5 +242,20 @@ export function jsonTextResponse(
     "Content-Type": "application/json",
   };
   if (result.status === 200) headers["Cache-Control"] = cacheControl;
+  return new Response(result.body, { status: result.status, headers });
+}
+
+/** Text response that keeps the upstream Content-Type, Cache-Control and ETag. */
+export function textResponse(
+  result: RouteLoadResult,
+  fallbackContentType: string,
+): Response {
+  const headers: Record<string, string> = {
+    "Content-Type": result.headers?.["Content-Type"] ?? fallbackContentType,
+  };
+  if (result.headers?.["Cache-Control"]) {
+    headers["Cache-Control"] = result.headers["Cache-Control"];
+  }
+  if (result.headers?.ETag) headers.ETag = result.headers.ETag;
   return new Response(result.body, { status: result.status, headers });
 }
