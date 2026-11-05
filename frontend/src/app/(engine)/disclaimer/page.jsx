@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MeasurementToggle } from "@/components/analytics/MeasurementToggle";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { CONTACT_URL } from "@/lib/contact";
@@ -127,6 +128,7 @@ export default function DisclaimerPage() {
             </a>{" "}
             (Lahiri sidereal).
           </p>
+          <MeasurementToggle />
         </div>
 
         <footer className="mt-8 flex max-w-xl flex-wrap items-center gap-x-3 gap-y-1 border-t border-(--sh-line-1) pt-4 text-micro text-black/60 dark:text-white/60">

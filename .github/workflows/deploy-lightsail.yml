@@ -57,6 +57,10 @@ jobs:
             tests/test_patterns.py \
             tests/test_regime_service.py \
             tests/test_regime_cases.py \
+            tests/test_analytics_schema.py \
+            tests/test_analytics_store.py \
+            tests/test_analytics_api.py \
+            tests/test_analytics_activation.py \
             -q
 
   test-frontend:
@@ -90,6 +94,9 @@ jobs:
 
       - name: Unit tests
         run: npm run test:unit
+
+      - name: Tracker size
+        run: npm run check:tracker
 
       - name: Build
         run: npm run build
@@ -138,6 +145,8 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           TURBO_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "1"
+          NEXT_PUBLIC_BUILD_SHA: "smoke01"
 
       - name: Start the stack and run the smoke tests
         run: |
@@ -145,6 +154,7 @@ jobs:
           (
             cd ../backend
             PYTHONPATH="src:." LOAD_ML_MODELS=0 \
+              ANALYTICS_INGEST_ENABLED=1 ANALYTICS_DB=/tmp/smoke-analytics.sqlite \
               nohup uvicorn api_server:app --host 127.0.0.1 --port 8010 \
               > /tmp/backend.log 2>&1 &
           )
@@ -171,6 +181,17 @@ jobs:
             sleep 2
           done
           npx playwright test
+          # The normal-browser test must have reached the backend's store.
+          sleep 2
+          python -c 'import sqlite3; n = sqlite3.connect("/tmp/smoke-analytics.sqlite").execute("SELECT COUNT(*) FROM events").fetchone()[0]; print("stored events:", n); assert n > 0, "no event reached the store"'
+
+      - name: Upload review screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: smoke-screens-${{ github.run_id }}
+          path: frontend/smoke-screens
+          if-no-files-found: ignore
 
       - name: Upload Playwright results
         if: failure()
@@ -248,6 +269,7 @@ jobs:
             fi
 
             # Build the new stack while the existing site is still serving.
+            export BUILD_SHA="$(git rev-parse --short=7 HEAD)"
             docker compose -p strikehike-chrono build
 
             OLD_IDS="$(docker ps -aq --filter 'label=com.docker.compose.project=strikehike' || true)"
@@ -460,3 +482,6 @@ jobs:
             fi
 
             prune_after_success
+            df -h /
+            docker compose -p strikehike-chrono exec -T backend \
+              du -sh /app/data/runtime/analytics 2>/dev/null || true

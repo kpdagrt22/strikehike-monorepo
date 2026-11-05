@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import "./globals.css";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { ThemeProvider } from "@/components/theme-provider";
 import {
   APP_ID,
@@ -235,6 +236,7 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="strikehike-theme"
         >
+          <PageViewTracker />
           {children}
         </ThemeProvider>
       </body>

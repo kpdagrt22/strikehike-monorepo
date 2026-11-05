@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "404"],
+  "limits": {
+    "max_body_bytes": 8192,
+    "max_events": 25,
+    "max_depth": 4,
+    "max_string": 64,
+    "max_referrer_host": 160,
+    "max_props_bytes": 512,
+    "max_vis": 25
+  },
+  "ids": {
+    "aid": "^[A-Za-z0-9_-]{22}$",
+    "sid": "^[A-Za-z0-9_-]{16}$",
+    "pv": "^[a-f0-9]{12}$"
+  },
+  "events": {
+    "page_viewed": {
+      "required": ["nav_type", "landing"],
+      "properties": {
+        "nav_type": { "type": "enum", "values": ["load", "client", "back_forward"] },
+        "landing": { "type": "int", "values": [0, 1] },
+        "referrer_host": { "type": "string", "max": 160 },
+        "utm_source": { "type": "string", "max": 64, "pattern": "^[a-z0-9._-]+$" },
+        "utm_medium": { "type": "string", "max": 64, "pattern": "^[a-z0-9._-]+$" },
+        "utm_campaign": { "type": "string", "max": 64, "pattern": "^[a-z0-9._-]+$" },
+        "utm_content": { "type": "string", "max": 64, "pattern": "^[a-z0-9._-]+$" },
+        "query_keys": {
+          "type": "array",
+          "max": 7,
+          "items": { "type": "enum", "values": ["d", "themes", "a", "b", "series", "span", "case"] }
+        }
+      }
+    },
+    "onboarding_dismissed": {
+      "required": ["method"],
+      "properties": {
+        "method": { "type": "enum", "values": ["enter", "escape"] },
+        "ms_shown": { "type": "enum", "values": ["<3s", "3–10s", ">10s"] }
+      }
+    },
+    "view_opened": {
+      "required": ["panel", "method"],
+      "properties": {
+        "panel": {
+          "type": "enum",
+          "values": [
+            "nav", "info", "archive", "ladder_sheet", "alignment_insight",
+            "planet_pinned", "timeline", "precise_picker", "regime_overlay",
+            "mobile_events", "mobile_data", "feedback", "nber_table", "catalogue_table"
+          ]
+        },
+        "method": { "type": "enum", "values": ["click", "tap", "keyboard", "hover_intent", "hash"] }
+      }
+    },
+    "date_travelled": {
+      "required": ["method", "target_year", "is_future"],
+      "properties": {
+        "method": {
+          "type": "enum",
+          "values": [
+            "scrub", "crash_marker", "page_key", "today", "precise_picker",
+            "archive_event", "sky_ladder", "ladder_lane", "crash_band",
+            "nber_select", "market_tape", "deep_link"
+          ]
+        },
+        "target_year": { "type": "int", "min": 1800, "max": 2200 },
+        "is_future": { "type": "int", "values": [0, 1] },
+        "target_ref": { "type": "string", "max": 64 }
+      }
+    },
+    "asset_compared": {
+      "required": ["action", "asset"],
+      "properties": {
+        "action": { "type": "enum", "values": ["select", "add", "remove", "compare_on", "compare_off"] },
+        "asset": { "type": "enum", "values": ["sp500", "gold", "bonds", "nifty50", ""] },
+        "assets_on": { "type": "int", "min": 0, "max": 10 }
+      }
+    },
+    "cycle_map_toggled": {
+      "required": ["state"],
+      "properties": { "state": { "type": "enum", "values": ["on", "off"] } }
+    },
+    "case_opened": {
+      "required": ["page", "slot", "method", "case_id"],
+      "properties": {
+        "page": { "type": "enum", "values": ["/convergence", "/patterns"] },
+        "slot": { "type": "enum", "values": ["a", "b", "pair", "compare"] },
+        "method": { "type": "enum", "values": ["picker", "picker_search", "suggested_pair", "swap", "cross_link", "deep_link"] },
+        "case_id": { "type": "string", "max": 64, "pattern": "^[a-z0-9-]{3,48}$" },
+        "case_id_b": { "type": "string", "max": 64, "pattern": "^[a-z0-9-]{3,48}$" }
+      }
+    },
+    "upcoming_opened": {
+      "required": ["method"],
+      "properties": {
+        "method": { "type": "enum", "values": ["tab", "mobile_sheet", "deep_link", "page"] },
+        "events_shown": { "type": "int", "min": 0, "max": 1000 }
+      }
+    },
+    "theme_selected": {
+      "required": ["theme", "state"],
+      "properties": {
+        "theme": {
+          "type": "enum",
+          "values": ["politics", "science", "finance", "culture-religion", "natural-disasters", "all", "clear"]
+        },
+        "state": { "type": "enum", "values": ["on", "off"] },
+        "selected_count": { "type": "int", "min": 0, "max": 5 },
+        "shown_count": { "type": "int", "min": 0, "max": 1000 }
+      }
+    },
+    "event_source_clicked": {
+      "required": ["event_id", "theme"],
+      "properties": {
+        "event_id": { "type": "string", "max": 64, "pattern": "^[a-z-]+:[a-z0-9_-]+:[A-Za-z0-9:._-]+$" },
+        "theme": {
+          "type": "enum",
+          "values": ["politics", "science", "finance", "culture-religion", "natural-disasters"]
+        },
+        "days_until_bucket": { "type": "enum", "values": ["0–7", "8–30", "31–90", "91–365"] },
+        "source_host": { "type": "string", "max": 160 }
+      }
+    },
+    "method_opened": {
+      "required": ["which", "page"],
+      "properties": {
+        "which": { "type": "enum", "values": ["method_limits", "how_it_works"] },
+        "page": { "type": "enum", "values": ["/regime", "/convergence"] }
+      }
+    },
+    "support_opened": {
+      "required": ["trigger"],
+      "properties": { "trigger": { "type": "enum", "values": ["click", "tap", "keyboard", "footer_link"] } }
+    },
+    "support_link_clicked": {
+      "required": ["target"],
+      "properties": { "target": { "type": "enum", "values": ["paypal"] } }
+    },
+    "feedback_submitted": {
+      "required": ["length_bucket"],
+      "properties": { "length_bucket": { "type": "enum", "values": ["<50", "50–200", ">200"] } }
+    }
+  }
+}

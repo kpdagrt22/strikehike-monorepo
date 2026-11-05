@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { onboardingDismissed } from "@/lib/analytics/events";
 import { DUR, EASE } from "@/lib/motion";
 
 const STORAGE_KEY = "hasSeenIntro";
@@ -45,12 +46,13 @@ export function OnboardingOverlay({ introComplete = false }) {
   const dialogRef = useRef(null);
   const enterRef = useRef(null);
 
-  const enter = () => {
+  const enter = (method = "enter") => {
     try {
       localStorage.setItem(STORAGE_KEY, "1");
     } catch {
       // Storage can be unavailable in privacy modes; the overlay still closes.
     }
+    onboardingDismissed(method === "escape" ? "escape" : "enter");
     setHasSeenIntro(true);
   };
 
@@ -58,7 +60,7 @@ export function OnboardingOverlay({ introComplete = false }) {
   useDialogFocus(visible, {
     containerRef: dialogRef,
     initialFocusRef: enterRef,
-    onClose: enter,
+    onClose: (method) => enter(method || "escape"),
   });
 
   return (
@@ -120,7 +122,7 @@ export function OnboardingOverlay({ introComplete = false }) {
               ref={enterRef}
               type="button"
               autoFocus
-              onClick={enter}
+              onClick={() => enter("enter")}
               className="mt-8 min-h-11 w-full rounded-full border border-black/10 bg-[#14121a] px-5 py-3 text-meta font-medium uppercase tracking-[0.18em] text-white transition-colors hover:bg-black dark:border-white/10 dark:bg-[#f2ede4] dark:text-[#14121a] dark:hover:bg-white"
             >
               Enter

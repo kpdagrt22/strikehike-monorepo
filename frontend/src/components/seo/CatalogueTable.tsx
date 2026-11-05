@@ -1,3 +1,4 @@
+import { DetailsTracker } from "@/components/analytics/DetailsTracker";
 import { formatCaseDate, formatPct, isOpen, isUnobservable } from "@/lib/regime/caseCompare";
 import type { CaseCatalogue, DeclineCase } from "@/lib/seo/data";
 import { PLUS, ROW, SOURCE_LINE, TABLE_REGION, TH_COL } from "./styles";
@@ -50,7 +51,8 @@ export function CatalogueTable({ catalogue }: { catalogue: CaseCatalogue | null 
   const notes = Array.isArray(catalogue.notes) ? catalogue.notes : [];
 
   return (
-    <details className={DETAILS}>
+    <details id="regime-catalogue-table" className={DETAILS}>
+      <DetailsTracker id="regime-catalogue-table" panel="catalogue_table" />
       <summary className={SUMMARY}>
         {title}
         <span className={PLUS} aria-hidden="true">

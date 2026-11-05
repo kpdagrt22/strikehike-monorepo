@@ -7,6 +7,7 @@ import gsap from "gsap";
 import * as THREE from "three";
 import { getRegimeToneColor } from "@/lib/regimeTone";
 import { useChronoStore } from "@/store/chronoStore";
+import { viewOpened } from "@/lib/analytics/events";
 import { useEntityStore } from "@/store/entityStore";
 
 const EARTH_RADIUS = 1.66;
@@ -731,6 +732,7 @@ function Planet({
       clearPinnedEntity();
     } else {
       setReadoutSide(event.pointer.x > 0 ? "left" : "right");
+      viewOpened("planet_pinned", "tap");
       pinEntity(entity);
     }
   };

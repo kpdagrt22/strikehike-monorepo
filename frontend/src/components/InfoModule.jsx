@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useAnimationControls } from "framer-motion";
+import { viewOpened } from "@/lib/analytics/events";
 import { CONTACT_URL } from "@/lib/contact";
 import { INTENT, reveal } from "@/lib/motion";
 
@@ -41,9 +42,12 @@ export function InfoModule() {
     window.clearTimeout(closeTimer.current);
   }, []);
 
-  const show = useCallback((via, at) => {
+  // `trackAs` separates the counted method from `via`, which drives the
+  // click guard. Hover and Tab previews are not counted; a click is.
+  const show = useCallback((via, at, trackAs = via) => {
     openVia.current = via;
     openedAt.current = at;
+    if (trackAs === "click" || trackAs === "hash") viewOpened("info", trackAs);
     setPanelHidden(false);
     setOpen(true);
   }, []);
@@ -81,7 +85,9 @@ export function InfoModule() {
   // enquiry form) arrives with the panel open.
   useEffect(() => {
     const openFromHash = () => {
-      if (window.location.hash === "#contact") show("click", performance.now());
+      if (window.location.hash === "#contact") {
+        show("click", performance.now(), "hash");
+      }
     };
     const frame = window.requestAnimationFrame(openFromHash);
     window.addEventListener("hashchange", openFromHash);
@@ -152,6 +158,7 @@ export function InfoModule() {
       event.timeStamp - openedAt.current < INTENT.clickGuardMs
     ) {
       openVia.current = "click";
+      viewOpened("info", "click");
       return;
     }
     hide();

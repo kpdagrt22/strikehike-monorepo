@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useTheme } from "next-themes";
+import { dateTravelled } from "@/lib/analytics/events";
 import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 import { EnergyGauge } from "@/components/EnergyGauge";
@@ -173,7 +174,10 @@ export default function Home() {
     const date = new URLSearchParams(window.location.search).get("d");
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     const store = useChronoStore.getState();
-    if (store.focusedDate !== date) store.setFocusedDate(date);
+    if (store.focusedDate !== date) {
+      dateTravelled("deep_link", date);
+      store.setFocusedDate(date);
+    }
   }, []);
 
   // false during SSR/hydration, true after: avoids a dark-material flash on a light theme.

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { getRegimeToneLabel } from "@/lib/regimeTone";
+import { viewOpened } from "@/lib/analytics/events";
 import { useChronoStore } from "@/store/chronoStore";
 
 const VIEWS = [
@@ -77,7 +78,15 @@ export function RegimeOverlayButton({ compact = false }) {
   return (
     <button
       type="button"
-      onClick={() => setRegimeOverlay(!regimeOverlay)}
+      onClick={(event) => {
+        if (!regimeOverlay) {
+          viewOpened(
+            "regime_overlay",
+            event.detail === 0 ? "keyboard" : "click",
+          );
+        }
+        setRegimeOverlay(!regimeOverlay);
+      }}
       aria-pressed={regimeOverlay}
       aria-label="Toggle regime overlay"
       title={overlayTitle}

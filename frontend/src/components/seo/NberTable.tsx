@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { DetailsTracker } from "@/components/analytics/DetailsTracker";
 import { formatCaseDate, formatMonth, formatPct, isOpen } from "@/lib/regime/caseCompare";
 import type { CaseCatalogue, DeclineCase, NberWindow, RegimeSummary } from "@/lib/seo/data";
 import { FIGURE, PLUS, ROW, SOURCE_LINE, TABLE_REGION, TH_COL, TH_WRAP } from "./styles";
@@ -42,7 +43,8 @@ export function NberTable({
   };
 
   return (
-    <details className={DETAILS}>
+    <details id="regime-nber-table" className={DETAILS}>
+      <DetailsTracker id="regime-nber-table" panel="nber_table" />
       <summary className={SUMMARY}>
         {title}
         <span className={PLUS} aria-hidden="true">

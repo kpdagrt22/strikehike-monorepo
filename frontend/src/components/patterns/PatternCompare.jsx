@@ -50,6 +50,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { caseOpened } from "@/lib/analytics/events";
 import { finite, formatChange, formatMonth } from "@/components/patterns/patternFormat";
 import { ASSET_TARGETS, PATTERN_ASSET_ORDER } from "@/components/regime/assetTargets";
 
@@ -979,6 +980,7 @@ function ComparePanel({ asset, choice, onChoose, onAlign, onSettled, announce })
     const other = side === "a" ? "b" : "a";
     const current = { a, b };
     if (current[side] === id) return;
+    caseOpened("/patterns", side, "picker", id);
     if (current[other] === id) {
       onChoose({ a: current.b, b: current.a }, []);
       announce("Swapped A and B.");
@@ -1155,6 +1157,7 @@ export function PatternCompare({ engine, assetKey, linkedCase: linkedId = null }
     linked: linkedCase,
     first: linkedCase,
   }));
+  const linkedTracked = useRef(false);
   // The reader's view, for the prefetch (which runs outside render).
   const alignRef = useRef(choice.align);
   useEffect(() => {
@@ -1162,6 +1165,16 @@ export function PatternCompare({ engine, assetKey, linkedCase: linkedId = null }
   }, [choice.align]);
   const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
   const casesEntry = useSyncExternalStore(store.subscribe, getCasesEntry, getNoEntry);
+  // A shared link's case is counted once, and only when the archive has it:
+  // a hand-edited id is never sent.
+  useEffect(() => {
+    if (linkedTracked.current || !linkedId || linkedId === "today") return;
+    if (casesEntry?.status !== "ready") return;
+    linkedTracked.current = true;
+    if (casesEntry.data.cases.some((item) => item.id === linkedId)) {
+      caseOpened("/patterns", "compare", "deep_link", linkedId);
+    }
+  }, [linkedId, casesEntry]);
 
   const count = useMemo(() => {
     const cases = casesEntry?.status === "ready" ? casesEntry.data.cases : null;

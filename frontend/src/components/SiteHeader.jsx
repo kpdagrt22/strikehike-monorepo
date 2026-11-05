@@ -17,6 +17,7 @@ import {
   useIsPresent,
   useReducedMotion,
 } from "framer-motion";
+import { viewOpened } from "@/lib/analytics/events";
 import { ModeSwitch, viewForPath } from "@/components/ModeSwitch";
 import { DUR, EASE, INTENT } from "@/lib/motion";
 import { useChronoStore } from "@/store/chronoStore";
@@ -188,7 +189,11 @@ export function SiteHeader() {
   const zoneRef = useRef(null);
   const cueRef = useRef(null);
   const openVia = useRef(null); // "hover" | "tab" | "click"
+  const navTracked = useRef(false);
   const openedAt = useRef(0);
+  useEffect(() => {
+    navTracked.current = false;
+  }, [pathname]);
   const hovering = useRef(false);
   const press = useRef({ type: "", at: -Infinity });
   const hoverTimer = useRef(0);
@@ -214,6 +219,13 @@ export function SiteHeader() {
   const show = useCallback((via, at, touch = false) => {
     openVia.current = via;
     openedAt.current = at;
+    if (!navTracked.current) {
+      navTracked.current = true;
+      viewOpened(
+        "nav",
+        via === "hover" ? "hover_intent" : via === "tab" ? "keyboard" : "click",
+      );
+    }
     setTouchOpen(touch);
     setOpen(true);
     if (via === "tab") return;
