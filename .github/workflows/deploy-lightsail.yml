@@ -66,6 +66,10 @@ jobs:
             tests/test_caddy_snippet.py \
             -q
 
+      - name: Caddy migration restores the host Caddyfile on a failed pull
+        working-directory: .
+        run: bash tests/deploy/test_caddy_migration.sh
+
   test-frontend:
     name: Frontend lint and build
     runs-on: ubuntu-24.04
@@ -323,34 +327,16 @@ jobs:
             git fetch origin main
             git checkout main
 
-            # Keep the old host Caddyfile and move thisiskp's locally appended
-            # block into the snippet directory before the pull tries to delete
-            # the tracked root file. Nothing here prints the block.
-            mkdir -p "$HOME/caddy-backups"
-            if [ -f Caddyfile ]; then
-              BACKUP="$HOME/caddy-backups/Caddyfile.$(date -u +%Y%m%dT%H%M%SZ)"
-              cp -p Caddyfile "$BACKUP"
-              echo "Backed up Caddyfile to $BACKUP"
-            fi
-            if [ -f Caddyfile ] && grep -qF "# BEGIN THISISKP.IN" Caddyfile; then
-              mkdir -p deploy/caddy/sites
-              SNIPPET_TMP="$(mktemp)"
-              HELPER_TMP="$(mktemp)"
-              git show origin/main:scripts/caddy_snippet.py > "$HELPER_TMP"
-              if python3 "$HELPER_TMP" Caddyfile > "$SNIPPET_TMP"; then
-                mv "$SNIPPET_TMP" deploy/caddy/sites/thisiskp.caddy
-                rm -f "$HELPER_TMP"
-                git checkout -- Caddyfile
-                echo "Migrated the thisiskp.in block to deploy/caddy/sites/thisiskp.caddy."
-              else
-                rm -f "$SNIPPET_TMP" "$HELPER_TMP"
-                echo "::error::Could not extract the thisiskp.in Caddy block; the old stack is unchanged."
-                exit 1
-              fi
-            fi
-
-            if ! git pull --ff-only origin main; then
-              echo "::error::git pull --ff-only failed after the Caddy migration; no images were built and the old stack is still serving."
+            # Back up the host Caddyfile, move thisiskp's locally appended block
+            # into the snippet directory, and pull. A failed pull copies the
+            # backup back. The script comes from origin/main because the working
+            # tree is not pulled yet; it prints its own ::error:: on failure.
+            MIGRATE_TMP="$(mktemp)"
+            git show origin/main:scripts/caddy_migrate.sh > "$MIGRATE_TMP"
+            MIGRATE_STATUS=0
+            bash "$MIGRATE_TMP" || MIGRATE_STATUS=$?
+            rm -f "$MIGRATE_TMP"
+            if [ "$MIGRATE_STATUS" -ne 0 ]; then
               exit 1
             fi
 

@@ -31,13 +31,16 @@ def main(argv: list[str] | None = None) -> int:
         print("usage: caddy_snippet.py <Caddyfile>", file=sys.stderr)
         return 2
     try:
-        block = extract_block(Path(args[0]).read_text(encoding="utf-8"))
+        # newline="" and a binary write keep the block's line endings exact.
+        with Path(args[0]).open(encoding="utf-8", newline="") as handle:
+            block = extract_block(handle.read())
     except (OSError, ValueError) as exc:
         print(f"caddy snippet extraction failed: {exc}", file=sys.stderr)
         return 1
     if block is None:
         return 2
-    sys.stdout.write(block)
+    sys.stdout.buffer.write(block.encode("utf-8"))
+    sys.stdout.flush()
     return 0
 
 

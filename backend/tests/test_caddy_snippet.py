@@ -46,3 +46,18 @@ def test_extract_block_returns_none_without_markers():
 def test_extract_block_rejects_a_missing_end_marker():
     with pytest.raises(ValueError, match="BEGIN marker without END"):
         caddy_snippet.extract_block("# BEGIN THISISKP.IN\nthisiskp.in { }\n")
+
+
+def test_main_writes_the_block_bytes_unchanged(tmp_path, capsysbinary):
+    block = (
+        b"# BEGIN THISISKP.IN\n"
+        b"thisiskp.in {\n"
+        b'\theader Content-Security-Policy "default-src \'self\'"\r\n'
+        b"\treverse_proxy 172.17.0.1:4321\n"
+        b"}\n"
+        b"# END THISISKP.IN\n"
+    )
+    caddyfile = tmp_path / "Caddyfile"
+    caddyfile.write_bytes(b"strikehike.com { }\n\n" + block)
+    assert caddy_snippet.main([str(caddyfile)]) == 0
+    assert capsysbinary.readouterr().out == block
