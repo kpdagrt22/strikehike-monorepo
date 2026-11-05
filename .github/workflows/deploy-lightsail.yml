@@ -285,6 +285,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           REHEARSE_ROLLBACK: ${{ github.event.inputs.rehearse_rollback || 'false' }}
+          GROWTH_EXPORT_TOKEN: ${{ secrets.GROWTH_EXPORT_TOKEN }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -295,7 +296,7 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN
           script: |
             set -euo pipefail
 
@@ -305,11 +306,50 @@ jobs:
 
             git fetch origin main
             git checkout main
-            git pull --ff-only origin main
+
+            # Keep the old host Caddyfile and move thisiskp's locally appended
+            # block into the snippet directory before the pull tries to delete
+            # the tracked root file. Nothing here prints the block.
+            mkdir -p "$HOME/caddy-backups"
+            if [ -f Caddyfile ]; then
+              BACKUP="$HOME/caddy-backups/Caddyfile.$(date -u +%Y%m%dT%H%M%SZ)"
+              cp -p Caddyfile "$BACKUP"
+              echo "Backed up Caddyfile to $BACKUP"
+            fi
+            if [ -f Caddyfile ] && grep -qF "# BEGIN THISISKP.IN" Caddyfile; then
+              mkdir -p deploy/caddy/sites
+              SNIPPET_TMP="$(mktemp)"
+              HELPER_TMP="$(mktemp)"
+              git show origin/main:scripts/caddy_snippet.py > "$HELPER_TMP"
+              if python3 "$HELPER_TMP" Caddyfile > "$SNIPPET_TMP"; then
+                mv "$SNIPPET_TMP" deploy/caddy/sites/thisiskp.caddy
+                rm -f "$HELPER_TMP"
+                git checkout -- Caddyfile
+                echo "Migrated the thisiskp.in block to deploy/caddy/sites/thisiskp.caddy."
+              else
+                rm -f "$SNIPPET_TMP" "$HELPER_TMP"
+                echo "::error::Could not extract the thisiskp.in Caddy block; the old stack is unchanged."
+                exit 1
+              fi
+            fi
+
+            if ! git pull --ff-only origin main; then
+              echo "::error::git pull --ff-only failed after the Caddy migration; no images were built and the old stack is still serving."
+              exit 1
+            fi
 
             MARKER="NBER recession windows from FRED"
             BASE_URL="https://strikehike.com"
+            CADDY_IMAGE="caddy:2.11.1"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
+
+            # Validate the new directory mount and the migrated/fixture snippets
+            # in a throwaway container before touching the running stack.
+            if ! docker run --rm -v "$PWD/deploy/caddy:/etc/caddy:ro" "$CADDY_IMAGE" \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "::error::Caddy config is invalid after the pull; nothing was rebuilt and the old stack is still serving."
+              exit 1
+            fi
 
             tag_rollback_images() {
               for service in backend frontend; do
@@ -432,6 +472,15 @@ jobs:
               "${CURL[@]}" "$BASE_URL/" > /dev/null
             }
 
+            probe_thisiskp() {
+              if ! curl --fail --silent --show-error \
+                --retry 12 --retry-delay 5 --retry-connrefused --retry-all-errors \
+                --resolve thisiskp.in:443:127.0.0.1 https://thisiskp.in/ > /dev/null; then
+                echo "::error::thisiskp.in did not return 200 after the StrikeHike cutover."
+                return 1
+              fi
+            }
+
             probe_regime() {
               page="$(mktemp)"
               for attempt in $(seq 1 30); do
@@ -476,7 +525,8 @@ jobs:
             wait_ready() {
               probe_backend \
                 && "${CURL[@]}" --retry 36 --retry-delay 5 --retry-connrefused --retry-all-errors \
-                  "$BASE_URL/" > /dev/null
+                  "$BASE_URL/" > /dev/null \
+                && probe_thisiskp
             }
 
             warm_up() {
@@ -494,7 +544,8 @@ jobs:
                 && probe_atlas \
                 && probe_home \
                 && probe_regime \
-                && probe_upcoming_page
+                && probe_upcoming_page \
+                && probe_thisiskp
             }
 
             show_caddy_logs() {
@@ -527,7 +578,21 @@ jobs:
 
             docker compose -p strikehike-chrono ps
 
-            if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+            CADDY_OK=0
+            if ! docker compose -p strikehike-chrono exec -T caddy \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "::error::The running Caddy rejected the new config after cutover; taking the rollback path."
+              CADDY_OK=1
+            elif ! docker compose -p strikehike-chrono exec -T caddy \
+              caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "::error::Caddy reload failed after cutover; taking the rollback path."
+              CADDY_OK=1
+            fi
+
+            if [ "$CADDY_OK" -ne 0 ]; then
+              PROBES_OK=1
+              show_caddy_logs
+            elif [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
               echo "::warning::Rollback rehearsal requested; the probe gate is forced to fail so the :rollback images are restored; the job passes if the restore works."
               PROBES_OK=1
             elif wait_ready && warm_up && run_probes; then
