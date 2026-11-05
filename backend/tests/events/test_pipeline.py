@@ -142,6 +142,36 @@ def test_pipeline_adopts_a_changed_historical_seed(tmp_path):
     assert second.exit_code == 2
 
 
+def test_pipeline_applies_the_official_finance_release_times(tmp_path):
+    data_dir = _copy_data(tmp_path)
+    result = _run(tmp_path, data_dir)
+    events = json.loads((result.bundle_dir / "events.json").read_text("utf-8"))["events"]
+    by_external_id = {
+        event["external_id"]: event
+        for event in events
+        if event["source_id"] in {"fred_release_dates", "curated_upcoming"}
+    }
+
+    fred = by_external_id["50-2026-12"]
+    assert (fred["start_time"], fred["timezone"], fred["all_day"]) == (
+        "08:30:00",
+        "America/New_York",
+        False,
+    )
+    assert (by_external_id["boe-mpc-2026-11"]["start_time"], by_external_id["boe-mpc-2026-11"]["timezone"]) == (
+        "12:00:00",
+        "Europe/London",
+    )
+    assert (by_external_id["ecb-gc-2026-12"]["start_time"], by_external_id["ecb-gc-2026-12"]["timezone"]) == (
+        "14:15:00",
+        "Europe/Berlin",
+    )
+    assert (by_external_id["fomc-2026-12"]["start_time"], by_external_id["fomc-2026-12"]["timezone"]) == (
+        "14:00:00",
+        "America/New_York",
+    )
+
+
 def test_pipeline_reports_natural_disasters_as_not_schedulable(tmp_path):
     data_dir = _copy_data(tmp_path)
     result = _run(tmp_path, data_dir)

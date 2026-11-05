@@ -20,6 +20,7 @@ from .macro_data import MacroDataError, validate_macro_refresh
 from .model_bundle import model_gate, model_info
 from .models import EventKind, EventStatus, SourceRun, iso_utc, parse_utc, replace_event
 from .registry import default_data_dir, load_registry, select_sources
+from .release_times import apply_release_time
 from .reporting import quality_report_payload
 from .runtime import (
     STAGES,
@@ -94,7 +95,11 @@ def stage_extraction(ctx: PipelineContext) -> StageOutcome:
             error = redact_secrets(extraction.error)
         payloads = extraction.raw_payloads if extraction else {}
         ctx.raw_files.extend(write_raw(ctx.options.out_dir, source.id, payloads, error))
-        records = extraction.records if extraction else ()
+        records = (
+            tuple(apply_release_time(record) for record in extraction.records)
+            if extraction
+            else ()
+        )
         rejects = extraction.rejects if extraction else ()
         ctx.extracted_counts[source.id] += len(records) + len(rejects)
         ctx.rejected_counts[source.id] += len(rejects)

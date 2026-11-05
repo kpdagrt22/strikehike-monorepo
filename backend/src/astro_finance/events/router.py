@@ -11,12 +11,19 @@ the ``current`` pointer written by the activation step, with a mtime cache in
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from .models import THEME_METADATA, THEME_ORDER, SCHEMA_VERSION, Theme
+from .models import (
+    THEME_METADATA,
+    THEME_ORDER,
+    SCHEMA_VERSION,
+    Theme,
+    iso_utc,
+    start_instant,
+)
 from .schemas import HealthResponse, ThemeUpcoming, UpcomingEvent, UpcomingResponse
 from .store import (
     current_bundle_dir,
@@ -42,6 +49,20 @@ def get_active_bundle() -> Path | None:
 
 def get_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def start_utc_for(event: dict) -> str | None:
+    """The event's UTC instant, or ``None`` when it is all-day."""
+
+    start_time = event.get("start_time")
+    if not start_time:
+        return None
+    instant = start_instant(
+        date.fromisoformat(str(event["start_date"])),
+        time.fromisoformat(str(start_time)),
+        event.get("timezone"),
+    )
+    return iso_utc(instant) if instant else None
 
 
 def parse_themes(value: str | None) -> list[Theme]:
@@ -90,7 +111,7 @@ def get_upcoming(
         None,
         description="Comma-separated theme names; omit for all five.",
     ),
-    limit_per_theme: int = Query(5, ge=1, le=20),
+    limit_per_theme: int = Query(5, ge=1, le=50),
     horizon_days: int = Query(365, ge=1, le=730),
     bundle_dir: Path | None = Depends(get_active_bundle),
     today: date = Depends(get_today),
@@ -153,6 +174,7 @@ def get_upcoming(
                     start_date=event["start_date"],
                     start_time=event.get("start_time"),
                     timezone=event.get("timezone"),
+                    start_utc=start_utc_for(event),
                     all_day=bool(event["all_day"]),
                     status=str(event["status"]),
                     verification=str(event["verification"]),

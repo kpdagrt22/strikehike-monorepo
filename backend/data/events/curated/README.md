@@ -36,7 +36,9 @@ Rules enforced by the loader and validation stage:
   article, Wikipedia page or prediction site is not an official source.
 - `verified_on` must be a real date and must not be in the future.
 - An entry with a `time` must also have an IANA `timezone`.  Without a `time`
-  the event is all-day.
+  the event is all-day.  The bundle builder applies the confirmed times for
+  the `fomc-`, `boe-mpc-` and `ecb-gc-` decisions; see
+  `src/astro_finance/events/release_times.py` for the agency citations.
 - A recurring title (for example a central-bank decision that happens several
   times a year) should carry an `external_id` that is stable per occurrence,
   such as `boe-mpc-2026-11`.  Without one, identity is

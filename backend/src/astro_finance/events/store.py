@@ -18,7 +18,7 @@ from .models import (
 )
 
 UPCOMING_STATUSES = (EventStatus.SCHEDULED.value, EventStatus.TENTATIVE.value)
-MAX_LIMIT_PER_THEME = 20
+MAX_LIMIT_PER_THEME = 50
 
 # The pointer format is deliberately simple: a small text file named
 # ``current`` containing a bundle directory (absolute, relative to the runtime
