@@ -466,21 +466,26 @@ jobs:
             }
 
             warm_up() {
-              probe_atlas \
-                && probe_upcoming \
-                && probe_home \
-                && probe_regime \
-                && probe_upcoming_page
+              echo "Warm-up: atlas"
+              probe_atlas || return 1
+              echo "Warm-up: upcoming"
+              probe_upcoming || return 1
+              echo "Warm-up: home"
+              probe_home || return 1
+              echo "Warm-up: regime"
+              probe_regime || return 1
+              echo "Warm-up: upcoming page"
+              probe_upcoming_page || return 1
             }
 
             run_probes() {
-              probe_backend \
-                && probe_events \
-                && probe_chrono \
-                && probe_atlas \
-                && probe_home \
-                && probe_regime \
-                && probe_upcoming_page
+              echo "Probe: backend";  probe_backend || { echo "::error::probe backend failed"; return 1; }
+              echo "Probe: events";   probe_events || { echo "::error::probe events failed"; return 1; }
+              echo "Probe: chrono";   probe_chrono || { echo "::error::probe chrono failed"; return 1; }
+              echo "Probe: atlas";    probe_atlas || { echo "::error::probe atlas failed"; return 1; }
+              echo "Probe: home";     probe_home || { echo "::error::probe home failed"; return 1; }
+              echo "Probe: regime";   probe_regime || { echo "::error::probe regime failed"; return 1; }
+              echo "Probe: upcoming page"; probe_upcoming_page || { echo "::error::probe upcoming page failed"; return 1; }
             }
 
             show_caddy_logs() {
