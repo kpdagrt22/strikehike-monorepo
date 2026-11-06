@@ -7,6 +7,7 @@ import { bestParallel } from "@/lib/parallelEpoch";
 import { useChronoStore } from "@/store/chronoStore";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { GaugeAura } from "@/components/GaugeAura";
+import { FACE_RADIUS } from "@/lib/aura/crown";
 import {
   GEOMETRY_MATCH_DEFINITION,
   SKY_ACTIVITY_DEFINITION,
@@ -168,6 +169,17 @@ export function EnergyGauge({
           paused={Boolean(mobileSheet)}
           compact={compactIntro}
         />
+        {/* The score's face: opaque and above every aura layer, so nothing
+            passes behind or over the digits. */}
+        <div
+          aria-hidden="true"
+          data-gauge-face
+          className="absolute rounded-full bg-(--sh-surface-face)"
+          style={{
+            inset: CENTER - FACE_RADIUS,
+            boxShadow: "var(--sh-face-shadow)",
+          }}
+        />
 
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -222,12 +234,23 @@ export function EnergyGauge({
           />
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="flex items-baseline gap-1">
-            <span className="text-[32px] font-light leading-none tabular-nums tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4]">
+        {/* "/ 100" sits under the number at every size: side by side, "100"
+            would not clear the face's edge. */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            data-gauge-score
+            className="flex flex-col items-center tabular-nums"
+          >
+            <span
+              data-gauge-number
+              className="text-[30px] font-light leading-none tracking-[-0.05em] text-(--sh-ink) dark:text-(--sh-pearl)"
+            >
               {score === null ? "—" : Math.round(score)}
             </span>
-            <span className="font-mono text-micro text-black/60 dark:text-white/60">
+            <span
+              data-gauge-of
+              className="mt-0.5 font-mono text-meta leading-none tracking-[0.02em] text-(--sh-text-2)"
+            >
               / 100
             </span>
           </span>

@@ -1,96 +1,62 @@
 "use client";
 
-// The Sky activity gauge's flame aura, drawn in the site's own palette
-// (signal red, gold, pearl) as crisp, animated-style vector flames.
-//   85+  one ring of signal-red tongues around the ring's upper half
-//   90+  taller tongues around most of the ring, each with a gold inner flame
-//   95+  the full crown, a pearl-hot inner layer, a pulsing core ring and
-//        embers drifting up off the crown
+// The Sky activity gauge's fire, in the site's own palette (signal red, ember
+// orange, gold, pearl). The geometry is lib/aura/crown.ts; the motion is the
+// sh-flame / sh-ember / sh-aura rules in globals.css.
+//   85+  a red crown of tongues around the top of the ring
+//   90+  taller and faster, with a gold inner flame
+//   95+  the tallest crown, pearl-hot tips and embers rising off it
 //
-// Motion is continuous (owner's choice, 4 Nov 2026): every tongue flickers
-// and sways on its own rhythm with transform-only CSS animations. It pauses
-// while a phone sheet covers the gauge, and under reduced motion the global
-// rule stops it on a still frame. Purely decorative (aria-hidden): the
-// number and its label carry the meaning.
+// Each tongue is one masked element: its shape is an SVG mask, its colour a
+// gradient from deep red at the base to gold (pearl at 95+) at the tip, and
+// its edges are slightly translucent. Tongues are grouped into short sectors;
+// each sector runs two loops (a scaleY lick and a skewX bend about its own
+// base) with co-prime lengths and random offsets, and the sectors run out of
+// phase, so the crown shimmers tongue by tongue without one animation per
+// tongue. The whole crown sways, and one blurred copy of it glows behind.
+// Motion is transform and opacity only, on the compositor, and continuous
+// while visible (owner's choice, 4 Nov 2026): it pauses offscreen, in a
+// hidden tab and under a phone sheet, and reduced motion shows one still
+// frame. Purely decorative (aria-hidden): the number and its label carry the
+// meaning. The score's face (EnergyGauge) is drawn above all of it, and no
+// tongue's box reaches inside that face.
 
-const BOX = 240;
-const C = BOX / 2; // the gauge ring's centre
-const RING = 51; // tongue bases tuck under the ring's stroke (the ring draws on top)
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  FACE_RADIUS,
+  RING_OUTER,
+  VARIANT_COUNT,
+  auraTier,
+  crown,
+} from "@/lib/aura/crown";
 
-const PALETTE = {
-  dark: { outer: "#f05d49", mid: "#f2a54a", inner: "#ffe9c2", core: "#ffe9c2", ember: "#f7c56b" },
-  light: { outer: "#c0442f", mid: "#e8892f", inner: "#f7c46a", core: "#f2a54a", ember: "#d98a2b" },
+export { auraTier };
+
+// The glow's colours (existing palette values; the tongues' own gradients are
+// in globals.css). Dark glows warmer; light stays faint on the beige sky.
+const GLOW = {
+  dark: { fill: "#f2a54a", halo: "#f05d49", opacity: 0.6 },
+  light: { fill: "#e8892f", halo: "#e8892f", opacity: 0.3 },
 };
 
-// One flame tongue, base at (0, 0), tip at (0, -1): an S-curved flat flame.
-const TONGUE =
-  "M-0.5 0C-0.62-0.3-0.28-0.5-0.2-0.72C-0.15-0.86-0.06-0.94 0.02-1C0.04-0.86 0.2-0.74 0.34-0.56C0.52-0.32 0.46-0.08 0.3 0Z";
+const PHONE_QUERY = "(max-width: 639.98px)";
 
-export function auraTier(score) {
-  if (!Number.isFinite(score)) return 0;
-  if (score >= 95) return 3;
-  if (score >= 90) return 2;
-  if (score >= 85) return 1;
-  return 0;
+function subscribePhone(onChange) {
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
 }
 
-// Layers per tier: a red back silhouette, a gold middle and (at 95+) a
-// pearl-hot centre. Wide, overlapping tongues read as one rising flame.
-const LAYERS = {
-  1: [{ key: "o", count: 9, arc: 0.58, crown: 26, width: 31, color: "outer", opacity: 0.92 }],
-  2: [
-    { key: "o", count: 10, arc: 0.62, crown: 32, width: 33, color: "outer", opacity: 0.92 },
-    { key: "m", count: 8, arc: 0.48, crown: 22, width: 25, color: "mid", opacity: 1 },
-  ],
-  3: [
-    { key: "o", count: 12, arc: 0.66, crown: 36, width: 34, color: "outer", opacity: 0.94 },
-    { key: "m", count: 10, arc: 0.54, crown: 26, width: 26, color: "mid", opacity: 1 },
-    { key: "i", count: 7, arc: 0.4, crown: 15, width: 17, color: "inner", opacity: 1 },
-  ],
-};
+const getPhone = () => window.matchMedia(PHONE_QUERY).matches;
+const getPhoneServer = () => false;
 
-/** One layer of tongues: tallest at the crown, leaning hard toward vertical. */
-function tongues(layer, compact) {
-  const { count, arc, crown, width } = layer;
-  const reach = compact ? 0.6 : 1; // phones: the gauge sits just under the header
-  return Array.from({ length: count }, (_, index) => {
-    const t = count === 1 ? 0 : index / (count - 1) - 0.5; // -0.5..0.5
-    const angle = t * 2 * arc * 180; // degrees from the top
-    const rad = (angle * Math.PI) / 180;
-    const up = ((1 + Math.cos(rad)) / 2) ** 2.2; // 1 at the top, ~0 low down
-    const jitter = ((index * 37) % 7) / 7 - 0.5; // so the crown never looks stamped
-    return {
-      key: `${layer.key}${index}`,
-      x: C + Math.sin(rad) * RING,
-      y: C - Math.cos(rad) * RING,
-      lean: angle * 0.82,
-      length: (3 + (crown - 3) * up * (1 + jitter * 0.25)) * reach,
-      width: width * (0.7 + 0.35 * up),
-      flip: index % 2 === 0 ? 1 : -1,
-      duration: 0.52 + ((index * 53) % 9) * 0.05,
-      delay: -(((index * 29) % 11) * 0.08),
-    };
-  });
+function subscribeVisibility(onChange) {
+  document.addEventListener("visibilitychange", onChange);
+  return () => document.removeEventListener("visibilitychange", onChange);
 }
 
-function Tongue({ item, color, scale = 1, opacity = 1 }) {
-  return (
-    <g transform={`translate(${item.x} ${item.y}) rotate(${item.lean})`}>
-      <g transform={`scale(${item.width * scale * item.flip} ${item.length * scale})`}>
-        <path
-          className="sh-tongue"
-          d={TONGUE}
-          fill={color}
-          opacity={opacity}
-          style={{
-            animationDuration: `${item.duration}s`,
-            animationDelay: `${item.delay}s`,
-          }}
-        />
-      </g>
-    </g>
-  );
-}
+const getHidden = () => document.visibilityState === "hidden";
+const getHiddenServer = () => false;
 
 export function GaugeAura({
   score,
@@ -98,78 +64,141 @@ export function GaugeAura({
   paused = false,
   compact = false,
 }) {
+  const rootRef = useRef(null);
+  const [offscreen, setOffscreen] = useState(false);
+  const phone = useSyncExternalStore(subscribePhone, getPhone, getPhoneServer);
+  const hidden = useSyncExternalStore(
+    subscribeVisibility,
+    getHidden,
+    getHiddenServer,
+  );
   const tier = auraTier(score);
+
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      setOffscreen(!entry.isIntersecting);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [tier]);
+
   if (!tier) return null;
-  const colors = isDark ? PALETTE.dark : PALETTE.light;
-  // Rendered only once a score has arrived (client side), so this is safe.
-  const compactTongues =
-    typeof window !== "undefined" &&
-    window.matchMedia("(max-width: 639.98px)").matches;
-  const box = compact ? 160 : BOX;
+  const mode = compact ? "compact" : phone ? "phone" : "full";
+  const shape = crown(tier, mode);
+  const glow = isDark ? GLOW.dark : GLOW.light;
+  const { box } = shape;
+  const centre = box / 2;
+  const small = mode === "compact";
+  const stopped = paused || hidden || offscreen;
 
   return (
     <div
+      ref={rootRef}
       aria-hidden="true"
       className="sh-aura pointer-events-none absolute left-1/2 top-1/2"
-      style={{ width: box, height: box, marginLeft: -box / 2, marginTop: -box / 2 }}
+      style={{
+        width: box,
+        height: box,
+        marginLeft: -box / 2,
+        marginTop: -box / 2,
+      }}
       data-tier={tier}
-      data-paused={paused ? "true" : undefined}
+      data-mode={mode}
+      data-paused={stopped ? "true" : undefined}
     >
-      <svg viewBox={`0 0 ${BOX} ${BOX}`} className="h-full w-full overflow-visible">
-        {/* A faint warm halo around the ring (stroke-opacity, so the halo's
-            own opacity animation can breathe on top of it). */}
-        <circle
-          className="sh-aura-halo"
-          cx={C}
-          cy={C}
-          r={RING + 4}
-          fill="none"
-          stroke={colors.outer}
-          strokeWidth={6 + tier * 3}
-          strokeOpacity={0.1 + tier * 0.05}
-        />
-
-        {LAYERS[tier].map((layer) =>
-          tongues(layer, compactTongues).map((item) => (
-            <Tongue
-              key={item.key}
-              item={item}
-              color={colors[layer.color]}
-              opacity={layer.opacity}
-            />
-          )),
-        )}
-
-        {tier >= 3 ? (
-          <>
-            <circle
-              className="sh-aura-core"
-              cx={C}
-              cy={C}
-              r={RING + 1}
-              fill="none"
-              stroke={colors.core}
-              strokeWidth="1.5"
-            />
-            {Array.from({ length: 7 }, (_, index) => (
+      <div
+        className="sh-aura-sway"
+        style={{ animationDuration: `${shape.sway}s` }}
+      >
+        {/* The glow: one blurred, static copy of the crown and a warm halo
+            around the ring. Only its opacity breathes. Masked clear of the
+            score's face. */}
+        <div
+          className="sh-aura-glow"
+          style={{
+            maskImage: `radial-gradient(circle at 50% 50%, transparent ${FACE_RADIUS + 1}px, #000 ${FACE_RADIUS + 4}px)`,
+            WebkitMaskImage: `radial-gradient(circle at 50% 50%, transparent ${FACE_RADIUS + 1}px, #000 ${FACE_RADIUS + 4}px)`,
+          }}
+        >
+          <svg
+            viewBox={`0 0 ${box} ${box}`}
+            width={box}
+            height={box}
+            className="block"
+          >
+            <defs>
+              <filter
+                id="sh-aura-blur"
+                x="-25%"
+                y="-25%"
+                width="150%"
+                height="150%"
+              >
+                <feGaussianBlur stdDeviation={small ? 3 : 5} />
+              </filter>
+            </defs>
+            <g filter="url(#sh-aura-blur)" opacity={glow.opacity}>
               <circle
-                key={`e${index}`}
-                className="sh-ember"
-                cx={C + (index - 3) * 12}
-                cy={C - RING - 12 + Math.abs(index - 3) * 5}
-                r={1.5}
-                fill={colors.ember}
+                cx={centre}
+                cy={centre}
+                r={RING_OUTER + 3}
+                fill="none"
+                stroke={glow.halo}
+                strokeWidth={(small ? 4 : 6) + tier}
+              />
+              <path d={shape.glowPath} fill={glow.fill} />
+            </g>
+          </svg>
+        </div>
+
+        {shape.sectors.map((sector) => (
+          <div
+            key={sector.key}
+            className="sh-sector"
+            style={{
+              transformOrigin: `${sector.originX}px ${sector.originY}px`,
+              animationDuration: `${sector.flicker}s`,
+              animationDelay: `${sector.delay}s`,
+              scale: sector.still,
+            }}
+          >
+            {sector.tongues.map((tongue) => (
+              <span
+                key={tongue.key}
+                className="sh-flame"
+                data-layer={tongue.layer}
+                data-v={tongue.variant + (tongue.mirrored ? VARIANT_COUNT : 0)}
                 style={{
-                  animationDelay: `${-index * 0.37}s`,
-                  animationDuration: `${1.8 + (index % 3) * 0.4}s`,
-                  "--sh-ember-dx": `${(index - 3) * 2}px`,
-                  "--sh-ember-rise": compactTongues ? "-20px" : "-30px",
+                  left: tongue.left,
+                  top: tongue.top,
+                  width: tongue.width,
+                  height: tongue.height,
+                  rotate: `${tongue.lean}deg`,
+                  opacity: tongue.opacity,
                 }}
               />
             ))}
-          </>
-        ) : null}
-      </svg>
+          </div>
+        ))}
+
+        {shape.embers.map((ember) => (
+          <span
+            key={ember.key}
+            className="sh-ember"
+            data-path={ember.path}
+            style={{
+              left: ember.left,
+              top: ember.top,
+              width: ember.size,
+              height: ember.size,
+              animationDuration: `${ember.duration}s`,
+              animationDelay: `${ember.delay}s`,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
