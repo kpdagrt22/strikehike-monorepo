@@ -14,8 +14,12 @@ function chipClass(active) {
   }`;
 }
 
-export function UpcomingFilterLinks({ themes, selected }) {
-  const allActive = selected.length === 0;
+/**
+ * One link per theme, to that theme's own page (/upcoming/[theme]) so every
+ * filter has a canonical URL. `current` marks the active one ("all" or a slug).
+ */
+export function UpcomingFilterLinks({ themes, current = "all" }) {
+  const allActive = current === "all";
   return (
     <nav
       aria-label="Filter upcoming dates by theme"
@@ -23,19 +27,19 @@ export function UpcomingFilterLinks({ themes, selected }) {
     >
       <Link
         href="/upcoming"
-        aria-current={allActive ? "true" : undefined}
+        aria-current={allActive ? "page" : undefined}
         onClick={() => themeSelected("all", "on", 0)}
         className={chipClass(allActive)}
       >
         All
       </Link>
       {themes.map((theme) => {
-        const active = selected.includes(theme.slug);
+        const active = current === theme.slug;
         return (
           <Link
             key={theme.slug}
-            href={`/upcoming?themes=${theme.slug}`}
-            aria-current={active ? "true" : undefined}
+            href={`/upcoming/${theme.slug}`}
+            aria-current={active ? "page" : undefined}
             onClick={() => themeSelected(theme.slug, "on", 1)}
             className={chipClass(active)}
           >

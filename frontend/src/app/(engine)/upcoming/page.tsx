@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteColophon } from "@/components/seo/SiteColophon";
-import { EventSourceLink } from "@/components/upcoming/EventSourceLink";
-import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { SubscribeControl } from "@/components/upcoming/SubscribeControl";
+import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
 import { UpcomingFilterLinks } from "@/components/upcoming/UpcomingFilterLinks";
 import { UpcomingPageTracker } from "@/components/upcoming/UpcomingPageTracker";
-import { orderedThemes, statusLabel, type OrderedTheme } from "@/lib/events/upcoming";
+import { orderedThemes, type OrderedTheme } from "@/lib/events/upcoming";
 import { getUpcoming, type UpcomingEventPayload } from "@/lib/seo/data";
 import { absoluteUrl, SITE_NAME } from "@/lib/seo/site";
 
@@ -32,7 +31,6 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
-const VISIBLE_SLUGS = new Set(["science", "finance", "culture-religion"]);
 const DATE_LABEL = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -45,14 +43,6 @@ function lastDateLabel(value: string | undefined) {
   return DATE_LABEL.format(new Date(`${value}T00:00:00Z`));
 }
 
-function parseFilter(value: string | string[] | undefined) {
-  const raw = Array.isArray(value) ? value.join(",") : value ?? "";
-  return raw
-    .split(",")
-    .map((part) => part.trim().toLowerCase())
-    .filter((part) => VISIBLE_SLUGS.has(part));
-}
-
 function EventRow({
   event,
   theme,
@@ -60,52 +50,12 @@ function EventRow({
   event: UpcomingEventPayload;
   theme: OrderedTheme;
 }) {
-  const status = statusLabel(event.status);
   return (
-    <li className="border-b border-(--sh-line-1) py-3 last:border-b-0">
-      <div className="flex items-start gap-3">
-        <span className="w-[5.25rem] shrink-0 text-micro uppercase tracking-[0.08em] text-(--sh-text-3)">
-          <LocalDateTime
-            startDate={event.start_date}
-            startTime={event.start_time}
-            startUtc={event.start_utc}
-            timezone={event.timezone}
-            allDay={event.all_day}
-            part="date"
-          />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-body font-medium leading-snug text-(--sh-text-1)">
-            {event.name}
-          </p>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-micro text-(--sh-text-3)">
-            <LocalDateTime
-              startDate={event.start_date}
-              startTime={event.start_time}
-              startUtc={event.start_utc}
-              timezone={event.timezone}
-              allDay={event.all_day}
-              part="time"
-            />
-            {status ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{status}</span>
-              </>
-            ) : null}
-            <span aria-hidden="true">·</span>
-            <EventSourceLink
-              eventId={event.event_id}
-              eventName={event.name}
-              theme={theme.slug}
-              daysUntil={event.days_until}
-              sourceUrl={event.source_url}
-              verification={event.verification}
-            />
-          </div>
-        </div>
-      </div>
-    </li>
+    <UpcomingEventRow
+      event={event}
+      themeSlug={theme.slug}
+      themeName={theme.name}
+    />
   );
 }
 
@@ -178,22 +128,11 @@ function ThemeSection({ theme }: { theme: OrderedTheme }) {
   );
 }
 
-export default async function UpcomingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ themes?: string | string[] }>;
-}) {
-  const [params, payload] = await Promise.all([
-    searchParams,
-    getUpcoming().catch(() => null),
-  ]);
-  const selected = parseFilter(params.themes);
+export default async function UpcomingPage() {
+  const payload = await getUpcoming().catch(() => null);
   const themes = orderedThemes(payload);
-  const shown = selected.length
-    ? themes.filter((theme) => selected.includes(theme.slug))
-    : themes;
   const unavailable = !payload || Boolean(payload.message);
-  const listedCount = shown.reduce(
+  const listedCount = themes.reduce(
     (total, theme) => total + (theme.data.events?.length ?? 0),
     0,
   );
@@ -233,21 +172,21 @@ export default async function UpcomingPage({
             </div>
 
             <div className="mt-4 border-y border-(--sh-line-1) py-1">
-              <UpcomingFilterLinks themes={themes} selected={selected} />
+              <UpcomingFilterLinks themes={themes} />
             </div>
 
-            {shown.length === 0 ? (
+            {themes.length === 0 ? (
               <p className="mt-6 text-body text-(--sh-text-2)">
-                No dates match this filter.{" "}
+                No dates are scheduled in the next 12 months.{" "}
                 <Link
                   href="/upcoming"
                   className="inline-flex min-h-11 items-center underline decoration-current/30 underline-offset-2 hover:decoration-current focus-visible:decoration-current"
                 >
-                  Show all dates
+                  Check again
                 </Link>
               </p>
             ) : (
-              shown.map((theme) => <ThemeSection key={theme.slug} theme={theme} />)
+              themes.map((theme) => <ThemeSection key={theme.slug} theme={theme} />)
             )}
 
             <p className="mt-8 border-t border-(--sh-line-1) pt-4 text-micro leading-relaxed text-(--sh-text-3)">

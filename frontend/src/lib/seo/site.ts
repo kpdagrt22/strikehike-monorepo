@@ -71,6 +71,9 @@ export const PAGES: Record<SitePath, { title: string; description: string; crumb
 
 export const absoluteUrl = (path: SitePath) => (path === "/" ? SITE_URL : `${SITE_URL}${path}`);
 
+/** An absolute URL for a generated path ("/events/finance~…"), which is not a SitePath. */
+export const urlFor = (path: string) => (path.startsWith("/") ? `${SITE_URL}${path}` : path);
+
 /** The `<title>` exactly as rendered: home stands alone, the rest carry " | StrikeHike". */
 export const fullTitle = (path: SitePath) =>
   path === "/" ? PAGES[path].title : `${PAGES[path].title} | ${SITE_NAME}`;
