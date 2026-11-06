@@ -69,7 +69,7 @@ function SelectedDayParallel({ parallels, compact = false }) {
           className={
             compact
               ? "flex min-w-0 flex-col items-start"
-              : "flex min-w-0 max-w-full flex-col items-center rounded-2xl px-3.5 py-1.5"
+              : "flex min-w-0 max-w-full flex-col items-center px-1 py-0.5"
           }
         >
           <span className="flex items-center gap-1.5">
@@ -273,8 +273,8 @@ export function EnergyGauge({
           <SelectedDayParallel parallels={parallels} compact />
         </div>
       ) : (
-        <>
-          <div className="mt-2.5 flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+        <div className="mt-2.5 flex w-full flex-col items-center rounded-2xl bg-(--sh-surface-float) px-3 py-2 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{ backgroundColor: tone.stroke }}
@@ -286,7 +286,7 @@ export function EnergyGauge({
             />
           </div>
           <SelectedDayParallel parallels={parallels} />
-        </>
+        </div>
       )}
     </div>
   );

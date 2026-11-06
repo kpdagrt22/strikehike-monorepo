@@ -393,9 +393,21 @@ jobs:
             }
 
             probe_atlas() {
-              "${CURL[@]}" "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
-                | docker compose -p strikehike-chrono exec -T backend \
-                    python -c 'import json,sys; payload=json.load(sys.stdin); assert len(payload.get("timeline") or []) > 8000'
+              # The first atlas request after a deploy is cold (the backend has
+              # to read and serialise the whole weekly history), and the Next
+              # proxy gives up at 15 s. Retry before calling the release bad.
+              for attempt in $(seq 1 12); do
+                if "${CURL[@]}" "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
+                  | docker compose -p strikehike-chrono exec -T backend \
+                      python -c 'import json,sys; payload=json.load(sys.stdin); assert len(payload.get("timeline") or []) > 8000'; then
+                  return 0
+                fi
+                if [ "$attempt" -eq 12 ]; then
+                  return 1
+                fi
+                sleep 5
+              done
+              return 1
             }
 
             probe_upcoming() {
