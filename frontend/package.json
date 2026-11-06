@@ -9,7 +9,7 @@
     "lint": "eslint",
     "check:copy": "node scripts/check-copy.mjs",
     "test:route-cache": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs",
-    "test:unit": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs src/lib/server/rateLimit.test.mjs src/lib/analytics/track.test.mjs src/lib/events/localTime.test.mjs",
+    "test:unit": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs src/lib/server/rateLimit.test.mjs src/lib/analytics/track.test.mjs src/lib/events/localTime.test.mjs src/lib/events/indexing.test.mjs",
     "test:smoke": "playwright test",
     "check:tracker": "node scripts/check-tracker-size.mjs"
   },
