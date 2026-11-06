@@ -245,7 +245,8 @@ export function jsonTextResponse(
   return new Response(result.body, { status: result.status, headers });
 }
 
-/** Text response that keeps the upstream Content-Type, Cache-Control and ETag. */
+/** Text response that keeps the upstream Content-Type, Cache-Control, ETag and
+ *  Content-Disposition. */
 export function textResponse(
   result: RouteLoadResult,
   fallbackContentType: string,
@@ -257,5 +258,18 @@ export function textResponse(
     headers["Cache-Control"] = result.headers["Cache-Control"];
   }
   if (result.headers?.ETag) headers.ETag = result.headers.ETag;
+  if (result.headers?.["Content-Disposition"]) {
+    headers["Content-Disposition"] = result.headers["Content-Disposition"];
+  }
   return new Response(result.body, { status: result.status, headers });
+}
+
+/** True when an If-None-Match header names this ETag (or is `*`). */
+export function matchesEtag(header: string | null, etag: string | undefined) {
+  if (!header || !etag) return false;
+  if (header.trim() === "*") return true;
+  return header
+    .split(",")
+    .map((part) => part.trim())
+    .includes(etag);
 }

@@ -1,5 +1,6 @@
 import {
   cachedRoute,
+  matchesEtag,
   textResponse,
   type RouteLoadResult,
 } from "@/lib/server/routeCache";
@@ -53,15 +54,6 @@ async function loadCalendar(theme: string | null): Promise<RouteLoadResult> {
   } finally {
     clearTimeout(timer);
   }
-}
-
-function matchesEtag(header: string | null, etag: string | undefined) {
-  if (!header || !etag) return false;
-  if (header.trim() === "*") return true;
-  return header
-    .split(",")
-    .map((part) => part.trim())
-    .includes(etag);
 }
 
 export async function GET(

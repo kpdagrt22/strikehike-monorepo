@@ -128,6 +128,14 @@ export function FutureLadder() {
     );
   };
 
+  // "See the sky" on a home Upcoming card: stay on the home page, move the
+  // orrery to that date and put the sheet away.
+  const travelToUpcomingEvent = (date) => {
+    dateTravelled("archive_event", date);
+    setFocusedDate(date);
+    if (sheetOpen) dismissSheet({ restoreFocus: true });
+  };
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -258,7 +266,7 @@ export function FutureLadder() {
           className="max-h-[min(24rem,55dvh)] overflow-y-auto px-1.5 pt-1.5 pb-5 [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_1.25rem),transparent)] [scrollbar-width:thin] lg:max-h-none lg:min-h-0 lg:flex-1 lg:pt-0 lg:pb-0"
         >
           {view === "upcoming" ? (
-            <UpcomingEvents />
+            <UpcomingEvents onSeeSky={travelToUpcomingEvent} />
           ) : (
             <>
               {error ? (

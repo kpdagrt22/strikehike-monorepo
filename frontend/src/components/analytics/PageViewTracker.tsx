@@ -3,15 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { pageViewed } from "@/lib/analytics/events";
-
-const PATHS = new Set([
-  "/",
-  "/regime",
-  "/convergence",
-  "/patterns",
-  "/disclaimer",
-  "/upcoming",
-]);
+import { pageTemplate } from "@/lib/analytics/paths";
 
 export function PageViewTracker() {
   const pathname = usePathname();
@@ -38,7 +30,9 @@ export function PageViewTracker() {
       navType = "back_forward";
     }
     back.current = false;
-    pageViewed(PATHS.has(pathname) ? pathname : "404", navType);
+    // A template, never the raw path: /events/… ids and unknown pages are
+    // recorded as "/events/[id]" and "404".
+    pageViewed(pageTemplate(pathname), navType);
   }, [pathname]);
 
   return null;

@@ -1,7 +1,6 @@
 import { create } from "zustand";
 
-export const TIMELINE_MIN = "1906-07-13";
-export const TIMELINE_MAX = "2027-12-31";
+export { TIMELINE_MAX, TIMELINE_MIN } from "@/lib/timeline";
 
 export function currentUtcDate() {
   return new Date().toISOString().slice(0, 10);

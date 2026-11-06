@@ -99,6 +99,9 @@ def test_schema_has_the_fifteen_live_events_and_no_future_ones():
         "/patterns",
         "/disclaimer",
         "/upcoming",
+        "/events/[id]",
+        "/upcoming/[theme]",
+        "/dates/[year]/[list]",
         "404",
     }
 

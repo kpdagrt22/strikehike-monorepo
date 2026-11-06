@@ -173,7 +173,15 @@ the bundle and quality reports, and the CLI exits `2`.
 `event_id, name, theme, kind, start_date, start_time, timezone, all_day,
 status, description, source_id, external_id, source_url,
 first_discovered_at, last_updated_at, collected_at, verification, supersedes,
-content_hash, days_until, missing_runs`.
+content_hash, days_until, missing_runs, authority_url`.
+
+`authority_url` (nullable) is a page that names that specific event, attached
+at build time by `events/authority.py`: NASA GSFC's page for each eclipse, the
+USNO per-year seasons table for solstices and equinoxes, and the Fed, Bank of
+England and ECB meeting calendars for curated decisions.  It is set only when
+the record's source, kind and date match an entry opened and checked by hand,
+and it enters `content_dict()` only when set, so events without one keep their
+earlier hash.  Bundles built before the column existed read it as `NULL`.
 
 `manifest.json` keys:
 
@@ -282,13 +290,22 @@ returns 503.
 
 ## Read API
 
-The backend exposes two read-only routes under `/api/v1/events`. They never
+The backend exposes these read-only routes under `/api/v1/events`. They never
 call the network.
 
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/api/v1/events/upcoming` | `{as_of, bundle_version, message, themes: {<theme>: {schedulable, total_available, events: [...]}}}` |
+| GET | `/api/v1/events/calendar.ics` | RFC 5545 feed, `themes` filter |
 | GET | `/api/v1/events/health` | `{active_version, created_at, counts, schema_version}` |
+| GET | `/api/v1/events/{event_id}` | one event of any kind: the upcoming fields plus `kind`, `description`, `source_id`, `authority_url` |
+| GET | `/api/v1/events/{event_id}.ics` | that event as a one-event calendar (same `VEVENT` and UID as the feed) |
+
+`event_id` must match `^[a-z-]+:[a-z0-9_-]+:[A-Za-z0-9:._-]+$` (at most 160
+characters), the grammar the analytics schema uses; anything else is a 422
+before any lookup, and an unknown id is a 404.  Archived snapshot ids (`@`,
+`~`) never match.  Events in `upcoming` also carry `description`, `source_id`
+and `authority_url`, so a page can apply the index rules without a second call.
 
 `upcoming` query parameters:
 
