@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { mockHomeData } from "./fixtures/homeData";
 
 const H1 = "The market record beside the sky, tested in public.";
 const PRIMARY = "See 170 years of markets beside the sky";
@@ -36,130 +37,12 @@ function overlaps(left: Box, right: Box) {
   );
 }
 
-const MOCK_CATEGORIES = [
-  "Science",
-  "Politics",
-  "Finance",
-  "Culture/Religion",
-  "Natural Disasters",
-];
-const MOCK_COUNTS = [43, 46, 28, 22, 20];
 const SURFACE_VIEWPORTS = [
   ["1024x768", 1024, 768],
   ["1280x720", 1280, 720],
   ["1440x900", 1440, 900],
   ["390x844", 390, 844],
 ] as const;
-const MOCK_BODIES = {
-  Sun: { lon: 198.35, rashi: "Tula", nakshatra: "Swati", retro: false },
-  Moon: {
-    lon: 147.76,
-    rashi: "Simha",
-    nakshatra: "Uttara Phalguni",
-    retro: false,
-  },
-  Mercury: { lon: 197.16, rashi: "Tula", nakshatra: "Swati", retro: true },
-  Venus: { lon: 180.43, rashi: "Tula", nakshatra: "Chitra", retro: true },
-  Mars: { lon: 116.36, rashi: "Karka", nakshatra: "Ashlesha", retro: false },
-  Jupiter: { lon: 120.31, rashi: "Simha", nakshatra: "Magha", retro: false },
-  Saturn: {
-    lon: 344.94,
-    rashi: "Meena",
-    nakshatra: "Uttara Bhadrapada",
-    retro: true,
-  },
-  Rahu: { lon: 301.62, rashi: "Kumbha", nakshatra: "Dhanishta", retro: true },
-  Ketu: { lon: 121.62, rashi: "Simha", nakshatra: "Magha", retro: true },
-};
-const MOCK_MATCHES = [
-  {
-    date: "2027-04-23",
-    similarity_percent: 89.7,
-    event: {
-      name: "India-Pakistan military strikes",
-      category: "Politics",
-      date: "2025-04-23",
-    },
-  },
-  {
-    date: "2027-03-31",
-    similarity_percent: 86.5,
-    event: {
-      name: "US national bank holiday",
-      category: "Finance",
-      date: "1933-03-31",
-    },
-  },
-  {
-    date: "2026-11-14",
-    similarity_percent: 83.2,
-    event: {
-      name: "Bhola cyclone",
-      category: "Natural Disasters",
-      date: "1970-11-14",
-    },
-  },
-  {
-    date: "2027-01-15",
-    similarity_percent: 78.1,
-    event: {
-      name: "A science echo",
-      category: "Science",
-      date: "1960-01-15",
-    },
-  },
-];
-
-function mockRoster() {
-  const total = MOCK_COUNTS.reduce((sum, count) => sum + count, 0);
-  return {
-    total,
-    categories: Object.fromEntries(
-      MOCK_CATEGORIES.map((category, index) => [
-        category,
-        Array.from({ length: MOCK_COUNTS[index] }, (_, event) => ({
-          date: `2000-01-${String((event % 28) + 1).padStart(2, "0")}`,
-          name: `${category} event ${event}`,
-        })),
-      ]),
-    ),
-  };
-}
-
-function mockPositions(url: string) {
-  const datetime =
-    new URL(url).searchParams.get("datetime") ?? "2026-10-28T00:00";
-  return {
-    datetime,
-    date: datetime.slice(0, 10),
-    source: "Swiss Ephemeris · Lahiri",
-    bodies: MOCK_BODIES,
-    energy: { score: 99, polarity: "disruptive" },
-    parallels: [
-      {
-        date: "1970-11-12",
-        name: "Bhola cyclone",
-        category: "Natural Disasters",
-        similarity_percent: 80.3,
-      },
-    ],
-  };
-}
-
-async function mockHomeData(page: Page) {
-  await page.route("**/api/events", (route) =>
-    route.fulfill({ json: mockRoster() }),
-  );
-  await page.route("**/api/chrono/positions*", (route) =>
-    route.fulfill({ json: mockPositions(route.request().url()) }),
-  );
-  await page.route("**/api/forecast-ladder", (route) =>
-    route.fulfill({ json: { matches: MOCK_MATCHES } }),
-  );
-  await page.route("**/api/v1/events/upcoming", (route) =>
-    route.fulfill({ json: { themes: {} } }),
-  );
-}
 
 async function setupHome(
   page: Page,
