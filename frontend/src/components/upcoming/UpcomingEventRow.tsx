@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EventSourceLink } from "@/components/upcoming/EventSourceLink";
+import { EventActions } from "@/components/upcoming/EventActions";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { statusLabel } from "@/lib/events/upcoming";
 import type { UpcomingEventPayload } from "@/lib/seo/data";
@@ -17,7 +18,7 @@ export function UpcomingEventRow({
 }) {
   const status = statusLabel(event.status);
   return (
-    <li className="border-b border-(--sh-line-1) py-3 last:border-b-0">
+    <li className="group border-b border-(--sh-line-1) py-3 last:border-b-0">
       <div className="flex items-start gap-3">
         <span className="w-[5.25rem] shrink-0 text-micro uppercase tracking-[0.08em] text-(--sh-text-3)">
           <LocalDateTime
@@ -69,6 +70,11 @@ export function UpcomingEventRow({
               verification={event.verification}
             />
           </div>
+          <EventActions
+            event={event}
+            themeSlug={themeSlug}
+            className="mt-1.5"
+          />
         </div>
       </div>
     </li>

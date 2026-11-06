@@ -8,6 +8,7 @@ import {
   themeSlug,
 } from "@/lib/analytics/events";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
+import { EventActions } from "@/components/upcoming/EventActions";
 import { orderedThemes } from "@/lib/events/upcoming";
 import { categoryTone } from "@/lib/categoryTone";
 
@@ -82,7 +83,7 @@ function Skeleton() {
   );
 }
 
-export function UpcomingEvents() {
+export function UpcomingEvents({ onSeeSky }) {
   // This component mounts only after the reader switches to the Upcoming tab,
   // so reading the shareable filter in the lazy initializer never runs during
   // SSR and cannot create a hydration mismatch.
@@ -310,7 +311,7 @@ export function UpcomingEvents() {
                       return (
                         <li
                           key={event.event_id}
-                          className="rounded-xl border border-black/5 bg-white/45 p-2.5 dark:border-white/5 dark:bg-white/[0.03]"
+                          className="group rounded-xl border border-black/5 bg-white/45 p-2.5 dark:border-white/5 dark:bg-white/[0.03]"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-body font-medium leading-snug text-black/80 dark:text-white/80">
@@ -381,6 +382,13 @@ export function UpcomingEvents() {
                               <path d="M4 2h6v6M10 2L2 10" />
                             </svg>
                           </a>
+
+                          <EventActions
+                            event={event}
+                            themeSlug={themeSlug(theme.name)}
+                            onSeeSky={onSeeSky}
+                            className="mt-2"
+                          />
                         </li>
                       );
                     })}
