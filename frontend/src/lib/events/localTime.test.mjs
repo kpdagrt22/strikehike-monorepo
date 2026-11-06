@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   allDayLabel,
+  allDayLongLabel,
   dateLabel,
+  longDateLabel,
   timeLabel,
   zoneLabel,
 } from "./localTime.ts";
@@ -36,4 +38,11 @@ test("an all-day date is never shifted", () => {
   assert.equal(allDayLabel("2026-12-21", "Asia/Kolkata"), "Mon 21 Dec");
   assert.equal(allDayLabel("2026-12-21", "America/New_York"), "Mon 21 Dec");
   assert.equal(allDayLabel("2026-12-21", "UTC"), "Mon 21 Dec");
+});
+
+test("the long labels carry the year and follow the zone", () => {
+  const instant = "2026-12-31T20:50:00Z";
+  assert.equal(longDateLabel(instant, "UTC"), "Thu, 31 Dec 2026");
+  assert.equal(longDateLabel(instant, "Asia/Kolkata"), "Fri, 1 Jan 2027");
+  assert.equal(allDayLongLabel("2027-03-28"), "Sun, 28 Mar 2027");
 });
