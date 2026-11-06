@@ -1,7 +1,10 @@
 """FastAPI routes for real scheduled events.
 
-GET /api/v1/events/upcoming  five verified events per theme, theme-filterable
-GET /api/v1/events/health    active bundle version, counts and created_at
+GET /api/v1/events/upcoming          five verified events per theme, theme-filterable
+GET /api/v1/events/calendar.ics      the RFC 5545 feed
+GET /api/v1/events/health            active bundle version, counts and created_at
+GET /api/v1/events/{event_id}        one event of any kind, or 404
+GET /api/v1/events/{event_id}.ics    that event as a one-event calendar
 
 The request path never calls the network.  The active bundle is resolved from
 the ``current`` pointer written by the activation step, with a mtime cache in
@@ -13,11 +16,14 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, datetime, time, timezone
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path as PathParam, Query, Response
 
-from .calendar import build_calendar
+from .calendar import build_calendar, build_event_calendar
 from .models import (
+    EVENT_ID_MAX_LENGTH,
+    EVENT_ID_PATTERN,
     THEME_METADATA,
     THEME_ORDER,
     SCHEMA_VERSION,
@@ -25,11 +31,18 @@ from .models import (
     iso_utc,
     start_instant,
 )
-from .schemas import HealthResponse, ThemeUpcoming, UpcomingEvent, UpcomingResponse
+from .schemas import (
+    EventDetail,
+    HealthResponse,
+    ThemeUpcoming,
+    UpcomingEvent,
+    UpcomingResponse,
+)
 from .store import (
     calendar_by_theme,
     current_bundle_dir,
     empty_event_counts,
+    event_by_id,
     event_counts,
     bundle_info,
     upcoming_by_theme,
@@ -182,6 +195,9 @@ def get_upcoming(
                     verification=str(event["verification"]),
                     source_url=str(event["source_url"]),
                     days_until=int(event["days_until"]),
+                    description=str(event.get("description") or "") or None,
+                    source_id=str(event["source_id"]),
+                    authority_url=event.get("authority_url") or None,
                 )
                 for event in events
             ],
@@ -282,4 +298,104 @@ def get_health(
         created_at=info.get("created_at"),
         counts=counts,
         schema_version=int(info.get("schema_version", SCHEMA_VERSION)),
+    )
+
+
+# The id routes come last, so /upcoming, /calendar.ics and /health keep their
+# own handlers, and the .ics route comes before the plain one, which would
+# otherwise read "<id>.ics" as an id.  FastAPI checks the grammar (422) before
+# the handler runs, so a malformed id never reaches the database.
+EventId = Annotated[
+    str,
+    PathParam(
+        pattern=EVENT_ID_PATTERN,
+        max_length=EVENT_ID_MAX_LENGTH,
+        description="An event id, <theme>:<source>:<fragment>.",
+    ),
+]
+EVENT_NOT_FOUND = "No event with this id in the active bundle."
+
+
+def _find_event(bundle_dir: Path | None, event_id: str, today: date) -> tuple[dict, dict]:
+    if bundle_dir is None:
+        raise HTTPException(status_code=503, detail=BUNDLE_UNAVAILABLE)
+    try:
+        info = bundle_info(bundle_dir)
+        event = event_by_id(bundle_dir / "events.sqlite", event_id, today=today)
+    except (FileNotFoundError, sqlite3.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail=BUNDLE_UNAVAILABLE) from exc
+    if event is None:
+        raise HTTPException(status_code=404, detail=EVENT_NOT_FOUND)
+    return info, event
+
+
+def _ics_filename(event_id: str) -> str:
+    fragment = event_id.split(":", 2)[-1]
+    return f"{fragment.replace(':', '-')}.ics"
+
+
+@router.get(
+    "/{event_id}.ics",
+    summary="One event as an RFC 5545 calendar file",
+    description=(
+        "Returns a one-event text/calendar file built by the same code as the "
+        "feeds, so the UID matches the feed's. 404 for an unknown id, 422 for "
+        "an id that does not match the grammar."
+    ),
+)
+def get_event_calendar(
+    event_id: EventId,
+    bundle_dir: Path | None = Depends(get_active_bundle),
+    today: date = Depends(get_today),
+) -> Response:
+    info, event = _find_event(bundle_dir, event_id, today)
+    body = build_event_calendar(event, created_at=info.get("created_at"))
+    etag = f'"{info.get("bundle_version") or "none"}-{event["content_hash"][:16]}"'
+    return Response(
+        content=body,
+        headers={
+            "Content-Type": "text/calendar; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": f'attachment; filename="{_ics_filename(event_id)}"',
+            "ETag": etag,
+        },
+    )
+
+
+@router.get(
+    "/{event_id}",
+    response_model=EventDetail,
+    summary="One event from the active bundle",
+    description=(
+        "Returns one upcoming or historical event with its description, its "
+        "UTC start and, when one was verified, an authority page that names "
+        "the event. 404 for an unknown id, 422 for an id that does not match "
+        "the grammar. This endpoint never calls an upstream service."
+    ),
+)
+def get_event(
+    response: Response,
+    event_id: EventId,
+    bundle_dir: Path | None = Depends(get_active_bundle),
+    today: date = Depends(get_today),
+) -> EventDetail:
+    _, event = _find_event(bundle_dir, event_id, today)
+    response.headers["Cache-Control"] = UPCOMING_CACHE_CONTROL
+    return EventDetail(
+        event_id=str(event["event_id"]),
+        name=str(event["name"]),
+        theme=str(event["theme"]),
+        kind=str(event["kind"]),
+        start_date=event["start_date"],
+        start_time=event.get("start_time"),
+        timezone=event.get("timezone"),
+        start_utc=start_utc_for(event),
+        all_day=bool(event["all_day"]),
+        status=str(event["status"]),
+        verification=str(event["verification"]),
+        source_url=str(event["source_url"]),
+        days_until=int(event["days_until"]),
+        description=str(event.get("description") or ""),
+        source_id=str(event["source_id"]),
+        authority_url=event.get("authority_url") or None,
     )

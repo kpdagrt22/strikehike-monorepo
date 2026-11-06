@@ -30,6 +30,7 @@ EVENT_COLUMNS = (
     "content_hash",
     "days_until",
     "missing_runs",
+    "authority_url",
 )
 
 
@@ -56,6 +57,7 @@ def _row(event: Event) -> tuple[Any, ...]:
         event.content_hash,
         event.days_until,
         event.missing_runs,
+        event.authority_url,
     )
 
 
@@ -90,7 +92,8 @@ def write_sqlite(path: Path, events: list[Event]) -> None:
             "supersedes TEXT, "
             "content_hash TEXT NOT NULL, "
             "days_until INTEGER, "
-            "missing_runs INTEGER NOT NULL DEFAULT 0"
+            "missing_runs INTEGER NOT NULL DEFAULT 0, "
+            "authority_url TEXT"
             ")"
         )
         connection.execute(

@@ -76,6 +76,7 @@ def _same_date_merge(target: Event, incoming: Event, now: datetime) -> Event:
         "source_url": incoming.source_url,
         "verification": incoming.verification,
         "supersedes": target.supersedes or incoming.supersedes,
+        "authority_url": incoming.authority_url,
         "days_until": None,
         "missing_runs": 0,
         "first_discovered_at": target.first_discovered_at,
@@ -110,6 +111,7 @@ def _cancelled_merge(target: Event, incoming: Event, now: datetime) -> Event:
         source_url=incoming.source_url,
         verification=incoming.verification,
         supersedes=target.supersedes or incoming.supersedes,
+        authority_url=incoming.authority_url,
         missing_runs=0,
         days_until=None,
         last_updated_at=now,
@@ -229,6 +231,8 @@ def merge_with_previous(
         }[target.status]
         archived_id = archive_event_id(base, target.start_date, used_ids)
         used_ids.add(archived_id)
+        # The authority page named the old date; once the date moves it no
+        # longer names this snapshot.
         output.append(
             replace_event(
                 target,
@@ -237,6 +241,7 @@ def merge_with_previous(
                 last_updated_at=now,
                 collected_at=now,
                 days_until=None,
+                authority_url=None,
             )
         )
         output.append(

@@ -11,6 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Mapping
 
+from .authority import apply_authority
 from .bundle import finalize_bundle, quality_report_markdown, write_dataset
 from .dedup import deduplicate
 from .gates import GateContext, GateResult, run_gates
@@ -96,7 +97,10 @@ def stage_extraction(ctx: PipelineContext) -> StageOutcome:
         payloads = extraction.raw_payloads if extraction else {}
         ctx.raw_files.extend(write_raw(ctx.options.out_dir, source.id, payloads, error))
         records = (
-            tuple(apply_release_time(record) for record in extraction.records)
+            tuple(
+                apply_authority(apply_release_time(record))
+                for record in extraction.records
+            )
             if extraction
             else ()
         )
