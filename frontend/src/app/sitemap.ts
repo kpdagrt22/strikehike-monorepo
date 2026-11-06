@@ -14,9 +14,9 @@ import {
 } from "@/lib/seo/data";
 import { CONTENT_DATES, absoluteUrl, urlFor, type SitePath } from "@/lib/seo/site";
 
-// Regenerated at most hourly on the server. A build without CHRONO_API_URL lists the copy dates;
-// the first regeneration with data adds the data dates and the generated pages.
-export const revalidate = 3600;
+// Generated per request: the Docker build has no backend, so a prerendered copy would list
+// only the fixed pages until its revalidate window passed. The data reads are cached for 60 s.
+export const dynamic = "force-dynamic";
 
 // ISO dates (YYYY-MM-DD) compare as strings.
 const later = (a: string, b?: string | null) => (b && b > a ? b : a);

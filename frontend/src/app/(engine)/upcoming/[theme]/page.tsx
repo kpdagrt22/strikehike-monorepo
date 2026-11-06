@@ -11,7 +11,10 @@ import { archiveCount, getEventsHealth, getUpcoming } from "@/lib/seo/data";
 import { themePageGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 
-export const revalidate = 300;
+// Rendered per request, not prerendered at build: the Docker build has no backend, so a
+// prerendered copy would serve "no dates" and a noindex robots tag for its revalidate window
+// after every deploy. dynamicParams=false still 404s politics and natural-disasters.
+export const dynamic = "force-dynamic";
 export const dynamicParams = false;
 
 // Only the three themes with pages. Politics and Natural Disasters are not

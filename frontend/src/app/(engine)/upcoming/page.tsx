@@ -9,7 +9,10 @@ import { orderedThemes, type OrderedTheme } from "@/lib/events/upcoming";
 import { getUpcoming, type UpcomingEventPayload } from "@/lib/seo/data";
 import { absoluteUrl, SITE_NAME } from "@/lib/seo/site";
 
-export const revalidate = 300;
+// Rendered per request, not prerendered at build: the Docker build has no backend, so a
+// prerendered copy would serve "unavailable" (or no dates) for its revalidate window after
+// every deploy. The data reads themselves keep a 60-second cache.
+export const dynamic = "force-dynamic";
 
 const TITLE = "Upcoming dates · StrikeHike";
 const DESCRIPTION =
