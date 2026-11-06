@@ -137,6 +137,11 @@ def normalize_raw(
     source_url = normalize_text(raw.source_url or source.url)
     if not is_https_url(source_url):
         reasons.append(f"source_url must be an absolute https URL: {source_url!r}")
+    authority_url = normalize_text(raw.authority_url) if raw.authority_url else None
+    if authority_url is not None and not is_https_url(authority_url):
+        reasons.append(
+            f"authority_url must be an absolute https URL: {authority_url!r}"
+        )
 
     if reasons:
         raise NormalizationError(reasons)
@@ -167,6 +172,7 @@ def normalize_raw(
         supersedes=raw.supersedes,
         days_until=None,
         missing_runs=0,
+        authority_url=authority_url,
     )
 
 
@@ -200,6 +206,10 @@ def validate_event(
         reasons.append("source_id is empty")
     if not is_https_url(event.source_url):
         reasons.append(f"source_url must be an absolute https URL: {event.source_url!r}")
+    if event.authority_url is not None and not is_https_url(event.authority_url):
+        reasons.append(
+            f"authority_url must be an absolute https URL: {event.authority_url!r}"
+        )
     if event.timezone:
         try:
             validate_timezone(event.timezone)

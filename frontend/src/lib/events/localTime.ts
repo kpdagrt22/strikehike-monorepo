@@ -9,6 +9,16 @@ const DATE_FORMAT = (timeZone: string) =>
     timeZone,
   });
 
+// With the year, for pages that stand alone (an event page, a year list).
+const LONG_DATE_FORMAT = (timeZone: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone,
+  });
+
 const TIME_FORMAT = (timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
@@ -28,6 +38,10 @@ export function eventInstant(
 
 export function dateLabel(instant: string, timeZone: string) {
   return DATE_FORMAT(timeZone).format(new Date(instant));
+}
+
+export function longDateLabel(instant: string, timeZone: string) {
+  return LONG_DATE_FORMAT(timeZone).format(new Date(instant));
 }
 
 export function timeLabel(instant: string, timeZone: string) {
@@ -52,4 +66,8 @@ export function allDayLabel(value: string, timeZone?: string) {
   // The zone is accepted only so callers can show it is deliberately ignored.
   void timeZone;
   return DATE_FORMAT("UTC").format(new Date(`${value}T00:00:00Z`));
+}
+
+export function allDayLongLabel(value: string) {
+  return LONG_DATE_FORMAT("UTC").format(new Date(`${value}T00:00:00Z`));
 }

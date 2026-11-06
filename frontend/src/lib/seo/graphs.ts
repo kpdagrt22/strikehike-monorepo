@@ -13,6 +13,7 @@ import {
   WEBSITE_ID,
   absoluteUrl,
   fullTitle,
+  urlFor,
   type SitePath,
 } from "./site";
 
@@ -164,4 +165,83 @@ export function patternsGraph(payload: PatternsPayload | null): JsonLdGraph {
 
 export function disclaimerGraph(): JsonLdGraph {
   return graph(webPage("/disclaimer"), breadcrumb("/disclaimer"));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Generated pages (/events/[id], /upcoming/[theme], /dates/[year]/[list]). Their paths are not
+// in CONTENT_DATES, so they carry their own WebPage and BreadcrumbList; no schema.org Event:
+// Google's Event rich result is for events people can attend, not releases or sky events.
+// ---------------------------------------------------------------------------------------------
+
+export type Crumb = { name: string; path: string };
+
+const generatedWebPage = (path: string, name: string, description: string, dateModified: string, crumbs: Crumb[]) => {
+  const url = urlFor(path);
+  return graph(
+    {
+      "@type": "WebPage",
+      "@id": `${url}#webpage`,
+      url,
+      name,
+      description,
+      inLanguage: "en",
+      isPartOf: ref(WEBSITE_ID),
+      publisher: ref(ORG_ID),
+      author: ref(PERSON_ID),
+      dateModified,
+      breadcrumb: ref(`${url}#breadcrumb`),
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${url}#breadcrumb`,
+      itemListElement: crumbs.map((crumb, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: crumb.name,
+        item: urlFor(crumb.path),
+      })),
+    },
+  );
+};
+
+/** An event page: Home > Upcoming dates > the event. */
+export function eventPageGraph(
+  path: string,
+  name: string,
+  description: string,
+  dateModified: string,
+): JsonLdGraph {
+  return generatedWebPage(path, name, description, dateModified, [
+    { name: PAGES["/"].crumb, path: "/" },
+    { name: PAGES["/upcoming"].crumb, path: "/upcoming" },
+    { name, path },
+  ]);
+}
+
+/** A theme page: Home > Upcoming dates > the theme. */
+export function themePageGraph(
+  path: string,
+  name: string,
+  description: string,
+  dateModified: string,
+): JsonLdGraph {
+  return generatedWebPage(path, name, description, dateModified, [
+    { name: PAGES["/"].crumb, path: "/" },
+    { name: PAGES["/upcoming"].crumb, path: "/upcoming" },
+    { name, path },
+  ]);
+}
+
+/** A year page: Home > Upcoming dates > the list. */
+export function yearPageGraph(
+  path: string,
+  name: string,
+  description: string,
+  dateModified: string,
+): JsonLdGraph {
+  return generatedWebPage(path, name, description, dateModified, [
+    { name: PAGES["/"].crumb, path: "/" },
+    { name: PAGES["/upcoming"].crumb, path: "/upcoming" },
+    { name, path },
+  ]);
 }

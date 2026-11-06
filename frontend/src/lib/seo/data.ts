@@ -215,6 +215,29 @@ export interface UpcomingEventPayload {
   verification: string;
   source_url: string;
   days_until: number;
+  // Enough to apply the index rules (lib/events/indexing.ts) without a second call.
+  description?: string | null;
+  source_id?: string | null;
+  authority_url?: string | null;
+  [key: string]: unknown;
+}
+
+/** `/api/v1/events/{event_id}`: one event of any kind. */
+export interface EventDetailPayload extends UpcomingEventPayload {
+  kind: string; // "upcoming" | "historical"
+  description: string;
+  source_id: string;
+  authority_url: string | null;
+}
+
+/** `/api/v1/events/health`: the active bundle and its theme × kind × status counts. */
+export interface EventsHealthPayload {
+  active_version: string | null;
+  created_at: string | null;
+  counts: {
+    total: number;
+    by_theme_kind_status: Record<string, Record<string, Record<string, number>>>;
+  };
   [key: string]: unknown;
 }
 
@@ -233,13 +256,55 @@ export interface UpcomingPayload {
   [key: string]: unknown;
 }
 
-export const getUpcoming = cache(async (): Promise<UpcomingPayload | null> => {
+async function readUpcoming(horizonDays: number): Promise<UpcomingPayload | null> {
   const payload = await getJson(
-    "/api/v1/events/upcoming?limit_per_theme=100&horizon_days=365",
+    `/api/v1/events/upcoming?limit_per_theme=100&horizon_days=${horizonDays}`,
   );
   if (!payload) return null;
   if (!payload.themes || typeof payload.themes !== "object") {
     throw new Error("upcoming shape");
   }
   return payload as unknown as UpcomingPayload;
+}
+
+/** The next 12 months: /upcoming and the theme pages list exactly this. */
+export const getUpcoming = cache(() => readUpcoming(365));
+
+/** Every listed date in the bundle (curated decisions reach past 12 months): the sitemap and an
+ *  event page's nearby dates read this, so no indexable event page is left out. */
+export const getUpcomingAll = cache(() => readUpcoming(730));
+
+export const getEventsHealth = cache(async (): Promise<EventsHealthPayload | null> => {
+  const payload = await getJson("/api/v1/events/health");
+  if (!payload) return null;
+  if (!payload.counts || typeof payload.counts !== "object") {
+    throw new Error("events health shape");
+  }
+  return payload as unknown as EventsHealthPayload;
+});
+
+/** Past events of one theme in the archive: the curated historical set. */
+export function archiveCount(health: EventsHealthPayload | null, theme: string): number | null {
+  const kinds = health?.counts?.by_theme_kind_status?.[theme];
+  if (!kinds?.historical) return null;
+  return Object.values(kinds.historical).reduce((total, count) => total + count, 0);
+}
+
+/**
+ * One event by id, or null when the bundle has no such event (404) or the id is malformed (422).
+ * Throws when there is no backend or it fails, so an ISR regeneration keeps the last good page.
+ */
+export const getEvent = cache(async (id: string): Promise<EventDetailPayload | null> => {
+  if (!BACKEND) throw new Error("CHRONO_API_URL is not set");
+  const response = await fetch(`${BACKEND}/api/v1/events/${encodeURIComponent(id)}`, {
+    next: { revalidate: 60 },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (response.status === 404 || response.status === 422) return null;
+  if (!response.ok) throw new Error(`event ${id} returned ${response.status}`);
+  const data: unknown = await response.json();
+  if (!data || typeof data !== "object" || !("event_id" in data)) {
+    throw new Error("event shape");
+  }
+  return data as EventDetailPayload;
 });
