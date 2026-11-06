@@ -107,7 +107,9 @@ jobs:
   test-frontend-smoke:
     name: Frontend smoke
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # The suite now covers the home, upcoming, event and gauge pages (142
+    # tests, including the gauge's review screenshots and videos).
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
