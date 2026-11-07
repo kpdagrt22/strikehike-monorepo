@@ -21,6 +21,9 @@ Thumbs.db
 # Generated runtime data
 **/data/historical_events.db
 
+# Local Caddy site snippets written by sibling deploys
+deploy/caddy/sites/*.caddy
+
 # Test artifacts
 **/artifacts/
 **/test-results/

@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from .botfilter import is_bot
 from .schema import PayloadTooLarge, ValidationError, load_schema, validate_batch
 from .store import get_store
+from .weekly import cached_weekly_export
 
 router = APIRouter(prefix="/usage", tags=["analytics"])
 feedback_router = APIRouter(prefix="/feedback", tags=["feedback"])
@@ -86,6 +90,33 @@ async def ingest(request: Request) -> Response:
         stripped_props=stripped,
     )
     return Response(status_code=204)
+
+
+@router.get("/weekly")
+async def weekly(request: Request, week: str) -> Response:
+    """Aggregates-only export for the private weekly growth report."""
+    expected = os.environ.get("GROWTH_EXPORT_TOKEN", "")
+    if not expected:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    authorization = request.headers.get("authorization", "")
+    scheme, _, provided = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not provided:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    provided = provided.strip()
+    if not hmac.compare_digest(
+        expected.encode("utf-8"), provided.encode("utf-8")
+    ):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    log_dir = Path(os.environ.get("CADDY_LOG_DIR", "/app/data/caddy-logs"))
+    try:
+        payload = await run_in_threadpool(
+            cached_weekly_export, get_store(), week, log_dir
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
 
 
 @feedback_router.post("", status_code=204)

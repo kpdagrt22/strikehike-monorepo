@@ -61,7 +61,14 @@ jobs:
             tests/test_analytics_store.py \
             tests/test_analytics_api.py \
             tests/test_analytics_activation.py \
+            tests/test_analytics_serverlogs.py \
+            tests/test_analytics_weekly.py \
+            tests/test_caddy_snippet.py \
             -q
+
+      - name: Caddy migration restores the host Caddyfile on a failed pull
+        working-directory: .
+        run: bash tests/deploy/test_caddy_migration.sh
 
   test-frontend:
     name: Frontend lint and build
@@ -247,9 +254,50 @@ jobs:
           path: frontend/test-results
           if-no-files-found: ignore
 
+  test-caddy:
+    name: Caddy config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # docker-compose.yml is the only place the Caddy tag is written.
+      - name: Read the pinned Caddy image
+        run: |
+          set -euo pipefail
+          images="$(docker compose config --images)"
+          image="$(printf '%s\n' "$images" | grep '^caddy:' || true)"
+          if ! printf '%s\n' "$image" | grep -Eqx 'caddy:[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::docker-compose.yml must pin the caddy service to an exact version (found '${image}')."
+            exit 1
+          fi
+          echo "CADDY_IMAGE=$image" >> "$GITHUB_ENV"
+          echo "Pinned Caddy image: $image"
+
+      - name: Validate with an empty sites directory
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/caddy-empty
+          mkdir -p /tmp/caddy-empty/sites
+          cp deploy/caddy/Caddyfile /tmp/caddy-empty/Caddyfile
+          docker run --rm -v /tmp/caddy-empty:/etc/caddy:ro \
+            "$CADDY_IMAGE" caddy validate \
+            --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: Validate with the thisiskp snippet
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/caddy-fixture
+          mkdir -p /tmp/caddy-fixture/sites
+          cp deploy/caddy/Caddyfile /tmp/caddy-fixture/Caddyfile
+          cp tests/fixtures/caddy/thisiskp.caddy /tmp/caddy-fixture/sites/
+          docker run --rm -v /tmp/caddy-fixture:/etc/caddy:ro \
+            "$CADDY_IMAGE" caddy validate \
+            --config /etc/caddy/Caddyfile --adapter caddyfile
+
   deploy:
     name: Deploy monorepo to Lightsail
-    needs: [test-backend, test-frontend, test-frontend-smoke]
+    needs: [test-backend, test-frontend, test-frontend-smoke, test-caddy]
     # Production only: pushes to main, or a manual run started from main.
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
@@ -259,6 +307,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           REHEARSE_ROLLBACK: ${{ github.event.inputs.rehearse_rollback || 'false' }}
+          GROWTH_EXPORT_TOKEN: ${{ secrets.GROWTH_EXPORT_TOKEN }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -269,7 +318,7 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN
           script: |
             set -euo pipefail
 
@@ -279,11 +328,39 @@ jobs:
 
             git fetch origin main
             git checkout main
-            git pull --ff-only origin main
+
+            # Back up the host Caddyfile, move thisiskp's locally appended block
+            # into the snippet directory, and pull. A failed pull copies the
+            # backup back. The script comes from origin/main because the working
+            # tree is not pulled yet; it prints its own ::error:: on failure.
+            MIGRATE_TMP="$(mktemp)"
+            git show origin/main:scripts/caddy_migrate.sh > "$MIGRATE_TMP"
+            MIGRATE_STATUS=0
+            bash "$MIGRATE_TMP" || MIGRATE_STATUS=$?
+            rm -f "$MIGRATE_TMP"
+            if [ "$MIGRATE_STATUS" -ne 0 ]; then
+              exit 1
+            fi
 
             MARKER="NBER recession windows from FRED"
             BASE_URL="https://strikehike.com"
             CURL=(curl --fail --silent --show-error --resolve strikehike.com:443:127.0.0.1)
+            THISISKP_SNIPPET="$PWD/deploy/caddy/sites/thisiskp.caddy"
+
+            # The Caddy tag is pinned once, in docker-compose.yml.
+            CADDY_IMAGE="$(docker compose config --images | grep '^caddy:' || true)"
+            if [ -z "$CADDY_IMAGE" ]; then
+              echo "::error::Could not read the caddy image from docker-compose.yml; nothing was rebuilt and the old stack is still serving."
+              exit 1
+            fi
+
+            # Validate the new directory mount and the migrated/fixture snippets
+            # in a throwaway container before touching the running stack.
+            if ! docker run --rm -v "$PWD/deploy/caddy:/etc/caddy:ro" "$CADDY_IMAGE" \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "::error::Caddy config is invalid after the pull; nothing was rebuilt and the old stack is still serving."
+              exit 1
+            fi
 
             tag_rollback_images() {
               for service in backend frontend; do
@@ -418,6 +495,40 @@ jobs:
               "${CURL[@]}" "$BASE_URL/" > /dev/null
             }
 
+            # Proves this Caddy still routes thisiskp.in. A down thisiskp app
+            # (502/503/504 from its upstream) is not a StrikeHike problem.
+            # Only connection/TLS errors are retried: 12 retries, 5 s apart.
+            probe_thisiskp() {
+              if [ ! -f "$THISISKP_SNIPPET" ]; then
+                echo "::warning::no thisiskp.in snippet on this host; skipping its probe"
+                return 0
+              fi
+              thisiskp_code=""
+              for attempt in $(seq 1 13); do
+                if thisiskp_code="$(curl --silent --show-error --output /dev/null \
+                  --write-out '%{http_code}' --max-time 20 \
+                  --resolve thisiskp.in:443:127.0.0.1 https://thisiskp.in/)"; then
+                  break
+                fi
+                thisiskp_code=""
+                if [ "$attempt" -lt 13 ]; then
+                  sleep 5
+                fi
+              done
+              case "$thisiskp_code" in
+                2??|3??)
+                  return 0
+                  ;;
+                502|503|504)
+                  echo "::warning::thisiskp.in upstream is down (Caddy routes it; not a StrikeHike config problem)"
+                  return 0
+                  ;;
+              esac
+              echo "thisiskp.in probe result: ${thisiskp_code:-no HTTP response (TLS or connection error)}"
+              echo "::error::thisiskp.in did not return 200 after the StrikeHike cutover."
+              return 1
+            }
+
             probe_regime() {
               page="$(mktemp)"
               for attempt in $(seq 1 30); do
@@ -462,7 +573,8 @@ jobs:
             wait_ready() {
               probe_backend \
                 && "${CURL[@]}" --retry 36 --retry-delay 5 --retry-connrefused --retry-all-errors \
-                  "$BASE_URL/" > /dev/null
+                  "$BASE_URL/" > /dev/null \
+                && probe_thisiskp
             }
 
             warm_up() {
@@ -486,6 +598,7 @@ jobs:
               echo "Probe: home";     probe_home || { echo "::error::probe home failed"; return 1; }
               echo "Probe: regime";   probe_regime || { echo "::error::probe regime failed"; return 1; }
               echo "Probe: upcoming page"; probe_upcoming_page || { echo "::error::probe upcoming page failed"; return 1; }
+              echo "Probe: thisiskp"; probe_thisiskp || { echo "::error::probe thisiskp failed"; return 1; }
             }
 
             show_caddy_logs() {
@@ -518,7 +631,21 @@ jobs:
 
             docker compose -p strikehike-chrono ps
 
-            if [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
+            CADDY_OK=0
+            if ! docker compose -p strikehike-chrono exec -T caddy \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "::error::The running Caddy rejected the new config after cutover; taking the rollback path."
+              CADDY_OK=1
+            elif ! docker compose -p strikehike-chrono exec -T caddy \
+              caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+              echo "::error::Caddy reload failed after cutover; taking the rollback path."
+              CADDY_OK=1
+            fi
+
+            if [ "$CADDY_OK" -ne 0 ]; then
+              PROBES_OK=1
+              show_caddy_logs
+            elif [ "${REHEARSE_ROLLBACK:-false}" = "true" ]; then
               echo "::warning::Rollback rehearsal requested; the probe gate is forced to fail so the :rollback images are restored; the job passes if the restore works."
               PROBES_OK=1
             elif wait_ready && warm_up && run_probes; then

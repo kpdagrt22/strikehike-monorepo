@@ -13,12 +13,14 @@ services:
       HISTORICAL_EVENTS_SEED: /app/data/historical_events.json
       ANALYTICS_DB: /app/data/runtime/analytics/analytics.sqlite
       ANALYTICS_INGEST_ENABLED: "1"
+      GROWTH_EXPORT_TOKEN: "${GROWTH_EXPORT_TOKEN:-}"
       PYTHONUNBUFFERED: "1"
     ports:
       # Host-loopback only. The frontend reaches it over the internal network.
       - "127.0.0.1:8010:8010"
     volumes:
       - historical-data:/app/data/runtime
+      - caddy-logs:/app/data/caddy-logs:ro
     networks:
       - strikehike
     restart: unless-stopped
@@ -82,15 +84,16 @@ services:
         max-file: "3"
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.7
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/caddy:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
+      - caddy-logs:/var/log/caddy
     depends_on:
       frontend:
         condition: service_healthy
@@ -111,3 +114,4 @@ volumes:
   historical-data:
   caddy-data:
   caddy-config:
+  caddy-logs:

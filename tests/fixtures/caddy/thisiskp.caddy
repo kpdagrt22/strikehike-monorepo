@@ -1,0 +1,23 @@
+# BEGIN THISISKP.IN
+www.thisiskp.in {
+	redir https://thisiskp.in{uri} permanent
+}
+
+thisiskp.in {
+	encode zstd gzip
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+		-Server
+	}
+
+	@immutable path /_astro/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	reverse_proxy 172.17.0.1:4321
+}
+# END THISISKP.IN
