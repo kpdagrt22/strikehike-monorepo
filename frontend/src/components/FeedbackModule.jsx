@@ -3,19 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { feedbackSubmitted, viewOpened } from "@/lib/analytics/events";
+import { pageTemplate } from "@/lib/analytics/paths";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
 
-// Only known page templates are stored with a message, never a raw URL.
-const FEEDBACK_PATHS = new Set([
-  "/",
-  "/regime",
-  "/convergence",
-  "/patterns",
-  "/disclaimer",
-  "/upcoming",
-]);
+// The path is stored as one of the allow-listed templates, never a raw URL.
 
 export function FeedbackModule() {
   const [open, setOpen] = useState(false);
@@ -61,9 +54,7 @@ export function FeedbackModule() {
         body: JSON.stringify({
           message,
           website,
-          path: FEEDBACK_PATHS.has(window.location.pathname)
-            ? window.location.pathname
-            : "404",
+          path: pageTemplate(window.location.pathname),
           app_version: (process.env.NEXT_PUBLIC_BUILD_SHA || "dev").slice(0, 7),
         }),
       });

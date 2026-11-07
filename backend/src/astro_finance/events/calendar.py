@@ -18,7 +18,10 @@ STATUS_MAP = {
     "scheduled": "CONFIRMED",
     "rescheduled": "CONFIRMED",
     "verified": "CONFIRMED",
+    "completed": "CONFIRMED",
     "tentative": "TENTATIVE",
+    # Feeds never list unverified dates; a single-event download can.
+    "unverified": "TENTATIVE",
     "cancelled": "CANCELLED",
 }
 
@@ -113,6 +116,16 @@ def _event_lines(event: Mapping[str, Any], stamp: str, sequence: int) -> list[st
     return lines
 
 
+def _stamp_and_sequence(created_at: str | None) -> tuple[str, int]:
+    """DTSTAMP and SEQUENCE both follow the bundle, never the request time."""
+
+    if not created_at:
+        return _format_utc(datetime.now(timezone.utc)), 0
+    created = parse_utc(created_at)
+    sequence = max(0, int((created - SEQUENCE_EPOCH).total_seconds() // 60))
+    return _format_utc(created), sequence
+
+
 def build_calendar(
     events: Iterable[Mapping[str, Any]],
     themes: list[Theme],
@@ -121,17 +134,7 @@ def build_calendar(
 ) -> bytes:
     """Build a complete VCALENDAR; the same inputs always produce the same bytes."""
 
-    stamp = (
-        _format_utc(parse_utc(created_at))
-        if created_at
-        else _format_utc(datetime.now(timezone.utc))
-    )
-    if created_at:
-        created = parse_utc(created_at)
-        sequence = max(0, int((created - SEQUENCE_EPOCH).total_seconds() // 60))
-    else:
-        sequence = 0
-
+    stamp, sequence = _stamp_and_sequence(created_at)
     ordered = sorted(
         events,
         key=lambda event: (
@@ -154,4 +157,29 @@ def build_calendar(
     for event in ordered:
         lines.extend(_event_lines(event, stamp, sequence))
     lines.append("END:VCALENDAR")
+    return _lines(lines)
+
+
+def build_event_calendar(
+    event: Mapping[str, Any],
+    *,
+    created_at: str | None,
+) -> bytes:
+    """One event as a VCALENDAR to download.
+
+    The event block is the feeds' own, so the UID matches a subscribed feed and
+    a calendar app updates the same entry rather than adding a second one.  No
+    calendar name or refresh interval: it is a one-off import, not a feed.
+    """
+
+    stamp, sequence = _stamp_and_sequence(created_at)
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        f"PRODID:{PRODID}",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        *_event_lines(event, stamp, sequence),
+        "END:VCALENDAR",
+    ]
     return _lines(lines)

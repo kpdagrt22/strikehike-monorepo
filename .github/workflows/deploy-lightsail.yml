@@ -114,7 +114,9 @@ jobs:
   test-frontend-smoke:
     name: Frontend smoke
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # The suite now covers the home, upcoming, event and gauge pages (142
+    # tests, including the gauge's review screenshots and videos).
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
@@ -468,9 +470,21 @@ jobs:
             }
 
             probe_atlas() {
-              "${CURL[@]}" "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
-                | docker compose -p strikehike-chrono exec -T backend \
-                    python -c 'import json,sys; payload=json.load(sys.stdin); assert len(payload.get("timeline") or []) > 8000'
+              # The first atlas request after a deploy is cold (the backend has
+              # to read and serialise the whole weekly history), and the Next
+              # proxy gives up at 15 s. Retry before calling the release bad.
+              for attempt in $(seq 1 12); do
+                if "${CURL[@]}" "$BASE_URL/api/v1/regime/macro-history?resolution=weekly&view=atlas" \
+                  | docker compose -p strikehike-chrono exec -T backend \
+                      python -c 'import json,sys; payload=json.load(sys.stdin); assert len(payload.get("timeline") or []) > 8000'; then
+                  return 0
+                fi
+                if [ "$attempt" -eq 12 ]; then
+                  return 1
+                fi
+                sleep 5
+              done
+              return 1
             }
 
             probe_upcoming() {
@@ -564,22 +578,27 @@ jobs:
             }
 
             warm_up() {
-              probe_atlas \
-                && probe_upcoming \
-                && probe_home \
-                && probe_regime \
-                && probe_upcoming_page
+              echo "Warm-up: atlas"
+              probe_atlas || return 1
+              echo "Warm-up: upcoming"
+              probe_upcoming || return 1
+              echo "Warm-up: home"
+              probe_home || return 1
+              echo "Warm-up: regime"
+              probe_regime || return 1
+              echo "Warm-up: upcoming page"
+              probe_upcoming_page || return 1
             }
 
             run_probes() {
-              probe_backend \
-                && probe_events \
-                && probe_chrono \
-                && probe_atlas \
-                && probe_home \
-                && probe_regime \
-                && probe_upcoming_page \
-                && probe_thisiskp
+              echo "Probe: backend";  probe_backend || { echo "::error::probe backend failed"; return 1; }
+              echo "Probe: events";   probe_events || { echo "::error::probe events failed"; return 1; }
+              echo "Probe: chrono";   probe_chrono || { echo "::error::probe chrono failed"; return 1; }
+              echo "Probe: atlas";    probe_atlas || { echo "::error::probe atlas failed"; return 1; }
+              echo "Probe: home";     probe_home || { echo "::error::probe home failed"; return 1; }
+              echo "Probe: regime";   probe_regime || { echo "::error::probe regime failed"; return 1; }
+              echo "Probe: upcoming page"; probe_upcoming_page || { echo "::error::probe upcoming page failed"; return 1; }
+              echo "Probe: thisiskp"; probe_thisiskp || { echo "::error::probe thisiskp failed"; return 1; }
             }
 
             show_caddy_logs() {

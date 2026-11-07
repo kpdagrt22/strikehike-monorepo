@@ -21,6 +21,18 @@ class UpcomingEvent(BaseModel):
     verification: str
     source_url: str
     days_until: int
+    # Enough for a page to apply the index rules (D-06) without a second call.
+    description: str | None = None
+    source_id: str | None = None
+    authority_url: str | None = None
+
+
+class EventDetail(UpcomingEvent):
+    """One event of any kind: the upcoming fields plus its kind and text."""
+
+    kind: str
+    description: str
+    source_id: str
 
 
 class ThemeUpcoming(BaseModel):

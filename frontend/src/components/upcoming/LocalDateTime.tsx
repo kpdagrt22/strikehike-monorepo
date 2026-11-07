@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   allDayLabel,
+  allDayLongLabel,
   dateLabel,
   eventInstant,
+  longDateLabel,
   timeLabel,
   zoneLabel,
 } from "@/lib/events/localTime";
@@ -16,15 +18,19 @@ type Props = {
   timezone: string | null;
   allDay: boolean;
   part: "date" | "time";
+  /** Show the year: for pages that stand alone, such as an event page. */
+  long?: boolean;
 };
 
 function serverDate({
   startDate,
   startUtc,
   allDay,
-}: Pick<Props, "startDate" | "startUtc" | "allDay">) {
-  if (allDay) return allDayLabel(startDate);
-  return dateLabel(startUtc ?? `${startDate}T00:00:00Z`, "UTC");
+  long,
+}: Pick<Props, "startDate" | "startUtc" | "allDay" | "long">) {
+  if (allDay) return long ? allDayLongLabel(startDate) : allDayLabel(startDate);
+  const instant = startUtc ?? `${startDate}T00:00:00Z`;
+  return long ? longDateLabel(instant, "UTC") : dateLabel(instant, "UTC");
 }
 
 function serverTime({
@@ -38,7 +44,7 @@ function serverTime({
 }
 
 export function LocalDateTime(props: Props) {
-  const { startDate, startTime, startUtc, allDay, part } = props;
+  const { startDate, startTime, startUtc, allDay, part, long = false } = props;
   const [value, setValue] = useState(() =>
     part === "date" ? serverDate(props) : serverTime(props),
   );
@@ -51,12 +57,14 @@ export function LocalDateTime(props: Props) {
       const instant = eventInstant(startDate, startTime, startUtc);
       setValue(
         part === "date"
-          ? dateLabel(instant, zone)
+          ? long
+            ? longDateLabel(instant, zone)
+            : dateLabel(instant, zone)
           : `${timeLabel(instant, zone)} ${zoneLabel(instant, zone)}`,
       );
     }, 0);
     return () => window.clearTimeout(queued);
-  }, [allDay, part, startDate, startTime, startUtc]);
+  }, [allDay, long, part, startDate, startTime, startUtc]);
 
   const title = allDay
     ? startDate

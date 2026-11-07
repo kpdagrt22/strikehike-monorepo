@@ -20,6 +20,14 @@ from zoneinfo import ZoneInfo
 
 SCHEMA_VERSION = 1
 
+# The public event-id grammar, ``<theme-slug>:<source-id>:<fragment>``: the same
+# pattern analytics/schema.json enforces for ``event_id``.  Archived snapshot
+# ids (``@`` and ``~``) never match, so they are not addressable on their own.
+# The length cap is wider than the analytics one: curated historical ids reach
+# 77 characters.
+EVENT_ID_PATTERN = r"^[a-z-]+:[a-z0-9_-]+:[A-Za-z0-9:._-]+$"
+EVENT_ID_MAX_LENGTH = 160
+
 
 class Theme(str, Enum):
     """The five themes shared with the existing historical dataset."""
@@ -201,11 +209,18 @@ class Event:
     content_hash: str
     days_until: int | None = None
     missing_runs: int = 0
+    # A page that names this specific event (events/authority.py). Optional.
+    authority_url: str | None = None
 
     def content_dict(self) -> dict[str, Any]:
-        """Fields that define the event's content, excluding run state."""
+        """Fields that define the event's content, excluding run state.
 
-        return {
+        ``authority_url`` is included only when set, so every event without
+        one keeps the content hash (and bundle version) it had before the
+        field existed.
+        """
+
+        payload: dict[str, Any] = {
             "event_id": self.event_id,
             "name": self.name,
             "theme": self.theme.value,
@@ -222,6 +237,9 @@ class Event:
             "verification": self.verification.value,
             "supersedes": self.supersedes,
         }
+        if self.authority_url:
+            payload["authority_url"] = self.authority_url
+        return payload
 
     def to_dict(self) -> dict[str, Any]:
         """Stable key order for ``events.json`` and the read API."""
@@ -264,6 +282,7 @@ class Event:
             content_hash=str(payload.get("content_hash") or ""),
             days_until=payload.get("days_until"),
             missing_runs=int(payload.get("missing_runs") or 0),
+            authority_url=payload.get("authority_url") or None,
         )
 
 
@@ -310,6 +329,7 @@ class RawRecord:
     verification: str | None = None
     kind: str = EventKind.UPCOMING.value
     supersedes: str | None = None
+    authority_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

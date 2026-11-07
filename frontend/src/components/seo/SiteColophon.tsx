@@ -17,7 +17,7 @@ const VIEWS: { href: SitePath; label: string }[] = [
  * links and the credit are in the HTML every crawler reads. Not on the full-bleed home page,
  * whose About panel carries the same links.
  */
-export function SiteColophon({ current }: { current: SitePath }) {
+export function SiteColophon({ current }: { current: string }) {
   return (
     <footer className="mt-10 flex flex-col gap-2 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
       <nav aria-label="StrikeHike pages" className="flex flex-wrap items-center gap-x-3 gap-y-1">

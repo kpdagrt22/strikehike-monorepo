@@ -47,6 +47,7 @@ def build_event(
     collected: datetime = NOW,
     days_until: int | None = None,
     missing_runs: int = 0,
+    authority_url: str | None = None,
 ) -> Event:
     if start_date is None:
         start_date = TODAY + timedelta(days=30) if kind is EventKind.UPCOMING else date(2020, 1, 1)
@@ -76,6 +77,7 @@ def build_event(
         supersedes=supersedes,
         days_until=days_until,
         missing_runs=missing_runs,
+        authority_url=authority_url,
     )
 
 

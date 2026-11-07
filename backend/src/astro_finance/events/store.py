@@ -109,6 +109,25 @@ def _read_only_connection(db_path: Path) -> sqlite3.Connection:
     return connection
 
 
+_EVENT_COLUMNS = (
+    "event_id, name, theme, kind, start_date, start_time, timezone, "
+    "all_day, status, description, source_id, external_id, "
+    "source_url, first_discovered_at, last_updated_at, collected_at, "
+    "verification, supersedes, content_hash, days_until, missing_runs"
+)
+
+
+def _event_columns(connection: sqlite3.Connection) -> str:
+    """The select list; bundles built before ``authority_url`` read it as NULL."""
+
+    names = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(events)").fetchall()
+    }
+    authority = "authority_url" if "authority_url" in names else "NULL AS authority_url"
+    return f"{_EVENT_COLUMNS}, {authority}"
+
+
 def upcoming_by_theme(
     db_path: Path,
     themes: list[str] | None = None,
@@ -127,11 +146,8 @@ def upcoming_by_theme(
     result: dict[str, list[dict[str, Any]]] = {theme.value: [] for theme in selected}
     connection = _read_only_connection(db_path)
     try:
-        query = """
-            SELECT event_id, name, theme, kind, start_date, start_time, timezone,
-                   all_day, status, description, source_id, external_id,
-                   source_url, first_discovered_at, last_updated_at, collected_at,
-                   verification, supersedes, content_hash, days_until, missing_runs
+        query = f"""
+            SELECT {_event_columns(connection)}
             FROM events
             WHERE kind = ? AND theme = ?
               AND status IN (?, ?)
@@ -177,11 +193,8 @@ def calendar_by_theme(
     result: dict[str, list[dict[str, Any]]] = {theme.value: [] for theme in selected}
     connection = _read_only_connection(db_path)
     try:
-        query = """
-            SELECT event_id, name, theme, kind, start_date, start_time, timezone,
-                   all_day, status, description, source_id, external_id,
-                   source_url, first_discovered_at, last_updated_at, collected_at,
-                   verification, supersedes, content_hash, days_until, missing_runs
+        query = f"""
+            SELECT {_event_columns(connection)}
             FROM events
             WHERE kind = ? AND theme = ?
               AND status IN (?, ?, ?, ?)
@@ -207,6 +220,24 @@ def calendar_by_theme(
     finally:
         connection.close()
     return result
+
+
+def event_by_id(
+    db_path: Path, event_id: str, *, today: date
+) -> dict[str, Any] | None:
+    """One event of any kind or status, or ``None`` when the id is unknown."""
+
+    if not isinstance(db_path, Path):
+        db_path = Path(db_path)
+    connection = _read_only_connection(db_path)
+    try:
+        row = connection.execute(
+            f"SELECT {_event_columns(connection)} FROM events WHERE event_id = ?",
+            (event_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+    return _row_to_dict(row, today=today) if row is not None else None
 
 
 def _row_to_dict(row: sqlite3.Row, *, today: date) -> dict[str, Any]:
