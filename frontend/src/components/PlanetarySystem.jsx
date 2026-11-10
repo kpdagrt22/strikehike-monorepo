@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Sphere } from "@react-three/drei";
 import gsap from "gsap";
@@ -816,6 +816,9 @@ export function PlanetarySystem({
   regimeTone = null,
   reducedMotion = false,
   ambientRef = null,
+  probe = false,
+  settled = false,
+  stage = null,
 }) {
   const gl = useThree((state) => state.gl);
   const camera = useThree((state) => state.camera);
@@ -1004,6 +1007,125 @@ export function PlanetarySystem({
         reducedMotion={reducedMotion}
         ambientRef={ambientRef}
       />
+
+      {probe ? (
+        <OrreryProbe
+          positions={positions}
+          settled={settled}
+          stage={stage}
+        />
+      ) : null}
     </group>
   );
+}
+
+/**
+ * Test-only probe (?orreryProbe=1): the screen centre and radius of the Sun,
+ * every planet, Earth and the Moon, plus the outer orbit's screen bounding box.
+ * Reads the live camera projection, so it measures what is actually drawn.
+ * Nothing is recorded or sent; the object exists only when the flag is on.
+ */
+function OrreryProbe({ positions, settled, stage }) {
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const lastWrite = useRef(0);
+
+  const write = useCallback(() => {
+    if (!positions) return;
+    const width = size.width;
+    const height = size.height;
+    const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
+    const project = (x, z, radius) => {
+      const world = new THREE.Vector3(x, 0, z);
+      const point = world.clone().project(camera);
+      const distance = camera.position.distanceTo(world);
+      const angular = Math.atan(radius / Math.max(0.001, distance));
+      return {
+        x: Math.round((point.x * 0.5 + 0.5) * width),
+        y: Math.round((0.5 - point.y * 0.5) * height),
+        r: Math.round((Math.tan(angular) / tanHalfFov) * (height / 2)),
+      };
+    };
+    const planets = [{ name: "Sun", ...project(0, 0, 0.27) }];
+    for (const planet of PLANETS) {
+      if (planet.radius === 0) continue;
+      const angle = (Number(positions[planet.name]?.lon ?? 0) * Math.PI) / 180;
+      planets.push({
+        name: planet.name,
+        ...project(
+          Math.cos(angle) * planet.radius,
+          Math.sin(angle) * planet.radius,
+          planet.size,
+        ),
+      });
+    }
+    const earthAngle =
+      (((Number(positions.Sun?.lon ?? 0) + 180) % 360) * Math.PI) / 180;
+    const earthX = Math.cos(earthAngle) * EARTH_RADIUS;
+    const earthZ = Math.sin(earthAngle) * EARTH_RADIUS;
+    planets.push({ name: "Earth", ...project(earthX, earthZ, EARTH_SIZE) });
+    const moonAngle = (Number(positions.Moon?.lon ?? 0) * Math.PI) / 180;
+    planets.push({
+      name: "Moon",
+      ...project(
+        earthX + Math.cos(moonAngle) * MOON_ORBIT_RADIUS,
+        earthZ - Math.sin(moonAngle) * MOON_ORBIT_RADIUS,
+        MOON_SIZE,
+      ),
+    });
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const ring = Math.max(...PLANETS.map((planet) => planet.radius));
+    for (let index = 0; index < 180; index += 1) {
+      const angle = (index / 180) * Math.PI * 2;
+      const point = new THREE.Vector3(
+        Math.cos(angle) * ring,
+        0,
+        Math.sin(angle) * ring,
+      ).project(camera);
+      const x = (point.x * 0.5 + 0.5) * width;
+      const y = (0.5 - point.y * 0.5) * height;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+
+    window.__shOrreryScreen = {
+      ready: Boolean(settled),
+      planets,
+      orbit: {
+        x: Math.round(minX),
+        y: Math.round(minY),
+        width: Math.round(maxX - minX),
+        height: Math.round(maxY - minY),
+      },
+      viewport: { width, height },
+      stage: stage
+        ? {
+            left: Math.round(stage.left),
+            top: Math.round(stage.top),
+            right: Math.round(stage.right),
+            bottom: Math.round(stage.bottom),
+          }
+        : null,
+      at: Math.round(performance.now()),
+    };
+  }, [camera, positions, settled, size.height, size.width, stage]);
+
+  useEffect(() => {
+    write();
+  }, [write]);
+
+  useFrame(() => {
+    const now = performance.now();
+    if (now - lastWrite.current < 150) return;
+    lastWrite.current = now;
+    write();
+  });
+
+  return null;
 }

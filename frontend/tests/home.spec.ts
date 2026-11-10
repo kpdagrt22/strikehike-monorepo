@@ -52,12 +52,14 @@ async function setupHome(
     theme = "dark",
     returning = false,
     archiveOpen = false,
+    probe = false,
   }: {
     width: number;
     height: number;
     theme?: "dark" | "light";
     returning?: boolean;
     archiveOpen?: boolean;
+    probe?: boolean;
   },
 ) {
   await page.addInitScript(
@@ -72,7 +74,7 @@ async function setupHome(
   await page.emulateMedia({ colorScheme: theme });
   await page.setViewportSize({ width, height });
   await mockHomeData(page);
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto(probe ? "/?orreryProbe=1" : "/", { waitUntil: "networkidle" });
   await expect(page.locator("[data-home-intro]")).toBeVisible();
   await expect(page.locator('[data-hud="gauge"]')).toBeVisible();
   if (width >= 1024) {
@@ -98,10 +100,14 @@ async function readSurfaceBoxes(
 ): Promise<Record<string, Box>> {
   const nav =
     width >= 640 ? '[data-shell="nav-pill"]' : '[data-shell="nav-row"]';
-  const specs: Array<[string, string, boolean?]> = [
+  // The flame aura is a soft, mostly transparent glow, not a solid panel: it
+  // is checked separately against the nav (assertAuraClearsNav) and against
+  // every body disc (the clearance suite), so this all-pairs matrix uses the
+  // gauge's own opaque box.
+  const specs: Array<[string, string]> = [
     ["intro", "[data-home-intro]"],
     ["nav", nav],
-    ["gauge", '[data-hud="gauge"]', true],
+    ["gauge", '[data-hud="gauge"]'],
     ["archive", "#chrono-events-sheet"],
     ["ladder", "#chrono-ladder-sheet"],
     ["footnote", "[data-ladder-footnote]"],
@@ -113,33 +119,12 @@ async function readSurfaceBoxes(
     ["timeline", '[data-hud="timeline"]'],
   ];
   const boxes: Record<string, Box> = {};
-  for (const [name, selector, includeAura] of specs) {
+  for (const [name, selector] of specs) {
     const locator = page.locator(selector).first();
     if (!(await locator.isVisible().catch(() => false))) continue;
     const box = await locator.boundingBox();
     if (!box) continue;
     boxes[name] = { ...box };
-    if (includeAura) {
-      const aura = page.locator(".sh-aura").first();
-      if (await aura.isVisible().catch(() => false)) {
-        const auraBox = await aura.boundingBox();
-        if (auraBox) {
-          const left = Math.min(box.x, auraBox.x);
-          const top = Math.min(box.y, auraBox.y);
-          const right = Math.max(box.x + box.width, auraBox.x + auraBox.width);
-          const bottom = Math.max(
-            box.y + box.height,
-            auraBox.y + auraBox.height,
-          );
-          boxes[name] = {
-            x: left,
-            y: top,
-            width: right - left,
-            height: bottom - top,
-          };
-        }
-      }
-    }
   }
   return boxes;
 }
@@ -711,5 +696,178 @@ test.describe("navigation review screenshots", () => {
         path: `smoke-screens/dock-phone-${scheme}.png`,
       });
     });
+  }
+});
+
+// ---------------------------------------------------------------------------------------------
+// The orrery must stay clear of the HUD. The scene exposes its live screen boxes
+// (?orreryProbe=1 -> window.__shOrreryScreen); every overlay is checked against
+// the Sun, each planet, Earth and the Moon (discs grown by 8 px), and the caption
+// block against the outer orbit's bounding box.
+// ---------------------------------------------------------------------------------------------
+type OrreryPlanet = { name: string; x: number; y: number; r: number };
+type OrreryScreen = {
+  ready: boolean;
+  planets: OrreryPlanet[];
+  orbit: { x: number; y: number; width: number; height: number };
+  viewport: { width: number; height: number };
+};
+
+const ORRERY_OVERLAYS: Array<[string, string]> = [
+  ["intro", "[data-home-intro]"],
+  ["gauge", '[data-hud="gauge"]'],
+  ["aura", ".sh-aura"],
+  ["captions", "[data-gauge-captions]"],
+  ["hint", "[data-home-hint]"],
+  ["left column", "[data-home-left-column]"],
+  ["right panel", "#chrono-alignment-sheet"],
+  ["time controls", '[data-hud="timeline"]'],
+  ["dock", '[data-hud="dock"]'],
+  ["feedback", "[data-home-feedback]"],
+  ["sponsor", "[data-home-sponsor]"],
+];
+
+function rectIntersects(
+  a: Box,
+  b: { x: number; y: number; width: number; height: number },
+) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
+function boxHitsDisc(box: Box, planet: OrreryPlanet, pad = 8) {
+  const x = Math.max(box.x, Math.min(planet.x, box.x + box.width));
+  const y = Math.max(box.y, Math.min(planet.y, box.y + box.height));
+  return Math.hypot(x - planet.x, y - planet.y) < planet.r + pad;
+}
+
+test.describe("home orrery clearance", () => {
+  const sizes = [
+    { label: "1024x768", width: 1024, height: 768, desktop: true },
+    { label: "1280x720", width: 1280, height: 720, desktop: true },
+    { label: "1366x768", width: 1366, height: 768, desktop: true },
+    { label: "1440x900", width: 1440, height: 900, desktop: true },
+    { label: "1536x864", width: 1536, height: 864, desktop: true },
+    { label: "1920x1080", width: 1920, height: 1080, desktop: true },
+    { label: "390x844", width: 390, height: 844, desktop: false },
+    { label: "360x740", width: 360, height: 740, desktop: false },
+  ] as const;
+
+  for (const size of sizes) {
+    for (const returning of [false, true]) {
+      for (const archiveOpen of size.desktop ? [false, true] : [false]) {
+        const visit = returning ? "return" : "first";
+        const suffix = archiveOpen ? "-archive-open" : "";
+        test(`orrery clear, ${size.label}, ${visit}${suffix}`, async ({
+          page,
+        }) => {
+          const errors = watchErrors(page);
+          await setupHome(page, {
+            width: size.width,
+            height: size.height,
+            returning,
+            archiveOpen,
+            probe: true,
+          });
+          await page.waitForSelector('[data-orrery-ready="true"]', {
+            timeout: 25_000,
+          });
+          await page.waitForTimeout(400);
+
+          const probe = await page.evaluate(
+            () =>
+              (window as unknown as { __shOrreryScreen?: OrreryScreen })
+                .__shOrreryScreen ?? null,
+          );
+          expect(probe, "the scene probe exists").not.toBeNull();
+          expect(probe!.ready, "the camera has settled").toBe(true);
+          expect(probe!.planets.map((planet) => planet.name)).toEqual(
+            expect.arrayContaining([
+              "Sun",
+              "Mercury",
+              "Venus",
+              "Mars",
+              "Jupiter",
+              "Saturn",
+              "Rahu",
+              "Ketu",
+              "Earth",
+              "Moon",
+            ]),
+          );
+
+          const boxes: Record<string, Box> = {};
+          for (const [name, selector] of ORRERY_OVERLAYS) {
+            const locator = page.locator(selector).first();
+            if (!(await locator.isVisible().catch(() => false))) continue;
+            const box = await locator.boundingBox();
+            if (box && box.width > 1 && box.height > 1) boxes[name] = box;
+          }
+
+          console.log(
+            `orrery ${size.label} ${visit}${suffix}: ${JSON.stringify({
+              planets: probe!.planets,
+              orbit: probe!.orbit,
+              boxes,
+            })}`,
+          );
+
+          // (a) no overlay touches a body disc (+8 px).
+          const hits: string[] = [];
+          for (const [name, box] of Object.entries(boxes)) {
+            for (const planet of probe!.planets) {
+              if (boxHitsDisc(box, planet)) {
+                hits.push(`${name} → ${planet.name}`);
+              }
+            }
+          }
+          expect(
+            hits,
+            `overlays over planets: ${hits.join(", ")}`,
+          ).toEqual([]);
+
+          // (b) the caption block clears the orbit's bounding box.
+          if (boxes.captions) {
+            expect(
+              rectIntersects(boxes.captions, probe!.orbit),
+              `captions over orbit: ${JSON.stringify({
+                captions: boxes.captions,
+                orbit: probe!.orbit,
+              })}`,
+            ).toBe(false);
+          }
+
+          // (c) the whole orbit is on screen and not under the side panels.
+          const orbit = probe!.orbit;
+          expect(orbit.x, "orbit left").toBeGreaterThanOrEqual(0);
+          expect(orbit.y, "orbit top").toBeGreaterThanOrEqual(0);
+          expect(orbit.x + orbit.width, "orbit right").toBeLessThanOrEqual(
+            size.width,
+          );
+          expect(orbit.y + orbit.height, "orbit bottom").toBeLessThanOrEqual(
+            size.height,
+          );
+          for (const side of ["left column", "right panel"]) {
+            if (!boxes[side]) continue;
+            expect(
+              rectIntersects(boxes[side], orbit),
+              `orbit under ${side}: ${JSON.stringify({
+                side: boxes[side],
+                orbit,
+              })}`,
+            ).toBe(false);
+          }
+
+          await page.screenshot({
+            path: `smoke-screens/home-${size.label}-${visit}${suffix}.png`,
+          });
+          expect(errors).toEqual([]);
+        });
+      }
+    }
   }
 });

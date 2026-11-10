@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -15,19 +16,19 @@ import gsap from "gsap";
 import { AmbientCosmos } from "@/components/AmbientCosmos";
 import { PlanetarySystem } from "@/components/PlanetarySystem";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import {
+  CAMERA_DIRECTIONS,
+  defaultStage,
+  fitOrrery,
+  framedPosition,
+  framingKey,
+} from "@/lib/orreryFit";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
 
-// Camera keys are calibrated to the compact orrery radius (not literal AU scale).
-const ORBITAL_VIEW = { x: 0, y: 8, z: 14 };
-// Portrait phones: a closer, more top-down framing. The orbit is a flat disc,
-// so tilting down makes the ring use the tall viewport instead of leaving a
-// vertical dead zone above and below it.
-const PORTRAIT_ORBITAL_VIEW = { x: 0, y: 16, z: 12 };
-// Large desktops: pull in so the orrery commands the center of the canvas.
-const WIDE_ORBITAL_VIEW = { x: 0, y: 5, z: 10 };
-const ZENITH_VIEW = { x: 0, y: 22, z: 0 };
-const PORTRAIT_ZENITH_VIEW = { x: 0, y: 28, z: 0 };
+// Camera framing: the angles are calibrated to the compact orrery radius (not
+// literal AU scale); the distance is fitted to the free HUD area at runtime
+// (lib/orreryFit.js), so the whole orbit stays between the panels.
 const INTRO_START = { x: 0, y: 55, z: 95 };
 // Scene motion. The fly-in is short and any pointer, wheel or key input lands
 // it at once; view changes are calm. Reduced motion places the camera.
@@ -47,18 +48,6 @@ const MAX_FRAME_DELTA = 1 / 30;
 const CANVAS_INTENT_EVENTS = ["pointermove", "pointerdown", "wheel", "touchstart"];
 const INTRO_SKIP_EVENTS = ["pointerdown", "wheel", "keydown"];
 
-const CAMERA_FRAMING = {
-  portrait: { orbital: PORTRAIT_ORBITAL_VIEW, zenith: PORTRAIT_ZENITH_VIEW },
-  standard: { orbital: ORBITAL_VIEW, zenith: ZENITH_VIEW },
-  wide: { orbital: WIDE_ORBITAL_VIEW, zenith: ZENITH_VIEW },
-};
-
-function getFramingKey(width, height) {
-  const aspect = width / Math.max(height, 1);
-  if (aspect < 0.8) return "portrait";
-  if (width >= 1200) return "wide";
-  return "standard";
-}
 
 function CameraRig({
   onIntroComplete,
@@ -67,12 +56,31 @@ function CameraRig({
   onRestChange,
   isDark,
   regimeTone,
+  stage,
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const invalidate = useThree((state) => state.invalidate);
   const eventSource = useThree((state) => state.events.connected);
-  const framing = CAMERA_FRAMING[getFramingKey(size.width, size.height)];
+  const cameraView = useChronoStore((state) => state.cameraView);
+  const cameraRevision = useChronoStore((state) => state.cameraRevision);
+  const directions = CAMERA_DIRECTIONS[framingKey(size.width, size.height)];
+  const direction =
+    cameraView === "zenith" ? directions.zenith : directions.orbital;
+  const fit = fitOrrery(
+    stage ?? defaultStage(size.width, size.height),
+    size.width,
+    size.height,
+    camera.fov,
+    direction,
+  );
+  const framing = useMemo(
+    () => ({
+      orbital: framedPosition(directions.orbital, fit.distance),
+      zenith: framedPosition(directions.zenith, fit.distance),
+    }),
+    [directions, fit.distance],
+  );
   const controlsRef = useRef(null);
   const idleTimerRef = useRef(null);
   const appliedViewRef = useRef(false);
@@ -86,13 +94,11 @@ function CameraRig({
   const restingRef = useRef(false);
   const sleepTimerRef = useRef(null);
   const lastWakeRef = useRef(0);
+  const cameraViewRef = useRef("orbital");
 
   const [introComplete, setIntroComplete] = useState(false);
   const [interacting, setInteracting] = useState(false);
   const [viewTweening, setViewTweening] = useState(false);
-
-  const cameraView = useChronoStore((state) => state.cameraView);
-  const cameraRevision = useChronoStore((state) => state.cameraRevision);
 
   useEffect(() => {
     introCallbackRef.current = onIntroComplete;
@@ -102,6 +108,41 @@ function CameraRig({
     framingRef.current = framing;
     introTargetRef.current = framing.orbital;
   }, [framing]);
+
+  useEffect(() => {
+    cameraViewRef.current = cameraView;
+  }, [cameraView]);
+
+  // The measured free area moves the projection window and, when its size
+  // changes, the camera distance. The canvas stays full-bleed; only the view
+  // window moves, so the starfield still fills the page.
+  useLayoutEffect(() => {
+    camera.setViewOffset(
+      size.width,
+      size.height,
+      fit.offsetX,
+      fit.offsetY,
+      size.width,
+      size.height,
+    );
+    camera.updateProjectionMatrix();
+    invalidate();
+    return () => {
+      camera.clearViewOffset();
+      camera.updateProjectionMatrix();
+    };
+  }, [camera, fit.offsetX, fit.offsetY, invalidate, size.height, size.width]);
+
+  // After the intro, a resize or a panel opening refits the current view at
+  // once (no tween: the HUD moved, the sky did not).
+  useLayoutEffect(() => {
+    if (!introDoneRef.current) return;
+    const target =
+      cameraViewRef.current === "zenith" ? framing.zenith : framing.orbital;
+    camera.position.set(target.x, target.y, target.z);
+    controlsRef.current?.update();
+    invalidate();
+  }, [camera, framing, invalidate]);
 
   // Reduced motion: the sky is still from the first frame.
   useLayoutEffect(() => {
@@ -380,7 +421,7 @@ function CameraRig({
       enableDamping={!reducedMotion}
       dampingFactor={0.055}
       minDistance={4}
-      maxDistance={180}
+      maxDistance={260}
       target={[0, 0, 0]}
     />
   );
@@ -392,18 +433,37 @@ export const Canvas3D = memo(function Canvas3D({
   mounted = false,
   onIntroComplete,
   regimeTone = null,
+  stage = null,
 }) {
   const reducedMotion = usePrefersReducedMotion();
   // Full motion renders every frame while the sky is awake and on demand at
   // rest; reduced motion renders on demand from the first frame.
   const [resting, setResting] = useState(false);
+  const [introComplete, setIntroComplete] = useState(false);
   const ambientRef = useRef(reducedMotion ? 0 : 1);
   const clearPinnedEntity = useEntityStore(
     (state) => state.clearPinnedEntity,
   );
+  // The scene probe is opt-in (?orreryProbe=1 or NEXT_PUBLIC_ORRERY_PROBE=1):
+  // the layout tests read the planets' screen boxes; nothing is sent anywhere.
+  const [probe] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      (new URLSearchParams(window.location.search).has("orreryProbe") ||
+        process.env.NEXT_PUBLIC_ORRERY_PROBE === "1"),
+  );
+  const handleIntroComplete = useCallback(() => {
+    setIntroComplete(true);
+    onIntroComplete?.();
+  }, [onIntroComplete]);
 
   return (
-    <div className="absolute inset-0" aria-hidden="true">
+    <div
+      className="absolute inset-0"
+      aria-hidden="true"
+      data-orrery-probe={probe ? "true" : undefined}
+      data-orrery-ready={probe && introComplete ? "true" : undefined}
+    >
       <Canvas
         dpr={[1, 1.5]}
         frameloop={reducedMotion || resting ? "demand" : "always"}
@@ -431,15 +491,19 @@ export const Canvas3D = memo(function Canvas3D({
                 regimeTone={regimeTone}
                 reducedMotion={reducedMotion}
                 ambientRef={ambientRef}
+                probe={probe}
+                settled={introComplete}
+                stage={stage}
               />
             </Suspense>
             <CameraRig
-              onIntroComplete={onIntroComplete}
+              onIntroComplete={handleIntroComplete}
               reducedMotion={reducedMotion}
               ambientRef={ambientRef}
               onRestChange={setResting}
               isDark={isDark}
               regimeTone={regimeTone}
+              stage={stage}
             />
           </>
         ) : null}
