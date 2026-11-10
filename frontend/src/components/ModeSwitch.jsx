@@ -21,6 +21,10 @@ const PAGES = [{ href: "/disclaimer", label: "Disclaimer" }];
 // The view (or page) a pathname belongs to; anything else outside the five
 // views is the Orrery.
 export function viewForPath(pathname) {
+  // The event, theme and year pages belong to the Upcoming view.
+  if (pathname?.startsWith("/events/") || pathname?.startsWith("/dates/")) {
+    return VIEWS.find((view) => view.href === "/upcoming") ?? VIEWS[0];
+  }
   return (
     [...VIEWS, ...PAGES].find(
       (view) =>
