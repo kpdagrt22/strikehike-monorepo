@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { dateTravelled } from "@/lib/analytics/events";
+import { recessionPath } from "@/lib/reference/reference";
 import {
   formatDate,
   formatPercent,
@@ -33,7 +35,13 @@ export function RecessionWindows({
           Recession windows
         </h2>
         <p className="text-micro text-(--sh-text-3)">
-          {metrics.length} NBER windows · select one to zoom the chart
+          {metrics.length} NBER windows · select one to zoom the chart ·{" "}
+          <Link
+            href="/recessions"
+            className="underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current"
+          >
+            All recession pages
+          </Link>
         </p>
       </div>
 
@@ -74,7 +82,12 @@ export function RecessionWindows({
                     className="max-w-[16rem] truncate py-2 pr-3 font-medium text-(--sh-text-1)"
                     title={metric.name}
                   >
-                    {metric.name}
+                    <Link
+                      href={recessionPath(metric.id)}
+                      className="underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
+                    >
+                      {metric.name}
+                    </Link>
                   </th>
                   <td className="whitespace-nowrap px-3 py-2 text-(--sh-text-2)">
                     {formatDate(metric.start)} → {formatDate(metric.end)}

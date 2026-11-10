@@ -7,11 +7,22 @@ import {
   getCaseCatalogue,
   getEvent,
   getPatternsDefault,
+  getRegimeAtlas,
   getRegimeSummary,
   getUpcoming,
   getUpcomingAll,
   patternsAsOf,
 } from "@/lib/seo/data";
+import {
+  declinePath,
+  declineRecordComplete,
+  declinesComplete,
+  recessionFacts,
+  recessionIndexable,
+  recessionPath,
+  recessionsComplete,
+  trendRecord,
+} from "@/lib/reference/reference";
 import { CONTENT_DATES, absoluteUrl, urlFor, type SitePath } from "@/lib/seo/site";
 
 // Generated per request: the Docker build has no backend, so a prerendered copy would list
@@ -28,12 +39,13 @@ type Generated = { url: string; lastModified: string };
 // the D-06 rules (lib/events/indexing.ts). noindex pages stay out. lastmod is the day the
 // bundle was built, never the build or request time.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [regime, cases, patterns, upcoming, everything] = await Promise.all([
+  const [regime, cases, patterns, upcoming, everything, atlas] = await Promise.all([
     getRegimeSummary().catch(() => null),
     getCaseCatalogue().catch(() => null),
     getPatternsDefault().catch(() => null),
     getUpcoming().catch(() => null),
     getUpcomingAll().catch(() => null),
+    getRegimeAtlas().catch(() => null),
   ]);
   const asOf: Partial<Record<SitePath, string | undefined>> = {
     "/regime": regime?.as_of?.slice(0, 10),
@@ -77,5 +89,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return [...fixed, ...themes, ...events, ...years];
+  // Reference pages: the index only when its payload is complete, a detail
+  // page only when that window/fall has its dates and S&P figure (D-06).
+  const reference: Generated[] = [];
+  const referenceDate = atlas?.as_of?.slice(0, 10) ?? bundleDate;
+  if (recessionsComplete(atlas)) {
+    reference.push({
+      url: urlFor("/recessions"),
+      lastModified: referenceDate,
+    });
+    for (const crash of atlas!.crashes) {
+      const facts = recessionFacts(atlas!, crash);
+      if (recessionIndexable(facts)) {
+        reference.push({
+          url: urlFor(recessionPath(crash.id)),
+          lastModified: referenceDate,
+        });
+      }
+    }
+  }
+  if (declinesComplete(atlas?.meta)) {
+    reference.push({ url: urlFor("/declines"), lastModified: referenceDate });
+    const record = trendRecord(atlas?.meta);
+    for (const fall of record?.falls ?? []) {
+      if (declineRecordComplete(fall)) {
+        reference.push({
+          url: urlFor(declinePath(fall.id)),
+          lastModified: referenceDate,
+        });
+      }
+    }
+  }
+
+  return [...fixed, ...themes, ...events, ...years, ...reference];
 }
