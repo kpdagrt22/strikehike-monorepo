@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { dateTravelled } from "@/lib/analytics/events";
 import { bestParallel } from "@/lib/parallelEpoch";
+import { useOrreryStage } from "@/hooks/useOrreryStage";
 import { useChronoStore } from "@/store/chronoStore";
 import { EnergyGauge } from "@/components/EnergyGauge";
 import { FeedbackModule } from "@/components/FeedbackModule";
@@ -147,6 +148,7 @@ const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
 
 const PHONE_QUERY = "(max-width: 639.98px)";
+const SHORT_PHONE_QUERY = "(max-width: 639.98px) and (max-height: 760px)";
 
 function subscribePhone(onChange) {
   const query = window.matchMedia(PHONE_QUERY);
@@ -156,6 +158,15 @@ function subscribePhone(onChange) {
 
 const getPhone = () => window.matchMedia(PHONE_QUERY).matches;
 const getPhoneServer = () => false;
+
+function subscribeShortPhone(onChange) {
+  const query = window.matchMedia(SHORT_PHONE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+const getShortPhone = () => window.matchMedia(SHORT_PHONE_QUERY).matches;
+const getShortPhoneServer = () => false;
 
 function subscribeIntroSeen(onChange) {
   window.addEventListener("strikehike:intro-dismissed", onChange);
@@ -178,6 +189,7 @@ const getIntroSeenServer = () => false;
 
 export default function Home() {
   const { resolvedTheme } = useTheme();
+  const stage = useOrreryStage();
 
   useEffect(() => {
     const date = new URLSearchParams(window.location.search).get("d");
@@ -196,12 +208,19 @@ export default function Home() {
     getServerSnapshot,
   );
   const phone = useSyncExternalStore(subscribePhone, getPhone, getPhoneServer);
+  const shortPhone = useSyncExternalStore(
+    subscribeShortPhone,
+    getShortPhone,
+    getShortPhoneServer,
+  );
   const introSeen = useSyncExternalStore(
     subscribeIntroSeen,
     getIntroSeen,
     getIntroSeenServer,
   );
-  const compactIntro = phone && introSeen;
+  // The short-phone first visit gets the compact intro too: at 740 px the full
+  // promise plus the gauge would leave the orrery no room above the hint.
+  const compactIntro = phone && (introSeen || shortPhone);
   // Dark until mounted, so the server HTML and the hydration render agree; the
   // post-mount render then patches the light colours (React 19 does not patch
   // mismatched attributes during hydration).
@@ -210,11 +229,15 @@ export default function Home() {
 
   return (
     <main className="relative h-full w-full overflow-hidden border-0 p-0">
-      <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} />
+      <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} stage={stage} />
 
       <HomeIntro compact={compactIntro} />
       <RegimeOverlaySync />
-      <EnergyGauge isDark={isDark} homeIntro compactIntro={compactIntro} />
+      <EnergyGauge
+        isDark={isDark}
+        homeIntro
+        gaugeTop={stage?.gaugeTop ?? null}
+      />
       <Tooltip />
       {/* Before the tray in DOM order: forward Tab reaches the dock before the
           tray's focus-expansion hides it. */}

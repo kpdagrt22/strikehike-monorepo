@@ -369,6 +369,33 @@ test.describe("card action analytics", () => {
   });
 });
 
+test.describe("navigation", () => {
+  test("generated pages mark Upcoming as the current view, not Orrery", async ({
+    page,
+    request,
+  }) => {
+    const events = eventsOf(await readUpcoming(request));
+    const indexable = events.find((event) => isIndexableEvent(event).index) ?? events[0];
+    expect(indexable).toBeDefined();
+    for (const path of [
+      eventPath(indexable!.event_id),
+      "/upcoming/finance",
+      "/dates/2027/fomc-meetings",
+    ]) {
+      const response = await page.goto(path, { waitUntil: "networkidle" });
+      expect(response?.status(), path).toBe(200);
+      await expect(
+        page.getByRole("link", { name: "Upcoming", exact: true }).first(),
+        path,
+      ).toHaveAttribute("aria-current", "page");
+      await expect(
+        page.getByRole("link", { name: "Orrery", exact: true }).first(),
+        path,
+      ).not.toHaveAttribute("aria-current", "page");
+    }
+  });
+});
+
 test.describe("review screenshots", () => {
   for (const scheme of ["dark", "light"] as const) {
     for (const [label, width, height] of [

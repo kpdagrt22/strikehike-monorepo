@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useSyncExternalStore } from "react";
 import { categoryTone } from "@/lib/categoryTone";
 import { getEnergyTone } from "@/lib/energyTone";
 import { bestParallel } from "@/lib/parallelEpoch";
@@ -106,11 +107,38 @@ function SelectedDayParallel({ parallels, compact = false }) {
   );
 }
 
+const PHONE_QUERY = "(max-width: 639.98px)";
+const SHORT_DESKTOP_QUERY = "(min-width: 640px) and (max-height: 820px)";
+
+function subscribeQuery(query, onChange) {
+  const media = window.matchMedia(query);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+const getPhone = () => window.matchMedia(PHONE_QUERY).matches;
+const getShortDesktop = () => window.matchMedia(SHORT_DESKTOP_QUERY).matches;
+const getServerQuery = () => false;
+
 export function EnergyGauge({
   isDark = true,
   homeIntro = false,
-  compactIntro = false,
+  gaugeTop = null,
 }) {
+  const phone = useSyncExternalStore(
+    (onChange) => subscribeQuery(PHONE_QUERY, onChange),
+    getPhone,
+    getServerQuery,
+  );
+  const shortDesktop = useSyncExternalStore(
+    (onChange) => subscribeQuery(SHORT_DESKTOP_QUERY, onChange),
+    getShortDesktop,
+    getServerQuery,
+  );
+  // Side by side where the top band is short (phones, and desktops under
+  // 820 px tall); stacked when there is room above the orrery.
+  const horizontal = phone || shortDesktop;
+  const compact = phone;
   const energy = useChronoStore((state) => state.energy);
   const parallels = useChronoStore((state) => state.parallels);
   const status = useChronoStore((state) => state.status);
@@ -144,13 +172,12 @@ export function EnergyGauge({
   return (
     <div
       data-hud="gauge"
+      style={gaugeTop != null ? { top: `${gaugeTop}px` } : undefined}
       className={`pointer-events-none absolute left-1/2 z-20 flex w-[min(21rem,calc(100vw-1.5rem))] -translate-x-1/2 select-none transition-opacity duration-200 motion-reduce:transition-none sm:w-[min(21rem,calc(100vw-2rem))] xl:w-[min(23rem,calc(100vw-2rem))] ${
-        compactIntro ? "flex-row items-center gap-3" : "flex-col items-center"
+        horizontal ? "flex-row items-center gap-3" : "flex-col items-center"
       } ${
         homeIntro
-          ? compactIntro
-            ? "top-[15.625rem] sm:top-[27rem] lg:top-[8.5rem]"
-            : "top-[27rem] sm:top-[27rem] lg:top-[8.5rem]"
+          ? "top-[17.5rem] sm:top-[27rem] lg:top-[8.5rem]"
           : "top-[4.5rem] sm:top-(--sh-header-clear)"
       } ${
         mobileSheet ? "max-lg:opacity-0" : ""
@@ -167,7 +194,7 @@ export function EnergyGauge({
           score={score}
           isDark={isDark}
           paused={Boolean(mobileSheet)}
-          compact={compactIntro}
+          compact={compact}
         />
         {/* The score's face: opaque and above every aura layer, so nothing
             passes behind or over the digits. */}
@@ -257,37 +284,27 @@ export function EnergyGauge({
         </div>
       </div>
 
-      {compactIntro ? (
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left">
-          <div className="flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: tone.stroke }}
-            />
-            {score === null ? label : `Sky activity · ${label}`}
-            <InfoTip
-              label="What sky activity means"
-              description={SKY_ACTIVITY_DEFINITION}
-            />
-          </div>
-          <SelectedDayParallel parallels={parallels} compact />
+      <div
+        data-gauge-captions
+        className={
+          horizontal
+            ? "flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left"
+            : "mt-2.5 flex w-full flex-col items-center"
+        }
+      >
+        <div className="flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: tone.stroke }}
+          />
+          {score === null ? label : `Sky activity · ${label}`}
+          <InfoTip
+            label="What sky activity means"
+            description={SKY_ACTIVITY_DEFINITION}
+          />
         </div>
-      ) : (
-        <div className="mt-2.5 flex w-full flex-col items-center rounded-2xl bg-(--sh-surface-float) px-3 py-2 backdrop-blur-md">
-          <div className="flex items-center gap-2 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: tone.stroke }}
-            />
-            {score === null ? label : `Sky activity · ${label}`}
-            <InfoTip
-              label="What sky activity means"
-              description={SKY_ACTIVITY_DEFINITION}
-            />
-          </div>
-          <SelectedDayParallel parallels={parallels} />
-        </div>
-      )}
+        <SelectedDayParallel parallels={parallels} compact={compact} />
+      </div>
     </div>
   );
 }
