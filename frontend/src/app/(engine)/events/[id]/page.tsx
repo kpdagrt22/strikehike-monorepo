@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { PageShell } from "@/components/PageShell";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
 import { eventCalendarPath, eventIdFromSlug, eventSlug, skyHref } from "@/lib/events/eventId";
@@ -131,121 +132,126 @@ export default async function EventPage({
       });
 
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24">
+    <PageShell>
       <JsonLd data={eventPageGraph(path, `${event.name} · ${day}`, summary, asOf)} />
-      <div className="w-full max-w-3xl px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
-        <nav aria-label="Breadcrumb" className="text-micro text-(--sh-text-3)">
-          <Link href="/" className="hover:text-(--sh-text-1)">StrikeHike</Link>
-          <span aria-hidden="true"> / </span>
-          <Link href="/upcoming" className="hover:text-(--sh-text-1)">Upcoming dates</Link>
-        </nav>
+      <div className="mx-auto grid w-full max-w-[760px] gap-8 xl:max-w-none xl:grid-cols-[minmax(0,760px)_20rem] xl:justify-center xl:gap-12">
+        <div className="min-w-0">
+          <nav aria-label="Breadcrumb" className="text-micro text-(--sh-text-3)">
+            <Link href="/" className="hover:text-(--sh-text-1)">StrikeHike</Link>
+            <span aria-hidden="true"> / </span>
+            <Link href="/upcoming" className="hover:text-(--sh-text-1)">Upcoming dates</Link>
+          </nav>
 
-        <header className="mt-4">
-          <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
-            {hasThemePage ? (
-              <Link href={`/upcoming/${slugTheme}`} className="hover:underline">
-                {event.theme}
-              </Link>
-            ) : (
-              event.theme
-            )}
-            {status ? ` · ${status}` : null}
-          </p>
-          <h1 className="mt-2 text-[1.75rem] font-semibold leading-[1.02] tracking-[-0.04em] text-(--sh-text-1) sm:text-[2.5rem]">
-            {event.name}
-          </h1>
-          <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body text-(--sh-text-2) sm:text-strong">
-            <span className="font-medium text-(--sh-text-1)">
-              <LocalDateTime
-                startDate={event.start_date}
-                startTime={event.start_time}
-                startUtc={event.start_utc}
-                timezone={event.timezone}
-                allDay={event.all_day}
-                part="date"
-                long
-              />
-            </span>
-            {event.all_day ? null : (
-              <>
-                <span aria-hidden="true">·</span>
+          <header className="mt-4">
+            <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
+              {hasThemePage ? (
+                <Link href={`/upcoming/${slugTheme}`} className="hover:underline">
+                  {event.theme}
+                </Link>
+              ) : (
+                event.theme
+              )}
+              {status ? ` · ${status}` : null}
+            </p>
+            <h1 className="mt-2 text-[1.75rem] font-semibold leading-[1.02] tracking-[-0.04em] text-(--sh-text-1) sm:text-[2.5rem]">
+              {event.name}
+            </h1>
+            <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body text-(--sh-text-2) sm:text-strong">
+              <span className="font-medium text-(--sh-text-1)">
                 <LocalDateTime
                   startDate={event.start_date}
                   startTime={event.start_time}
                   startUtc={event.start_utc}
                   timezone={event.timezone}
                   allDay={event.all_day}
-                  part="time"
+                  part="date"
+                  long
                 />
-              </>
-            )}
-          </p>
-        </header>
+              </span>
+              {event.all_day ? null : (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <LocalDateTime
+                    startDate={event.start_date}
+                    startTime={event.start_time}
+                    startUtc={event.start_utc}
+                    timezone={event.timezone}
+                    allDay={event.all_day}
+                    part="time"
+                  />
+                </>
+              )}
+            </p>
+          </header>
 
-        {event.description ? (
-          <p className="mt-5 max-w-2xl text-body leading-relaxed text-(--sh-text-2) sm:text-strong">
-            {event.description}
-          </p>
-        ) : null}
+          {event.description ? (
+            <p className="mt-5 max-w-[760px] text-body leading-relaxed text-(--sh-text-2) sm:text-strong">
+              {event.description}
+            </p>
+          ) : null}
 
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-(--sh-line-1) pt-4 text-meta text-(--sh-text-3)">
-          <a
-            href={event.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-1 underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current sm:min-h-0"
-          >
-            {sourceLabel}
-            <span aria-hidden="true">↗</span>
-          </a>
-          {authority ? (
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-(--sh-line-1) pt-4 text-meta text-(--sh-text-3)">
             <a
-              href={authority}
+              href={event.source_url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-11 items-center gap-1 underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current sm:min-h-0"
             >
-              Authority
+              {sourceLabel}
               <span aria-hidden="true">↗</span>
             </a>
-          ) : null}
+            {authority ? (
+              <a
+                href={authority}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center gap-1 underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current sm:min-h-0"
+              >
+                Authority
+                <span aria-hidden="true">↗</span>
+              </a>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {sky ? (
+              <Link
+                href={sky}
+                className="inline-flex min-h-11 items-center rounded-full border border-(--sh-line-2) px-3 text-meta font-medium text-(--sh-text-1) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
+              >
+                See the sky on this date
+              </Link>
+            ) : (
+              <p className="text-meta text-(--sh-text-3)">
+                This date is outside the orrery&apos;s timeline (1906–2027).
+              </p>
+            )}
+            {past ? null : (
+              <a
+                href={eventCalendarPath(event.event_id)}
+                className="inline-flex min-h-11 items-center rounded-full border border-(--sh-line-1) px-3 text-meta font-medium text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
+              >
+                Add to calendar (.ics)
+              </a>
+            )}
+            {google ? (
+              <a
+                href={google}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center rounded-full border border-(--sh-line-1) px-3 text-meta font-medium text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
+              >
+                Google Calendar
+              </a>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {sky ? (
-            <Link
-              href={sky}
-              className="inline-flex min-h-11 items-center rounded-full border border-(--sh-line-2) px-3 text-meta font-medium text-(--sh-text-1) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
-            >
-              See the sky on this date
-            </Link>
-          ) : (
-            <p className="text-meta text-(--sh-text-3)">
-              This date is outside the orrery&apos;s timeline (1906–2027).
-            </p>
-          )}
-          {past ? null : (
-            <a
-              href={eventCalendarPath(event.event_id)}
-              className="inline-flex min-h-11 items-center rounded-full border border-(--sh-line-1) px-3 text-meta font-medium text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
-            >
-              Add to calendar (.ics)
-            </a>
-          )}
-          {google ? (
-            <a
-              href={google}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center rounded-full border border-(--sh-line-1) px-3 text-meta font-medium text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
-            >
-              Google Calendar
-            </a>
-          ) : null}
-        </div>
-
-        {siblings.length > 0 ? (
-          <section aria-labelledby="more-dates" className="mt-9 border-t border-(--sh-line-1) pt-5">
+        {siblings.length > 0 || hasThemePage ? (
+          <aside
+            aria-labelledby="more-dates"
+            className="min-w-0 border-t border-(--sh-line-1) pt-5 xl:sticky xl:top-(--sh-header-clear) xl:self-start xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 id="more-dates" className="text-strong font-semibold tracking-[-0.02em] text-(--sh-text-1)">
                 More {event.theme} dates
@@ -257,22 +263,30 @@ export default async function EventPage({
                 All {event.theme} dates →
               </Link>
             </div>
-            <ul className="mt-2">
-              {siblings.map((other) => (
-                <UpcomingEventRow key={other.event_id} event={other} themeSlug={slugTheme} />
-              ))}
-            </ul>
-          </section>
-        ) : hasThemePage ? (
-          <p className="mt-9 border-t border-(--sh-line-1) pt-5 text-meta text-(--sh-text-3)">
-            <Link href={`/upcoming/${slugTheme}`} className="underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current">
-              All {event.theme} dates →
-            </Link>
-          </p>
+            {siblings.length > 0 ? (
+              <ul className="mt-2">
+                {siblings.map((other) => (
+                  <UpcomingEventRow
+                    key={other.event_id}
+                    event={other}
+                    themeSlug={slugTheme}
+                    actions={false}
+                    linkTitle
+                  />
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-meta leading-relaxed text-(--sh-text-3)">
+                No other {event.theme} dates are listed in the next 12 months.
+              </p>
+            )}
+          </aside>
         ) : null}
+      </div>
 
+      <div className="mx-auto mt-10 w-full max-w-[760px] xl:max-w-none">
         <SiteColophon current={path} />
       </div>
-    </main>
+    </PageShell>
   );
 }

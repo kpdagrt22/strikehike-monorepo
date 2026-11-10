@@ -249,7 +249,7 @@ test.describe("upcoming calendar", () => {
     await expect(download).toHaveAttribute("href", /\/calendar\/all\.ics$/);
   });
 
-  test("every theme count and Show all match the data", async ({
+  test("every month group and Show all match the data", async ({
     page,
     request,
   }) => {
@@ -265,48 +265,66 @@ test.describe("upcoming calendar", () => {
     );
     expect(themes.length).toBeGreaterThan(0);
 
-    for (const [name, entry] of themes) {
-      const count = entry.events.length;
+    const events = themes.flatMap(([, entry]) => entry.events);
+    const months = new Map<string, number>();
+    for (const event of events) {
+      const key = event.start_date.slice(0, 7);
+      months.set(key, (months.get(key) ?? 0) + 1);
+    }
+    const monthLabel = new Intl.DateTimeFormat("en-GB", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+
+    for (const [key, count] of months) {
+      const label = monthLabel.format(new Date(`${key}-01T00:00:00Z`));
       const heading = page.getByRole("heading", {
         level: 2,
-        name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+        name: label,
+        exact: true,
       });
-      await expect(heading).toContainText(`${name} (${count})`);
-      const section = page.locator("section").filter({ has: heading });
-      await expect(section.locator("li:visible")).toHaveCount(
-        Math.min(5, count),
+      await expect(heading).toBeVisible();
+      const group = page.locator("[data-upcoming-group]").filter({ has: heading });
+      await expect(
+        group.locator("h2").locator("..").locator("span").last(),
+      ).toHaveText(String(count));
+      await expect(group.locator("li:visible")).toHaveCount(
+        Math.min(8, count),
       );
 
-      if (count > 5) {
-        const details = section.locator("details");
+      if (count > 8) {
+        const details = group.locator("details");
         await expect(details.locator("summary")).toContainText(
           `Show all ${count}`,
         );
         await details.locator("summary").click();
         await expect(details).toHaveJSProperty("open", true);
-        await expect(section.locator("li:visible")).toHaveCount(count);
+        await expect(group.locator("li:visible")).toHaveCount(count);
       } else {
-        await expect(section.locator("details")).toHaveCount(0);
+        await expect(group.locator("details")).toHaveCount(0);
       }
+    }
 
-      const more = Math.max(0, entry.total_available - count);
-      const feedLink = section.getByRole("link", { name: "calendar feed" });
-      if (more > 0) {
-        const slug = {
-          Science: "science",
-          Finance: "finance",
-          "Culture/Religion": "culture-religion",
-        }[name];
-        await expect(section).toContainText(
-          new RegExp(`${more} more dates? after`),
-        );
-        await expect(feedLink).toHaveAttribute(
-          "href",
-          `/calendar/${slug}.ics`,
-        );
-      } else {
-        await expect(feedLink).toHaveCount(0);
-      }
+    // The rail's filter counts are the horizon totals the payload reports.
+    const filters = page.locator("[data-upcoming-filters]:visible");
+    const total = themes.reduce(
+      (sum, [, entry]) =>
+        sum + Math.max(entry.total_available ?? 0, entry.events.length),
+      0,
+    );
+    await expect(
+      filters.getByRole("link", { name: new RegExp(`^All\\s*${total}$`) }),
+    ).toBeVisible();
+    for (const [name, entry] of themes) {
+      const count = Math.max(entry.total_available ?? 0, entry.events.length);
+      await expect(
+        filters.getByRole("link", {
+          name: new RegExp(
+            `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*${count}$`,
+          ),
+        }),
+      ).toBeVisible();
     }
   });
 
@@ -332,9 +350,15 @@ test.describe("subscribe menus", () => {
       await page.setViewportSize({ width, height });
       await page.goto("/upcoming", { waitUntil: "networkidle" });
 
-      const triggers = page.locator("[data-subscribe-trigger]");
+      const triggers = page.locator("[data-subscribe-trigger]:visible");
       const count = await triggers.count();
-      expect(count).toBeGreaterThan(1);
+      if (width >= 1024) {
+        // The rail lists a subscribe control for every theme.
+        expect(count).toBeGreaterThan(1);
+      } else {
+        // Below lg the theme rows are chips; "Subscribe to all" stays.
+        expect(count).toBe(1);
+      }
 
       for (let index = 0; index < count; index += 1) {
         const trigger = triggers.nth(index);
@@ -393,6 +417,7 @@ test.describe("subscribe menus", () => {
       });
       await page.keyboard.press("Escape");
 
+      await page.goto("/upcoming/finance", { waitUntil: "networkidle" });
       const finance = page.locator('[data-subscribe-trigger="finance"]');
       await finance.scrollIntoViewIfNeeded();
       await finance.click();

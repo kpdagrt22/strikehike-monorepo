@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PageShell } from "@/components/PageShell";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
-import { SubscribeControl } from "@/components/upcoming/SubscribeControl";
-import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
+import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
+import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
+import {
+  flatEvents,
+  nextItem,
+  themeGroup,
+} from "@/components/upcoming/upcomingGrouping";
 import { isIndexableTheme } from "@/lib/events/indexing";
-import { themeName } from "@/lib/events/upcoming";
+import { orderedThemes, themeName } from "@/lib/events/upcoming";
 import { archiveCount, getEventsHealth, getUpcoming } from "@/lib/seo/data";
 import { themePageGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
@@ -97,8 +103,21 @@ export default async function ThemePage({
   const path = `/upcoming/${theme}`;
   const asOf = payload?.as_of?.slice(0, 10);
 
+  const themes = orderedThemes(payload);
+  const themeEntry =
+    themes.find((item) => item.slug === theme) ?? {
+      name,
+      slug: theme,
+      data: payload?.themes?.[name] ?? { events: [] },
+      count: events.length,
+      available: events.length,
+    };
+  const items = flatEvents([themeEntry]);
+  const groups = themeGroup(themeEntry, items);
+  const total = themes.reduce((sum, item) => sum + item.available, 0);
+
   return (
-    <main className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24">
+    <PageShell>
       <JsonLd
         data={themePageGraph(
           path,
@@ -107,68 +126,59 @@ export default async function ThemePage({
           asOf ?? new Date().toISOString().slice(0, 10),
         )}
       />
-      <div className="w-full max-w-3xl px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
-        <nav aria-label="Breadcrumb" className="text-micro text-(--sh-text-3)">
-          <Link href="/" className="hover:text-(--sh-text-1)">StrikeHike</Link>
-          <span aria-hidden="true"> / </span>
-          <Link href="/upcoming" className="hover:text-(--sh-text-1)">Upcoming dates</Link>
-        </nav>
+      <div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[21rem_minmax(0,1fr)]">
+        <UpcomingRail
+          title={TITLE[theme]}
+          intro={INTRO[theme]}
+          note={
+            <>
+              {history != null
+                ? `${history} past events in the archive.`
+                : "The archive count is unavailable right now."}{" "}
+              <Link
+                href="/upcoming"
+                className="underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current"
+              >
+                All upcoming dates
+              </Link>
+            </>
+          }
+          breadcrumb={
+            <nav aria-label="Breadcrumb" className="text-micro text-(--sh-text-3)">
+              <Link href="/" className="hover:text-(--sh-text-1)">
+                StrikeHike
+              </Link>
+              <span aria-hidden="true"> / </span>
+              <Link href="/upcoming" className="hover:text-(--sh-text-1)">
+                Upcoming dates
+              </Link>
+            </nav>
+          }
+          subscribeScope={theme}
+          themes={themes}
+          current={theme}
+          total={total}
+          next={nextItem(items)}
+          showFilterSubscribes={false}
+        />
 
-        <header className="mt-4">
-          <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">Calendar</p>
-          <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-(--sh-text-1) sm:text-5xl">
-            {TITLE[theme]}
-          </h1>
-          <p className="mt-4 max-w-2xl text-body leading-relaxed text-(--sh-text-2) sm:text-strong">
-            {INTRO[theme]}
-          </p>
-          <p className="mt-2 text-meta text-(--sh-text-3)">
-            {history != null
-              ? `${history} past events in the archive.`
-              : "The archive count is unavailable right now."}{" "}
-            <Link
-              href="/upcoming"
-              className="underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current"
-            >
-              All upcoming dates
-            </Link>
-          </p>
-        </header>
+        <div className="mt-8 min-w-0 lg:mt-0">
+          {events.length > 0 ? (
+            <UpcomingGroups groups={groups} />
+          ) : (
+            <p className="mt-6 text-body text-(--sh-text-2)">
+              No {name} dates are scheduled in the next 12 months.
+            </p>
+          )}
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-y border-(--sh-line-1) py-2">
-          <p className="text-meta text-(--sh-text-3)">
-            {events.length > 0
-              ? `${events.length} ${events.length === 1 ? "date" : "dates"} in the next 12 months.`
-              : "No dates in the next 12 months."}{" "}
-            Times are shown in your time zone.
+          <p className="mt-8 border-t border-(--sh-line-1) pt-4 text-micro leading-relaxed text-(--sh-text-3)">
+            {decision.index
+              ? "This page lists dates only; StrikeHike does not say what will happen on them."
+              : "This page lists dates only; it stays out of search until there are more of them."}
           </p>
-          <SubscribeControl scope={theme} />
         </div>
-
-        {events.length > 0 ? (
-          <ul className="mt-2">
-            {events.map((event) => (
-              <UpcomingEventRow
-                key={event.event_id}
-                event={event}
-                themeSlug={theme}
-              />
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-6 text-body text-(--sh-text-2)">
-            No {name} dates are scheduled in the next 12 months.
-          </p>
-        )}
-
-        <p className="mt-8 border-t border-(--sh-line-1) pt-4 text-micro leading-relaxed text-(--sh-text-3)">
-          {decision.index
-            ? "This page lists dates only; StrikeHike does not say what will happen on them."
-            : "This page lists dates only; it stays out of search until there are more of them."}
-        </p>
-
-        <SiteColophon current={path} />
       </div>
-    </main>
+      <SiteColophon current={path} />
+    </PageShell>
   );
 }

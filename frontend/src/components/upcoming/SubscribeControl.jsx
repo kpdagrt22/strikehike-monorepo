@@ -11,7 +11,7 @@ const MENU_LINK =
 const GUTTER = 16;
 const DESKTOP_WIDTH = 288;
 
-export function SubscribeControl({ scope, label = "Subscribe" }) {
+export function SubscribeControl({ scope, label = "Subscribe", compact = false }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const timer = useRef(0);
@@ -109,20 +109,42 @@ export function SubscribeControl({ scope, label = "Subscribe" }) {
         data-subscribe-trigger={scope}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
+        aria-label={compact ? label : undefined}
+        title={compact ? label : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--sh-line-2) px-3 text-micro font-medium uppercase tracking-[0.12em] text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
+        className={
+          compact
+            ? "inline-flex h-8 w-8 items-center justify-center rounded-full border border-(--sh-line-1) text-(--sh-text-3) transition-colors hover:bg-(--sh-hover) hover:text-(--sh-text-1) focus-visible:bg-(--sh-hover) pointer-coarse:h-11 pointer-coarse:w-11"
+            : "inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--sh-line-2) px-3 text-micro font-medium uppercase tracking-[0.12em] text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover)"
+        }
       >
-        {label}
-        <svg
-          viewBox="0 0 12 12"
-          className={`h-2.5 w-2.5 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.3"
-          aria-hidden="true"
-        >
-          <path d="M2.5 4.5 6 8l3.5-3.5" />
-        </svg>
+        {compact ? (
+          <svg
+            viewBox="0 0 16 16"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            aria-hidden="true"
+          >
+            <rect x="2.2" y="3.3" width="11.6" height="10.5" rx="1.6" />
+            <path d="M2.2 6.4h11.6M5.2 2.2v2.4M10.8 2.2v2.4M5.2 9.2h2.2M5.2 11.4h4.6" />
+          </svg>
+        ) : (
+          <>
+            {label}
+            <svg
+              viewBox="0 0 12 12"
+              className={`h-2.5 w-2.5 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              aria-hidden="true"
+            >
+              <path d="M2.5 4.5 6 8l3.5-3.5" />
+            </svg>
+          </>
+        )}
       </button>
 
       {open ? (

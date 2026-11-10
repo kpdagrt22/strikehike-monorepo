@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PageShell } from "@/components/PageShell";
 import { SiteColophon } from "@/components/seo/SiteColophon";
-import { SubscribeControl } from "@/components/upcoming/SubscribeControl";
-import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
-import { UpcomingFilterLinks } from "@/components/upcoming/UpcomingFilterLinks";
+import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingPageTracker } from "@/components/upcoming/UpcomingPageTracker";
-import { orderedThemes, type OrderedTheme } from "@/lib/events/upcoming";
-import { getUpcoming, type UpcomingEventPayload } from "@/lib/seo/data";
+import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
+import { flatEvents, monthGroups, nextItem } from "@/components/upcoming/upcomingGrouping";
+import { orderedThemes } from "@/lib/events/upcoming";
+import { getUpcoming } from "@/lib/seo/data";
 import { absoluteUrl, SITE_NAME } from "@/lib/seo/site";
 
 // Rendered per request, not prerendered at build: the Docker build has no backend, so a
@@ -34,171 +35,55 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
-const DATE_LABEL = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-function lastDateLabel(value: string | undefined) {
-  if (!value) return "";
-  return DATE_LABEL.format(new Date(`${value}T00:00:00Z`));
-}
-
-function EventRow({
-  event,
-  theme,
-}: {
-  event: UpcomingEventPayload;
-  theme: OrderedTheme;
-}) {
-  return (
-    <UpcomingEventRow
-      event={event}
-      themeSlug={theme.slug}
-      themeName={theme.name}
-    />
-  );
-}
-
-function ThemeSection({ theme }: { theme: OrderedTheme }) {
-  const events = theme.data.events ?? [];
-  const first = events.slice(0, 5);
-  const rest = events.slice(5);
-  const more = Math.max(0, theme.available - events.length);
-  const last = events[events.length - 1];
-  const headingId = `upcoming-${theme.slug}`;
-  return (
-    <section
-      aria-labelledby={headingId}
-      className="mt-8 border-t border-(--sh-line-1) pt-5"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2
-          id={headingId}
-          className="text-strong font-semibold tracking-[-0.02em] text-(--sh-text-1)"
-        >
-          {theme.name}{" "}
-          <span className="font-normal text-(--sh-text-3)">({events.length})</span>
-        </h2>
-        <SubscribeControl scope={theme.slug} />
-      </div>
-
-      <ul className="mt-2">
-        {first.map((event) => (
-          <EventRow key={event.event_id} event={event} theme={theme} />
-        ))}
-      </ul>
-
-      {rest.length > 0 ? (
-        <details className="group mt-1 border-t border-(--sh-line-1)">
-          <summary className="-mx-2 flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl px-2 text-micro font-medium text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) focus-visible:bg-(--sh-hover) [&::-webkit-details-marker]:hidden">
-            <svg
-              viewBox="0 0 12 12"
-              className="h-2.5 w-2.5 transition-transform motion-reduce:transition-none group-open:rotate-180"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              aria-hidden="true"
-            >
-              <path d="M2.5 4.5 6 8l3.5-3.5" />
-            </svg>
-            Show all {events.length}
-          </summary>
-          <ul className="pb-1">
-            {rest.map((event) => (
-              <EventRow key={event.event_id} event={event} theme={theme} />
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      {more > 0 && last ? (
-        <p className="mt-2 text-micro leading-relaxed text-(--sh-text-3)">
-          {more} more {more === 1 ? "date" : "dates"} after{" "}
-          {lastDateLabel(last.start_date)} are in the{" "}
-          <Link
-            href={`/calendar/${theme.slug}.ics`}
-            className="inline-flex min-h-11 items-center underline decoration-current/30 underline-offset-2 hover:decoration-current focus-visible:decoration-current sm:min-h-0"
-          >
-            calendar feed
-          </Link>
-          .
-        </p>
-      ) : null}
-    </section>
-  );
-}
+const INTRO =
+  "Scheduled releases, central-bank decisions, eclipses and festivals for the next 12 months, from official calendars.";
 
 export default async function UpcomingPage() {
   const payload = await getUpcoming().catch(() => null);
   const themes = orderedThemes(payload);
   const unavailable = !payload || Boolean(payload.message);
-  const listedCount = themes.reduce(
-    (total, theme) => total + (theme.data.events?.length ?? 0),
-    0,
-  );
+  const items = flatEvents(themes);
+  const groups = monthGroups(items);
+  const total = themes.reduce((sum, theme) => sum + theme.available, 0);
+  const next = nextItem(items);
+  const listedCount = items.length;
 
   return (
-    <main
-      data-upcoming-count={listedCount > 0 ? listedCount : undefined}
-      className="relative h-full w-full overflow-y-auto overflow-x-hidden pb-24"
-    >
+    <PageShell data-upcoming-count={listedCount > 0 ? listedCount : undefined}>
       <UpcomingPageTracker />
-      <div className="w-full max-w-3xl px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
-        <header>
-          <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
-            Calendar
-          </p>
-          <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-(--sh-text-1) sm:text-5xl">
-            Upcoming dates
-          </h1>
-          <p className="mt-4 text-body leading-relaxed text-(--sh-text-2) sm:text-strong">
-            Scheduled economic releases, central-bank decisions, eclipses,
-            solstices and festivals for the next 12 months, from official
-            calendars.
-          </p>
-        </header>
+      <div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[21rem_minmax(0,1fr)]">
+        <UpcomingRail
+          title="Upcoming dates"
+          intro={INTRO}
+          subscribeScope="all"
+          subscribeLabel="Subscribe to all"
+          themes={themes}
+          current="all"
+          total={total}
+          next={next}
+        />
 
-        {unavailable ? (
-          <p className="mt-6 max-w-xl border-t border-(--sh-line-1) pt-5 text-body leading-relaxed text-(--sh-text-2)">
-            Upcoming dates are unavailable right now. Please check back soon.
-          </p>
-        ) : (
-          <>
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-meta text-(--sh-text-3)">
-                Times are shown in your time zone.
-              </p>
-              <SubscribeControl scope="all" label="Subscribe to all" />
-            </div>
-
-            <div className="mt-4 border-y border-(--sh-line-1) py-1">
-              <UpcomingFilterLinks themes={themes} />
-            </div>
-
-            {themes.length === 0 ? (
-              <p className="mt-6 text-body text-(--sh-text-2)">
-                No dates are scheduled in the next 12 months.{" "}
-                <Link
-                  href="/upcoming"
-                  className="inline-flex min-h-11 items-center underline decoration-current/30 underline-offset-2 hover:decoration-current focus-visible:decoration-current"
-                >
-                  Check again
-                </Link>
-              </p>
-            ) : (
-              themes.map((theme) => <ThemeSection key={theme.slug} theme={theme} />)
-            )}
-
-            <p className="mt-8 border-t border-(--sh-line-1) pt-4 text-micro leading-relaxed text-(--sh-text-3)">
-              Natural disasters can&apos;t be scheduled, so none are listed.
+        <div className="mt-8 min-w-0 lg:mt-0">
+          {unavailable ? (
+            <p className="mt-6 max-w-xl border-t border-(--sh-line-1) pt-5 text-body leading-relaxed text-(--sh-text-2)">
+              Upcoming dates are unavailable right now. Please check back soon.
             </p>
-          </>
-        )}
-        <SiteColophon current="/upcoming" />
+          ) : groups.length === 0 ? (
+            <p className="mt-6 text-body text-(--sh-text-2)">
+              No dates are scheduled in the next 12 months.{" "}
+              <Link
+                href="/upcoming"
+                className="inline-flex min-h-11 items-center underline decoration-current/30 underline-offset-2 hover:decoration-current focus-visible:decoration-current"
+              >
+                Check again
+              </Link>
+            </p>
+          ) : (
+            <UpcomingGroups groups={groups} />
+          )}
+        </div>
       </div>
-    </main>
+      <SiteColophon current="/upcoming" />
+    </PageShell>
   );
 }
