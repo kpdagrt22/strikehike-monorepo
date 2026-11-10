@@ -18,12 +18,8 @@ import {
   createChart,
 } from "lightweight-charts";
 import { dateTravelled } from "@/lib/analytics/events";
-import {
-  CARD_LEFT,
-  CARD_WIDTH,
-  ChartCrosshairLegend,
-} from "@/components/regime/ChartCrosshairLegend";
 import { MacroHUD } from "@/components/regime/MacroHUD";
+import { buildCrashMetrics } from "@/components/regime/regimeMetrics";
 import { cycleZoneLabel } from "@/components/regime/CycleMini";
 import { weeklyTrail } from "@/components/regime/cycleMap";
 import {
@@ -162,12 +158,6 @@ const PRICE_AREA_BOTTOM = 0.68;
 const FLAG_STRIP_PX = 2;
 const FLAG_STRIP_INSET_PX = 1;
 const FLAG_STRIP_GAP_PX = 2;
-// The snapshot card's height on a plain week with one asset row, and what
-// each further row adds, measured from lg (the larger type; 205 and 23 px
-// from sm). It is display:none at rest: what the card's drop under the
-// stuck HUD allows for until measured.
-const CARD_REST_HEIGHT = 213;
-const CARD_ROW_HEIGHT = 24;
 // The flag strip's lanes for screen readers: each rule as the strip covers
 // it (the trend rule ran on the S&P 90 before the S&P 500 began).
 const MARKET_FLAG_SPOKEN = {
@@ -262,34 +252,6 @@ function buildBands(timeline, crashes) {
     .filter(Boolean);
 }
 
-function buildCrashMetrics(timeline, crashes) {
-  return (crashes ?? []).map((crash) => {
-    const points = timeline.filter(
-      (point) => point.date >= crash.start && point.date <= crash.end,
-    );
-    const equities = points
-      .map((point) => Number(point.sp500_proxy))
-      .filter((value) => Number.isFinite(value) && value > 0);
-    const peak = equities.length ? Math.max(...equities) : null;
-    const trough = equities.length ? Math.min(...equities) : null;
-    const drawdown =
-      peak != null && trough != null && peak > 0
-        ? (trough / peak - 1) * 100
-        : null;
-    const scores = points
-      .map((point) => Number(point.core_index))
-      .filter((value) => Number.isFinite(value));
-    return {
-      id: crash.id,
-      name: crash.name,
-      start: crash.start,
-      end: crash.end,
-      drawdown,
-      score: scores.length ? Math.min(...scores) : null,
-    };
-  });
-}
-
 function applyCrashZoom(chart, crash) {
   if (!chart || !crash) return;
   const from = crash.start;
@@ -314,14 +276,6 @@ function applyOverview(chart, container) {
     barSpacing: Math.max(0.02, viewportWidth / (52 * targetYears)),
     rightOffset: 1,
   });
-}
-
-// The snapshot card sits at the chart's top left (about 28-272 px). Once the
-// point being read comes under it, the card moves to the right; the 300/380
-// gap keeps it from flickering at the boundary.
-function legendSideFor(side, x) {
-  if (side === "left") return x < 300 ? "right" : "left";
-  return x > 380 ? "left" : "right";
 }
 
 function buildChartSeries(timeline, target) {
@@ -1351,11 +1305,9 @@ export function RegimeTimeline({
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [hoveredCrashId, setHoveredCrashId] = useState(null);
   const [crosshairActive, setCrosshairActive] = useState(false);
-  const [legendSide, setLegendSide] = useState("left");
   // The axis is a fixed width, so the first paint is already final.
   const [equityScaleWidth, setEquityScaleWidth] = useState(PRICE_AXIS_WIDTH);
   const [timeScaleHeight, setTimeScaleHeight] = useState(TIME_AXIS_HEIGHT);
-  const [chartWidth, setChartWidth] = useState(0);
   // The axis's 0% while the view is in deep history (see labelBase); the ref
   // is what the chart's range handler reads.
   const [viewBase, setViewBaseState] = useState(null);
@@ -1427,10 +1379,9 @@ export function RegimeTimeline({
   }, [hasTimeline]);
 
   // While the stuck HUD covers the chart's top (a laptop window scrolled down
-  // to the chart's foot, where the ribbon and the flag strip are), the
-  // snapshot card and the red-band tooltip drop by the covered height,
-  // staying inside the price area. A transform on a CSS variable: no layout
-  // shift and no chart rebuild.
+  // to the chart's foot, where the ribbon and the flag strip are), the red-band
+  // tooltip drops by the covered height, staying inside the price area. A
+  // transform on a CSS variable: no layout shift and no chart rebuild.
   useEffect(() => {
     const hud = hudRef.current;
     const box = chartBoxRef.current;
@@ -1444,16 +1395,14 @@ export function RegimeTimeline({
         getComputedStyle(hud).position === "sticky"
           ? hud.getBoundingClientRect().bottom - box.getBoundingClientRect().top
           : 0;
-      const card = box.querySelector("[data-regime-card]");
-      const rows = Number(card?.dataset.rows) || 1;
-      const cardHeight =
-        card?.offsetHeight || CARD_REST_HEIGHT + (rows - 1) * CARD_ROW_HEIGHT;
+      // The band tooltip's own height is bounded by one line; keep it inside
+      // the price area when the stuck HUD covers the chart's top.
       const room =
-        (box.clientHeight - TIME_AXIS_HEIGHT) * PRICE_AREA_BOTTOM - cardHeight - 24;
+        (box.clientHeight - TIME_AXIS_HEIGHT) * PRICE_AREA_BOTTOM - 80;
       const drop = Math.round(Math.max(0, Math.min(covered, room)));
       if (drop === last) return;
       last = drop;
-      box.style.setProperty("--regime-card-drop", `${drop}px`);
+      box.style.setProperty("--regime-tooltip-drop", `${drop}px`);
     };
     const request = () => {
       if (!frame) frame = requestAnimationFrame(sync);
@@ -1463,13 +1412,11 @@ export function RegimeTimeline({
     const observer = new ResizeObserver(request);
     observer.observe(hud);
     observer.observe(box);
-    const card = box.querySelector("[data-regime-card]");
-    if (card) observer.observe(card);
     return () => {
       cancelAnimationFrame(frame);
       page.removeEventListener("scroll", request);
       observer.disconnect();
-      box.style.removeProperty("--regime-card-drop");
+      box.style.removeProperty("--regime-tooltip-drop");
     };
   }, [hasTimeline]);
 
@@ -1643,52 +1590,9 @@ export function RegimeTimeline({
     );
   }, [navTimes, displayPoint]);
 
-  // The snapshot card pads its figures to the widest value any drawn line
-  // can show in this mode, so they keep one width while scrubbing. Prices are
-  // positive: the widest is the largest value, or the largest of those below
-  // 100, which carry two decimals on the S&P series (formatAssetValue). A
-  // return is widest at the line's extremes: against the shared base week
-  // when assets are compared, against any week (an open window or a week in
-  // view can be the base) for one asset.
-  const valueChars = useMemo(() => {
-    let chars = 0;
-    for (const key of drawnKeys) {
-      const target = getAssetTarget(key);
-      if (valueMode === "price") {
-        let largest = null;
-        let largestBelow100 = null;
-        for (const item of priceData[key]?.points ?? []) {
-          if (largest == null || item.value > largest) largest = item.value;
-          if (item.value < 100 && (largestBelow100 == null || item.value > largestBelow100)) {
-            largestBelow100 = item.value;
-          }
-        }
-        for (const value of [largest, largestBelow100]) {
-          if (value != null) chars = Math.max(chars, formatAssetValue(target, value).length);
-        }
-        continue;
-      }
-      let low = Infinity;
-      let high = -Infinity;
-      for (const item of seriesData[key] ?? []) {
-        low = Math.min(low, item.value);
-        high = Math.max(high, item.value);
-      }
-      if (!(low > 0)) continue;
-      const bases = compareAssets ? [100] : [low, high];
-      for (const base of bases) {
-        for (const value of [low, high]) {
-          chars = Math.max(chars, formatReturn(value / base - 1).length);
-        }
-      }
-    }
-    return chars;
-  }, [drawnKeys, valueMode, priceData, seriesData, compareAssets]);
-
   // Each drawn asset's value at the week shown, in this mode: the return
   // since the axis's base week (labelBase, else the shared base week, where
-  // every line is 100), or its own price. The snapshot card and the slider
-  // read these.
+  // every line is 100), or its own price. The slider reads these.
   const assetReadouts = drawnKeys.map((key) => {
     const target = getAssetTarget(key);
     let value = "—";
@@ -1828,8 +1732,6 @@ export function RegimeTimeline({
     const point =
       timeline[pointIndex]?.date === time ? timeline[pointIndex] : null;
     drawCrosshairAt(time);
-    const x = chartRef.current?.timeScale().timeToCoordinate(time);
-    if (x != null) setLegendSide((side) => legendSideFor(side, x));
     setHoveredPoint(point);
     setHoveredCrashId(crashAt(crashes, time)?.id ?? null);
     setCrosshairActive(true);
@@ -1907,8 +1809,6 @@ export function RegimeTimeline({
     const time = navTimes[navIndex];
     if (!time) return;
     drawCrosshairAt(time);
-    const x = chartRef.current?.timeScale().timeToCoordinate(time);
-    if (x != null) setLegendSide((side) => legendSideFor(side, x));
     setCrosshairActive(true);
   };
 
@@ -2120,7 +2020,6 @@ export function RegimeTimeline({
     const syncScaleWidth = () => {
       setEquityScaleWidth(chart.priceScale("right").width() || PRICE_AXIS_WIDTH);
       setTimeScaleHeight(chart.timeScale().height() || TIME_AXIS_HEIGHT);
-      setChartWidth(container.clientWidth);
     };
     const scaleFrame = requestAnimationFrame(syncScaleWidth);
     const scaleObserver = new ResizeObserver(syncScaleWidth);
@@ -2197,8 +2096,6 @@ export function RegimeTimeline({
         setCrosshairActive(false);
         return;
       }
-      const x = param?.point?.x;
-      if (x != null) setLegendSide((side) => legendSideFor(side, x));
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
       // Set before the chart paints its top layer on this frame.
@@ -2332,26 +2229,9 @@ export function RegimeTimeline({
 
   // The red-band tooltip shows with the snapshot card and keeps clear of it:
   // from 1280 px centred over the chart (clear of the card on either side);
-  // narrower, centred in the free space beside the card, its name truncating
-  // first, and drawn afresh when the card changes sides. On phones the card is
-  // the scrub readout and the tooltip is left out (a tap on a band opens the
-  // window's detail, with its drawdown and score).
-  const tooltipPlace = (() => {
-    if (chartWidth < 640) return null;
-    if (chartWidth >= 1280) return { centre: true };
-    const cardShift = Math.max(
-      0,
-      chartWidth - (equityScaleWidth + 28) - CARD_LEFT - CARD_WIDTH,
-    );
-    const left =
-      legendSide === "right" ? CARD_LEFT : CARD_LEFT + CARD_WIDTH + 12;
-    const right =
-      legendSide === "right"
-        ? CARD_LEFT + cardShift - 12
-        : chartWidth - equityScaleWidth - 12;
-    return right - left >= 160 ? { left, width: right - left } : null;
-  })();
-
+  // The red-band tooltip is centred over the chart on pointer devices and
+  // left out on phones (a tap on a band opens the window's detail, with its
+  // drawdown and score).
   return (
     <section
       aria-labelledby="regime-timeline-title"
@@ -2390,8 +2270,8 @@ export function RegimeTimeline({
               .map((flag) => `a ${flag.label.toLowerCase()} (${MARKET_FLAG_SPOKEN[flag.field] ?? flag.rule})`)
               .join(" and ")}.`
           : ""}{" "}
-        Hover a red NBER band for the crash name, peak-to-trough drawdown and
-        Core Index score; click it to zoom to the event.
+        Red bands mark NBER recession windows: a band shows its peak-to-trough
+        drawdown and Core Index low, and can be opened to zoom the chart to it.
       </p>
 
       {/* Sticky from sm up where the window has the height for it
@@ -2400,15 +2280,15 @@ export function RegimeTimeline({
           The strip above it is covered while it is stuck; at rest that cover
           sits above the section and the section's overflow-clip hides it.
           On phones and short landscape windows the HUD scrolls away so the
-          chart gets the screen, and the snapshot card is the scrub readout. */}
+          chart gets the screen. */}
       <div
         ref={hudRef}
         className="relative z-30 border-b border-black/5 bg-[#f5f0e8]/85 dark:border-white/5 dark:bg-[#06060a]/80 sm-tall:sticky sm-tall:top-(--sh-header-clear) sm-tall:backdrop-blur-2xl sm-tall:before:pointer-events-none sm-tall:before:absolute sm-tall:before:inset-x-0 sm-tall:before:bottom-full sm-tall:before:h-(--sh-header-clear) sm-tall:before:bg-[#f5f0e8] sm-tall:dark:before:bg-[#06060a]"
       >
         <MacroHUD
           point={displayPoint}
+          hovering={Boolean(hoveredPoint)}
           isDark={isDark}
-          resolution={resolution}
           activeCrash={selectedCrash}
           assetKey={asset.key}
           onAssetChange={onAssetChange}
@@ -2420,6 +2300,14 @@ export function RegimeTimeline({
           onValueModeChange={setValueMode}
           cycleOn={cycleOn}
           onCycleToggle={toggleCycle}
+          cycle={
+            cycleOn
+              ? {
+                  trail: cycleTrail,
+                  assetLabel: assetLabelAt(asset, displayPoint),
+                }
+              : null
+          }
           marketFlags={marketFlags}
         />
       </div>
@@ -2453,31 +2341,10 @@ export function RegimeTimeline({
           className="absolute inset-0 [&_#tv-attr-logo]:z-20! [&_tr:first-child>td:last-child]:[mask-image:linear-gradient(to_bottom,#000_69%,transparent_72%)]"
         />
 
-        <ChartCrosshairLegend
-          point={displayPoint}
-          rows={assetReadouts}
-          caption={valueMode === "roi" ? `ROI from ${formatDate(zeroDate)}` : "Price"}
-          isDark={isDark}
-          active={crosshairActive}
-          side={legendSide}
-          room={chartWidth}
-          rightInset={equityScaleWidth + 28}
-          valueChars={valueChars}
-          marketFlags={marketFlags}
-          cycle={cycleOn ? { trail: cycleTrail, assetLabel: assetLabelAt(asset, displayPoint) } : null}
-        />
-
-        {hoveredMetric && tooltipPlace ? (
+        {hoveredMetric ? (
           <div
-            key={`${hoveredMetric.id}|${tooltipPlace.centre ? "centre" : legendSide}`}
-            className={`pointer-events-none absolute top-4 z-20 flex justify-center sm-tall:translate-y-[var(--regime-card-drop,0px)] ${
-              tooltipPlace.centre ? "left-1/2 -translate-x-1/2" : ""
-            }`}
-            style={
-              tooltipPlace.centre
-                ? undefined
-                : { left: tooltipPlace.left, width: tooltipPlace.width }
-            }
+            key={hoveredMetric.id}
+            className="pointer-events-none absolute left-1/2 top-4 z-20 hidden -translate-x-1/2 sm:flex sm-tall:translate-y-[var(--regime-tooltip-drop,0px)]"
           >
             <div
               data-testid="crash-hover-tooltip"
@@ -2548,9 +2415,9 @@ export function RegimeTimeline({
       <div className="border-t border-black/5 px-3 py-2.5 dark:border-white/5 sm:px-5 lg:px-8">
         <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 text-micro text-black/60 dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span>
+            <span data-regime-axis-caption="">
               {formatDate(coverage?.start)} → {formatDate(coverage?.end)} ·{" "}
-              {crashes?.length ?? 0} NBER windows ·{" "}
+              {crashes?.length ?? 0} recession windows ·{" "}
               {resolution ? `${resolution} tape` : "macro tape"} ·{" "}
               {/* Both readings share one box (the wider one's), so switching
                   modes never re-wraps the footer; the date is monospaced, so
@@ -2602,11 +2469,17 @@ export function RegimeTimeline({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="hidden sm:inline [@media(hover:none)]:hidden">
-              Hover a red NBER band for drawdown + score · click to zoom.
+            <span
+              data-regime-hint=""
+              className="[@media(hover:none)]:hidden"
+            >
+              Hover or drag to move through time · click a red band to zoom
             </span>
-            <span className="hidden sm:[@media(hover:none)]:inline">
-              Press and hold the chart to scrub
+            <span
+              data-regime-hint=""
+              className="hidden [@media(hover:none)]:inline"
+            >
+              Press and hold to scrub · tap a band
             </span>
             <label className="inline-flex items-center gap-1.5">
               <span className="sr-only">Jump to NBER recession window</span>

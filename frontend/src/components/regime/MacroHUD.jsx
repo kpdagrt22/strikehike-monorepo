@@ -11,6 +11,7 @@ import {
   ASSET_ORDER,
   ASSET_TARGETS,
 } from "@/components/regime/assetTargets";
+import { CycleMini } from "@/components/regime/CycleMini";
 import { coreIndexFlag, marketFlagText } from "@/components/regime/regimeChart";
 
 // A slim −50…+50 track under the score: ticks at −25, 0 and +25 and a marker
@@ -92,11 +93,17 @@ const VALUE_MODES = [
   ["roi", "ROI %"],
   ["price", "Price"],
 ];
+const SHORT_ASSET = {
+  sp500: "S&P",
+  gold: "Gold",
+  bonds: "Bonds",
+  nifty: "Nifty",
+};
 
 export function MacroHUD({
   point,
+  hovering = false,
   isDark,
-  resolution,
   activeCrash,
   assetKey = "sp500",
   onAssetChange,
@@ -108,6 +115,7 @@ export function MacroHUD({
   onValueModeChange,
   cycleOn = true,
   onCycleToggle,
+  cycle = null,
   marketFlags = [],
 }) {
   const tone = coreIndexTone(point?.core_index_bucket, isDark);
@@ -118,15 +126,17 @@ export function MacroHUD({
   const flagText = flagsOn.length === 1 ? marketFlagText(flagsOn[0], point) : "";
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-3 pb-3 pt-3 pr-20 sm:pb-4 sm:pl-5 sm:pt-5 sm:pr-20 lg:pl-8 lg:pr-20">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div className="flex flex-wrap items-end gap-4 sm:gap-8">
-          <div className="min-w-0">
-            <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
-              Core Index
-              {point?.date ? ` · ${formatDate(point.date)}` : ""}
-            </p>
-            <div className="mt-1 flex items-end gap-1.5 sm:gap-2">
+    <div className="mx-auto w-full max-w-[1600px] px-3 pb-2 pt-2 sm:px-5 sm:pb-3 sm:pt-4 lg:px-8">
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
+        {/* One readout, one date: "Now" at rest, the hovered week while
+            scrubbing, with the band label inside it (not a second block). */}
+        <div className="min-w-0" data-regime-readout="">
+          <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
+            {hovering ? "Hovered" : activeCrash ? "Window start" : "Now"}
+            {point?.date ? ` · week of ${formatDate(point.date)}` : ""}
+          </p>
+          <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
+            <div className="flex items-end gap-1.5 sm:gap-2">
               {/* A fixed five-character box (a signed score with one decimal,
                   "+22.4"), always filled (shorter scores are padded): digits
                   change in place and "/ +50" never moves while scrubbing. */}
@@ -140,89 +150,98 @@ export function MacroHUD({
                 / +50
               </span>
             </div>
-            <CoreIndexScale value={point?.core_index} color={tone.color} />
-            <p className="mt-1 font-mono text-micro text-black/60 dark:text-white/60">
-              −50 ↔ +50 · sentiment map
-            </p>
-          </div>
-
-          {/* Sized by the row's width, not by the state's text, so it wraps
-              under the score at the same widths for every week. */}
-          <div className="min-w-[min(16rem,100%)] max-w-[24.0625rem] flex-1 basis-0 border-l border-black/5 pl-4 dark:border-white/5 sm:min-w-[18.25rem] sm:pl-6">
-            <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
-              State
-            </p>
             <p
-              className="mt-1 text-xl font-semibold leading-none tracking-[-0.05em] sm:text-2xl"
+              className="pb-0.5 text-lg font-semibold leading-none tracking-[-0.04em] sm:text-2xl"
               style={{ color: tone.color }}
             >
               {tone.label}
             </p>
-            {/* Lines reserved for the longest band line (three below sm, two
-                from sm), so hovering across buckets never moves the chart. */}
-            <p className="mt-1.5 min-h-[4.875em] max-w-[360px] text-micro leading-relaxed text-black/60 dark:text-white/60 sm:min-h-[3.25em]">
-              {tone.description !== "—" ? (
-                <>
-                  Band {tone.description}. What followed similar readings:{" "}
-                  <a
-                    href="#regime-method"
-                    onClick={() => {
-                      // The record sits in a closed <details>: open it, then
-                      // let the link scroll to it.
-                      const method = document.getElementById("regime-method");
-                      if (method && "open" in method) method.open = true;
-                    }}
-                    className="whitespace-nowrap underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
-                  >
-                    Method &amp; record
-                  </a>
-                </>
-              ) : null}
+          </div>
+          <CoreIndexScale value={point?.core_index} color={tone.color} />
+          <p className="mt-1 max-w-[560px] text-micro leading-relaxed text-black/60 dark:text-white/60">
+            Band {tone.description}.{" "}
+            {tone.description !== "—" ? (
+              <a
+                href="#regime-method"
+                onClick={() => {
+                  // The record sits in a closed <details>: open it, then let
+                  // the link scroll to it.
+                  const method = document.getElementById("regime-method");
+                  if (method && "open" in method) method.open = true;
+                }}
+                className="whitespace-nowrap underline decoration-current/40 underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
+              >
+                What followed similar readings →
+              </a>
+            ) : null}
+          </p>
+
+          {flag ? (
+            <p className="mt-1 max-w-[360px] truncate text-micro text-black/60 dark:text-white/60">
+              <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
+                {flag.label}
+              </span>{" "}
+              {flag.text}
             </p>
-            {/* One line, always: the week's Core Index flag when it has one,
-                otherwise the NBER window or the scrub hint. */}
-            <p className="mt-1 max-w-[320px] truncate text-micro text-black/60 dark:text-white/60">
-              {flag ? (
-                <>
-                  <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
-                    {flag.label}
-                  </span>{" "}
-                  {flag.text}
-                </>
-              ) : activeCrash ? (
-                `${activeCrash.name} · NBER window`
-              ) : point ? (
-                <>
-                  <span className="[@media(hover:none)]:hidden">
-                    Hover the chart to move through history
+          ) : activeCrash ? (
+            <p className="mt-1 max-w-[360px] truncate text-micro text-black/60 dark:text-white/60">
+              {activeCrash.name} · NBER window
+            </p>
+          ) : null}
+
+          {marketFlags.length ? (
+            <p
+              key={`${flagsOn.map((item) => item.field).join("|")}|${flagText}`}
+              className="mt-1 min-h-[1.35em] max-w-[420px] truncate text-micro text-black/60 dark:text-white/60"
+            >
+              {flagsOn.length ? (
+                flagsOn.map((item, index) => (
+                  <span key={item.field}>
+                    {index ? <span aria-hidden="true"> · </span> : null}
+                    <span
+                      aria-hidden="true"
+                      className="mr-1.5 inline-block h-0.5 w-3 rounded-full align-middle"
+                      style={{ backgroundColor: isDark ? item.dark : item.light }}
+                    />
+                    <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
+                      {item.label}
+                    </span>
+                    {flagText ? ` ${flagText}` : null}
                   </span>
-                  <span className="hidden [@media(hover:none)]:inline">
-                    Press and hold the chart to scrub
-                  </span>
-                </>
+                ))
               ) : (
-                "Awaiting market archive"
+                <span aria-hidden="true">{"\u00a0"}</span>
               )}
             </p>
-          </div>
+          ) : null}
+
+          {cycle ? (
+            <div className="mt-1 w-full max-w-[260px]">
+              <CycleMini
+                trail={cycle.trail}
+                assetLabel={cycle.assetLabel}
+                isDark={isDark}
+                ringColor={isDark ? "#06060a" : "#f6f1e9"}
+              />
+            </div>
+          ) : null}
         </div>
 
-        {/* From xl this column keeps the controls' width and the state
-            column gives way (down to its 18.25rem floor), so the controls
-            stay on one row and the HUD keeps its height at 1280 px. */}
-        <div className="flex flex-col items-start gap-2 xl:shrink-0 xl:items-end">
-          <div className="flex flex-wrap items-center gap-1.5">
+        {/* From xl this column keeps the controls' width; below it the row
+            sits under the readout. All four controls stay on one line. */}
+        <div className="flex min-w-0 flex-col items-start gap-2 xl:shrink-0 xl:items-end">
+          <div
+            data-regime-controls=""
+            className="flex w-full flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1 xl:w-auto xl:flex-wrap xl:overflow-visible"
+          >
             {/* The pills are the chart's key: each carries its line's colour.
                 One asset: a click picks it. Compare: each is a checkbox for
                 its line; the last line drawn stays checked (aria-disabled),
-                with nothing in the layout changing. A label never breaks;
-                below lg the pills (and the values switch) are a little
-                tighter, so the four keep one row on a 390 px phone and the
-                controls keep one row from 640 px. */}
+                with nothing in the layout changing. */}
             <div
               role="group"
               aria-label={compareAssets ? "Assets on the chart" : "Primary asset"}
-              className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 dark:border-white/5 dark:bg-white/[0.035]"
+              className="inline-flex shrink-0 items-center gap-0 rounded-full border border-black/5 bg-black/[0.025] p-0.5 dark:border-white/5 dark:bg-white/[0.035]"
             >
               {ASSET_ORDER.map((key) => {
                 const target = ASSET_TARGETS[key];
@@ -240,6 +259,7 @@ export function MacroHUD({
                       role="checkbox"
                       aria-checked={checked}
                       aria-disabled={locked ? "true" : undefined}
+                      aria-label={target.label}
                       title={locked ? "At least one asset stays on the chart" : undefined}
                       onClick={() => {
                         if (!locked) {
@@ -251,7 +271,7 @@ export function MacroHUD({
                           onShownToggle?.(key);
                         }
                       }}
-                      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-colors duration-200 aria-disabled:cursor-default lg:gap-1.5 lg:px-2.5 ${
+                      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-0.5 py-1 text-micro font-medium transition-colors duration-200 aria-disabled:cursor-default sm:px-2 lg:gap-1.5 lg:px-2.5 ${
                         checked
                           ? "text-black/80 dark:text-white/85"
                           : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
@@ -259,7 +279,8 @@ export function MacroHUD({
                       style={colors}
                     >
                       <AssetSwatch mode={checked ? "checked" : "unchecked"} />
-                      {target.label}
+                      <span className="hidden sm:inline">{target.label}</span>
+                      <span className="sm:hidden">{SHORT_ASSET[key]}</span>
                     </button>
                   );
                 }
@@ -268,6 +289,7 @@ export function MacroHUD({
                   <button
                     key={key}
                     type="button"
+                    aria-label={target.label}
                     onClick={() => {
                       assetCompared(
                         "select",
@@ -276,7 +298,7 @@ export function MacroHUD({
                       onAssetChange?.(key);
                     }}
                     aria-pressed={selected}
-                    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-[background-color,color] duration-200 lg:gap-1.5 lg:px-2.5 ${
+                    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-0.5 py-1 text-micro font-medium transition-[background-color,color] duration-200 sm:px-2 lg:gap-1.5 lg:px-2.5 ${
                       selected
                         ? "bg-white/80 text-(--asset-light) dark:bg-(--asset-dark)/12 dark:text-(--asset-dark)"
                         : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
@@ -284,7 +306,8 @@ export function MacroHUD({
                     style={colors}
                   >
                     <AssetSwatch mode="dot" />
-                    {target.label}
+                    <span className="hidden sm:inline">{target.label}</span>
+                    <span className="sm:hidden">{SHORT_ASSET[key]}</span>
                   </button>
                 );
               })}
@@ -301,7 +324,8 @@ export function MacroHUD({
                 onCompareToggle?.();
               }}
               aria-pressed={compareAssets}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-micro font-medium transition-colors ${
+              aria-label="Compare assets"
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-1.5 py-1.5 text-micro font-medium sm:px-3 transition-colors ${
                 compareAssets
                   ? "border-black/10 bg-black/[0.07] text-[#14121a] dark:border-white/10 dark:bg-white/[0.08] dark:text-[#f2ede4]"
                   : "border-black/5 text-black/60 hover:bg-black/[0.04] hover:text-black/75 focus-visible:bg-black/[0.04] focus-visible:text-black/75 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/75 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/75"
@@ -320,7 +344,7 @@ export function MacroHUD({
                 <path d="M4 17l5-6 4 4 7-9" />
                 <path d="M4 21h16" />
               </svg>
-              Compare assets
+              <span className="hidden sm:inline">Compare assets</span>
             </button>
 
             {/* What the lines show: the return since the base week, or each
@@ -328,7 +352,7 @@ export function MacroHUD({
             <div
               role="group"
               aria-label="Chart values"
-              className="inline-flex items-center gap-0.5 rounded-full border border-black/5 bg-black/[0.025] p-0.5 dark:border-white/5 dark:bg-white/[0.035]"
+              className="inline-flex shrink-0 items-center gap-0 rounded-full border border-black/5 bg-black/[0.025] p-0.5 dark:border-white/5 dark:bg-white/[0.035]"
             >
               {VALUE_MODES.map(([mode, label]) => {
                 const selected = mode === valueMode;
@@ -338,7 +362,7 @@ export function MacroHUD({
                     type="button"
                     onClick={() => onValueModeChange?.(mode)}
                     aria-pressed={selected}
-                    className={`whitespace-nowrap rounded-full px-2 py-1 text-micro font-medium transition-[background-color,color] duration-200 lg:px-2.5 ${
+                    className={`whitespace-nowrap rounded-full px-0.5 py-1 text-micro font-medium transition-[background-color,color] duration-200 sm:px-2 lg:px-2.5 ${
                       selected
                         ? "bg-white/80 text-[#14121a] dark:bg-white/[0.08] dark:text-[#f2ede4]"
                         : "text-black/60 hover:text-black/75 focus-visible:text-black/75 dark:text-white/60 dark:hover:text-white/75 dark:focus-visible:text-white/75"
@@ -350,7 +374,7 @@ export function MacroHUD({
               })}
             </div>
 
-            {/* Shows or hides the small cycle map in the hover card (the full
+            {/* Shows or hides the small cycle map in the readout (the full
                 map below the chart stays). */}
             <button
               type="button"
@@ -359,8 +383,9 @@ export function MacroHUD({
                 onCycleToggle?.();
               }}
               aria-pressed={cycleOn}
-              title="The 90-day cycle map in the hover card"
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-micro font-medium transition-colors ${
+              aria-label="Cycle map"
+              title="The 90-day cycle map in the readout"
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-1.5 py-1.5 text-micro font-medium sm:px-3 transition-colors ${
                 cycleOn
                   ? "border-black/10 bg-black/[0.07] text-[#14121a] dark:border-white/10 dark:bg-white/[0.08] dark:text-[#f2ede4]"
                   : "border-black/5 text-black/60 hover:bg-black/[0.04] hover:text-black/75 focus-visible:bg-black/[0.04] focus-visible:text-black/75 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/75 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/75"
@@ -379,59 +404,9 @@ export function MacroHUD({
                 <rect x="3.5" y="3.5" width="17" height="17" rx="2" />
                 <path d="M12 3.5v17M3.5 12h17" />
               </svg>
-              Cycle map
+              <span className="hidden sm:inline">Cycle map</span>
             </button>
           </div>
-
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 xl:justify-end">
-            <span className="inline-flex items-center gap-2 text-micro font-medium uppercase tracking-[0.18em] text-black/60 dark:text-white/60">
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: tone.color }}
-                aria-hidden="true"
-              />
-              Date
-            </span>
-            <p className="font-mono text-lg font-medium tracking-[-0.03em] text-black/75 dark:text-white/80">
-              {formatDate(point?.date)}
-            </p>
-            <p className="text-micro text-black/60 dark:text-white/60">
-              {resolution ? `${resolution} tape` : "Market tape"}
-              <span className="[@media(hover:none)]:hidden"> · hover to
-              scrub</span>
-            </p>
-          </div>
-
-          {/* The S&P market flags of the week: one line kept under the date
-              (sized by the column, w-0 min-w-full, so its text never widens
-              it), so a flag turning on or off never moves the chart. With
-              two flags on, only their labels fit. From xl the line sits
-              beside the taller score column and costs no height; narrower
-              HUDs keep their height, and the snapshot card (the scrub
-              readout) and the summary above carry the flags there. The line
-              is right-aligned, so it is drawn afresh whenever its content
-              changes (keyed by it) rather than sliding what stays in it. */}
-          {marketFlags.length ? (
-            <p
-              key={`${flagsOn.map((item) => item.field).join("|")}|${flagText}`}
-              className="hidden min-h-[1.35em] w-0 min-w-full truncate text-right text-micro text-black/60 dark:text-white/60 xl:block"
-            >
-              {flagsOn.map((item, index) => (
-                <span key={item.field}>
-                  {index ? <span aria-hidden="true"> · </span> : null}
-                  <span
-                    aria-hidden="true"
-                    className="mr-1.5 inline-block h-0.5 w-3 rounded-full align-middle"
-                    style={{ backgroundColor: isDark ? item.dark : item.light }}
-                  />
-                  <span className="font-semibold uppercase tracking-[0.1em] text-black/70 dark:text-white/70">
-                    {item.label}
-                  </span>
-                  {flagText ? ` ${flagText}` : null}
-                </span>
-              ))}
-            </p>
-          ) : null}
         </div>
       </div>
     </div>

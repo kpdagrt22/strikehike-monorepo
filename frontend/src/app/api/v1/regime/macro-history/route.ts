@@ -20,7 +20,7 @@ const MAX_DAILY_RANGE_DAYS = 2_738;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // view=atlas (weekly only): the timeline fields the /regime page reads
-// (RegimeTimeline, MacroHUD, ChartCrosshairLegend, PhasePlane and the asset
+// (RegimeTimeline, MacroHUD, PhasePlane and the asset
 // fields in assetTargets.js). Re-check those consumers before changing this.
 // Daily windows are never projected. core_index_fast_warning is sent from
 // data 59192d5aa731; an older artifact omits it, which the page reads as no

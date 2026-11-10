@@ -12,82 +12,20 @@ import { AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
 import { PhasePlane } from "@/components/regime/PhasePlane";
+import { RecessionWindows } from "@/components/regime/RecessionWindows";
 import { OnboardingModal } from "@/components/ui/OnboardingModal";
 import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
 import { dateTravelled, methodOpened } from "@/lib/analytics/events";
 import { MARKET_FLAGS, sourcePeriods } from "@/components/regime/regimeChart";
+import { buildCrashMetrics } from "@/components/regime/regimeMetrics";
 import {
-  coreIndexTone,
   formatDate,
-  formatNumber,
-  formatSigned,
 } from "@/components/regime/regimeUtils";
 import { useChronoStore } from "@/store/chronoStore";
 
 const subscribe = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
-
-function StatusBadge({ status }) {
-  const config =
-    status === "ready"
-      ? {
-          label: "Archive online",
-          dot: "bg-[#0f766e] dark:bg-[#5eead4]",
-          pulse: false,
-        }
-      : status === "error"
-        ? {
-            label: "Archive offline",
-            dot: "bg-[#ef4444]",
-            pulse: false,
-          }
-        : {
-            label: "Reading archive",
-            dot: "bg-[#d8b47a]",
-            pulse: true,
-          };
-
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/45 px-3 py-1.5 text-micro font-medium uppercase tracking-[0.12em] text-black/60 dark:border-white/5 dark:bg-black/30 dark:text-white/60">
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${config.dot} ${
-          config.pulse ? "animate-pulse" : ""
-        }`}
-        aria-hidden="true"
-      />
-      {config.label}
-    </span>
-  );
-}
-
-function Stat({ label, value, suffix, detail, accent }) {
-  return (
-    <div className="py-3 sm:px-5 sm:first:pl-0">
-      <p className="text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-        {label}
-      </p>
-      <p className="mt-1 font-mono text-xl font-medium tracking-[-0.04em] text-[#14121a] dark:text-[#f2ede4]">
-        {value}
-        {suffix ? (
-          <span className="ml-1 text-micro font-normal tracking-normal text-black/60 dark:text-white/60">
-            {suffix}
-          </span>
-        ) : null}
-      </p>
-      <p className="mt-0.5 text-micro text-black/60 dark:text-white/60">
-        {accent ? (
-          <span
-            aria-hidden="true"
-            className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle"
-            style={{ backgroundColor: accent }}
-          />
-        ) : null}
-        {detail}
-      </p>
-    </div>
-  );
-}
 
 // At least one screen tall, as the chart it stands in for is: Method & limits,
 // the NBER table and the page's foot (server-rendered below it) then start
@@ -285,6 +223,8 @@ function MethodDetails({ meta }) {
   const allNotes = [
     v2Index >= 0 ? notes[v2Index] : CORE_INDEX_NOTE,
     BAND_NOTE,
+    "Every NBER window carries its own drawdown and Core Index low; select one under the chart to zoom to it.",
+    "Compare the S&P 500, gold, Treasuries and Nifty 50 on one percentage scale.",
     `${firstScored ? `Every weekly reading from ${firstScored} is shown. ` : ""}The rules were designed and tuned on the years from 1971 on, so 1929–71 served as the out-of-sample test, and few stress inputs existed before 1953.`,
     `Severity, shown as the decline class${
       severities.length > 1
@@ -450,35 +390,15 @@ export default function RegimeClient({
 
   const data = state.data;
   // Until the archive arrives (or if it fails), the summary the server read
-  // with the page fills the Stat row, the coverage chip and Method & limits:
-  // the same meta, coverage and windows, so the page reads the same before
-  // and after hydration, and without JS.
+  // with the page fills Method & record with the same meta, so the page reads
+  // the same before and after hydration, and without JS.
   const summary = data ? null : initialSummary;
   const meta = data?.meta ?? summary?.meta ?? null;
-  const coverage = data?.coverage ?? summary?.coverage ?? null;
-  const windowCount = data ? data.crashes.length : summary?.windows;
   const latestCoreIndex = meta?.latest_core_index ?? null;
-  const latestTone = coreIndexTone(latestCoreIndex?.bucket, isDark);
-  // Today's flags, named in the summary only while they are on, in one
-  // compact phrase: "trend warning", or "Core Index, trend and fast warnings".
-  const latestFlags = [
-    [
-      latestCoreIndex?.warning === true &&
-        (latestCoreIndex?.bucket === "calm_bullish" ||
-          latestCoreIndex?.bucket === "strong_bullish"),
-      "Core Index",
-      "warning",
-    ],
-    [latestCoreIndex?.trend_warning === true, "trend", "trend warning"],
-    [latestCoreIndex?.fast_warning === true, "fast", "fast warning"],
-  ].filter(([on]) => on);
-  const latestFlagNames = latestFlags.map(([, name]) => name);
-  const latestFlagText =
-    latestFlags.length === 1
-      ? latestFlags[0][2]
-      : latestFlags.length
-        ? `${latestFlagNames.slice(0, -1).join(", ")} and ${latestFlagNames.at(-1)} warnings`
-        : "";
+  const crashMetrics = useMemo(
+    () => (data?.timeline ? buildCrashMetrics(data.timeline, data.crashes) : []),
+    [data],
+  );
   const selectedCrash = useMemo(
     () => data?.crashes.find((crash) => crash.id === selectedId) ?? null,
     [data, selectedId],
@@ -538,89 +458,18 @@ export default function RegimeClient({
           container, so the HUD sticks at the same offset with no slit above
           it. */}
       <div className="mx-auto w-full max-w-[1600px] px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-micro uppercase tracking-[0.2em] text-[#a83a27] dark:text-[#ff8b77]">
-              Macro atlas
-            </p>
-            <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl">
-              The −50 to +50 macro atlas.
-            </h1>
-            <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/60 dark:text-white/60 sm:text-body">
-              One full-bleed market chart. The Core Index reads the
-              S&amp;P 500&apos;s trend and volatility against credit,
-              unemployment and yield-curve stress each Friday; every NBER window
-              carries its own drawdown and score. Compare the S&amp;P 500, gold,
-              Treasuries and Nifty 50 on a single percentage scale. Readings near
-              +50 mark euphoric markets; readings near −50 mark maximum fear.
-              Method &amp; record shows how its warnings lined up with every 20%
-              fall since 1928, misses included. Descriptive research, not
-              investment advice.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={state.status} />
-            <span className="inline-flex items-center rounded-full border border-black/5 bg-white/35 px-3 py-1.5 text-micro text-black/60 dark:border-white/5 dark:bg-black/25 dark:text-white/60">
-              FRED ·{" "}
-              {coverage?.start?.slice(0, 4) ?? "1854"}–
-              {coverage?.end?.slice(0, 4) ?? "2026"}
-            </span>
-          </div>
+        <header className="max-w-3xl">
+          <p className="text-micro uppercase tracking-[0.2em] text-[#a83a27] dark:text-[#ff8b77]">
+            Macro atlas
+          </p>
+          <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl">
+            The −50 to +50 macro atlas.
+          </h1>
+          <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/60 dark:text-white/60 sm:text-body">
+            A weekly −50 to +50 reading of US market stress since 1854, set
+            against every NBER recession.
+          </p>
         </header>
-
-        {/* One slot for the Stat row in every state, so it never remounts when
-            the archive replaces the server's summary (same figures). */}
-        {latestCoreIndex || coverage ? (
-          <div className="mt-5 grid grid-cols-2 gap-x-4 border-y border-(--sh-line-1) sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-(--sh-line-1)">
-            <Stat
-              label="Latest weekly reading"
-              value={formatSigned(latestCoreIndex?.score)}
-              suffix="/ +50"
-              detail={
-                latestFlagText ? (
-                  // Two unbreakable parts: a narrow column wraps between
-                  // them, never inside one.
-                  <>
-                    <span className="whitespace-nowrap">
-                      {latestTone.label} ·
-                    </span>{" "}
-                    <span className="whitespace-nowrap">{latestFlagText}</span>
-                  </>
-                ) : (
-                  latestTone.label
-                )
-              }
-              accent={latestTone.color}
-            />
-            <Stat
-              label="As of"
-              value={latestCoreIndex?.date ? formatDate(latestCoreIndex.date) : "—"}
-              detail={data ? `${formatNumber(data.point_count)} timeline points` : null}
-            />
-            <Stat
-              label="Coverage"
-              value={isNumber(coverage?.years) ? `${coverage.years.toFixed(0)} yrs` : "—"}
-              detail={`${formatDate(coverage?.start)} → ${formatDate(coverage?.end)}`}
-            />
-            <Stat
-              label="NBER windows"
-              value={isNumber(windowCount) ? String(windowCount) : "—"}
-              detail={
-                state.status === "error" ? null : (
-                  <>
-                    <span className="[@media(hover:none)]:hidden">
-                      Hover a red band · click to zoom
-                    </span>
-                    <span className="hidden [@media(hover:none)]:inline">
-                      Press and hold the chart to scrub
-                    </span>
-                  </>
-                )
-              }
-            />
-          </div>
-        ) : null}
 
         {state.status === "loading" ? <LoadingState /> : null}
 
@@ -673,6 +522,13 @@ export default function RegimeClient({
                 />
               ) : null}
             </AnimatePresence>
+
+            <RecessionWindows
+              metrics={crashMetrics}
+              crashes={data.crashes}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
 
             <div className="mt-4">
               <PhasePlane
