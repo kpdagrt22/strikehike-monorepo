@@ -36,7 +36,7 @@ async function openRegime(page: Page) {
 }
 
 test.describe("regime revamp", () => {
-  test("the latest score appears once above the chart, with one hint", async ({
+  test("the latest score appears once above the chart, with one hint", { tag: "@deploy" }, async ({
     page,
     request,
   }) => {
@@ -104,7 +104,7 @@ test.describe("regime revamp", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the chart's top is inside 600 px on phones", async ({ page }) => {
+  test("the chart's top is inside 600 px on phones", { tag: "@deploy" }, async ({ page }) => {
     const errors = watchErrors(page);
     for (const [width, height] of [
       [390, 844],
@@ -117,6 +117,45 @@ test.describe("regime revamp", () => {
         .boundingBox();
       expect(chart, `${width}x${height}: chart`).not.toBeNull();
       expect(chart!.y, `${width}x${height}: chart top`).toBeLessThan(600);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test("readout, cycle and controls share one row at 1440 and 1920", async ({
+    page,
+  }) => {
+    const errors = watchErrors(page);
+    for (const [width, height] of [
+      [1440, 900],
+      [1920, 1080],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      await openRegime(page);
+      const [readout, cycle, controls, chart] = await Promise.all([
+        page.locator("[data-regime-readout]").boundingBox(),
+        page.locator("[data-regime-cycle]").boundingBox(),
+        page.locator("[data-regime-controls]").boundingBox(),
+        page.locator('[data-testid="regime-terminal-chart"]').boundingBox(),
+      ]);
+      expect(readout, `${width}: readout`).not.toBeNull();
+      expect(cycle, `${width}: cycle`).not.toBeNull();
+      expect(controls, `${width}: controls`).not.toBeNull();
+      expect(chart, `${width}: chart`).not.toBeNull();
+
+      const readoutBottom = readout!.y + readout!.height;
+      const controlsBottom = controls!.y + controls!.height;
+      expect(
+        Math.abs(readoutBottom - controlsBottom),
+        `${width}: aligned bottoms`,
+      ).toBeLessThanOrEqual(24);
+      expect(cycle!.x, `${width}: cycle beside the readout`).toBeGreaterThanOrEqual(
+        readout!.x + readout!.width - 8,
+      );
+      const verticalOverlap =
+        Math.min(readoutBottom, cycle!.y + cycle!.height) -
+        Math.max(readout!.y, cycle!.y);
+      expect(verticalOverlap, `${width}: cycle in the readout row`).toBeGreaterThan(0);
+      expect(chart!.y, `${width}: chart top`).toBeLessThan(420);
     }
     expect(errors).toEqual([]);
   });

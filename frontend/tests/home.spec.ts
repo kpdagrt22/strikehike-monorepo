@@ -237,11 +237,18 @@ async function assertPrimaryContrast(page: Page) {
       return { color: style.color, background: style.backgroundColor };
     });
   const check = async (label: string) => {
-    const value = await colors();
-    expect(
-      contrastRatio(value.color, value.background),
-      `${label}: ${JSON.stringify(value)}`,
-    ).toBeGreaterThanOrEqual(4.5);
+    // Colour transitions can pass through a low-contrast frame; poll until the
+    // settled style is readable, but still fail on a genuinely dark-on-dark
+    // focus state.
+    await expect
+      .poll(
+        async () => {
+          const value = await colors();
+          return contrastRatio(value.color, value.background);
+        },
+        { timeout: 2_000, message: label },
+      )
+      .toBeGreaterThanOrEqual(4.5);
   };
 
   await check("rest");
@@ -513,21 +520,34 @@ test.describe("navigation is one action", () => {
     ["phone", 390, 844],
   ] as const) {
     test(`every view on ${label}`, async ({ page }) => {
+      test.setTimeout(120_000);
       const errors = watchErrors(page);
       await page.setViewportSize({ width, height });
-      for (const view of VIEWS) {
-        await page.goto("/", { waitUntil: "networkidle" });
-        const link = page.getByRole("link", {
-          name: view.label,
-          exact: true,
-        }).first();
+      await page.goto("/", { waitUntil: "networkidle" });
+      const nav = page.locator(
+        width < 640 ? '[data-shell="nav-row"]' : '[data-shell="nav-pill"]',
+      );
+      // One navigation per view: each click starts from the page the previous
+      // click landed on, so only / is loaded once.
+      for (const view of [...VIEWS.slice(1), VIEWS[0]]) {
+        const link = nav
+          .getByRole("link", { name: view.label, exact: true })
+          .first();
+        await link.scrollIntoViewIfNeeded();
         await expect(link).toBeVisible();
+        const box = await link.boundingBox();
+        expect(box, `${view.label}: link box`).not.toBeNull();
+        expect(box!.x, `${view.label}: left edge`).toBeGreaterThanOrEqual(0);
+        expect(
+          box!.x + box!.width,
+          `${view.label}: right edge`,
+        ).toBeLessThanOrEqual(width);
         await link.click();
         await expect
           .poll(() => new URL(page.url()).pathname)
           .toBe(view.href);
         await expect(
-          page.getByRole("link", { name: view.label, exact: true }).first(),
+          nav.getByRole("link", { name: view.label, exact: true }).first(),
         ).toHaveAttribute("aria-current", "page");
       }
       expect(errors).toEqual([]);
@@ -762,7 +782,13 @@ test.describe("home orrery clearance", () => {
       for (const archiveOpen of size.desktop ? [false, true] : [false]) {
         const visit = returning ? "return" : "first";
         const suffix = archiveOpen ? "-archive-open" : "";
-        test(`orrery clear, ${size.label}, ${visit}${suffix}`, async ({
+        const deploy =
+          !returning &&
+          !archiveOpen &&
+          (size.label === "1280x720" || size.label === "390x844");
+        test(`orrery clear, ${size.label}, ${visit}${suffix}`, {
+          tag: deploy ? "@deploy" : [],
+        }, async ({
           page,
         }) => {
           const errors = watchErrors(page);

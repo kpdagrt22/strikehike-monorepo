@@ -50,7 +50,7 @@ const SIZES = [
 
 test.describe("upcoming family layout", () => {
   for (const [width, height] of SIZES) {
-    test(`centred with compact rows at ${width}x${height}`, async ({
+    test(`centred with compact rows at ${width}x${height}`, { tag: "@deploy" }, async ({
       page,
       request,
     }) => {
