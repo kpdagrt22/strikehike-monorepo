@@ -10,11 +10,15 @@ const STATIC = new Set([
   "/patterns",
   "/disclaimer",
   "/upcoming",
+  "/recessions",
+  "/declines",
 ]);
 const THEMES = new Set(["science", "finance", "culture-religion"]);
 const EVENT = /^\/events\/[^/]+\/?$/;
 const THEME = /^\/upcoming\/([^/]+)\/?$/;
 const YEAR_LIST = /^\/dates\/[^/]+\/[^/]+\/?$/;
+const RECESSION = /^\/recessions\/[^/]+\/?$/;
+const DECLINE = /^\/declines\/[^/]+\/?$/;
 
 export function pageTemplate(pathname: string): string {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -23,5 +27,7 @@ export function pageTemplate(pathname: string): string {
   const theme = THEME.exec(path);
   if (theme && THEMES.has(theme[1])) return "/upcoming/[theme]";
   if (YEAR_LIST.test(path)) return "/dates/[year]/[list]";
+  if (RECESSION.test(path)) return "/recessions/[id]";
+  if (DECLINE.test(path)) return "/declines/[id]";
   return "404";
 }

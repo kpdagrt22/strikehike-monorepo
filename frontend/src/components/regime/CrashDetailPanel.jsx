@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { panel } from "@/lib/motion";
 import { RegimeDetailChart } from "@/components/regime/RegimeDetailChart";
 import { SkyStrip } from "@/components/regime/SkyStrip";
+import { ShareButton } from "@/components/reference/ShareButton";
 import { coreIndexFlag } from "@/components/regime/regimeChart";
 import {
   addDaysIso,
@@ -87,7 +88,7 @@ function DetailSkeleton() {
   );
 }
 
-export function CrashDetailPanel({ crash, isDark, onClose }) {
+export function CrashDetailPanel({ crash, isDark, onClose, shareUrl }) {
   const reduceMotion = useReducedMotion();
   const detailStart =
     crash.zoom_window?.start ?? addMonthsIso(crash.start, -6);
@@ -182,24 +183,33 @@ export function CrashDetailPanel({ crash, isDark, onClose }) {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close crash detail"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/5 text-black/60 transition-colors hover:bg-black/[0.04] hover:text-black/70 focus-visible:bg-black/[0.04] focus-visible:text-black/70 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/70 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/70 sm:h-9 sm:w-9"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              aria-hidden="true"
+          <div className="flex shrink-0 items-center gap-2">
+            {shareUrl ? (
+              <ShareButton
+                surface="regime"
+                url={shareUrl}
+                title={`${crash.name} on the Regime chart`}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close crash detail"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/5 text-black/60 transition-colors hover:bg-black/[0.04] hover:text-black/70 focus-visible:bg-black/[0.04] focus-visible:text-black/70 dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/70 dark:focus-visible:bg-white/[0.06] dark:focus-visible:text-white/70 sm:h-9 sm:w-9"
             >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -25,6 +25,7 @@ MEANINGFUL = frozenset(
         "event_source_clicked",
         "method_opened",
         "calendar_subscribed",
+        "share_clicked",
         "link_shared",
     }
 )

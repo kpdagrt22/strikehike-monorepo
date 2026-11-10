@@ -9,6 +9,8 @@ PAGE_ROUTES = (
     "/patterns",
     "/disclaimer",
     "/upcoming",
+    "/recessions",
+    "/declines",
 )
 PAGE_TEMPLATES = (*PAGE_ROUTES, "other")
 

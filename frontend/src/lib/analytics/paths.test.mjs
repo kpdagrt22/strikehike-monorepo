@@ -11,9 +11,21 @@ test("known pages keep their path", () => {
     "/patterns",
     "/disclaimer",
     "/upcoming",
+    "/recessions",
+    "/declines",
   ]) {
     assert.equal(pageTemplate(path), path);
   }
+});
+
+test("reference detail pages map to their template", () => {
+  assert.equal(pageTemplate("/recessions/nber-2007-12"), "/recessions/[id]");
+  assert.equal(
+    pageTemplate("/declines/1929-09-16-1929-crash-great-depression"),
+    "/declines/[id]",
+  );
+  assert.equal(pageTemplate("/recessions/"), "/recessions");
+  assert.equal(pageTemplate("/declines/"), "/declines");
 });
 
 test("event pages map to their template, never a raw id", () => {

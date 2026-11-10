@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { ShareButton } from "@/components/reference/ShareButton";
 import { SubscribeControl } from "@/components/upcoming/SubscribeControl";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { eventPath } from "@/lib/events/eventId";
@@ -119,6 +120,7 @@ export default async function YearListPage({
               All {list.entries.length} dates are in the data.
             </p>
             <SubscribeControl scope={list.themeSlug} />
+            <ShareButton surface="date" url={urlFor(path)} title={list.title} />
           </div>
 
           <ul className="mt-4">

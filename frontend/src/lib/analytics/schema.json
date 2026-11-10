@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "404"],
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "404"],
   "limits": {
     "max_body_bytes": 8192,
     "max_events": 25,
@@ -147,6 +147,13 @@
       "properties": {
         "scope": { "type": "enum", "values": ["all", "science", "finance", "culture-religion"] },
         "method": { "type": "enum", "values": ["apple", "google", "outlook", "copy", "download"] }
+      }
+    },
+    "share_clicked": {
+      "required": ["surface", "method"],
+      "properties": {
+        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime"] },
+        "method": { "type": "enum", "values": ["clipboard", "share"] }
       }
     }
   }

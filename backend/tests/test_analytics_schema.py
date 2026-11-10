@@ -72,7 +72,7 @@ def test_depth_and_size_limits_are_enforced():
         validate_batch(payload(), 9000)
 
 
-def test_schema_has_the_fifteen_live_events_and_no_future_ones():
+def test_schema_has_the_sixteen_live_events_and_no_future_ones():
     names = set(load_schema()["events"])
     assert names == {
         "page_viewed",
@@ -90,6 +90,7 @@ def test_schema_has_the_fifteen_live_events_and_no_future_ones():
         "support_link_clicked",
         "feedback_submitted",
         "calendar_subscribed",
+        "share_clicked",
     }
     assert "link_shared" not in names
     assert set(load_schema()["paths"]) == {
@@ -102,6 +103,10 @@ def test_schema_has_the_fifteen_live_events_and_no_future_ones():
         "/events/[id]",
         "/upcoming/[theme]",
         "/dates/[year]/[list]",
+        "/recessions",
+        "/recessions/[id]",
+        "/declines",
+        "/declines/[id]",
         "404",
     }
 
@@ -122,6 +127,29 @@ def test_calendar_subscribed_accepts_only_the_known_scopes_and_methods():
         {"scope": "all", "method": "email"},
         {"scope": "politics", "method": "copy"},
         {"scope": "finance"},
+    ):
+        bad = {**good, "pr": props}
+        _, events, _, _, invalid = validate_batch(payload(ev=[bad]))
+        assert events == []
+        assert invalid == 1
+
+
+def test_share_clicked_accepts_only_the_known_surfaces_and_methods():
+    good = {
+        "n": "share_clicked",
+        "t": 1,
+        "pv": "a" * 12,
+        "p": "/recessions/[id]",
+        "pr": {"surface": "recession", "method": "clipboard"},
+    }
+    _, events, _, _, invalid = validate_batch(payload(ev=[good]))
+    assert invalid == 0
+    assert events[0]["props"] == {"surface": "recession", "method": "clipboard"}
+
+    for props in (
+        {"surface": "page", "method": "clipboard"},
+        {"surface": "event", "method": "email"},
+        {"surface": "event"},
     ):
         bad = {**good, "pr": props}
         _, events, _, _, invalid = validate_batch(payload(ev=[bad]))
