@@ -1,54 +1,89 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
-import { AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
-import { CrashDetailPanel } from "@/components/regime/CrashDetailPanel";
-import { PhasePlane } from "@/components/regime/PhasePlane";
-import { RecessionWindows } from "@/components/regime/RecessionWindows";
-import { OnboardingModal } from "@/components/ui/OnboardingModal";
-import { RegimeTimeline } from "@/components/regime/RegimeTimeline";
+import { Deferred } from "@/components/Deferred";
 import { dateTravelled, methodOpened } from "@/lib/analytics/events";
-import { MARKET_FLAGS, sourcePeriods } from "@/components/regime/regimeChart";
 import { buildCrashMetrics } from "@/components/regime/regimeMetrics";
-import {
-  formatDate,
-} from "@/components/regime/regimeUtils";
 import { urlFor } from "@/lib/seo/site";
 import { useChronoStore } from "@/store/chronoStore";
+
+const CrashDetailPanel = dynamic(
+  () =>
+    import("@/components/regime/CrashDetailPanel").then(
+      (module) => module.CrashDetailPanel,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-4 h-[420px] animate-pulse rounded-[1.6rem] border border-(--sh-line-1) bg-(--sh-hover) motion-reduce:animate-none" />
+    ),
+  },
+);
+
+const RegimeTimeline = dynamic(
+  () =>
+    import("@/components/regime/RegimeTimeline").then(
+      (module) => module.RegimeTimeline,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-4 h-[calc(68vh+9.5rem)] min-h-[672px] animate-pulse rounded-2xl border border-(--sh-line-1) bg-(--sh-hover) motion-reduce:animate-none" />
+    ),
+  },
+);
+
+const RecessionWindows = dynamic(
+  () =>
+    import("@/components/regime/RecessionWindows").then(
+      (module) => module.RecessionWindows,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-4 h-[20rem] animate-pulse rounded-2xl border border-(--sh-line-1) bg-(--sh-hover) motion-reduce:animate-none" />
+    ),
+  },
+);
+
+const PhasePlane = dynamic(
+  () =>
+    import("@/components/regime/PhasePlane").then(
+      (module) => module.PhasePlane,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-4 h-[420px] animate-pulse rounded-2xl border border-(--sh-line-1) bg-(--sh-hover) motion-reduce:animate-none" />
+    ),
+  },
+);
+
+const OnboardingModal = dynamic(
+  () =>
+    import("@/components/ui/OnboardingModal").then(
+      (module) => module.OnboardingModal,
+    ),
+  { ssr: false },
+);
 
 const subscribe = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
 
-// At least one screen tall, as the chart it stands in for is: Method & limits,
-// the NBER table and the page's foot (server-rendered below it) then start
-// below the fold, so the chart's arrival moves nothing on screen.
-function LoadingState() {
+function ErrorState({ onRetry }) {
   return (
-    <section className="mt-6 flex min-h-[100dvh] flex-col overflow-hidden rounded-[1.6rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/40 sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-micro uppercase tracking-[0.16em] text-black/60 dark:text-white/60">
-          Loading 170 years of macro history
-        </p>
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#d8b47a]" />
-      </div>
-      <div className="mt-5 min-h-[320px] flex-1 animate-pulse rounded-2xl bg-black/[0.04] dark:bg-white/[0.05]" />
-      <div className="mt-3 h-3 w-2/3 animate-pulse rounded-full bg-black/[0.04] dark:bg-white/[0.05]" />
-    </section>
-  );
-}
-
-function ErrorState({ message, onRetry }) {
-  return (
-    <section className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#ef4444]/20 bg-white/45 p-5 dark:border-[#ef4444]/25 dark:bg-black/40 sm:p-6">
+    <section data-regime-error="" className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#ef4444]/20 bg-white/45 p-5 dark:border-[#ef4444]/25 dark:bg-black/40 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-2xl">
           <p className="text-micro uppercase tracking-[0.16em] text-[#c0442f] dark:text-[#ff8b77]">
@@ -58,16 +93,13 @@ function ErrorState({ message, onRetry }) {
             The macro archive is not responding.
           </h2>
           <p className="mt-2 text-meta leading-relaxed text-black/60 dark:text-white/60">
-            {message || "The API returned an empty response."}
-          </p>
-          <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
-            A 503 means the parquet artifact has not been published to this
-            environment yet. The rest of the Chrono engine is unaffected.
+            The page could not read the weekly history. Try again in a moment.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
+            data-retry=""
             onClick={onRetry}
             className="rounded-full border border-black/5 px-3.5 py-2 text-micro font-medium text-black/60 transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] dark:border-white/5 dark:text-white/60 dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
           >
@@ -90,217 +122,6 @@ function ErrorState({ message, onRetry }) {
 const FOOTER_LINK =
   "text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]";
 
-// Core Index v2 as the backend contract words it (§5.1), shown only when the
-// payload lacks the backend's own fuller v2 note, and the band definition.
-const CORE_INDEX_NOTE =
-  "Core Index v2 is a weekly trend-and-stress state machine: the equity proxy against its 40-week average and its own volatility, with credit spreads, unemployment and the yield curve as stress inputs, each lagged by its publication delay; it is decided at the Friday close and starts at the end of 1928.";
-const BAND_NOTE =
-  "The Core Index is a descriptive sentiment map: +25 begins the Risk elevated band; -25 begins the Maximum fear band.";
-// The drawn S&P line crosses the 1927 splice of two separate indices.
-const SPLICE_NOTE =
-  "The chart joins the Cowles index to the S&P 90 at 30 Dec 1927 for display only; the two indices' levels do not compare across that date.";
-
-const isNumber = (value) => typeof value === "number" && Number.isFinite(value);
-
-// "Dec 1928" from an ISO day, or null.
-function monthOf(value) {
-  const text = formatDate(value);
-  return text === "—" ? null : text.slice(3);
-}
-
-function shareOf(value) {
-  const percent = value * 100;
-  return `${percent < 10 ? percent.toFixed(1) : Math.round(percent)}%`;
-}
-
-function flagLabel(field) {
-  const flag = MARKET_FLAGS.find((item) => item.field === field);
-  return `${flag.label}: ${flag.text}.`;
-}
-
-// A flag's measured record (meta …record) in one passage: its hits, its
-// misses and its false warnings together, every figure read from the payload.
-// Null when any of the three is missing, so none is ever shown alone. The
-// definition of a false warning is given once (`define`), from the trend
-// record: no text from the fast warning's meta is shown (contract §7.2).
-function recordPassage(record, { define = false } = {}) {
-  const falls = record?.falls_of_20pct_or_more;
-  const count = falls?.count;
-  const hits = falls?.on_within_first_20pct ?? falls?.within_first_20pct;
-  const misses = falls?.not_within_first_20pct;
-  const rates = record?.false_alarms_per_decade;
-  if (![count, hits, misses, rates?.all].every(isNumber)) return null;
-  const kinds = [];
-  if (isNumber(falls.during_the_fall) && isNumber(falls.before_the_peak_only)) {
-    kinds.push(
-      `${falls.during_the_fall} during the fall`,
-      `${falls.before_the_peak_only} only before the peak`,
-    );
-  }
-  if (falls.left_on_from_the_decline_before > 0) {
-    kinds.push(
-      `${falls.left_on_from_the_decline_before} of them only because it was still on from the decline before`,
-    );
-  }
-  const eras = Object.entries(rates)
-    .filter(([key, value]) => key !== "all" && isNumber(value))
-    .map(([key, value]) => `${value.toFixed(1)} in ${key.replace("-", "–")}`);
-  const from = monthOf(record.measured_on?.first_week ?? record.measured_on?.first_day);
-  const to = monthOf(record.measured_on?.last_week ?? record.measured_on?.last_day);
-  const weeksOn = record.share_of_weeks_on?.all;
-  const daysOn = record.share_of_days_on?.all;
-  const definition = define ? record.definitions?.false_alarm : null;
-  return [
-    from && to ? `Its record, ${from} to ${to}: it` : "Its record: it",
-    ` came on before the market had done a fifth of the fall in ${hits} of the ${count} falls of 20% or more`,
-    kinds.length ? ` (${kinds.join(", ")})` : "",
-    ` and later than that in ${misses} of ${count}; it gave ${rates.all.toFixed(1)} false warnings a decade`,
-    eras.length ? ` (${eras.join(", ")})` : "",
-    isNumber(weeksOn)
-      ? ` and was on in ${shareOf(weeksOn)} of weeks.`
-      : isNumber(daysOn)
-        ? ` and was on ${shareOf(daysOn)} of days.`
-        : ".",
-    definition ? ` A false warning is ${definition}.` : "",
-    " A historical record, not a forecast.",
-  ].join("");
-}
-
-// The weekly trend warning: its label, its rule from the meta, and its record.
-function trendNote(trend) {
-  if (!trend) return null;
-  const rule = isNumber(trend.weeks)
-    ? ` It is on when the S&P 500's (the S&P 90's before March 1957) Friday close is below the average of its last ${trend.weeks} Friday closes: a textbook rule${
-        trend.fitted === false ? ", not fitted to this history" : ""
-      }, chosen after seeing its record${
-        trend.changes_core_index === false
-          ? ", and shown beside the Core Index without changing it"
-          : ""
-      }.`
-    : "";
-  const record = recordPassage(trend.record, { define: true });
-  return `${flagLabel("core_index_trend_warning")}${rule}${record ? ` ${record}` : ""}`;
-}
-
-// The daily fast warning, when the backend sends one: the same three parts.
-function fastNote(fast) {
-  if (!fast) return null;
-  const rule =
-    isNumber(fast.drop) && isNumber(fast.days)
-      ? ` It is on when the S&P 500 (the S&P 90 before March 1957) closes ${Math.round(fast.drop * 100)}% or more below its close ${fast.days} calendar days earlier, decided at each close (a week shows it if it was on any day): a reaction to a sharp fall, chosen after seeing this history${
-          fast.changes_core_index === false
-            ? ", and shown beside the Core Index without changing it"
-            : ""
-        }.`
-      : "";
-  const record = recordPassage(fast.record);
-  return `${flagLabel("core_index_fast_warning")}${rule}${record ? ` ${record}` : ""}`;
-}
-
-function MethodDetails({ meta }) {
-  const notes = Array.isArray(meta?.notes) ? meta.notes : [];
-  const sources = sourcePeriods([
-    ...(Array.isArray(meta?.proxy_sources) ? meta.proxy_sources : []),
-    ...(meta?.assets?.nifty
-      ? [
-          {
-            source: meta.assets.nifty.source ?? "YAHOO_FINANCE_NSEI",
-            start: meta.assets.nifty.first_observation,
-            end: meta.assets.nifty.last_observation,
-          },
-        ]
-      : []),
-  ]);
-  const firstScored = monthOf(meta?.core_index_first_scored);
-  const severities = (
-    Array.isArray(meta?.core_index_severities) ? meta.core_index_severities : []
-  ).filter((name) => name !== "none");
-  // The backend's own Core Index v2 note leads, as the fuller description;
-  // the contract's sentence stands in only when the payload lacks it, so the
-  // description is never given twice.
-  const v2Index = notes.findIndex(
-    (note) => typeof note === "string" && note.startsWith("Core Index v2"),
-  );
-  const allNotes = [
-    v2Index >= 0 ? notes[v2Index] : CORE_INDEX_NOTE,
-    BAND_NOTE,
-    "Every NBER window carries its own drawdown and Core Index low; select one under the chart to zoom to it.",
-    "Compare the S&P 500, gold, Treasuries and Nifty 50 on one percentage scale.",
-    `${firstScored ? `Every weekly reading from ${firstScored} is shown. ` : ""}The rules were designed and tuned on the years from 1971 on, so 1929–71 served as the out-of-sample test, and few stress inputs existed before 1953.`,
-    `Severity, shown as the decline class${
-      severities.length > 1
-        ? ` (${severities.slice(0, -1).join(", ")} or ${severities.at(-1)})`
-        : ""
-    }, is the class a decline has reached in the current spell. It only steps up within a spell, so it can still read crash in a recovery; in Maximum fear it is the class of the decline being measured. A warning can show while Steady or Risk elevated; it does not change the band.`,
-    trendNote(meta?.core_index_trend_warning),
-    fastNote(meta?.core_index_fast_warning),
-    ...notes.filter((_, index) => index !== v2Index),
-  ].filter(Boolean);
-
-  return (
-    <details
-      id="regime-method"
-      onToggle={(event) => {
-        if (event.currentTarget.open) methodOpened("method_limits", "/regime");
-      }}
-      className="group mt-4 scroll-mt-24 rounded-[1.4rem] border border-(--sh-line-1) bg-white/45 p-5 dark:bg-black/25 sm:p-6"
-    >
-      <summary className="-m-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-2 text-micro font-medium uppercase tracking-[0.16em] text-black/60 [&::-webkit-details-marker]:hidden dark:text-white/60">
-        Method &amp; record
-        <span className="text-base font-normal text-black/60 transition-transform group-open:rotate-45 dark:text-white/60" aria-hidden="true">
-          +
-        </span>
-      </summary>
-
-      <div className="mt-4 grid gap-5 sm:grid-cols-[1.15fr_0.85fr]">
-        <ul className="space-y-2.5">
-          {allNotes.map((note, index) => (
-            <li
-              key={`${index}-${note}`}
-              className="flex gap-2 text-meta leading-relaxed text-black/60 dark:text-white/60"
-            >
-              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#f05d49]" />
-              <span>{note}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div>
-          <p className="text-micro uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-            Asset proxy sources
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {sources.map((source) => (
-              <li
-                key={`${source.source}-${source.start}`}
-                title={source.source}
-                className="text-micro text-black/60 dark:text-white/60"
-              >
-                {source.label} ·{" "}
-                <span className="font-mono">
-                  {formatDate(source.start)} → {formatDate(source.end)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {sources.some((source) => source.source === "M1125AUSM343NNBR") ? (
-            <p className="mt-2 text-micro leading-relaxed text-black/60 dark:text-white/60">
-              {SPLICE_NOTE}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <p className="mt-4 border-t border-black/5 pt-3 text-micro leading-relaxed text-black/60 dark:border-white/5 dark:text-white/60">
-        Data version {meta?.data_version ?? "—"} ·{" "}
-        {meta?.core_index_version ?? meta?.strength_version ?? "—"} · Source
-        FRED, World Bank, Blockchain.com, Yahoo Finance. Descriptive historical
-        research. Not investment advice.
-      </p>
-    </details>
-  );
-}
-
 /**
  * The /regime view. `page.tsx` renders it on the server with the summary it
  * read (`initialSummary`: the archive's meta, coverage and window count, or
@@ -309,12 +130,18 @@ function MethodDetails({ meta }) {
  *
  * @param {{
  *   initialSummary?: { as_of?: string, coverage?: object, meta?: object, windows?: number } | null,
+ *   header?: import("react").ReactNode,
+ *   boot?: import("react").ReactNode,
+ *   method?: import("react").ReactNode,
  *   after?: import("react").ReactNode,
  *   colophon?: import("react").ReactNode,
  * }} props
  */
 export default function RegimeClient({
   initialSummary = null,
+  header = null,
+  boot = null,
+  method = null,
   after = null,
   colophon = null,
 }) {
@@ -335,24 +162,53 @@ export default function RegimeClient({
     status: "loading",
     data: null,
     error: null,
+    full: false,
   });
+  const fullStarted = useRef(false);
+
+  const loadFull = useCallback(() => {
+    if (fullStarted.current) return;
+    fullStarted.current = true;
+    fetch("/api/v1/regime/macro-history?resolution=weekly&view=atlas")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("full atlas unavailable");
+        return response.json();
+      })
+      .then((payload) => {
+        if (!Array.isArray(payload?.timeline)) return;
+        setState((previous) =>
+          previous.status === "ready"
+            ? { ...previous, data: payload, full: true }
+            : previous,
+        );
+      })
+      .catch(() => {
+        // The lite view stays usable; a later intent may try again.
+        fullStarted.current = false;
+      });
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    fullStarted.current = false;
 
-    // view=atlas: only the fields this page reads (≈1.7 MB instead of 11 MB);
-    // the route sends Cache-Control, so repeat visits reuse it.
-    fetch("/api/v1/regime/macro-history?resolution=weekly&view=atlas", {
+    // view=lite: the visible range and only the first-paint fields. A phone
+    // asks for the last 20 years; a desktop keeps the full range.
+    const phone = window.matchMedia("(max-width: 639.98px)").matches;
+    const start = phone ? `${new Date().getFullYear() - 20}-01-01` : null;
+    const params = new URLSearchParams({
+      resolution: "weekly",
+      view: "lite",
+      asset: "sp500",
+    });
+    if (start) params.set("start", start);
+
+    fetch(`/api/v1/regime/macro-history?${params}`, {
       signal: controller.signal,
     })
       .then(async (response) => {
         if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(
-            payload?.detail ||
-              payload?.error ||
-              `Macro archive returned ${response.status}.`,
-          );
+          throw new Error("Macro archive unavailable.");
         }
         return response.json();
       })
@@ -363,20 +219,40 @@ export default function RegimeClient({
         ) {
           throw new Error("The macro archive returned an unexpected payload.");
         }
-        setState({ status: "ready", data: payload, error: null });
+        setState({ status: "ready", data: payload, error: null, full: false });
       })
       .catch((loadError) => {
         if (loadError.name !== "AbortError") {
           setState({
             status: "error",
             data: null,
-            error: loadError.message,
+            error: "The macro archive is not responding.",
+            full: false,
           });
         }
       });
 
     return () => controller.abort();
   }, [reloadKey]);
+
+  // Fetch the rest once the page is idle, or as soon as the reader scrubs,
+  // changes asset or opens a window.
+  useEffect(() => {
+    if (state.status !== "ready" || state.full) return undefined;
+    let idle = 0;
+    let timer = 0;
+    if (typeof window.requestIdleCallback === "function") {
+      idle = window.requestIdleCallback(loadFull, { timeout: 2_500 });
+    } else {
+      timer = window.setTimeout(loadFull, 1_500);
+    }
+    return () => {
+      if (idle && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idle);
+      }
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [state.status, state.full, loadFull]);
 
 
   useEffect(() => {
@@ -427,12 +303,13 @@ export default function RegimeClient({
   const orreryDate = selectedCrash?.start ?? latestCoreIndex?.date ?? null;
 
   const handleSelect = useCallback((crash) => {
+    loadFull();
     setSelectedId(crash.id);
     useChronoStore.getState().setFocusedDate(crash.start);
     const url = new URL(window.location.href);
     url.searchParams.set("d", crash.start);
     window.history.replaceState(null, "", url);
-  }, []);
+  }, [loadFull]);
 
   const handleHoverPoint = useCallback((point) => {
     setHoverPoint(point ?? null);
@@ -459,24 +336,13 @@ export default function RegimeClient({
           container, so the HUD sticks at the same offset with no slit above
           it. */}
       <div className="mx-auto w-full max-w-[1600px] px-3 pt-(--sh-header-clear) sm:px-5 lg:px-8">
-        <header className="max-w-3xl">
-          <p className="text-micro uppercase tracking-[0.2em] text-[#a83a27] dark:text-[#ff8b77]">
-            Macro atlas
-          </p>
-          <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-[#14121a] dark:text-[#f2ede4] sm:text-5xl">
-            The −50 to +50 macro atlas.
-          </h1>
-          <p className="mt-3 max-w-2xl text-meta leading-relaxed text-black/60 dark:text-white/60 sm:text-body">
-            A weekly −50 to +50 reading of US market stress since 1854, set
-            against every NBER recession.
-          </p>
-        </header>
+        {header}
 
-        {state.status === "loading" ? <LoadingState /> : null}
+        {state.status === "loading" ? boot : null}
 
         {state.status === "error" ? (
           <>
-            <ErrorState message={state.error} onRetry={handleRetry} />
+            <ErrorState onRetry={handleRetry} />
             {/* The footer's links stay when the archive is offline. */}
             <div className="mt-4 flex flex-wrap justify-end gap-3 text-micro">
               <button
@@ -507,46 +373,55 @@ export default function RegimeClient({
               coverage={data.coverage}
               resolution={data.resolution}
               assetKey={selectedAsset}
-              onAssetChange={setSelectedAsset}
+              onAssetChange={(key) => {
+                loadFull();
+                setSelectedAsset(key);
+              }}
               compareAssets={compareAssets}
-              onCompareToggle={() => setCompareAssets((value) => !value)}
+              onCompareToggle={() => {
+                loadFull();
+                setCompareAssets((value) => !value);
+              }}
               onHoverPoint={handleHoverPoint}
+              onNeedFull={loadFull}
             />
 
-            <AnimatePresence mode="wait" initial={false}>
-              {selectedCrash ? (
-                <CrashDetailPanel
-                  key={selectedCrash.id}
-                  crash={selectedCrash}
-                  isDark={isDark}
-                  onClose={handleClose}
-                  shareUrl={urlFor(`/regime?d=${selectedCrash.start}`)}
-                />
-              ) : null}
-            </AnimatePresence>
-
-            <RecessionWindows
-              metrics={crashMetrics}
-              crashes={data.crashes}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-            />
-
-            <div className="mt-4">
-              <PhasePlane
-                point={phaseDisplayPoint}
-                asOf={phaseAsOf}
-                contextLabel={phaseContext}
+            {selectedCrash ? (
+              <CrashDetailPanel
+                key={selectedCrash.id}
+                crash={selectedCrash}
                 isDark={isDark}
-                assetKey={selectedAsset}
+                onClose={handleClose}
+                shareUrl={urlFor(`/regime?d=${selectedCrash.start}`)}
               />
-            </div>
+            ) : null}
+
+            <Deferred minHeight={360} label="Loading recession windows">
+              <RecessionWindows
+                metrics={crashMetrics}
+                crashes={data.crashes}
+                selectedId={selectedId}
+                onSelect={handleSelect}
+              />
+            </Deferred>
+
+            <Deferred minHeight={440} label="Loading the cycle map">
+              <div className="mt-4">
+                <PhasePlane
+                  point={phaseDisplayPoint}
+                  asOf={phaseAsOf}
+                  contextLabel={phaseContext}
+                  isDark={isDark}
+                  assetKey={selectedAsset}
+                />
+              </div>
+            </Deferred>
           </>
         ) : null}
 
         {/* Outside the status gates: from the server's summary until the
             archive arrives, then from the archive (the same meta). */}
-        {meta ? <MethodDetails meta={meta} /> : null}
+        {method}
 
         {after}
 

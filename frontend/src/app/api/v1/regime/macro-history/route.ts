@@ -36,8 +36,11 @@ const ATLAS_FIELDS = [
   "sp500_proxy",
   "proxy_source",
   "gold_proxy",
+  "gold_proxy_source",
   "bond_proxy",
+  "bond_proxy_source",
   "nifty_proxy",
+  "nifty_proxy_source",
   "1y_volatility_percentile",
   "drawdown_1y",
   "gold_1y_volatility_percentile",
@@ -47,6 +50,23 @@ const ATLAS_FIELDS = [
   "nifty_1y_volatility_percentile",
   "nifty_drawdown_1y",
 ];
+
+// view=lite: only the first-paint fields, and only the chosen asset's line.
+const LITE_CORE_FIELDS = [
+  "date",
+  "core_index",
+  "core_index_bucket",
+  "core_index_severity",
+  "core_index_warning",
+  "core_index_trend_warning",
+  "core_index_fast_warning",
+];
+const LITE_ASSET_FIELDS: Record<string, string[]> = {
+  sp500: ["sp500_proxy", "proxy_source"],
+  gold: ["gold_proxy", "gold_proxy_source"],
+  bonds: ["bond_proxy", "bond_proxy_source"],
+  nifty: ["nifty_proxy", "nifty_proxy_source"],
+};
 
 type JsonRecord = Record<string, unknown>;
 
@@ -66,9 +86,26 @@ function projectAtlas(payload: JsonRecord): JsonRecord {
   };
 }
 
+function projectLite(payload: JsonRecord, asset: string): JsonRecord {
+  if (!Array.isArray(payload?.timeline)) return payload;
+  const fields = [...LITE_CORE_FIELDS, ...(LITE_ASSET_FIELDS[asset] ?? LITE_ASSET_FIELDS.sp500)];
+  return {
+    ...payload,
+    timeline: payload.timeline.map((point: JsonRecord) => {
+      const slim: JsonRecord = {};
+      for (const field of fields) {
+        const value = point?.[field];
+        if (value !== null && value !== undefined) slim[field] = value;
+      }
+      return slim;
+    }),
+  };
+}
+
 async function loadMacroHistory(
   query: string,
-  atlas: boolean,
+  view: "full" | "atlas" | "lite",
+  asset = "sp500",
 ): Promise<RouteLoadResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
@@ -87,14 +124,17 @@ async function loadMacroHistory(
       };
     }
 
-    if (!atlas) {
+    if (view === "full") {
       // Default contract: the upstream JSON passes through unparsed.
       return { status: 200, body: await response.text() };
     }
 
+    const payload = await response.json();
     return {
       status: 200,
-      body: JSON.stringify(projectAtlas(await response.json())),
+      body: JSON.stringify(
+        view === "lite" ? projectLite(payload, asset) : projectAtlas(payload),
+      ),
     };
   } catch {
     return { status: 503, body: JSON.stringify(UNAVAILABLE) };
@@ -151,8 +191,15 @@ export async function GET(request: Request) {
     }
   }
 
-  const atlas =
-    searchParams.get("view") === "atlas" && resolution === "weekly";
+  const viewParam = searchParams.get("view");
+  const view: "full" | "atlas" | "lite" =
+    resolution === "weekly" && viewParam === "atlas"
+      ? "atlas"
+      : resolution === "weekly" && viewParam === "lite"
+        ? "lite"
+        : "full";
+  const assetParam = searchParams.get("asset");
+  const asset = assetParam && LITE_ASSET_FIELDS[assetParam] ? assetParam : "sp500";
 
   // One canonical query is both the upstream request and the cache key, so
   // unknown parameters can neither reach the backend nor mint new entries.
@@ -163,9 +210,9 @@ export async function GET(request: Request) {
   }
   const query = canonical.toString();
   const result = await cachedRoute(
-    `macro-history:${atlas ? "atlas" : "full"}?${query}`,
+    `macro-history:${view === "lite" ? `lite:${asset}` : view}?${query}`,
     CACHE_POLICY,
-    () => loadMacroHistory(query, atlas),
+    () => loadMacroHistory(query, view, asset),
   );
   return jsonTextResponse(result, CACHE_CONTROL);
 }
