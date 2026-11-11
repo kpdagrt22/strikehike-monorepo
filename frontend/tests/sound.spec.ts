@@ -23,7 +23,7 @@ function soundButton(page: Page) {
 }
 
 test.describe("ambient sound", () => {
-  test("choose a soundscape, switch it off, and keep the choice", { tag: "@deploy" }, async ({
+  test("sound is on by default; off stays off until turned back on", { tag: "@deploy" }, async ({
     page,
   }) => {
     const errors: string[] = [];
@@ -31,33 +31,35 @@ test.describe("ambient sound", () => {
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/regime");
 
+    // A first visit: the mode is on (Drift). Automated browsers never start
+    // audio, so this checks the mode, not playback.
     const button = soundButton(page);
-    await expect(button).toHaveAttribute("data-sound", "off");
-
-    // Automated browsers never start sound on their own.
-    await page.mouse.click(683, 600);
-    await expect(button).toHaveAttribute("data-sound", "off");
+    await expect(button).toHaveAttribute("data-sound", "drift");
+    await expect(button).toHaveAttribute("aria-label", /Sound on: Drift/);
 
     await button.click();
     const panel = page.locator("#site-sound-panel");
     await expect(panel).toBeVisible();
     await expect(panel.getByRole("radio")).toHaveCount(3);
+    await expect(panel.getByRole("switch")).toHaveAttribute("aria-checked", "true");
 
     await panel.locator('[data-scape="orbit"]').click();
     await expect(button).toHaveAttribute("data-sound", "orbit");
     await expect(panel.locator('[data-scape="orbit"]')).toHaveAttribute("aria-checked", "true");
-    expect(await page.evaluate(() => localStorage.getItem("sh.sound.v1"))).toContain('"orbit"');
 
+    // Off is remembered: across a reload and on another page.
     await panel.getByRole("switch").click();
     await expect(button).toHaveAttribute("data-sound", "off");
     expect(await page.evaluate(() => localStorage.getItem("sh.sound.v1"))).toContain('"off"');
-
-    // Turning it back on resumes the last scape, after a reload too.
-    await panel.locator('[data-scape="wind"]').click();
     await page.reload();
+    await expect(soundButton(page)).toHaveAttribute("data-sound", "off");
+    await page.goto("/upcoming");
+    await expect(soundButton(page)).toHaveAttribute("data-sound", "off");
+
+    // Turning it back on resumes the last scape.
     await soundButton(page).click();
     await page.locator("#site-sound-panel").getByRole("switch").click();
-    await expect(soundButton(page)).toHaveAttribute("data-sound", "wind");
+    await expect(soundButton(page)).toHaveAttribute("data-sound", "orbit");
 
     await page.keyboard.press("Escape");
     await expect(page.locator("#site-sound-panel")).toBeHidden();
