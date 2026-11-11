@@ -131,12 +131,18 @@
       }
     },
     "support_opened": {
-      "required": ["trigger"],
-      "properties": { "trigger": { "type": "enum", "values": ["click", "tap", "keyboard", "footer_link"] } }
+      "required": ["trigger", "surface"],
+      "properties": {
+        "trigger": { "type": "enum", "values": ["click", "tap", "keyboard", "footer_link"] },
+        "surface": { "type": "enum", "values": ["home", "footer"] }
+      }
     },
     "support_link_clicked": {
-      "required": ["target"],
-      "properties": { "target": { "type": "enum", "values": ["paypal"] } }
+      "required": ["target", "surface"],
+      "properties": {
+        "target": { "type": "enum", "values": ["paypal"] },
+        "surface": { "type": "enum", "values": ["home", "footer"] }
+      }
     },
     "feedback_submitted": {
       "required": ["length_bucket"],
