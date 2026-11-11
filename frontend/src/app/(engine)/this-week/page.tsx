@@ -47,8 +47,7 @@ export default async function ThisWeekPage() {
             This week: macro + sky
           </h1>
           <p className="mt-3 text-body leading-relaxed text-(--sh-text-2)">
-            The next roundup is coming. The latest approved week will appear
-            here.
+            The next roundup is coming. The latest approved week appears here.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-micro">
             <Link href="/regime" className="underline decoration-current/30 underline-offset-2 hover:decoration-current">
