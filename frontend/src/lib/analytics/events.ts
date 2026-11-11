@@ -46,6 +46,13 @@ type Theme =
   | "finance"
   | "culture-religion"
   | "natural-disasters";
+type ShareSurface =
+  | "event"
+  | "theme"
+  | "date"
+  | "recession"
+  | "decline"
+  | "regime";
 
 function ordinary(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 64);
@@ -194,6 +201,13 @@ export function calendarSubscribed(
   method: "apple" | "google" | "outlook" | "copy" | "download",
 ) {
   trackEvent("calendar_subscribed", { scope, method });
+}
+
+export function shareClicked(
+  surface: ShareSurface,
+  method: "clipboard" | "share",
+) {
+  trackEvent("share_clicked", { surface, method });
 }
 
 export function themeSlug(theme: string) {

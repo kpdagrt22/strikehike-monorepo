@@ -245,3 +245,138 @@ export function yearPageGraph(
     { name, path },
   ]);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Reference pages (/recessions, /declines and their details). Each row's facts
+// are on the page; the graph names the dataset and the one window.
+// ---------------------------------------------------------------------------------------------
+
+const referenceWebPage = (
+  path: string,
+  name: string,
+  description: string,
+  dateModified: string,
+) => {
+  const url = urlFor(path);
+  return {
+    "@type": "WebPage",
+    "@id": `${url}#webpage`,
+    url,
+    name,
+    description,
+    inLanguage: "en",
+    isPartOf: ref(WEBSITE_ID),
+    publisher: ref(ORG_ID),
+    author: ref(PERSON_ID),
+    dateModified,
+    breadcrumb: ref(`${url}#breadcrumb`),
+  };
+};
+
+const referenceBreadcrumb = (path: string, crumbs: Crumb[]) => {
+  const url = urlFor(path);
+  return {
+    "@type": "BreadcrumbList",
+    "@id": `${url}#breadcrumb`,
+    itemListElement: crumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.name,
+      item: urlFor(crumb.path),
+    })),
+  };
+};
+
+export function referenceIndexGraph({
+  path,
+  name,
+  description,
+  dateModified,
+  start,
+  end,
+  variableMeasured,
+  sources,
+  crumbs,
+}: {
+  path: string;
+  name: string;
+  description: string;
+  dateModified: string;
+  start?: string;
+  end?: string;
+  variableMeasured: string[];
+  sources: string[];
+  crumbs: Crumb[];
+}): JsonLdGraph {
+  const url = urlFor(path);
+  const id = `${url}#dataset`;
+  return graph(
+    {
+      ...referenceWebPage(path, name, description, dateModified),
+      about: ref(id),
+    },
+    referenceBreadcrumb(path, crumbs),
+    {
+      "@type": "Dataset",
+      "@id": id,
+      name,
+      description,
+      url,
+      ...DATASET_PARTIES,
+      variableMeasured,
+      isBasedOn: sources,
+      ...(start && end ? { temporalCoverage: `${start}/${end}` } : {}),
+      dateModified,
+    },
+  );
+}
+
+export function referenceDetailGraph({
+  path,
+  name,
+  description,
+  dateModified,
+  start,
+  end,
+  crumbs,
+}: {
+  path: string;
+  name: string;
+  description: string;
+  dateModified: string;
+  start?: string;
+  end?: string;
+  crumbs: Crumb[];
+}): JsonLdGraph {
+  const url = urlFor(path);
+  const articleId = `${url}#article`;
+  return graph(
+    {
+      ...referenceWebPage(path, name, description, dateModified),
+      about: ref(articleId),
+      mainEntity: ref(articleId),
+    },
+    referenceBreadcrumb(path, crumbs),
+    {
+      "@type": "Article",
+      "@id": articleId,
+      headline: name,
+      description,
+      url,
+      dateModified,
+      inLanguage: "en",
+      author: ref(PERSON_ID),
+      publisher: ref(ORG_ID),
+      isPartOf: ref(WEBSITE_ID),
+      mainEntityOfPage: ref(url),
+      ...(start && end
+        ? {
+            about: {
+              "@type": "Thing",
+              name: `${name} (${start} to ${end})`,
+            },
+          }
+        : {}),
+    },
+  );
+}

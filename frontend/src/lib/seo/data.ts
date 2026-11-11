@@ -75,6 +75,22 @@ export interface RegimeSummary {
   [key: string]: unknown;
 }
 
+/** One weekly point of the atlas view (the fields the reference pages read). */
+export interface RegimePoint {
+  date: string;
+  core_index?: number | null;
+  core_index_bucket?: string | null;
+  sp500_proxy?: number | null;
+  [key: string]: unknown;
+}
+
+/** `/api/v1/regime/macro-history?resolution=weekly&view=atlas`. */
+export interface RegimeAtlas extends RegimeSummary {
+  timeline: RegimePoint[];
+  point_count?: number;
+  resolution?: string;
+}
+
 /** One `kinds[]` entry of the case catalogue (payload order is display order). */
 export interface CaseKind {
   key: string; // "us_equity" | "india_equity" | "bitcoin" | "gold" | "treasury"
@@ -174,6 +190,17 @@ export const getRegimeSummary = cache(async (): Promise<RegimeSummary | null> =>
   if (!p) return null;
   if (!Array.isArray(p.crashes) || !p.meta || !p.coverage) throw new Error("macro-history shape");
   return p as unknown as RegimeSummary;
+});
+
+// The weekly atlas: the same crashes and meta, plus every weekly point the
+// reference pages draw. ≈2.6 MB; the 60-second cache is shared by the pages.
+export const getRegimeAtlas = cache(async (): Promise<RegimeAtlas | null> => {
+  const p = await getJson("/api/v1/regime/macro-history?resolution=weekly&view=atlas");
+  if (!p) return null;
+  if (!Array.isArray(p.timeline) || !Array.isArray(p.crashes) || !p.meta) {
+    throw new Error("regime atlas shape");
+  }
+  return p as unknown as RegimeAtlas;
 });
 
 export const getCaseCatalogue = cache(async (): Promise<CaseCatalogue | null> => {

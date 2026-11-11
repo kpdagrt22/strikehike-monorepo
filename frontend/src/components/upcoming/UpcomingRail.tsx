@@ -21,6 +21,7 @@ type Props = {
   next?: Item | null;
   breadcrumb?: ReactNode;
   showFilterSubscribes?: boolean;
+  share?: ReactNode;
 };
 
 /**
@@ -41,6 +42,7 @@ export function UpcomingRail({
   next = null,
   breadcrumb = null,
   showFilterSubscribes = true,
+  share = null,
 }: Props) {
   return (
     <aside className="min-w-0 lg:sticky lg:top-(--sh-header-clear) lg:max-h-[calc(100dvh-var(--sh-header-clear)-1.5rem)] lg:self-start lg:overflow-y-auto lg:pr-2 lg:[scrollbar-width:thin]">
@@ -67,6 +69,7 @@ export function UpcomingRail({
           Times are shown in your time zone.
         </p>
         <SubscribeControl scope={subscribeScope} label={subscribeLabel} />
+        {share}
       </div>
 
       <div className="mt-5 border-t border-(--sh-line-1) pt-2">

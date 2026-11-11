@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { ShareButton } from "@/components/reference/ShareButton";
 import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
 import {
@@ -160,6 +161,13 @@ export default async function ThemePage({
           total={total}
           next={nextItem(items)}
           showFilterSubscribes={false}
+          share={
+            <ShareButton
+              surface="theme"
+              url={urlFor(path)}
+              title={TITLE[theme]}
+            />
+          }
         />
 
         <div className="mt-8 min-w-0 lg:mt-0">

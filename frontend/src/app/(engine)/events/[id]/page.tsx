@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { PageShell } from "@/components/PageShell";
+import { ShareButton } from "@/components/reference/ShareButton";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
 import { eventCalendarPath, eventIdFromSlug, eventSlug, skyHref } from "@/lib/events/eventId";
@@ -244,6 +245,7 @@ export default async function EventPage({
                 Google Calendar
               </a>
             ) : null}
+            <ShareButton surface="event" url={urlFor(path)} title={event.name} />
           </div>
         </div>
 

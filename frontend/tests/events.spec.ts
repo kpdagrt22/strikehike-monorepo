@@ -86,7 +86,7 @@ function parseIcs(body: string) {
 }
 
 test.describe("event pages", () => {
-  test("an indexable event renders with index robots and the right JSON-LD", async ({
+  test("an indexable event renders with index robots and the right JSON-LD", { tag: "@deploy" }, async ({
     page,
     request,
   }) => {
@@ -142,7 +142,7 @@ test.describe("event pages", () => {
 });
 
 test.describe("theme pages", () => {
-  test("finance has a page; politics does not", async ({ page }) => {
+  test("finance has a page; politics does not", { tag: "@deploy" }, async ({ page }) => {
     expect((await page.goto("/upcoming/finance", { waitUntil: "networkidle" }))?.status()).toBe(200);
     const missing = await page.goto("/upcoming/politics", { waitUntil: "domcontentloaded" });
     expect(missing?.status()).toBe(404);

@@ -128,9 +128,10 @@ export function MacroHUD({
   return (
     <div className="mx-auto w-full max-w-[1600px] px-3 pb-2 pt-2 sm:px-5 sm:pb-3 sm:pt-4 lg:px-8">
       <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-        {/* One readout, one date: "Now" at rest, the hovered week while
-            scrubbing, with the band label inside it (not a second block). */}
-        <div className="min-w-0" data-regime-readout="">
+        <div className="min-w-0 xl:flex xl:items-end xl:gap-6">
+          {/* One readout, one date: "Now" at rest, the hovered week while
+              scrubbing, with the band label inside it (not a second block). */}
+          <div className="min-w-0 xl:max-w-[520px]" data-regime-readout="">
           <p className="text-micro font-medium uppercase tracking-[0.2em] text-black/60 dark:text-white/60">
             {hovering ? "Hovered" : activeCrash ? "Window start" : "Now"}
             {point?.date ? ` · week of ${formatDate(point.date)}` : ""}
@@ -215,16 +216,21 @@ export function MacroHUD({
             </p>
           ) : null}
 
-          {cycle ? (
-            <div className="mt-1 w-full max-w-[260px]">
-              <CycleMini
-                trail={cycle.trail}
-                assetLabel={cycle.assetLabel}
-                isDark={isDark}
-                ringColor={isDark ? "#06060a" : "#f6f1e9"}
-              />
-            </div>
-          ) : null}
+        </div>
+
+        {cycle ? (
+          <div
+            data-regime-cycle=""
+            className="mt-1 w-full max-w-[260px] xl:mt-0 xl:w-[240px] xl:shrink-0"
+          >
+            <CycleMini
+              trail={cycle.trail}
+              assetLabel={cycle.assetLabel}
+              isDark={isDark}
+              ringColor={isDark ? "#06060a" : "#f6f1e9"}
+            />
+          </div>
+        ) : null}
         </div>
 
         {/* From xl this column keeps the controls' width; below it the row

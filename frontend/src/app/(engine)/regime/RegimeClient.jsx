@@ -21,6 +21,7 @@ import { buildCrashMetrics } from "@/components/regime/regimeMetrics";
 import {
   formatDate,
 } from "@/components/regime/regimeUtils";
+import { urlFor } from "@/lib/seo/site";
 import { useChronoStore } from "@/store/chronoStore";
 
 const subscribe = () => () => {};
@@ -519,6 +520,7 @@ export default function RegimeClient({
                   crash={selectedCrash}
                   isDark={isDark}
                   onClose={handleClose}
+                  shareUrl={urlFor(`/regime?d=${selectedCrash.start}`)}
                 />
               ) : null}
             </AnimatePresence>

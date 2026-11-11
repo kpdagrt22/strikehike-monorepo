@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { PERSON_URL, REPO_URL, type SitePath } from "@/lib/seo/site";
+import { PERSON_URL, REPO_URL } from "@/lib/seo/site";
 import { LINK } from "./styles";
 
-const VIEWS: { href: SitePath; label: string }[] = [
+const VIEWS: { href: string; label: string }[] = [
   { href: "/", label: "Orrery" },
   { href: "/regime", label: "Regime" },
+  { href: "/recessions", label: "Recessions" },
+  { href: "/declines", label: "20% falls" },
   { href: "/convergence", label: "Convergence" },
   { href: "/patterns", label: "Study of Patterns" },
   { href: "/upcoming", label: "Upcoming dates" },
