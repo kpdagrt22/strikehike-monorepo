@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "src");
+const ROUNDUPS = path.resolve(HERE, "..", "content", "roundups");
+const ROOTS = [ROOT, ROUNDUPS];
 const EXTENSIONS = new Set([
   ".js",
   ".jsx",
@@ -38,10 +40,22 @@ const BANNED = [
   "trim into",
   "accumulate into",
   "contrarian",
+  "expected to",
+  "is likely to",
+  "we expect",
+  "next week will",
+  "this week will",
+  "will rise",
+  "will fall",
 ];
 
 async function* files(dir) {
-  const entries = await readdir(dir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -53,21 +67,23 @@ async function* files(dir) {
 }
 
 const hits = [];
-for await (const file of files(ROOT)) {
-  const text = await readFile(file, "utf8");
-  const lower = text.toLowerCase();
-  const lines = text.split(/\r?\n/);
-  for (const phrase of BANNED) {
-    let at = lower.indexOf(phrase);
-    while (at !== -1) {
-      const line = lower.slice(0, at).split("\n").length;
-      hits.push({
-        file: path.relative(path.resolve(HERE, ".."), file).replaceAll("\\", "/"),
-        line,
-        phrase,
-        text: lines[line - 1]?.trim() ?? "",
-      });
-      at = lower.indexOf(phrase, at + phrase.length);
+for (const root of ROOTS) {
+  for await (const file of files(root)) {
+    const text = await readFile(file, "utf8");
+    const lower = text.toLowerCase();
+    const lines = text.split(/\r?\n/);
+    for (const phrase of BANNED) {
+      let at = lower.indexOf(phrase);
+      while (at !== -1) {
+        const line = lower.slice(0, at).split("\n").length;
+        hits.push({
+          file: path.relative(path.resolve(HERE, ".."), file).replaceAll("\\", "/"),
+          line,
+          phrase,
+          text: lines[line - 1]?.trim() ?? "",
+        });
+        at = lower.indexOf(phrase, at + phrase.length);
+      }
     }
   }
 }
@@ -80,4 +96,6 @@ if (hits.length > 0) {
   process.exit(1);
 }
 
-console.log(`Copy guard passed (${BANNED.length} phrases, ${ROOT}).`);
+console.log(
+  `Copy guard passed (${BANNED.length} phrases, ${ROOTS.map((root) => path.relative(path.resolve(HERE, ".."), root)).join(" + ")}).`,
+);

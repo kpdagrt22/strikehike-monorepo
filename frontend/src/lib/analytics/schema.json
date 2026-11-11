@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "404"],
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "404"],
   "limits": {
     "max_body_bytes": 8192,
     "max_events": 25,
@@ -152,8 +152,24 @@
     "share_clicked": {
       "required": ["surface", "method"],
       "properties": {
-        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime"] },
+        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime", "roundup"] },
         "method": { "type": "enum", "values": ["clipboard", "share"] }
+      }
+    },
+    "theme_followed": {
+      "required": ["theme", "action"],
+      "properties": {
+        "theme": {
+          "type": "enum",
+          "values": ["politics", "science", "finance", "culture-religion", "natural-disasters"]
+        },
+        "action": { "type": "enum", "values": ["follow", "unfollow"] }
+      }
+    },
+    "change_note": {
+      "required": ["action"],
+      "properties": {
+        "action": { "type": "enum", "values": ["shown", "dismissed", "clicked"] }
       }
     }
   }
