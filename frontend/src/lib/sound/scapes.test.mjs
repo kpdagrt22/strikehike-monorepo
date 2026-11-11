@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  AUTOSTART_FIRST_VISIT,
+  DEFAULT_ON,
   DEFAULT_SCAPE,
   DEFAULT_VOLUME,
   autostartChoice,
+  modeOf,
   parsePrefs,
 } from "./scapes.ts";
 
@@ -15,28 +16,35 @@ test("nothing saved, or junk saved, reads as a first visit", () => {
   }
 });
 
-test("a saved choice keeps its scape and clamps the volume", () => {
+test("a saved choice keeps its scape, clamps the volume and remembers the last scape", () => {
   assert.deepEqual(parsePrefs('{"choice":"orbit","volume":0.3}'), {
     choice: "orbit",
     volume: 0.3,
+    last: "orbit",
   });
-  assert.deepEqual(parsePrefs('{"choice":"off","volume":7}'), {
+  assert.deepEqual(parsePrefs('{"choice":"off","volume":7,"last":"wind"}'), {
     choice: "off",
     volume: 1,
+    last: "wind",
   });
-  assert.deepEqual(parsePrefs('{"choice":"wind"}'), {
-    choice: "wind",
+  assert.deepEqual(parsePrefs('{"choice":"off"}'), {
+    choice: "off",
     volume: DEFAULT_VOLUME,
+    last: DEFAULT_SCAPE,
   });
 });
 
-test("autostart: a first visit gets the default, off stays off, tests stay silent", () => {
-  assert.equal(
-    autostartChoice(null, false),
-    AUTOSTART_FIRST_VISIT ? DEFAULT_SCAPE : null,
-  );
-  assert.equal(autostartChoice({ choice: "orbit", volume: 0.5 }, false), "orbit");
-  assert.equal(autostartChoice({ choice: "off", volume: 0.5 }, false), null);
+test("sound is on by default, and off stays off", () => {
+  assert.equal(DEFAULT_ON, true);
+  assert.equal(modeOf(null), DEFAULT_SCAPE);
+  assert.equal(modeOf({ choice: "off", volume: 0.5, last: "orbit" }), "off");
+  assert.equal(modeOf({ choice: "wind", volume: 0.5, last: "wind" }), "wind");
+});
+
+test("autostart: the mode starts on a gesture, off never does, tests stay silent", () => {
+  assert.equal(autostartChoice(null, false), DEFAULT_SCAPE);
+  assert.equal(autostartChoice({ choice: "orbit", volume: 0.5, last: "orbit" }, false), "orbit");
+  assert.equal(autostartChoice({ choice: "off", volume: 0.5, last: "orbit" }, false), null);
   assert.equal(autostartChoice(null, true), null);
-  assert.equal(autostartChoice({ choice: "wind", volume: 0.5 }, true), null);
+  assert.equal(autostartChoice({ choice: "wind", volume: 0.5, last: "wind" }, true), null);
 });

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 import { soundChanged } from "@/lib/analytics/events";
 import { useDismissable } from "@/hooks/useDismissable";
 import {
@@ -8,9 +14,12 @@ import {
   DEFAULT_VOLUME,
   SCAPES,
   autostartChoice,
+  modeOf,
+  parsePrefs,
+  prefsSnapshot,
   readPrefs,
+  subscribePrefs,
   writePrefs,
-  type Scape,
   type SoundChoice,
 } from "@/lib/sound/scapes";
 
@@ -64,17 +73,18 @@ function SoundIcon({ on }: { on: boolean }) {
   );
 }
 
+// Started once per page load, however often the header remounts.
+let autostarted = false;
+
 export function SoundToggle() {
-  const [choice, setChoice] = useState<SoundChoice>("off");
-  // Saved values only feed the closed panel, so reading them during the first
-  // render cannot change the server-rendered button.
-  const [lastScape, setLastScape] = useState<Scape>(() => {
-    const saved = readPrefs()?.choice;
-    return saved && saved !== "off" ? saved : DEFAULT_SCAPE;
-  });
-  const [volume, setVolume] = useState(
-    () => readPrefs()?.volume ?? DEFAULT_VOLUME,
-  );
+  // The saved choice, with sound on by default. The server renders the
+  // default; the client reads storage after hydration. Once switched off it
+  // stays off, on every page and visit, until the visitor turns it back on.
+  const raw = useSyncExternalStore(subscribePrefs, prefsSnapshot, () => null);
+  const prefs = parsePrefs(raw);
+  const choice = modeOf(prefs);
+  const volume = prefs?.volume ?? DEFAULT_VOLUME;
+  const lastScape = prefs?.last ?? (choice !== "off" ? choice : DEFAULT_SCAPE);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,24 +96,20 @@ export function SoundToggle() {
     closeOnOutside: true,
   });
 
-  // Saved choice, and the quiet start on the first gesture (browsers allow no
-  // sound before one). A gesture on this control is left to its own handlers.
+  // Browsers allow no sound before a gesture: start on the first click, tap
+  // or key press anywhere, this button included, unless sound is off.
   useEffect(() => {
-    const prefs = readPrefs();
-    const start = autostartChoice(prefs, Boolean(navigator.webdriver));
-    if (!start) return;
-
+    if (autostarted || navigator.webdriver) return;
     const listening = new AbortController();
-    const begin = (event: Event) => {
-      if (containerRef.current?.contains(event.target as Node)) return;
+    const begin = () => {
       listening.abort();
+      autostarted = true;
+      const saved = readPrefs();
+      const start = autostartChoice(saved, false);
+      if (!start) return;
       void engine().then((sound) => {
-        sound.setVolume(prefs?.volume ?? DEFAULT_VOLUME);
-        if (sound.play(start)) {
-          setChoice(start);
-          setLastScape(start);
-          soundChanged(start, "auto");
-        }
+        sound.setVolume(saved?.volume ?? DEFAULT_VOLUME);
+        if (sound.play(start)) soundChanged(start, "auto");
       });
     };
     const options = { capture: true, signal: listening.signal };
@@ -113,9 +119,11 @@ export function SoundToggle() {
   }, []);
 
   const choose = (next: SoundChoice) => {
-    setChoice(next);
-    if (next !== "off") setLastScape(next);
-    writePrefs({ choice: next, volume });
+    writePrefs({
+      choice: next,
+      volume,
+      last: next !== "off" ? next : lastScape,
+    });
     soundChanged(next, "click");
     void engine().then((sound) => {
       if (next === "off") sound.stop();
@@ -127,8 +135,7 @@ export function SoundToggle() {
   };
 
   const changeVolume = (value: number) => {
-    setVolume(value);
-    writePrefs({ choice, volume: value });
+    writePrefs({ choice, volume: value, last: lastScape });
     void engine().then((sound) => sound.setVolume(value));
   };
 
