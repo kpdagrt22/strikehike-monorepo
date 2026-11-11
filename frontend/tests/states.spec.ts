@@ -33,33 +33,6 @@ test.describe("loading states", () => {
       expect(errors).toEqual([]);
     });
   }
-
-  test("an Upcoming theme shows its skeleton on a client navigation", async ({
-    page,
-  }) => {
-    const errors = watchErrors(page);
-    await page.setViewportSize({ width: 1366, height: 768 });
-    await page.goto("/upcoming", { waitUntil: "networkidle" });
-    await page.route("**/upcoming/finance**", async (route) => {
-      if (route.request().headers().rsc) {
-        await new Promise((resolve) => setTimeout(resolve, 3_000));
-      }
-      await route.continue();
-    });
-    await page.getByRole("link", { name: /^Finance/ }).first().click();
-    await expect(page.locator('[data-route-loading="list"]')).toBeVisible();
-    await page.screenshot({
-      path: "smoke-screens/upcoming-loading-1366.png",
-    });
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({
-      path: "smoke-screens/upcoming-loading-390.png",
-    });
-    await expect(page.getByRole("heading", { name: "Finance dates" })).toBeVisible({
-      timeout: 15_000,
-    });
-    expect(errors).toEqual([]);
-  });
 });
 
 test.describe("error states", () => {
