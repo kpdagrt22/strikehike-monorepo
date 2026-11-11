@@ -21,6 +21,7 @@ type Current = {
   asOf: string | null;
   events: string[];
   week: string | null;
+  ok: boolean;
 };
 
 async function getJson(path: string): Promise<unknown> {
@@ -61,6 +62,7 @@ async function loadCurrent(): Promise<Current> {
     asOf,
     events,
     week: typeof week === "string" ? week : null,
+    ok: upcoming != null,
   };
 }
 
@@ -128,14 +130,14 @@ export function ChangeNote({ where }: { where: "home" | "upcoming" }) {
       const current = await loadCurrent();
       if (cancelled) return;
 
-      if (returning && record) {
+      if (returning && record && current.ok) {
         const next = buildNote(record, current, followedSnapshot(), now);
         setNote(next);
         setVisible(true);
         changeNote("shown");
       }
 
-      if (current.score != null || current.events.length > 0) {
+      if (current.ok) {
         writeLastVisit({
           at: now,
           score: current.score,
