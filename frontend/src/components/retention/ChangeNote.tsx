@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { changeNote } from "@/lib/analytics/events";
 import { isHiddenTheme, themeName } from "@/lib/events/upcoming";
+import { newDatesSentence } from "@/lib/retention/copy";
 import {
   followedSnapshot,
   readLastVisit,
@@ -163,14 +164,7 @@ export function ChangeNote({ where }: { where: "home" | "upcoming" }) {
     note.scoreThen != null && note.scoreNow != null
       ? `The Regime score moved from ${signed(note.scoreThen)} to ${signed(note.scoreNow)}.`
       : null;
-  const datesLine =
-    note.newDates === 0
-      ? note.followed
-        ? "No new dates were added in your themes."
-        : "No new dates were added across all themes."
-      : `${note.newDates} new ${note.newDates === 1 ? "date was" : "dates were"} added ${
-          note.followed ? "in your themes" : "across all themes"
-        }.`;
+  const datesLine = newDatesSentence(note.newDates, note.followed);
 
   return (
     <aside
