@@ -134,7 +134,14 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # An Ubuntu mirror outage must not block the gate: if the system
+        # packages can't be fetched in 4 minutes, install the browser alone
+        # (the runner image already has the libraries Chromium needs).
+        run: |
+          if ! timeout 240 npx playwright install --with-deps chromium; then
+            echo "::warning::System packages unavailable; installing Chromium without them."
+            npx playwright install chromium
+          fi
 
       - name: Set up Python 3.11.9
         uses: actions/setup-python@v5
@@ -279,7 +286,14 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # An Ubuntu mirror outage must not block the gate: if the system
+        # packages can't be fetched in 4 minutes, install the browser alone
+        # (the runner image already has the libraries Chromium needs).
+        run: |
+          if ! timeout 240 npx playwright install --with-deps chromium; then
+            echo "::warning::System packages unavailable; installing Chromium without them."
+            npx playwright install chromium
+          fi
 
       - name: Set up Python 3.11.9
         uses: actions/setup-python@v5
