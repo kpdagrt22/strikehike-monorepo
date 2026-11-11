@@ -247,3 +247,10 @@ export function experimentExposed(experiment: string, variant: string) {
 export function themeSlug(theme: string) {
   return ordinary(theme);
 }
+
+export function soundChanged(
+  choice: "off" | "drift" | "orbit" | "wind",
+  trigger: "auto" | "click",
+) {
+  trackEvent("sound_changed", { choice, trigger });
+}

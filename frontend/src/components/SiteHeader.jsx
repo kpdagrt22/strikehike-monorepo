@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { viewOpened } from "@/lib/analytics/events";
 import { ModeSwitch, viewForPath } from "@/components/ModeSwitch";
+import { SoundToggle } from "@/components/SoundToggle";
 import { useDismissable } from "@/hooks/useDismissable";
 import { DUR, EASE } from "@/lib/motion";
 import { useChronoStore } from "@/store/chronoStore";
@@ -42,12 +43,24 @@ function NakshatraHalo() {
       strokeWidth="1.5"
       className="sh-halo text-(--sh-text-4)"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1, transition: { duration: DUR.reveal, ease: EASE.out } }}
-      exit={{ opacity: 0, transition: { duration: DUR.revealOut, ease: EASE.exit } }}
+      animate={{
+        opacity: 1,
+        transition: { duration: DUR.reveal, ease: EASE.out },
+      }}
+      exit={{
+        opacity: 0,
+        transition: { duration: DUR.revealOut, ease: EASE.exit },
+      }}
     >
       {HALO_TICKS.map((d, index) =>
         index === lit ? (
-          <path key={d} d={d} data-lit="" stroke="var(--sh-signal)" strokeWidth="3" />
+          <path
+            key={d}
+            d={d}
+            data-lit=""
+            stroke="var(--sh-signal)"
+            strokeWidth="3"
+          />
         ) : (
           <path key={d} d={d} />
         ),
@@ -141,8 +154,7 @@ export function SiteHeader() {
     setOpen(false);
   };
 
-  const menuRight =
-    view.href === "/" ? "right-[4.5rem]" : "right-3 sm:right-5";
+  const menuRight = view.href === "/" ? "right-[4.5rem]" : "right-3 sm:right-5";
 
   return (
     <header
@@ -180,39 +192,41 @@ export function SiteHeader() {
       </div>
 
       <div
-        ref={containerRef}
-        className={`pointer-events-auto absolute top-3 sm:top-5 ${menuRight}`}
+        className={`pointer-events-auto absolute top-3 flex items-start gap-2 sm:top-5 ${menuRight}`}
       >
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          aria-controls={open ? "site-nav-menu" : undefined}
-          aria-label="StrikeHike menu"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-(--sh-line-1) bg-(--sh-surface-float) text-(--sh-text-2) shadow-(--sh-shadow-float) backdrop-blur-xl transition-colors hover:bg-(--sh-hover) hover:text-(--sh-text-1) focus-visible:bg-(--sh-hover) focus-visible:text-(--sh-text-1)"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.35"
-            strokeLinecap="round"
-            aria-hidden="true"
+        <SoundToggle />
+        <div ref={containerRef} className="relative">
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-controls={open ? "site-nav-menu" : undefined}
+            aria-label="StrikeHike menu"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-(--sh-line-1) bg-(--sh-surface-float) text-(--sh-text-2) shadow-(--sh-shadow-float) backdrop-blur-xl transition-colors hover:bg-(--sh-hover) hover:text-(--sh-text-1) focus-visible:bg-(--sh-hover) focus-visible:text-(--sh-text-1)"
           >
-            <path d="M4 7h16M4 12h16M4 17h16" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.35"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
 
-        {open ? (
-          <div
-            id="site-nav-menu"
-            className="absolute right-0 top-full mt-2 w-[14rem] rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-overlay) p-1.5 shadow-(--sh-shadow-overlay)"
-          >
-            <ModeSwitch layout="list" onNavigate={handleNavClick} />
-          </div>
-        ) : null}
+          {open ? (
+            <div
+              id="site-nav-menu"
+              className="absolute right-0 top-full mt-2 w-[14rem] rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-overlay) p-1.5 shadow-(--sh-shadow-overlay)"
+            >
+              <ModeSwitch layout="list" onNavigate={handleNavClick} />
+            </div>
+          ) : null}
+        </div>
       </div>
     </header>
   );
