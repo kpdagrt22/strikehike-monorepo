@@ -72,7 +72,7 @@ def test_depth_and_size_limits_are_enforced():
         validate_batch(payload(), 9000)
 
 
-def test_schema_has_the_eighteen_live_events_and_no_future_ones():
+def test_schema_has_only_the_live_events_and_no_future_ones():
     names = set(load_schema()["events"])
     assert names == {
         "page_viewed",
@@ -93,6 +93,7 @@ def test_schema_has_the_eighteen_live_events_and_no_future_ones():
         "share_clicked",
         "theme_followed",
         "change_note",
+        "experiment_exposed",
     }
     assert "link_shared" not in names
     assert set(load_schema()["paths"]) == {
@@ -111,6 +112,8 @@ def test_schema_has_the_eighteen_live_events_and_no_future_ones():
         "/declines/[id]",
         "/this-week",
         "/this-week/[week]",
+        "/tested",
+        "/tested/[claim]",
         "404",
     }
 

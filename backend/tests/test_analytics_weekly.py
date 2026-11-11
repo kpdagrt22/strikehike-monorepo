@@ -121,6 +121,8 @@ def test_weekly_export_aggregates_and_suppresses_small_cells(tmp_path):
     assert product["weekly_returning_explorers"]["value"] is None
     assert product["retention"]["d1"]["value"] is None
     assert product["retention"]["d7"]["value"] is None
+    # No experiment reported an exposure, so no experiment appears.
+    assert product["experiments"] == {}
     assert payload["feedback"] == [
         {
             "day": "2026-11-03",
@@ -301,3 +303,75 @@ def test_invalid_weeks_are_not_cached(api, counted):
         assert response.status_code == 422
     assert builds == ["2026-W99", "2026-W99"]
     assert weekly_module._cache == {}
+
+
+def test_experiment_split_counts_engaged_sessions_per_variant(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        # Two sessions saw "control", one saw "record". Only one control session
+        # and the record session are engaged (a meaningful event each).
+        put(
+            store,
+            "A" * 22,
+            "S" * 16,
+            [
+                event("page_viewed", NOW, "a" * 12),
+                event("experiment_exposed", NOW, "a" * 12, exp="home-cta", variant="control"),
+                event(
+                    "date_travelled",
+                    NOW,
+                    "a" * 12,
+                    path="/regime",
+                    method="scrub",
+                    target_year=2020,
+                    is_future=0,
+                ),
+            ],
+            NOW,
+        )
+        put(
+            store,
+            "B" * 22,
+            "T" * 16,
+            [
+                event("page_viewed", NOW, "b" * 12),
+                event("experiment_exposed", NOW, "b" * 12, exp="home-cta", variant="control"),
+            ],
+            NOW,
+        )
+        put(
+            store,
+            "C" * 22,
+            "U" * 16,
+            [
+                event("page_viewed", NOW, "c" * 12),
+                event("experiment_exposed", NOW, "c" * 12, exp="home-cta", variant="record"),
+                event(
+                    "share_clicked",
+                    NOW,
+                    "c" * 12,
+                    path="/tested/[claim]",
+                    surface="tested",
+                    method="clipboard",
+                ),
+            ],
+            NOW,
+        )
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        payload = build_weekly_export(store, WEEK, logs)
+    finally:
+        store.close()
+
+    split = payload["product"]["experiments"]
+    assert split == {
+        "home-cta": {
+            "assigned_sessions": 3,
+            "engaged_sessions": 2,
+            "variants": {"control": 1, "record": 1},
+        }
+    }
+    # No ids leak into the export.
+    text = json.dumps(payload)
+    for aid in ("A" * 22, "B" * 22, "C" * 22):
+        assert aid not in text

@@ -229,6 +229,14 @@ export function changeNote(action: "shown" | "dismissed" | "clicked") {
   trackEvent("change_note", { action });
 }
 
+const EXP_TOKEN = /^[a-z0-9-]{1,32}$/;
+
+// One report per session per experiment, only when a real variant is shown.
+export function experimentExposed(experiment: string, variant: string) {
+  if (!EXP_TOKEN.test(experiment) || !EXP_TOKEN.test(variant)) return;
+  trackEvent("experiment_exposed", { exp: experiment, variant });
+}
+
 export function themeSlug(theme: string) {
   return ordinary(theme);
 }

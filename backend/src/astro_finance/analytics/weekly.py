@@ -29,6 +29,7 @@ MEANINGFUL = frozenset(
         "link_shared",
         "theme_followed",
         "change_note",
+        "experiment_exposed",
     }
 )
 NON_MEANINGFUL_METHODS = frozenset({"deep_link", "page"})
@@ -136,6 +137,42 @@ def _server(log_dir: str | Path, week: str) -> dict[str, Any]:
     return aggregate_server_logs(log_dir, week)
 
 
+def _experiment_split(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Engaged sessions per variant, for each experiment that reported exposures.
+
+    A session is engaged when it has at least one meaningful event beyond seeing
+    the experiment itself: the exposure is meaningful, but counting it as the
+    engagement would make the measure circular. A session is counted under the
+    variant it reported in ``experiment_exposed``. An experiment only appears
+    when an exposure was actually sent, so an inactive experiment that reports
+    nothing is absent rather than shown as a zero.
+    """
+    exposed: dict[str, dict[str, str]] = defaultdict(dict)
+    engaged: set[str] = set()
+    for row in events:
+        props = _props(row["props"])
+        if row["name"] == "experiment_exposed":
+            exp = props.get("exp")
+            variant = props.get("variant")
+            if isinstance(exp, str) and exp and isinstance(variant, str) and variant:
+                exposed[exp][row["session_id"]] = variant
+            continue
+        if _meaningful(row["name"], props):
+            engaged.add(row["session_id"])
+    split: dict[str, Any] = {}
+    for exp in sorted(exposed):
+        counts: dict[str, int] = defaultdict(int)
+        for session, variant in exposed[exp].items():
+            if session in engaged:
+                counts[variant] += 1
+        split[exp] = {
+            "assigned_sessions": len(exposed[exp]),
+            "engaged_sessions": sum(counts.values()),
+            "variants": {variant: counts[variant] for variant in sorted(counts)},
+        }
+    return split
+
+
 def build_weekly_export(
     store: AnalyticsStore, week: str, log_dir: str | Path = "/app/data/caddy-logs"
 ) -> dict[str, Any]:
@@ -222,6 +259,7 @@ def build_weekly_export(
         }
 
         retention = _retention(store, start)
+        experiments = _experiment_split(events)
 
         stats = store.connection.execute(
             "SELECT * FROM ingest_stats WHERE day_ist BETWEEN ? AND ?",
@@ -289,6 +327,7 @@ def build_weekly_export(
             "weekly_explorers": people_cell(len(meaningful_we)),
             "weekly_returning_explorers": wre_cell,
             "retention": retention,
+            "experiments": experiments,
         },
         "server": _server(log_dir, week),
         "feedback": feedback,

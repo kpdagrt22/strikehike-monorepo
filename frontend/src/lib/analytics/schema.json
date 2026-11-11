@@ -171,6 +171,13 @@
       "properties": {
         "action": { "type": "enum", "values": ["shown", "dismissed", "clicked"] }
       }
+    },
+    "experiment_exposed": {
+      "required": ["exp", "variant"],
+      "properties": {
+        "exp": { "type": "string", "max": 32, "pattern": "^[a-z0-9-]{1,32}$" },
+        "variant": { "type": "string", "max": 32, "pattern": "^[a-z0-9-]{1,32}$" }
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChangeNote } from "@/components/retention/ChangeNote";
+import { HomeCta } from "@/components/experiments/HomeCta";
 
 // Server-rendered first paint: the H1 and both actions are in the HTML before
 // the orrery's JavaScript. It sits left of the centred gauge on desktop and
@@ -34,12 +35,7 @@ export function HomeIntro({ compact = false }) {
           compact ? "mt-2" : "mt-3"
         }`}
       >
-        <Link
-          href="/regime"
-          className="inline-flex min-h-11 items-center rounded-full bg-(--sh-ink) px-4 text-meta font-medium text-(--sh-pearl) transition-colors hover:bg-(--sh-signal) hover:text-(--sh-ink) focus-visible:bg-(--sh-signal) focus-visible:text-(--sh-ink) dark:bg-(--sh-pearl) dark:text-(--sh-ink) dark:hover:bg-(--sh-signal-ink) dark:hover:text-(--sh-ink) dark:focus-visible:bg-(--sh-signal-ink) dark:focus-visible:text-(--sh-ink)"
-        >
-          See 170 years of markets beside the sky
-        </Link>
+        <HomeCta />
         {compact ? null : (
           <Link
             href="/upcoming"
