@@ -28,44 +28,44 @@
   },
   "comparison": {
     "in": {
-      "n": 322,
-      "mean_return": -0.0005548183611755457,
-      "median_return": 0.0011961316459345728,
-      "decline_starts": 0,
-      "decline_share": 0.0
+      "n": 446,
+      "mean_return": 0.0012448230947212015,
+      "median_return": 0.002772612043595357,
+      "decline_starts": 1,
+      "decline_share": 0.002242152466367713
     },
     "out": {
-      "n": 322,
-      "mean_return": -0.0004191774229982807,
-      "median_return": 0.001934884583817853,
+      "n": 446,
+      "mean_return": -0.0006898846171535725,
+      "median_return": 0.0010079581683578587,
       "decline_starts": 2,
-      "decline_share": 0.006211180124223602
+      "decline_share": 0.004484304932735426
     },
-    "mean_difference": -0.00013564093817726506,
-    "median_difference": -0.0007387529378832802,
-    "p_value": 0.9500249875062469,
+    "mean_difference": 0.001934707711874774,
+    "median_difference": 0.0017646538752374985,
+    "p_value": 0.248375812093953,
     "permutations": 2000,
     "seed": 20261111,
     "meaningful": false
   },
   "full_history": {
     "in": {
-      "n": 418,
-      "mean_return": 0.00048818105061530445,
-      "median_return": 0.004077140707506199,
-      "decline_starts": 2,
-      "decline_share": 0.004784688995215311
+      "n": 510,
+      "mean_return": 0.0025263355062352683,
+      "median_return": 0.005053301511535491,
+      "decline_starts": 3,
+      "decline_share": 0.0058823529411764705
     },
     "out": {
-      "n": 1451,
-      "mean_return": 0.00577284156990613,
-      "median_return": 0.007614392238714407,
-      "decline_starts": 14,
-      "decline_share": 0.009648518263266712
+      "n": 1359,
+      "mean_return": 0.0053657260404054484,
+      "median_return": 0.007570970515519582,
+      "decline_starts": 13,
+      "decline_share": 0.009565857247976454
     },
-    "mean_difference": -0.005284660519290826,
-    "median_difference": -0.0035372515312082076,
-    "p_value": 0.06846576711644178,
+    "mean_difference": -0.00283939053417018,
+    "median_difference": -0.002517669003984091,
+    "p_value": 0.2688655672163918,
     "permutations": 2000,
     "seed": 20261111,
     "meaningful": false,
@@ -74,7 +74,7 @@
   "chart": [
     {
       "year": 1928,
-      "value": 0.3737
+      "value": -0.617
     },
     {
       "year": 1929,
@@ -86,11 +86,11 @@
     },
     {
       "year": 1931,
-      "value": -6.967
+      "value": -6.1972
     },
     {
       "year": 1932,
-      "value": -7.7404
+      "value": -2.5006
     },
     {
       "year": 1933,
@@ -98,11 +98,11 @@
     },
     {
       "year": 1934,
-      "value": 0.5772
+      "value": 1.8138
     },
     {
       "year": 1935,
-      "value": 0.9228
+      "value": 0.4968
     },
     {
       "year": 1936,
@@ -114,11 +114,11 @@
     },
     {
       "year": 1938,
-      "value": 0.3439
+      "value": 0.8476
     },
     {
       "year": 1939,
-      "value": -0.1574
+      "value": 0.717
     },
     {
       "year": 1940,
@@ -130,11 +130,11 @@
     },
     {
       "year": 1942,
-      "value": -3.0769
+      "value": -0.7579
     },
     {
       "year": 1943,
-      "value": 0.9486
+      "value": -0.1496
     },
     {
       "year": 1944,
@@ -142,11 +142,11 @@
     },
     {
       "year": 1945,
-      "value": -1.2809
+      "value": -0.6769
     },
     {
       "year": 1946,
-      "value": 2.888
+      "value": 1.88
     },
     {
       "year": 1947,
@@ -158,11 +158,11 @@
     },
     {
       "year": 1949,
-      "value": 0.3208
+      "value": 0.2588
     },
     {
       "year": 1950,
-      "value": 0.9795
+      "value": 1.2097
     },
     {
       "year": 1951,
@@ -170,15 +170,15 @@
     },
     {
       "year": 1952,
-      "value": -0.1907
+      "value": -0.3514
     },
     {
       "year": 1953,
-      "value": 0.7536
+      "value": -0.1667
     },
     {
       "year": 1954,
-      "value": 0.591
+      "value": 0.7185
     },
     {
       "year": 1955,
@@ -186,11 +186,11 @@
     },
     {
       "year": 1956,
-      "value": -2.6377
+      "value": -0.2684
     },
     {
       "year": 1957,
-      "value": 0.2385
+      "value": 0.742
     },
     {
       "year": 1958,
@@ -202,11 +202,11 @@
     },
     {
       "year": 1960,
-      "value": 0.0187
+      "value": -0.6825
     },
     {
       "year": 1961,
-      "value": 0.1972
+      "value": 0.3057
     },
     {
       "year": 1962,
@@ -214,11 +214,11 @@
     },
     {
       "year": 1963,
-      "value": 0.9545
+      "value": 0.4677
     },
     {
       "year": 1964,
-      "value": 0.6825
+      "value": 0.6517
     },
     {
       "year": 1965,
@@ -230,11 +230,11 @@
     },
     {
       "year": 1967,
-      "value": 0.4951
+      "value": -0.8004
     },
     {
       "year": 1968,
-      "value": 0.7484
+      "value": 1.1495
     },
     {
       "year": 1969,
@@ -246,11 +246,11 @@
     },
     {
       "year": 1971,
-      "value": 0.2553
+      "value": 0.1713
     },
     {
       "year": 1972,
-      "value": 0.9076
+      "value": 0.1155
     },
     {
       "year": 1973,
@@ -258,11 +258,11 @@
     },
     {
       "year": 1974,
-      "value": 2.0402
+      "value": -0.001
     },
     {
       "year": 1975,
-      "value": -0.6124
+      "value": 0.5934
     },
     {
       "year": 1976,
@@ -274,11 +274,11 @@
     },
     {
       "year": 1978,
-      "value": -2.3037
+      "value": -0.5153
     },
     {
       "year": 1979,
-      "value": -0.1816
+      "value": -0.2465
     },
     {
       "year": 1980,
@@ -286,11 +286,11 @@
     },
     {
       "year": 1981,
-      "value": -1.0918
+      "value": -0.5595
     },
     {
       "year": 1982,
-      "value": -0.7989
+      "value": 0.2355
     },
     {
       "year": 1983,
@@ -302,11 +302,11 @@
     },
     {
       "year": 1985,
-      "value": 1.2832
+      "value": 1.5987
     },
     {
       "year": 1986,
-      "value": -0.3731
+      "value": 0.9832
     },
     {
       "year": 1987,
@@ -318,11 +318,11 @@
     },
     {
       "year": 1989,
-      "value": -0.3607
+      "value": 0.082
     },
     {
       "year": 1990,
-      "value": -0.6497
+      "value": -1.3713
     },
     {
       "year": 1991,
@@ -330,11 +330,11 @@
     },
     {
       "year": 1992,
-      "value": -0.5623
+      "value": 0.0329
     },
     {
       "year": 1993,
-      "value": -0.671
+      "value": 0.2633
     },
     {
       "year": 1994,
@@ -346,11 +346,11 @@
     },
     {
       "year": 1996,
-      "value": 0.2883
+      "value": 0.6816
     },
     {
       "year": 1997,
-      "value": 0.7879
+      "value": 1.3945
     },
     {
       "year": 1998,
@@ -362,11 +362,11 @@
     },
     {
       "year": 2000,
-      "value": -2.306
+      "value": 0.5298
     },
     {
       "year": 2001,
-      "value": -0.6495
+      "value": -0.2395
     },
     {
       "year": 2002,
@@ -374,11 +374,11 @@
     },
     {
       "year": 2003,
-      "value": -1.1197
+      "value": 0.521
     },
     {
       "year": 2004,
-      "value": 1.2284
+      "value": 0.3715
     },
     {
       "year": 2005,
@@ -390,11 +390,11 @@
     },
     {
       "year": 2007,
-      "value": -0.5873
+      "value": 1.0922
     },
     {
       "year": 2008,
-      "value": -0.6287
+      "value": -1.4919
     },
     {
       "year": 2009,
@@ -402,11 +402,11 @@
     },
     {
       "year": 2010,
-      "value": -1.2116
+      "value": -0.3266
     },
     {
       "year": 2011,
-      "value": -1.3784
+      "value": -0.0472
     },
     {
       "year": 2012,
@@ -418,11 +418,11 @@
     },
     {
       "year": 2014,
-      "value": -0.2157
+      "value": 0.9255
     },
     {
       "year": 2015,
-      "value": 0.2092
+      "value": 1.0188
     },
     {
       "year": 2016,
@@ -434,11 +434,11 @@
     },
     {
       "year": 2018,
-      "value": -2.2429
+      "value": -0.4145
     },
     {
       "year": 2019,
-      "value": -0.5997
+      "value": 1.0909
     },
     {
       "year": 2020,
@@ -446,11 +446,11 @@
     },
     {
       "year": 2021,
-      "value": 0.3895
+      "value": 1.2807
     },
     {
       "year": 2022,
-      "value": 1.4193
+      "value": 1.647
     },
     {
       "year": 2023,
@@ -462,19 +462,40 @@
     },
     {
       "year": 2025,
-      "value": 1.1551
+      "value": 0.2539
     },
     {
       "year": 2026,
-      "value": -0.9516
+      "value": -0.117
     }
   ],
   "windows": [
+    {
+      "start": "1928-05-16",
+      "end": "1928-05-22",
+      "kind": "solar",
+      "return": -0.034414,
+      "decline_start": false
+    },
     {
       "start": "1928-05-31",
       "end": "1928-06-06",
       "kind": "lunar_total",
       "return": -0.017,
+      "decline_start": false
+    },
+    {
+      "start": "1928-06-14",
+      "end": "1928-06-20",
+      "kind": "solar",
+      "return": -0.025197,
+      "decline_start": false
+    },
+    {
+      "start": "1928-11-09",
+      "end": "1928-11-15",
+      "kind": "solar",
+      "return": 0.021286,
       "decline_start": false
     },
     {
@@ -548,6 +569,20 @@
       "decline_start": false
     },
     {
+      "start": "1931-04-15",
+      "end": "1931-04-21",
+      "kind": "solar",
+      "return": -0.039555,
+      "decline_start": false
+    },
+    {
+      "start": "1931-09-09",
+      "end": "1931-09-15",
+      "kind": "solar",
+      "return": -0.060345,
+      "decline_start": false
+    },
+    {
       "start": "1931-09-23",
       "end": "1931-09-29",
       "kind": "lunar_total",
@@ -555,10 +590,31 @@
       "decline_start": false
     },
     {
+      "start": "1931-10-08",
+      "end": "1931-10-14",
+      "kind": "solar",
+      "return": -0.070621,
+      "decline_start": false
+    },
+    {
+      "start": "1932-03-04",
+      "end": "1932-03-10",
+      "kind": "solar",
+      "return": 0.001147,
+      "decline_start": false
+    },
+    {
       "start": "1932-03-19",
       "end": "1932-03-25",
       "kind": "lunar_partial",
       "return": -0.01995,
+      "decline_start": false
+    },
+    {
+      "start": "1932-08-28",
+      "end": "1932-09-03",
+      "kind": "solar",
+      "return": 0.053635,
       "decline_start": false
     },
     {
@@ -632,6 +688,20 @@
       "decline_start": false
     },
     {
+      "start": "1934-08-07",
+      "end": "1934-08-13",
+      "kind": "solar",
+      "return": 0.055236,
+      "decline_start": false
+    },
+    {
+      "start": "1935-01-02",
+      "end": "1935-01-08",
+      "kind": "solar",
+      "return": -0.004206,
+      "decline_start": false
+    },
+    {
       "start": "1935-01-16",
       "end": "1935-01-22",
       "kind": "lunar_total",
@@ -639,10 +709,38 @@
       "decline_start": false
     },
     {
+      "start": "1935-01-31",
+      "end": "1935-02-06",
+      "kind": "solar",
+      "return": -0.031868,
+      "decline_start": false
+    },
+    {
+      "start": "1935-06-27",
+      "end": "1935-07-03",
+      "kind": "solar",
+      "return": 0.019705,
+      "decline_start": false
+    },
+    {
       "start": "1935-07-13",
       "end": "1935-07-19",
       "kind": "lunar_total",
       "return": -0.003766,
+      "decline_start": false
+    },
+    {
+      "start": "1935-07-27",
+      "end": "1935-08-02",
+      "kind": "solar",
+      "return": 0.014829,
+      "decline_start": false
+    },
+    {
+      "start": "1935-12-22",
+      "end": "1935-12-28",
+      "kind": "solar",
+      "return": 0.017857,
       "decline_start": false
     },
     {
@@ -716,6 +814,13 @@
       "decline_start": false
     },
     {
+      "start": "1938-05-26",
+      "end": "1938-06-01",
+      "kind": "solar",
+      "return": 0.03014,
+      "decline_start": false
+    },
+    {
       "start": "1938-11-04",
       "end": "1938-11-10",
       "kind": "lunar_total",
@@ -723,10 +828,31 @@
       "decline_start": false
     },
     {
+      "start": "1938-11-18",
+      "end": "1938-11-24",
+      "kind": "solar",
+      "return": -0.003115,
+      "decline_start": false
+    },
+    {
+      "start": "1939-04-16",
+      "end": "1939-04-22",
+      "kind": "solar",
+      "return": 0.031044,
+      "decline_start": false
+    },
+    {
       "start": "1939-04-30",
       "end": "1939-05-06",
       "kind": "lunar_total",
       "return": 0.025618,
+      "decline_start": false
+    },
+    {
+      "start": "1939-10-09",
+      "end": "1939-10-15",
+      "kind": "solar",
+      "return": 0.000786,
       "decline_start": false
     },
     {
@@ -807,6 +933,20 @@
       "decline_start": false
     },
     {
+      "start": "1942-03-13",
+      "end": "1942-03-19",
+      "kind": "solar",
+      "return": 0.021171,
+      "decline_start": false
+    },
+    {
+      "start": "1942-08-09",
+      "end": "1942-08-15",
+      "kind": "solar",
+      "return": 0.010601,
+      "decline_start": false
+    },
+    {
       "start": "1942-08-23",
       "end": "1942-08-29",
       "kind": "lunar_total",
@@ -814,10 +954,31 @@
       "decline_start": false
     },
     {
+      "start": "1942-09-07",
+      "end": "1942-09-13",
+      "kind": "solar",
+      "return": -0.00813,
+      "decline_start": false
+    },
+    {
+      "start": "1943-02-01",
+      "end": "1943-02-07",
+      "kind": "solar",
+      "return": -0.000951,
+      "decline_start": false
+    },
+    {
       "start": "1943-02-17",
       "end": "1943-02-23",
       "kind": "lunar_partial",
       "return": 0.002775,
+      "decline_start": false
+    },
+    {
+      "start": "1943-07-29",
+      "end": "1943-08-04",
+      "kind": "solar",
+      "return": -0.024007,
       "decline_start": false
     },
     {
@@ -884,6 +1045,13 @@
       "decline_start": false
     },
     {
+      "start": "1945-07-06",
+      "end": "1945-07-12",
+      "kind": "solar",
+      "return": 0.012072,
+      "decline_start": false
+    },
+    {
       "start": "1945-12-16",
       "end": "1945-12-22",
       "kind": "lunar_total",
@@ -891,10 +1059,38 @@
       "decline_start": false
     },
     {
+      "start": "1945-12-31",
+      "end": "1946-01-06",
+      "kind": "solar",
+      "return": -0.007489,
+      "decline_start": false
+    },
+    {
+      "start": "1946-05-27",
+      "end": "1946-06-02",
+      "kind": "solar",
+      "return": 0.013742,
+      "decline_start": true
+    },
+    {
       "start": "1946-06-11",
       "end": "1946-06-17",
       "kind": "lunar_total",
       "return": 0.008579,
+      "decline_start": false
+    },
+    {
+      "start": "1946-06-26",
+      "end": "1946-07-02",
+      "kind": "solar",
+      "return": 0.023192,
+      "decline_start": false
+    },
+    {
+      "start": "1946-11-20",
+      "end": "1946-11-26",
+      "kind": "solar",
+      "return": -0.000692,
       "decline_start": false
     },
     {
@@ -968,6 +1164,13 @@
       "decline_start": false
     },
     {
+      "start": "1949-04-25",
+      "end": "1949-05-01",
+      "kind": "solar",
+      "return": 0.002044,
+      "decline_start": false
+    },
+    {
       "start": "1949-10-04",
       "end": "1949-10-10",
       "kind": "lunar_total",
@@ -975,10 +1178,31 @@
       "decline_start": false
     },
     {
+      "start": "1949-10-18",
+      "end": "1949-10-24",
+      "kind": "solar",
+      "return": 0.001894,
+      "decline_start": false
+    },
+    {
+      "start": "1950-03-15",
+      "end": "1950-03-21",
+      "kind": "solar",
+      "return": 0.0,
+      "decline_start": false
+    },
+    {
       "start": "1950-03-30",
       "end": "1950-04-05",
       "kind": "lunar_total",
       "return": 0.019075,
+      "decline_start": false
+    },
+    {
+      "start": "1950-09-09",
+      "end": "1950-09-15",
+      "kind": "solar",
+      "return": 0.0288,
       "decline_start": false
     },
     {
@@ -1045,10 +1269,31 @@
       "decline_start": false
     },
     {
+      "start": "1952-08-17",
+      "end": "1952-08-23",
+      "kind": "solar",
+      "return": -0.008333,
+      "decline_start": false
+    },
+    {
       "start": "1953-01-26",
       "end": "1953-02-01",
       "kind": "lunar_total",
       "return": 0.013835,
+      "decline_start": false
+    },
+    {
+      "start": "1953-02-11",
+      "end": "1953-02-17",
+      "kind": "solar",
+      "return": -0.00546,
+      "decline_start": false
+    },
+    {
+      "start": "1953-07-08",
+      "end": "1953-07-14",
+      "kind": "solar",
+      "return": -0.017143,
       "decline_start": false
     },
     {
@@ -1059,10 +1304,31 @@
       "decline_start": false
     },
     {
+      "start": "1953-08-06",
+      "end": "1953-08-12",
+      "kind": "solar",
+      "return": -0.000806,
+      "decline_start": false
+    },
+    {
+      "start": "1954-01-02",
+      "end": "1954-01-08",
+      "kind": "solar",
+      "return": 0.004837,
+      "decline_start": false
+    },
+    {
       "start": "1954-01-16",
       "end": "1954-01-22",
       "kind": "lunar_total",
       "return": 0.016516,
+      "decline_start": false
+    },
+    {
+      "start": "1954-06-27",
+      "end": "1954-07-03",
+      "kind": "solar",
+      "return": 0.013356,
       "decline_start": false
     },
     {
@@ -1122,6 +1388,13 @@
       "decline_start": false
     },
     {
+      "start": "1956-06-05",
+      "end": "1956-06-11",
+      "kind": "solar",
+      "return": -0.003271,
+      "decline_start": false
+    },
+    {
       "start": "1956-11-15",
       "end": "1956-11-21",
       "kind": "lunar_total",
@@ -1129,10 +1402,31 @@
       "decline_start": false
     },
     {
+      "start": "1956-11-29",
+      "end": "1956-12-05",
+      "kind": "solar",
+      "return": 0.045291,
+      "decline_start": false
+    },
+    {
+      "start": "1957-04-27",
+      "end": "1957-05-03",
+      "kind": "solar",
+      "return": 0.018462,
+      "decline_start": false
+    },
+    {
       "start": "1957-05-10",
       "end": "1957-05-16",
       "kind": "lunar_total",
       "return": 0.009229,
+      "decline_start": false
+    },
+    {
+      "start": "1957-10-20",
+      "end": "1957-10-26",
+      "kind": "solar",
+      "return": 0.006447,
       "decline_start": false
     },
     {
@@ -1213,6 +1507,13 @@
       "decline_start": false
     },
     {
+      "start": "1960-03-24",
+      "end": "1960-03-30",
+      "kind": "solar",
+      "return": -0.005716,
+      "decline_start": false
+    },
+    {
       "start": "1960-09-02",
       "end": "1960-09-08",
       "kind": "lunar_total",
@@ -1220,10 +1521,31 @@
       "decline_start": false
     },
     {
+      "start": "1960-09-17",
+      "end": "1960-09-23",
+      "kind": "solar",
+      "return": -0.021956,
+      "decline_start": false
+    },
+    {
+      "start": "1961-02-12",
+      "end": "1961-02-18",
+      "kind": "solar",
+      "return": 0.009756,
+      "decline_start": false
+    },
+    {
       "start": "1961-02-27",
       "end": "1961-03-05",
       "kind": "lunar_partial",
       "return": 0.010269,
+      "decline_start": false
+    },
+    {
+      "start": "1961-08-08",
+      "end": "1961-08-14",
+      "kind": "solar",
+      "return": -0.001474,
       "decline_start": false
     },
     {
@@ -1290,6 +1612,13 @@
       "decline_start": false
     },
     {
+      "start": "1963-07-17",
+      "end": "1963-07-23",
+      "kind": "solar",
+      "return": -0.014798,
+      "decline_start": false
+    },
+    {
       "start": "1963-12-27",
       "end": "1964-01-02",
       "kind": "lunar_total",
@@ -1297,10 +1626,38 @@
       "decline_start": false
     },
     {
+      "start": "1964-01-11",
+      "end": "1964-01-17",
+      "kind": "solar",
+      "return": 0.004197,
+      "decline_start": false
+    },
+    {
+      "start": "1964-06-07",
+      "end": "1964-06-13",
+      "kind": "solar",
+      "return": 0.00734,
+      "decline_start": false
+    },
+    {
       "start": "1964-06-22",
       "end": "1964-06-28",
       "kind": "lunar_total",
       "return": 0.004315,
+      "decline_start": false
+    },
+    {
+      "start": "1964-07-06",
+      "end": "1964-07-12",
+      "kind": "solar",
+      "return": 0.004579,
+      "decline_start": false
+    },
+    {
+      "start": "1964-12-01",
+      "end": "1964-12-07",
+      "kind": "solar",
+      "return": 0.009336,
       "decline_start": false
     },
     {
@@ -1374,6 +1731,13 @@
       "decline_start": false
     },
     {
+      "start": "1967-05-06",
+      "end": "1967-05-12",
+      "kind": "solar",
+      "return": -0.010165,
+      "decline_start": false
+    },
+    {
       "start": "1967-10-15",
       "end": "1967-10-21",
       "kind": "lunar_total",
@@ -1381,10 +1745,31 @@
       "decline_start": false
     },
     {
+      "start": "1967-10-30",
+      "end": "1967-11-05",
+      "kind": "solar",
+      "return": -0.031754,
+      "decline_start": false
+    },
+    {
+      "start": "1968-03-25",
+      "end": "1968-03-31",
+      "kind": "solar",
+      "return": 0.021171,
+      "decline_start": false
+    },
+    {
       "start": "1968-04-10",
       "end": "1968-04-16",
       "kind": "lunar_total",
       "return": 0.00993,
+      "decline_start": false
+    },
+    {
+      "start": "1968-09-19",
+      "end": "1968-09-25",
+      "kind": "solar",
+      "return": 0.009843,
       "decline_start": false
     },
     {
@@ -1465,6 +1850,20 @@
       "decline_start": false
     },
     {
+      "start": "1971-02-22",
+      "end": "1971-02-28",
+      "kind": "solar",
+      "return": 0.010761,
+      "decline_start": false
+    },
+    {
+      "start": "1971-07-19",
+      "end": "1971-07-25",
+      "kind": "solar",
+      "return": 0.000101,
+      "decline_start": false
+    },
+    {
       "start": "1971-08-03",
       "end": "1971-08-09",
       "kind": "lunar_total",
@@ -1472,10 +1871,31 @@
       "decline_start": false
     },
     {
+      "start": "1971-08-17",
+      "end": "1971-08-23",
+      "kind": "solar",
+      "return": -0.007401,
+      "decline_start": false
+    },
+    {
+      "start": "1972-01-13",
+      "end": "1972-01-19",
+      "kind": "solar",
+      "return": 0.008642,
+      "decline_start": false
+    },
+    {
       "start": "1972-01-27",
       "end": "1972-02-02",
       "kind": "lunar_total",
       "return": 0.011401,
+      "decline_start": false
+    },
+    {
+      "start": "1972-07-07",
+      "end": "1972-07-13",
+      "kind": "solar",
+      "return": -0.022173,
       "decline_start": false
     },
     {
@@ -1542,6 +1962,13 @@
       "decline_start": false
     },
     {
+      "start": "1974-06-17",
+      "end": "1974-06-23",
+      "kind": "solar",
+      "return": -0.028654,
+      "decline_start": false
+    },
+    {
       "start": "1974-11-26",
       "end": "1974-12-02",
       "kind": "lunar_total",
@@ -1549,10 +1976,31 @@
       "decline_start": false
     },
     {
+      "start": "1974-12-10",
+      "end": "1974-12-16",
+      "kind": "solar",
+      "return": -0.012188,
+      "decline_start": false
+    },
+    {
+      "start": "1975-05-08",
+      "end": "1975-05-14",
+      "kind": "solar",
+      "return": 0.030259,
+      "decline_start": false
+    },
+    {
       "start": "1975-05-22",
       "end": "1975-05-28",
       "kind": "lunar_total",
       "return": 0.00358,
+      "decline_start": false
+    },
+    {
+      "start": "1975-10-31",
+      "end": "1975-11-06",
+      "kind": "solar",
+      "return": 0.005728,
       "decline_start": false
     },
     {
@@ -1626,6 +2074,13 @@
       "decline_start": false
     },
     {
+      "start": "1978-04-04",
+      "end": "1978-04-10",
+      "kind": "solar",
+      "return": 0.018343,
+      "decline_start": false
+    },
+    {
       "start": "1978-09-13",
       "end": "1978-09-19",
       "kind": "lunar_total",
@@ -1633,10 +2088,31 @@
       "decline_start": false
     },
     {
+      "start": "1978-09-29",
+      "end": "1978-10-05",
+      "kind": "solar",
+      "return": 0.007119,
+      "decline_start": false
+    },
+    {
+      "start": "1979-02-23",
+      "end": "1979-03-01",
+      "kind": "solar",
+      "return": -0.009,
+      "decline_start": false
+    },
+    {
       "start": "1979-03-10",
       "end": "1979-03-16",
       "kind": "lunar_partial",
       "return": 0.011553,
+      "decline_start": false
+    },
+    {
+      "start": "1979-08-19",
+      "end": "1979-08-25",
+      "kind": "solar",
+      "return": 0.00277,
       "decline_start": false
     },
     {
@@ -1703,6 +2179,13 @@
       "decline_start": false
     },
     {
+      "start": "1981-07-28",
+      "end": "1981-08-03",
+      "kind": "solar",
+      "return": 0.010376,
+      "decline_start": false
+    },
+    {
       "start": "1982-01-06",
       "end": "1982-01-12",
       "kind": "lunar_total",
@@ -1710,10 +2193,38 @@
       "decline_start": false
     },
     {
+      "start": "1982-01-22",
+      "end": "1982-01-28",
+      "kind": "solar",
+      "return": 0.030681,
+      "decline_start": false
+    },
+    {
+      "start": "1982-06-18",
+      "end": "1982-06-24",
+      "kind": "solar",
+      "return": 0.02377,
+      "decline_start": false
+    },
+    {
       "start": "1982-07-03",
       "end": "1982-07-09",
       "kind": "lunar_total",
       "return": 0.010961,
+      "decline_start": false
+    },
+    {
+      "start": "1982-07-17",
+      "end": "1982-07-23",
+      "kind": "solar",
+      "return": 0.0009,
+      "decline_start": false
+    },
+    {
+      "start": "1982-12-12",
+      "end": "1982-12-18",
+      "kind": "solar",
+      "return": -0.014903,
       "decline_start": false
     },
     {
@@ -1794,6 +2305,13 @@
       "decline_start": false
     },
     {
+      "start": "1985-05-16",
+      "end": "1985-05-22",
+      "kind": "solar",
+      "return": 0.01562,
+      "decline_start": false
+    },
+    {
       "start": "1985-10-25",
       "end": "1985-10-31",
       "kind": "lunar_total",
@@ -1801,10 +2319,31 @@
       "decline_start": false
     },
     {
+      "start": "1985-11-09",
+      "end": "1985-11-15",
+      "kind": "solar",
+      "return": 0.022662,
+      "decline_start": false
+    },
+    {
+      "start": "1986-04-06",
+      "end": "1986-04-12",
+      "kind": "solar",
+      "return": 0.031833,
+      "decline_start": false
+    },
+    {
       "start": "1986-04-21",
       "end": "1986-04-27",
       "kind": "lunar_total",
       "return": -0.010011,
+      "decline_start": false
+    },
+    {
+      "start": "1986-09-30",
+      "end": "1986-10-06",
+      "kind": "solar",
+      "return": 0.014958,
       "decline_start": false
     },
     {
@@ -1878,6 +2417,13 @@
       "decline_start": false
     },
     {
+      "start": "1989-03-04",
+      "end": "1989-03-10",
+      "kind": "solar",
+      "return": 0.005838,
+      "decline_start": false
+    },
+    {
       "start": "1989-08-14",
       "end": "1989-08-20",
       "kind": "lunar_total",
@@ -1885,10 +2431,31 @@
       "decline_start": false
     },
     {
+      "start": "1989-08-28",
+      "end": "1989-09-03",
+      "kind": "solar",
+      "return": 0.004658,
+      "decline_start": false
+    },
+    {
+      "start": "1990-01-23",
+      "end": "1990-01-29",
+      "kind": "solar",
+      "return": -0.01933,
+      "decline_start": false
+    },
+    {
       "start": "1990-02-06",
       "end": "1990-02-12",
       "kind": "lunar_total",
       "return": 0.001274,
+      "decline_start": false
+    },
+    {
+      "start": "1990-07-19",
+      "end": "1990-07-25",
+      "kind": "solar",
+      "return": -0.022528,
       "decline_start": false
     },
     {
@@ -1955,6 +2522,13 @@
       "decline_start": false
     },
     {
+      "start": "1992-06-27",
+      "end": "1992-07-03",
+      "kind": "solar",
+      "return": 0.020622,
+      "decline_start": false
+    },
+    {
       "start": "1992-12-06",
       "end": "1992-12-12",
       "kind": "lunar_total",
@@ -1962,10 +2536,31 @@
       "decline_start": false
     },
     {
+      "start": "1992-12-21",
+      "end": "1992-12-27",
+      "kind": "solar",
+      "return": -0.00211,
+      "decline_start": false
+    },
+    {
+      "start": "1993-05-18",
+      "end": "1993-05-24",
+      "kind": "solar",
+      "return": 0.017442,
+      "decline_start": false
+    },
+    {
       "start": "1993-06-01",
       "end": "1993-06-07",
       "kind": "lunar_total",
       "return": -0.013529,
+      "decline_start": false
+    },
+    {
+      "start": "1993-11-10",
+      "end": "1993-11-16",
+      "kind": "solar",
+      "return": 0.006513,
       "decline_start": false
     },
     {
@@ -2039,6 +2634,13 @@
       "decline_start": false
     },
     {
+      "start": "1996-04-14",
+      "end": "1996-04-20",
+      "kind": "solar",
+      "return": 0.01313,
+      "decline_start": false
+    },
+    {
       "start": "1996-09-24",
       "end": "1996-09-30",
       "kind": "lunar_total",
@@ -2046,10 +2648,31 @@
       "decline_start": false
     },
     {
+      "start": "1996-10-09",
+      "end": "1996-10-15",
+      "kind": "solar",
+      "return": 0.008368,
+      "decline_start": false
+    },
+    {
+      "start": "1997-03-06",
+      "end": "1997-03-12",
+      "kind": "solar",
+      "return": 0.007138,
+      "decline_start": false
+    },
+    {
       "start": "1997-03-21",
       "end": "1997-03-27",
       "kind": "lunar_partial",
       "return": -0.013034,
+      "decline_start": false
+    },
+    {
+      "start": "1997-08-30",
+      "end": "1997-09-05",
+      "kind": "solar",
+      "return": 0.032886,
       "decline_start": false
     },
     {
@@ -2130,6 +2753,20 @@
       "decline_start": false
     },
     {
+      "start": "2000-02-02",
+      "end": "2000-02-08",
+      "kind": "solar",
+      "return": 0.023135,
+      "decline_start": false
+    },
+    {
+      "start": "2000-06-28",
+      "end": "2000-07-04",
+      "kind": "solar",
+      "return": 0.010118,
+      "decline_start": false
+    },
+    {
       "start": "2000-07-13",
       "end": "2000-07-19",
       "kind": "lunar_total",
@@ -2137,10 +2774,31 @@
       "decline_start": false
     },
     {
+      "start": "2000-07-28",
+      "end": "2000-08-03",
+      "kind": "solar",
+      "return": 0.023009,
+      "decline_start": false
+    },
+    {
+      "start": "2000-12-22",
+      "end": "2000-12-28",
+      "kind": "solar",
+      "return": 0.021647,
+      "decline_start": false
+    },
+    {
       "start": "2001-01-06",
       "end": "2001-01-12",
       "kind": "lunar_total",
       "return": 0.015558,
+      "decline_start": false
+    },
+    {
+      "start": "2001-06-18",
+      "end": "2001-06-24",
+      "kind": "solar",
+      "return": 0.014002,
       "decline_start": false
     },
     {
@@ -2207,6 +2865,13 @@
       "decline_start": false
     },
     {
+      "start": "2003-05-28",
+      "end": "2003-06-03",
+      "kind": "solar",
+      "return": 0.01924,
+      "decline_start": false
+    },
+    {
       "start": "2003-11-06",
       "end": "2003-11-12",
       "kind": "lunar_total",
@@ -2214,10 +2879,31 @@
       "decline_start": false
     },
     {
+      "start": "2003-11-20",
+      "end": "2003-11-26",
+      "kind": "solar",
+      "return": 0.023993,
+      "decline_start": false
+    },
+    {
+      "start": "2004-04-16",
+      "end": "2004-04-22",
+      "kind": "solar",
+      "return": 0.004689,
+      "decline_start": false
+    },
+    {
       "start": "2004-05-01",
       "end": "2004-05-07",
       "kind": "lunar_total",
       "return": -0.007767,
+      "decline_start": false
+    },
+    {
+      "start": "2004-10-11",
+      "end": "2004-10-17",
+      "kind": "solar",
+      "return": -0.014399,
       "decline_start": false
     },
     {
@@ -2291,6 +2977,13 @@
       "decline_start": false
     },
     {
+      "start": "2007-03-16",
+      "end": "2007-03-22",
+      "kind": "solar",
+      "return": 0.034313,
+      "decline_start": false
+    },
+    {
       "start": "2007-08-25",
       "end": "2007-08-31",
       "kind": "lunar_total",
@@ -2298,10 +2991,31 @@
       "decline_start": false
     },
     {
+      "start": "2007-09-08",
+      "end": "2007-09-14",
+      "kind": "solar",
+      "return": 0.021121,
+      "decline_start": false
+    },
+    {
+      "start": "2008-02-04",
+      "end": "2008-02-10",
+      "kind": "solar",
+      "return": -0.03587,
+      "decline_start": false
+    },
+    {
       "start": "2008-02-18",
       "end": "2008-02-24",
       "kind": "lunar_total",
       "return": 0.002311,
+      "decline_start": false
+    },
+    {
+      "start": "2008-07-29",
+      "end": "2008-08-04",
+      "kind": "solar",
+      "return": -0.011233,
       "decline_start": false
     },
     {
@@ -2368,6 +3082,13 @@
       "decline_start": false
     },
     {
+      "start": "2010-07-08",
+      "end": "2010-07-14",
+      "kind": "solar",
+      "return": 0.023284,
+      "decline_start": false
+    },
+    {
       "start": "2010-12-18",
       "end": "2010-12-24",
       "kind": "lunar_total",
@@ -2375,10 +3096,38 @@
       "decline_start": false
     },
     {
+      "start": "2011-01-01",
+      "end": "2011-01-07",
+      "kind": "solar",
+      "return": 0.011021,
+      "decline_start": false
+    },
+    {
+      "start": "2011-05-29",
+      "end": "2011-06-04",
+      "kind": "solar",
+      "return": -0.023244,
+      "decline_start": false
+    },
+    {
       "start": "2011-06-12",
       "end": "2011-06-18",
       "kind": "lunar_total",
       "return": 0.000409,
+      "decline_start": false
+    },
+    {
+      "start": "2011-06-28",
+      "end": "2011-07-04",
+      "kind": "solar",
+      "return": 0.033162,
+      "decline_start": false
+    },
+    {
+      "start": "2011-11-22",
+      "end": "2011-11-28",
+      "kind": "solar",
+      "return": 0.003796,
       "decline_start": false
     },
     {
@@ -2459,6 +3208,13 @@
       "decline_start": false
     },
     {
+      "start": "2014-04-26",
+      "end": "2014-05-02",
+      "kind": "solar",
+      "return": 0.00952,
+      "decline_start": false
+    },
+    {
       "start": "2014-10-05",
       "end": "2014-10-11",
       "kind": "lunar_total",
@@ -2466,10 +3222,31 @@
       "decline_start": false
     },
     {
+      "start": "2014-10-20",
+      "end": "2014-10-26",
+      "kind": "solar",
+      "return": 0.031812,
+      "decline_start": false
+    },
+    {
+      "start": "2015-03-17",
+      "end": "2015-03-23",
+      "kind": "solar",
+      "return": 0.01453,
+      "decline_start": false
+    },
+    {
       "start": "2015-04-01",
       "end": "2015-04-07",
       "kind": "lunar_partial",
       "return": 0.008079,
+      "decline_start": false
+    },
+    {
+      "start": "2015-09-10",
+      "end": "2015-09-16",
+      "kind": "solar",
+      "return": 0.022036,
       "decline_start": false
     },
     {
@@ -2543,6 +3320,20 @@
       "decline_start": false
     },
     {
+      "start": "2018-02-12",
+      "end": "2018-02-18",
+      "kind": "solar",
+      "return": 0.028697,
+      "decline_start": false
+    },
+    {
+      "start": "2018-07-10",
+      "end": "2018-07-16",
+      "kind": "solar",
+      "return": 0.001643,
+      "decline_start": false
+    },
+    {
       "start": "2018-07-24",
       "end": "2018-07-30",
       "kind": "lunar_total",
@@ -2550,10 +3341,31 @@
       "decline_start": false
     },
     {
+      "start": "2018-08-08",
+      "end": "2018-08-14",
+      "kind": "solar",
+      "return": -0.006208,
+      "decline_start": false
+    },
+    {
+      "start": "2019-01-03",
+      "end": "2019-01-09",
+      "kind": "solar",
+      "return": 0.055995,
+      "decline_start": false
+    },
+    {
       "start": "2019-01-18",
       "end": "2019-01-24",
       "kind": "lunar_total",
       "return": -0.010626,
+      "decline_start": false
+    },
+    {
+      "start": "2019-06-29",
+      "end": "2019-07-05",
+      "kind": "solar",
+      "return": 0.016538,
       "decline_start": false
     },
     {
@@ -2620,6 +3432,13 @@
       "decline_start": false
     },
     {
+      "start": "2021-06-07",
+      "end": "2021-06-13",
+      "kind": "solar",
+      "return": 0.00495,
+      "decline_start": false
+    },
+    {
       "start": "2021-11-16",
       "end": "2021-11-22",
       "kind": "lunar_partial",
@@ -2627,10 +3446,31 @@
       "decline_start": false
     },
     {
+      "start": "2021-12-01",
+      "end": "2021-12-07",
+      "kind": "solar",
+      "return": 0.038491,
+      "decline_start": false
+    },
+    {
+      "start": "2022-04-27",
+      "end": "2022-05-03",
+      "kind": "solar",
+      "return": -0.002027,
+      "decline_start": false
+    },
+    {
       "start": "2022-05-13",
       "end": "2022-05-19",
       "kind": "lunar_total",
       "return": -0.030592,
+      "decline_start": false
+    },
+    {
+      "start": "2022-10-22",
+      "end": "2022-10-28",
+      "kind": "solar",
+      "return": 0.03952,
       "decline_start": false
     },
     {
@@ -2704,6 +3544,13 @@
       "decline_start": false
     },
     {
+      "start": "2025-03-26",
+      "end": "2025-04-01",
+      "kind": "solar",
+      "return": -0.013853,
+      "decline_start": false
+    },
+    {
       "start": "2025-09-04",
       "end": "2025-09-10",
       "kind": "lunar_total",
@@ -2711,10 +3558,31 @@
       "decline_start": false
     },
     {
+      "start": "2025-09-18",
+      "end": "2025-09-24",
+      "kind": "solar",
+      "return": 0.000906,
+      "decline_start": false
+    },
+    {
+      "start": "2026-02-14",
+      "end": "2026-02-20",
+      "kind": "solar",
+      "return": 0.010728,
+      "decline_start": false
+    },
+    {
       "start": "2026-02-28",
       "end": "2026-03-06",
       "kind": "lunar_total",
       "return": -0.020186,
+      "decline_start": false
+    },
+    {
+      "start": "2026-08-09",
+      "end": "2026-08-15",
+      "kind": "solar",
+      "return": 0.003625,
       "decline_start": false
     },
     {
@@ -2733,7 +3601,7 @@
     "end_utc": "2027-02-09T16:00:21.759569Z"
   },
   "method": [
-    "Every solar and lunar eclipse in the record, using the seven calendar days from three days before to three days after it.",
+    "Every solar eclipse visible anywhere on Earth (partial, annular or total) and every lunar eclipse (penumbral, partial or total) in the record, using the seven calendar days from three days before to three days after it.",
     "Returns are the S&P proxy close at the first session in a window to its close at the last session in that window.",
     "Each event window is paired with the nearest non-overlapping window of the same calendar length, searching backward first, then forward. Control windows never overlap an event or another control.",
     "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",

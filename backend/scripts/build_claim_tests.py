@@ -40,6 +40,7 @@ PERMUTATIONS = 2_000
 MEANINGFUL_MEAN_DIFFERENCE = 0.005  # half a percentage point
 FULL_MOON_DAYS = 7
 ECLIPSE_DAYS = 7
+EARTH_RADIUS_KM = 6_378.137
 DAILY_SOURCE = "YAHOO_FINANCE_GSPC"
 
 CLAIMS = {
@@ -56,7 +57,7 @@ CLAIMS = {
     "eclipses": {
         "title": "Eclipses and the market",
         "claim": "Eclipses are often said to mark turning points in the market.",
-        "windows": "Every solar and lunar eclipse in the record, using the seven calendar days from three days before to three days after it.",
+        "windows": "Every solar eclipse visible anywhere on Earth (partial, annular or total) and every lunar eclipse (penumbral, partial or total) in the record, using the seven calendar days from three days before to three days after it.",
     },
 }
 
@@ -194,7 +195,13 @@ def astronomy_windows(start_year: int, end_year: int, after: datetime) -> dict[s
         separation_degrees = float(separation(time) * 180.0 / np.pi)
         sun_radius = math.degrees(math.asin(696_340.0 / sun_distance))
         moon_radius = math.degrees(math.asin(1_737.1 / moon_distance))
-        if separation_degrees >= sun_radius + moon_radius:
+        # An eclipse is visible somewhere on Earth when the discs overlap from
+        # some point on its surface, not just from its centre: widen the limit
+        # by the Moon's horizontal parallax minus the Sun's.
+        moon_parallax = math.degrees(math.asin(EARTH_RADIUS_KM / moon_distance))
+        sun_parallax = math.degrees(math.asin(EARTH_RADIUS_KM / sun_distance))
+        limit = sun_radius + moon_radius + moon_parallax - sun_parallax
+        if separation_degrees >= limit:
             continue
         moment = time.utc_datetime()
         eclipses.append(

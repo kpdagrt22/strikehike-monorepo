@@ -1,9 +1,8 @@
 """Tests for backend/scripts/build_claim_tests.py.
 
 The pure statistics and windowing run everywhere. The astronomy check needs a
-Skyfield ephemeris: it runs when SKYFIELD_EPHEMERIS points at a file, or when a
-de406.bsp/de421.bsp sits in the backend directory, and skips otherwise so CI
-never downloads hundreds of megabytes.
+Skyfield ephemeris: it uses SKYFIELD_EPHEMERIS when set, otherwise the repo's
+committed data/raw/de421.bsp (1900-2050), so it runs in CI without a download.
 """
 
 from __future__ import annotations
@@ -112,7 +111,11 @@ def _ephemeris_or_skip() -> Path:
     env = os.environ.get("SKYFIELD_EPHEMERIS")
     if env:
         candidates.append(Path(env))
-    candidates += [BACKEND / "de406.bsp", BACKEND / "de421.bsp"]
+    candidates += [
+        BACKEND / "data" / "raw" / "de421.bsp",
+        BACKEND / "de406.bsp",
+        BACKEND / "de421.bsp",
+    ]
     for candidate in candidates:
         if candidate.exists():
             return candidate
@@ -141,3 +144,31 @@ def test_known_astronomy_dates(monkeypatch):
 
     assert windows["next"]["full_moon"] is not None
     assert windows["next"]["mercury"] is not None
+
+
+def _solar_days(start_year: int, end_year: int) -> list[str]:
+    """Calendar day of greatest eclipse (window centre) for each solar eclipse."""
+    windows = builder.astronomy_windows(
+        start_year, end_year, datetime(start_year, 1, 1, tzinfo=timezone.utc)
+    )
+    days = []
+    for window in windows["eclipses"]:
+        if window["kind"] != "solar":
+            continue
+        start = datetime.fromisoformat(window["start_utc"].replace("Z", "+00:00"))
+        moment = start + pd.Timedelta(days=builder.ECLIPSE_DAYS // 2)
+        if start_year <= moment.year <= end_year:
+            days.append(moment.date().isoformat())
+    return days
+
+
+def test_solar_eclipse_counts_match_the_nasa_catalogue(monkeypatch):
+    # NASA Five Millennium Canon of Solar Eclipses: 20 in 2001-2010 and 24 in
+    # 2011-2020, partial eclipses included.
+    ephemeris = _ephemeris_or_skip()
+    monkeypatch.setenv("SKYFIELD_EPHEMERIS", str(ephemeris))
+    assert len(_solar_days(2001, 2010)) == 20
+    days_2011_2020 = _solar_days(2011, 2020)
+    assert len(days_2011_2020) == 24
+    in_2011 = [day for day in days_2011_2020 if day.startswith("2011")]
+    assert in_2011 == ["2011-01-04", "2011-06-01", "2011-07-01", "2011-11-25"]
