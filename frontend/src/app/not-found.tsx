@@ -14,6 +14,7 @@ const VIEWS = [
   { href: "/regime", label: "Regime" },
   { href: "/convergence", label: "Convergence" },
   { href: "/patterns", label: "Study of Patterns" },
+  { href: "/upcoming", label: "Upcoming dates" },
 ];
 
 export default function NotFound() {

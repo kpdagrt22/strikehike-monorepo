@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { ShareButton } from "@/components/reference/ShareButton";
+import { DataUnavailable } from "@/components/states/DataUnavailable";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import {
@@ -125,10 +126,10 @@ export default async function DeclinesPage() {
       </header>
 
       {!complete ? (
-        <p className="mt-8 max-w-xl border-t border-(--sh-line-1) pt-5 text-body leading-relaxed text-(--sh-text-2)">
-          The decline reference is unavailable right now. Please check back
-          soon.
-        </p>
+        <DataUnavailable
+          title="The decline reference is unavailable right now."
+          detail="The macro archive did not answer. Try again in a moment."
+        />
       ) : (
         <>
           <p className="mt-6 text-meta text-(--sh-text-3)">

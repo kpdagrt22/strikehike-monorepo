@@ -1285,11 +1285,13 @@ export function RegimeTimeline({
   compareAssets = false,
   onCompareToggle,
   onHoverPoint,
+  onNeedFull,
 }) {
   const containerRef = useRef(null);
   const hudRef = useRef(null);
   const chartBoxRef = useRef(null);
   const onHoverPointRef = useRef(onHoverPoint);
+  const onNeedFullRef = useRef(onNeedFull);
   const chartRef = useRef(null);
   const lineSeriesRef = useRef({});
   // The built chart's lines, axis and marks, for applyChartLines.
@@ -1354,7 +1356,8 @@ export function RegimeTimeline({
 
   useEffect(() => {
     onHoverPointRef.current = onHoverPoint;
-  }, [onHoverPoint]);
+    onNeedFullRef.current = onNeedFull;
+  }, [onHoverPoint, onNeedFull]);
 
   // The page keeps in-page scrolling and keyboard focus clear of the stuck
   // HUD: its height goes to --regime-hud-h on the scrolling <main>, which adds
@@ -2096,6 +2099,7 @@ export function RegimeTimeline({
         setCrosshairActive(false);
         return;
       }
+      onNeedFullRef.current?.();
       const key =
         typeof param.time === "string" ? param.time : String(param.time);
       // Set before the chart paints its top layer on this frame.

@@ -1,10 +1,14 @@
 import { JsonLd } from "@/components/seo/JsonLd";
 import { NberTable } from "@/components/seo/NberTable";
+import { MethodDetails } from "@/components/regime/MethodDetails";
+import { MethodDetailsBody } from "@/components/regime/MethodDetailsBody";
 import { readOrNull } from "@/components/seo/readOrNull";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { getCaseCatalogue, getRegimeSummary, type RegimeSummary } from "@/lib/seo/data";
 import { regimeGraph } from "@/lib/seo/graphs";
 import RegimeClient from "./RegimeClient";
+import { RegimeBoot } from "./RegimeBoot";
+import { RegimeHeader } from "./RegimeHeader";
 
 // ISR: the page is prerendered (without data when the build has no backend) and regenerated
 // on the server at most once a minute. Metadata comes from the route layout.
@@ -48,6 +52,15 @@ export default async function Page() {
     <>
       <RegimeClient
         initialSummary={initialSummary(summary)}
+        header={<RegimeHeader />}
+        boot={<RegimeBoot summary={summary} />}
+        method={
+          summary?.meta ? (
+            <MethodDetails>
+              <MethodDetailsBody meta={summary.meta} />
+            </MethodDetails>
+          ) : null
+        }
         after={<NberTable summary={summary} catalogue={catalogue} />}
         colophon={<SiteColophon current="/regime" />}
       />

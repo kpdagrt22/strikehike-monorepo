@@ -1,6 +1,7 @@
 "use client";
 
 import { assetCompared, cycleMapToggled } from "@/lib/analytics/events";
+import dynamic from "next/dynamic";
 import {
   coreIndexTone,
   formatDate,
@@ -11,8 +12,17 @@ import {
   ASSET_ORDER,
   ASSET_TARGETS,
 } from "@/components/regime/assetTargets";
-import { CycleMini } from "@/components/regime/CycleMini";
 import { coreIndexFlag, marketFlagText } from "@/components/regime/regimeChart";
+
+const CycleMini = dynamic(
+  () => import("@/components/regime/CycleMini").then((module) => module.CycleMini),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-4 animate-pulse rounded bg-(--sh-hover) motion-reduce:animate-none sm:h-[104px]" />
+    ),
+  },
+);
 
 // A slim −50…+50 track under the score: ticks at −25, 0 and +25 and a marker
 // at the current value in its band's tone. The marker keeps one layout

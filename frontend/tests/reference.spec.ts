@@ -135,6 +135,12 @@ test.describe("share", () => {
         ),
       { timeout: 25_000 },
     );
+    await page
+      .getByRole("status", { name: "Loading recession windows" })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      page.locator("[data-recession-window] button").first(),
+    ).toBeVisible();
     await page.locator("[data-recession-window] button").first().click();
     const selected = await page.evaluate(
       () => new URL(window.location.href).searchParams.get("d"),

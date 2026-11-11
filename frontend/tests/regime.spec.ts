@@ -36,6 +36,32 @@ async function openRegime(page: Page) {
 }
 
 test.describe("regime revamp", () => {
+  test("the first atlas request is the small lite view", async ({ page }) => {
+    const errors = watchErrors(page);
+    const requests: { url: string; bytes: number }[] = [];
+    page.on("response", async (response) => {
+      if (!response.url().includes("/api/v1/regime/macro-history")) return;
+      const body = await response.body().catch(() => Buffer.alloc(0));
+      requests.push({
+        url: response.url().replace("http://127.0.0.1:3000", ""),
+        bytes: body.length,
+      });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/regime", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("[data-regime-readout]")).toBeVisible({
+      timeout: 25_000,
+    });
+    await expect
+      .poll(() => requests.length, { timeout: 20_000 })
+      .toBeGreaterThanOrEqual(2);
+    expect(requests[0].url).toContain("view=lite");
+    expect(requests[0].url).toContain("start=2006-01-01");
+    expect(requests[0].bytes).toBeLessThan(400_000);
+    expect(requests.some((entry) => entry.url.includes("view=atlas"))).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test("the latest score appears once above the chart, with one hint", { tag: "@deploy" }, async ({
     page,
     request,
@@ -79,6 +105,10 @@ test.describe("regime revamp", () => {
     await expect(page.locator("[data-regime-axis-caption]")).toContainText(
       /recession windows/,
     );
+    await page
+      .getByRole("status", { name: "Loading recession windows" })
+      .scrollIntoViewIfNeeded();
+    await expect(page.locator("[data-recession-window]").first()).toBeVisible();
     expect(
       await page.locator("[data-recession-window]").count(),
     ).toBeGreaterThan(0);
