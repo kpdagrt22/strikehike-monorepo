@@ -115,8 +115,9 @@ jobs:
     name: Frontend smoke
     runs-on: ubuntu-24.04
     # The deploy gate: smoke.spec.ts plus the @deploy subset (home clearance at
-    # 1280×720 and 390×844, upcoming, regime and events), kept under 10 minutes.
-    timeout-minutes: 10
+    # 1280×720 and 390×844, upcoming, regime and events). It runs in about 7
+    # minutes; the 15-minute ceiling leaves room for a slow browser install.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -135,10 +136,10 @@ jobs:
 
       - name: Install Chromium
         # An Ubuntu mirror outage must not block the gate: if the system
-        # packages can't be fetched in 4 minutes, install the browser alone
+        # packages can't be fetched in 2 minutes, install the browser alone
         # (the runner image already has the libraries Chromium needs).
         run: |
-          if ! timeout 240 npx playwright install --with-deps chromium; then
+          if ! timeout 120 npx playwright install --with-deps chromium; then
             echo "::warning::System packages unavailable; installing Chromium without them."
             npx playwright install chromium
           fi
@@ -287,10 +288,10 @@ jobs:
 
       - name: Install Chromium
         # An Ubuntu mirror outage must not block the gate: if the system
-        # packages can't be fetched in 4 minutes, install the browser alone
+        # packages can't be fetched in 2 minutes, install the browser alone
         # (the runner image already has the libraries Chromium needs).
         run: |
-          if ! timeout 240 npx playwright install --with-deps chromium; then
+          if ! timeout 120 npx playwright install --with-deps chromium; then
             echo "::warning::System packages unavailable; installing Chromium without them."
             npx playwright install chromium
           fi
