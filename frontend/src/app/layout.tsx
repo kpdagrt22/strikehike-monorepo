@@ -227,6 +227,15 @@ export default function RootLayout({
             __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
           }}
         />
+        {/* Before first paint: reserve the "Your themes" slot only when this
+            browser follows something, so the client-rendered group shifts
+            nothing. The group itself is never in the server HTML. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var f=JSON.parse(localStorage.getItem("sh.follow.v1")||"[]");if(Array.isArray(f)&&f.length)document.documentElement.setAttribute("data-follows","");}catch(e){}',
+          }}
+        />
       </head>
       <body className="antialiased">
         <ThemeProvider

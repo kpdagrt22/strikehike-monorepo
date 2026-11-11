@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SubscribeControl } from "@/components/upcoming/SubscribeControl";
+import { FollowButton } from "@/components/retention/FollowButton";
 import { themeSelected } from "@/lib/analytics/events";
 
 /**
@@ -49,18 +50,23 @@ export function UpcomingFilterLinks({
         {themes.map((theme) => {
           const active = current === theme.slug;
           return (
-            <Link
+            <span
               key={theme.slug}
-              href={`/upcoming/${theme.slug}`}
-              aria-current={active ? "page" : undefined}
-              onClick={() => themeSelected(theme.slug, "on", 1)}
-              className={chip(active)}
+              className="inline-flex shrink-0 items-center gap-1"
             >
-              {theme.name}
-              <span className="tabular-nums text-(--sh-text-3)">
-                {theme.available}
-              </span>
-            </Link>
+              <Link
+                href={`/upcoming/${theme.slug}`}
+                aria-current={active ? "page" : undefined}
+                onClick={() => themeSelected(theme.slug, "on", 1)}
+                className={chip(active)}
+              >
+                {theme.name}
+                <span className="tabular-nums text-(--sh-text-3)">
+                  {theme.available}
+                </span>
+              </Link>
+              <FollowButton theme={theme.slug} name={theme.name} compact />
+            </span>
           );
         })}
       </nav>
@@ -104,6 +110,9 @@ export function UpcomingFilterLinks({
                 {theme.available}
               </span>
             </Link>
+            {showSubscribes ? (
+              <FollowButton theme={theme.slug} name={theme.name} compact />
+            ) : null}
             {showSubscribes ? (
               <span className="w-8 shrink-0">
                 <SubscribeControl
