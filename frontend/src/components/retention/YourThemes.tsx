@@ -11,6 +11,13 @@ export type YourTheme = {
   next: Array<{ id: string; name: string; date: string }>;
 };
 
+const SHORT_DATE = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
 // Rendered only after hydration: the server HTML has no followed group. The
 // page puts it at the top of the list; when it is below the first fold there is
 // nothing above it to move.
@@ -70,7 +77,9 @@ export function YourThemes({ themes }: { themes: YourTheme[] }) {
                     >
                       {event.name}
                     </Link>{" "}
-                    <span className="tabular-nums">{event.date.slice(5)}</span>
+                    <span className="whitespace-nowrap tabular-nums">
+                      {SHORT_DATE.format(new Date(`${event.date}T00:00:00Z`))}
+                    </span>
                   </span>
                 ))}
               </span>

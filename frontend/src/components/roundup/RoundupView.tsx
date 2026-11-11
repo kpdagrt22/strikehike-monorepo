@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ShareButton } from "@/components/reference/ShareButton";
 import type { Roundup } from "@/lib/roundup/store";
-import { weekLabel } from "@/lib/roundup/week";
+import { weekLabel, isoWeekOf } from "@/lib/roundup/week";
 import { urlFor } from "@/lib/seo/site";
 
 const DATE = new Intl.DateTimeFormat("en-GB", {
@@ -14,6 +14,19 @@ const DATE = new Intl.DateTimeFormat("en-GB", {
 
 export function RoundupView({ roundup }: { roundup: Roundup }) {
   const path = `/this-week/${roundup.week}`;
+  const readingDate = roundup.regime
+    ? new Date(`${roundup.regime.as_of}T00:00:00Z`)
+    : null;
+  const readingWeek = roundup.regime
+    ? isoWeekOf(roundup.regime.as_of)
+    : null;
+  const staleReading =
+    readingDate && roundup.start
+      ? (new Date(`${roundup.start}T00:00:00Z`).getTime() -
+          readingDate.getTime()) /
+          86_400_000 >
+        7
+      : false;
   return (
     <article data-roundup={roundup.week}>
       <nav aria-label="Breadcrumb" className="text-micro text-(--sh-text-3)">
@@ -55,31 +68,14 @@ export function RoundupView({ roundup }: { roundup: Roundup }) {
             Regime
           </h2>
           <p className="mt-1 text-meta leading-relaxed text-(--sh-text-2)">
-            {roundup.lines?.regime}
+            {roundup.lines?.regime}{" "}
+            Latest reading: week of{" "}
+            {readingDate ? DATE.format(readingDate) : roundup.regime.as_of}
+            {staleReading && readingWeek
+              ? ` (from ${readingWeek}, before ${roundup.week})`
+              : ""}
+            .
           </p>
-          <dl className="mt-3 grid gap-3 text-micro sm:grid-cols-3">
-            <div>
-              <dt className="text-(--sh-text-3)">Latest reading</dt>
-              <dd className="mt-0.5 font-mono text-(--sh-text-1)">
-                {roundup.regime.score >= 0 ? "+" : ""}
-                {roundup.regime.score.toFixed(1)} · {roundup.regime.label}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-(--sh-text-3)">Week of</dt>
-              <dd className="mt-0.5 font-mono text-(--sh-text-1)">
-                {DATE.format(new Date(`${roundup.regime.as_of}T00:00:00Z`))}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-(--sh-text-3)">From last week</dt>
-              <dd className="mt-0.5 font-mono text-(--sh-text-1)">
-                {roundup.regime.change == null
-                  ? "—"
-                  : `${roundup.regime.change >= 0 ? "+" : ""}${roundup.regime.change.toFixed(1)}`}
-              </dd>
-            </div>
-          </dl>
         </section>
       ) : null}
 

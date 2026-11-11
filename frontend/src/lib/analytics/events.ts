@@ -53,7 +53,9 @@ type ShareSurface =
   | "recession"
   | "decline"
   | "regime"
-  | "roundup";
+  | "roundup"
+  | "tested";
+type SupportSurface = "home" | "footer";
 
 function ordinary(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 64);
@@ -184,12 +186,18 @@ export function methodOpened(which: "method_limits" | "how_it_works", page: "/re
   trackEvent("method_opened", { which, page });
 }
 
-export function supportOpened(trigger: "click" | "tap" | "keyboard" | "footer_link") {
-  trackEvent("support_opened", { trigger });
+export function supportOpened(
+  trigger: "click" | "tap" | "keyboard" | "footer_link",
+  surface: SupportSurface,
+) {
+  trackEvent("support_opened", { trigger, surface });
 }
 
-export function supportLinkClicked(target: "paypal" = "paypal") {
-  trackEvent("support_link_clicked", { target });
+export function supportLinkClicked(
+  target: "paypal" = "paypal",
+  surface: SupportSurface,
+) {
+  trackEvent("support_link_clicked", { target, surface });
 }
 
 export function feedbackSubmitted(length: number) {
@@ -226,6 +234,14 @@ export function themeFollowed(theme: string, action: "follow" | "unfollow") {
 
 export function changeNote(action: "shown" | "dismissed" | "clicked") {
   trackEvent("change_note", { action });
+}
+
+const EXP_TOKEN = /^[a-z0-9-]{1,32}$/;
+
+// One report per session per experiment, only when a real variant is shown.
+export function experimentExposed(experiment: string, variant: string) {
+  if (!EXP_TOKEN.test(experiment) || !EXP_TOKEN.test(variant)) return;
+  trackEvent("experiment_exposed", { exp: experiment, variant });
 }
 
 export function themeSlug(theme: string) {

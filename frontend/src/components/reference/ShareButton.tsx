@@ -10,7 +10,8 @@ type ShareSurface =
   | "recession"
   | "decline"
   | "regime"
-  | "roundup";
+  | "roundup"
+  | "tested";
 
 // Copies the page's canonical URL (or uses the native sheet on touch). The
 // status line is always in the DOM so a screen reader announces it.

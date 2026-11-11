@@ -14,6 +14,7 @@ import {
   patternsAsOf,
 } from "@/lib/seo/data";
 import { approvedRoundups } from "@/lib/roundup/store";
+import { readClaimTests } from "@/lib/tested/store";
 import {
   declinePath,
   declineRecordComplete,
@@ -40,7 +41,7 @@ type Generated = { url: string; lastModified: string };
 // the D-06 rules (lib/events/indexing.ts). noindex pages stay out. lastmod is the day the
 // bundle was built, never the build or request time.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [regime, cases, patterns, upcoming, everything, atlas, roundups] =
+  const [regime, cases, patterns, upcoming, everything, atlas, roundups, claims] =
     await Promise.all([
       getRegimeSummary().catch(() => null),
       getCaseCatalogue().catch(() => null),
@@ -49,6 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       getUpcomingAll().catch(() => null),
       getRegimeAtlas().catch(() => null),
       approvedRoundups(),
+      readClaimTests(),
     ]);
   const asOf: Partial<Record<SitePath, string | undefined>> = {
     "/regime": regime?.as_of?.slice(0, 10),
@@ -141,9 +143,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
+  // Claim tests: the three prebuilt pages and their index. lastmod is the day
+  // the builder ran, stored in each JSON.
+  const testedEntries: Generated[] = [];
+  if (claims.length > 0) {
+    testedEntries.push({
+      url: urlFor("/tested"),
+      lastModified: claims[0].source.build_date,
+    });
+    for (const claim of claims) {
+      testedEntries.push({
+        url: urlFor(`/tested/${claim.id}`),
+        lastModified: claim.source.build_date,
+      });
+    }
+  }
+
   return [
     ...fixed,
     ...roundupEntries,
+    ...testedEntries,
     ...themes,
     ...events,
     ...years,

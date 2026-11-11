@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "404"],
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "/tested", "/tested/[claim]", "404"],
   "limits": {
     "max_body_bytes": 8192,
     "max_events": 25,
@@ -131,12 +131,18 @@
       }
     },
     "support_opened": {
-      "required": ["trigger"],
-      "properties": { "trigger": { "type": "enum", "values": ["click", "tap", "keyboard", "footer_link"] } }
+      "required": ["trigger", "surface"],
+      "properties": {
+        "trigger": { "type": "enum", "values": ["click", "tap", "keyboard", "footer_link"] },
+        "surface": { "type": "enum", "values": ["home", "footer"] }
+      }
     },
     "support_link_clicked": {
-      "required": ["target"],
-      "properties": { "target": { "type": "enum", "values": ["paypal"] } }
+      "required": ["target", "surface"],
+      "properties": {
+        "target": { "type": "enum", "values": ["paypal"] },
+        "surface": { "type": "enum", "values": ["home", "footer"] }
+      }
     },
     "feedback_submitted": {
       "required": ["length_bucket"],
@@ -152,7 +158,7 @@
     "share_clicked": {
       "required": ["surface", "method"],
       "properties": {
-        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime", "roundup"] },
+        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime", "roundup", "tested"] },
         "method": { "type": "enum", "values": ["clipboard", "share"] }
       }
     },
@@ -170,6 +176,13 @@
       "required": ["action"],
       "properties": {
         "action": { "type": "enum", "values": ["shown", "dismissed", "clicked"] }
+      }
+    },
+    "experiment_exposed": {
+      "required": ["exp", "variant"],
+      "properties": {
+        "exp": { "type": "string", "max": 32, "pattern": "^[a-z0-9-]{1,32}$" },
+        "variant": { "type": "string", "max": 32, "pattern": "^[a-z0-9-]{1,32}$" }
       }
     }
   }

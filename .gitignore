@@ -21,6 +21,9 @@ Thumbs.db
 # Generated runtime data
 **/data/historical_events.db
 
+# Skyfield ephemeris, downloaded on first use by backend/scripts/build_claim_tests.py
+**/*.bsp
+
 # Local Caddy site snippets written by sibling deploys
 deploy/caddy/sites/*.caddy
 

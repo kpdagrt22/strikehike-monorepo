@@ -4,11 +4,16 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { supportLinkClicked, supportOpened } from "@/lib/analytics/events";
+import {
+  PAYPAL_URL,
+  SUPPORT_NOTE,
+  SUPPORT_PAYS,
+  SUPPORT_TITLE,
+  SUPPORT_WHAT,
+} from "@/lib/support/copy";
 import { useDismissable } from "@/hooks/useDismissable";
 import { useChronoStore } from "@/store/chronoStore";
 import { useEntityStore } from "@/store/entityStore";
-
-const PAYPAL_URL = "https://paypal.me/kpdagrt22";
 
 export function SponsorModule() {
   const [open, setOpen] = useState(false);
@@ -49,6 +54,7 @@ export function SponsorModule() {
                 : window.matchMedia("(pointer: coarse)").matches
                   ? "tap"
                   : "click",
+              "home",
             );
           }
           setOpen((value) => !value);
@@ -103,10 +109,13 @@ export function SponsorModule() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
-                  Support
+                  {SUPPORT_TITLE}
                 </p>
-                <p className="mt-1 text-[12px] text-black/60 dark:text-white/60">
-                  Keep the engine independent.
+                <p className="mt-1 text-[12px] leading-snug text-black/60 dark:text-white/60">
+                  {SUPPORT_WHAT}
+                </p>
+                <p className="mt-1 text-[12px] leading-snug text-black/60 dark:text-white/60">
+                  {SUPPORT_PAYS}
                 </p>
               </div>
               <button
@@ -161,7 +170,7 @@ export function SponsorModule() {
                 href={PAYPAL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => supportLinkClicked("paypal")}
+                onClick={() => supportLinkClicked("paypal", "home")}
                 className="mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-black/10 px-4 text-[13px] font-medium tracking-[-0.01em] text-[#14121a] transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] lg:min-h-9 dark:border-white/10 dark:text-[#f2ede4] dark:hover:bg-white/[0.06] dark:focus-visible:bg-white/[0.06]"
               >
                 Buy me a drink · PayPal
@@ -169,6 +178,10 @@ export function SponsorModule() {
                 <span className="sr-only">(opens in a new tab)</span>
               </a>
             </div>
+
+            <p className="mt-3 text-center text-[11px] text-black/50 dark:text-white/50">
+              {SUPPORT_NOTE}
+            </p>
           </motion.section>
         ) : null}
       </AnimatePresence>

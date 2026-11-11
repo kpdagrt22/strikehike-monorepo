@@ -438,7 +438,7 @@ test.describe("what changed since your last visit", () => {
       await expect(note).toContainText(
         "The Regime score moved from +10.0 to +12.5.",
       );
-      await expect(note).toContainText("1 new date was added across all themes.");
+      await expect(note).toContainText("One new date was added across all themes.");
       await expect(note.locator('[data-change-note-link=""]')).toHaveAttribute(
         "href",
         "/this-week",
