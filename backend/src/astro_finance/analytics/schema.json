@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "404"],
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "/tested", "/tested/[claim]", "404"],
   "limits": {
     "max_body_bytes": 8192,
     "max_events": 25,
@@ -152,7 +152,7 @@
     "share_clicked": {
       "required": ["surface", "method"],
       "properties": {
-        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime", "roundup"] },
+        "surface": { "type": "enum", "values": ["event", "theme", "date", "recession", "decline", "regime", "roundup", "tested"] },
         "method": { "type": "enum", "values": ["clipboard", "share"] }
       }
     },

@@ -11,6 +11,7 @@ PAGE_ROUTES = (
     "/upcoming",
     "/recessions",
     "/declines",
+    "/tested",
 )
 PAGE_TEMPLATES = (*PAGE_ROUTES, "other")
 

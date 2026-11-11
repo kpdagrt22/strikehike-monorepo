@@ -53,7 +53,8 @@ type ShareSurface =
   | "recession"
   | "decline"
   | "regime"
-  | "roundup";
+  | "roundup"
+  | "tested";
 
 function ordinary(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 64);

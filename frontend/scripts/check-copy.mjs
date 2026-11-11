@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "src");
 const ROUNDUPS = path.resolve(HERE, "..", "content", "roundups");
-const ROOTS = [ROOT, ROUNDUPS];
+const TESTED = path.resolve(HERE, "..", "content", "tested");
+const ROOTS = [ROOT, ROUNDUPS, TESTED];
 const EXTENSIONS = new Set([
   ".js",
   ".jsx",
@@ -47,6 +48,13 @@ const BANNED = [
   "this week will",
   "will rise",
   "will fall",
+  "will outperform",
+  "will underperform",
+  "guaranteed return",
+  "sure thing",
+  "we predict",
+  "predicts the market",
+  "proves that",
 ];
 
 async function* files(dir) {

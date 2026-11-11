@@ -13,6 +13,7 @@ const STATIC = new Set([
   "/recessions",
   "/declines",
   "/this-week",
+  "/tested",
 ]);
 const THEMES = new Set(["science", "finance", "culture-religion"]);
 const EVENT = /^\/events\/[^/]+\/?$/;
@@ -21,6 +22,7 @@ const YEAR_LIST = /^\/dates\/[^/]+\/[^/]+\/?$/;
 const RECESSION = /^\/recessions\/[^/]+\/?$/;
 const DECLINE = /^\/declines\/[^/]+\/?$/;
 const WEEK = /^\/this-week\/\d{4}-W\d{2}\/?$/;
+const TESTED = /^\/tested\/[a-z-]+\/?$/;
 
 export function pageTemplate(pathname: string): string {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -32,5 +34,6 @@ export function pageTemplate(pathname: string): string {
   if (RECESSION.test(path)) return "/recessions/[id]";
   if (DECLINE.test(path)) return "/declines/[id]";
   if (WEEK.test(path)) return "/this-week/[week]";
+  if (TESTED.test(path)) return "/tested/[claim]";
   return "404";
 }
