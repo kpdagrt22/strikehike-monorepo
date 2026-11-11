@@ -27,6 +27,8 @@ MEANINGFUL = frozenset(
         "calendar_subscribed",
         "share_clicked",
         "link_shared",
+        "theme_followed",
+        "change_note",
     }
 )
 NON_MEANINGFUL_METHODS = frozenset({"deep_link", "page"})

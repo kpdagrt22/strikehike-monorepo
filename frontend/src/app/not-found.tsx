@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { RecentlyViewed } from "@/components/retention/RecentlyViewed";
 
 // Out of the index, links still followed. The root layout sets no canonical or hreflang, so the
 // 404 claims no URL of its own.
@@ -51,6 +52,7 @@ export default function NotFound() {
             </Link>
           ))}
         </nav>
+        <RecentlyViewed className="w-full text-left" />
       </div>
     </main>
   );

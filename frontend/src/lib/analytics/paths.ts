@@ -1,6 +1,6 @@
 // Page templates for analytics: a real path mapped to the allow-listed template,
 // never a raw id. Used by PageViewTracker (page_viewed) and FeedbackModule (the
-// path stored with a message). The same three templates are in both copies of
+// path stored with a message). The same templates are in both copies of
 // schema.json (frontend/src/lib/analytics and backend/src/astro_finance/analytics).
 
 const STATIC = new Set([
@@ -12,6 +12,7 @@ const STATIC = new Set([
   "/upcoming",
   "/recessions",
   "/declines",
+  "/this-week",
 ]);
 const THEMES = new Set(["science", "finance", "culture-religion"]);
 const EVENT = /^\/events\/[^/]+\/?$/;
@@ -19,6 +20,7 @@ const THEME = /^\/upcoming\/([^/]+)\/?$/;
 const YEAR_LIST = /^\/dates\/[^/]+\/[^/]+\/?$/;
 const RECESSION = /^\/recessions\/[^/]+\/?$/;
 const DECLINE = /^\/declines\/[^/]+\/?$/;
+const WEEK = /^\/this-week\/\d{4}-W\d{2}\/?$/;
 
 export function pageTemplate(pathname: string): string {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -29,5 +31,6 @@ export function pageTemplate(pathname: string): string {
   if (YEAR_LIST.test(path)) return "/dates/[year]/[list]";
   if (RECESSION.test(path)) return "/recessions/[id]";
   if (DECLINE.test(path)) return "/declines/[id]";
+  if (WEEK.test(path)) return "/this-week/[week]";
   return "404";
 }

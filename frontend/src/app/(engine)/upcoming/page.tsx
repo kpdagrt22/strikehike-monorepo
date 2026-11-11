@@ -3,6 +3,9 @@ import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { DataUnavailable } from "@/components/states/DataUnavailable";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { ChangeNote } from "@/components/retention/ChangeNote";
+import { RecentlyViewed } from "@/components/retention/RecentlyViewed";
+import { YourThemes } from "@/components/retention/YourThemes";
 import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingPageTracker } from "@/components/upcoming/UpcomingPageTracker";
 import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
@@ -48,6 +51,16 @@ export default async function UpcomingPage() {
   const total = themes.reduce((sum, theme) => sum + theme.available, 0);
   const next = nextItem(items);
   const listedCount = items.length;
+  const yourThemes = themes.map((theme) => ({
+    id: theme.slug,
+    name: theme.name,
+    count: theme.available,
+    next: (theme.data.events ?? []).slice(0, 3).map((event) => ({
+      id: event.event_id,
+      name: event.name,
+      date: event.start_date,
+    })),
+  }));
 
   return (
     <PageShell data-upcoming-count={listedCount > 0 ? listedCount : undefined}>
@@ -62,9 +75,14 @@ export default async function UpcomingPage() {
           current="all"
           total={total}
           next={next}
+          changeNote={<ChangeNote where="upcoming" />}
+          footer={<RecentlyViewed />}
         />
 
         <div className="mt-8 min-w-0 lg:mt-0">
+          <div data-your-themes-slot="" className="mb-6">
+            <YourThemes themes={yourThemes} />
+          </div>
           {unavailable ? (
             <DataUnavailable
               title="Upcoming dates are unavailable right now."

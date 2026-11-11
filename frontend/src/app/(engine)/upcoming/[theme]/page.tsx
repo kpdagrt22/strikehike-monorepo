@@ -6,6 +6,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { DataUnavailable } from "@/components/states/DataUnavailable";
 import { ShareButton } from "@/components/reference/ShareButton";
+import { FollowButton } from "@/components/retention/FollowButton";
 import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
 import {
@@ -164,11 +165,14 @@ export default async function ThemePage({
           next={nextItem(items)}
           showFilterSubscribes={false}
           share={
-            <ShareButton
-              surface="theme"
-              url={urlFor(path)}
-              title={TITLE[theme]}
-            />
+            <>
+              <FollowButton theme={theme} name={name} />
+              <ShareButton
+                surface="theme"
+                url={urlFor(path)}
+                title={TITLE[theme]}
+              />
+            </>
           }
         />
 

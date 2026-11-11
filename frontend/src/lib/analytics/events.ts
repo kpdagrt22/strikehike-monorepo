@@ -52,7 +52,8 @@ type ShareSurface =
   | "date"
   | "recession"
   | "decline"
-  | "regime";
+  | "regime"
+  | "roundup";
 
 function ordinary(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 64);
@@ -208,6 +209,23 @@ export function shareClicked(
   method: "clipboard" | "share",
 ) {
   trackEvent("share_clicked", { surface, method });
+}
+
+const FOLLOW_THEMES = new Set([
+  "politics",
+  "science",
+  "finance",
+  "culture-religion",
+  "natural-disasters",
+]);
+
+export function themeFollowed(theme: string, action: "follow" | "unfollow") {
+  if (!FOLLOW_THEMES.has(theme)) return;
+  trackEvent("theme_followed", { theme, action });
+}
+
+export function changeNote(action: "shown" | "dismissed" | "clicked") {
+  trackEvent("change_note", { action });
 }
 
 export function themeSlug(theme: string) {

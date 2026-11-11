@@ -7,6 +7,7 @@ import { SiteColophon } from "@/components/seo/SiteColophon";
 import { ShareButton } from "@/components/reference/ShareButton";
 import { SubscribeControl } from "@/components/upcoming/SubscribeControl";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
+import { RecentTracker } from "@/components/retention/RecentTracker";
 import { eventPath } from "@/lib/events/eventId";
 import {
   findYearList,
@@ -82,6 +83,11 @@ export default async function YearListPage({
 
   return (
     <PageShell>
+      <RecentTracker
+        kind="date"
+        id={`${list.year}/${list.slug}`}
+        title={list.title}
+      />
       <JsonLd data={yearPageGraph(path, list.title, list.intro, dateModified)} />
       <div className="mx-auto grid w-full max-w-[760px] gap-8 xl:max-w-none xl:grid-cols-[minmax(0,760px)_18rem] xl:justify-center xl:gap-12">
         <div className="min-w-0">

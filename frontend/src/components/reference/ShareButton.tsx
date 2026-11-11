@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { shareClicked } from "@/lib/analytics/events";
 
-type ShareSurface = "event" | "theme" | "date" | "recession" | "decline" | "regime";
+type ShareSurface =
+  | "event"
+  | "theme"
+  | "date"
+  | "recession"
+  | "decline"
+  | "regime"
+  | "roundup";
 
 // Copies the page's canonical URL (or uses the native sheet on touch). The
 // status line is always in the DOM so a screen reader announces it.

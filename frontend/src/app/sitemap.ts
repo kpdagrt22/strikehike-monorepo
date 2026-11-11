@@ -13,6 +13,7 @@ import {
   getUpcomingAll,
   patternsAsOf,
 } from "@/lib/seo/data";
+import { approvedRoundups } from "@/lib/roundup/store";
 import {
   declinePath,
   declineRecordComplete,
@@ -39,14 +40,16 @@ type Generated = { url: string; lastModified: string };
 // the D-06 rules (lib/events/indexing.ts). noindex pages stay out. lastmod is the day the
 // bundle was built, never the build or request time.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [regime, cases, patterns, upcoming, everything, atlas] = await Promise.all([
-    getRegimeSummary().catch(() => null),
-    getCaseCatalogue().catch(() => null),
-    getPatternsDefault().catch(() => null),
-    getUpcoming().catch(() => null),
-    getUpcomingAll().catch(() => null),
-    getRegimeAtlas().catch(() => null),
-  ]);
+  const [regime, cases, patterns, upcoming, everything, atlas, roundups] =
+    await Promise.all([
+      getRegimeSummary().catch(() => null),
+      getCaseCatalogue().catch(() => null),
+      getPatternsDefault().catch(() => null),
+      getUpcoming().catch(() => null),
+      getUpcomingAll().catch(() => null),
+      getRegimeAtlas().catch(() => null),
+      approvedRoundups(),
+    ]);
   const asOf: Partial<Record<SitePath, string | undefined>> = {
     "/regime": regime?.as_of?.slice(0, 10),
     "/convergence": cases?.as_of?.slice(0, 10),
@@ -121,5 +124,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return [...fixed, ...themes, ...events, ...years, ...reference];
+  // Roundups: only the weeks the owner approved. /this-week exists once the
+  // first approved week does, and its lastmod is that week's generation day.
+  const roundupEntries: Generated[] = [];
+  if (roundups.length > 0) {
+    const latest = roundups[0];
+    roundupEntries.push({
+      url: urlFor("/this-week"),
+      lastModified: latest.generated_at.slice(0, 10),
+    });
+    for (const round of roundups) {
+      roundupEntries.push({
+        url: urlFor(`/this-week/${round.week}`),
+        lastModified: round.generated_at.slice(0, 10),
+      });
+    }
+  }
+
+  return [
+    ...fixed,
+    ...roundupEntries,
+    ...themes,
+    ...events,
+    ...years,
+    ...reference,
+  ];
 }

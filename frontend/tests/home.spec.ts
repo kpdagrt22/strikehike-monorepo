@@ -735,6 +735,7 @@ type OrreryScreen = {
 
 const ORRERY_OVERLAYS: Array<[string, string]> = [
   ["intro", "[data-home-intro]"],
+  ["change note", "[data-home-change-note]"],
   ["gauge", '[data-hud="gauge"]'],
   ["aura", ".sh-aura"],
   ["captions", "[data-gauge-captions]"],

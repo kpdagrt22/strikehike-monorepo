@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChangeNote } from "@/components/retention/ChangeNote";
 
 // Server-rendered first paint: the H1 and both actions are in the HTML before
 // the orrery's JavaScript. It sits left of the centred gauge on desktop and
@@ -50,6 +51,7 @@ export function HomeIntro({ compact = false }) {
           </Link>
         )}
       </div>
+      <ChangeNote where="home" />
     </div>
   );
 }

@@ -671,3 +671,21 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* The "Your themes" slot exists in the HTML but takes no space until the
+   pre-paint script sees a followed theme. Then it reserves the group's height
+   before hydration, so the client-rendered group cannot shift the list. */
+[data-your-themes-slot] {
+  display: none;
+}
+
+html[data-follows] [data-your-themes-slot] {
+  display: block;
+  min-height: 13rem;
+}
+
+@media (min-width: 1024px) {
+  html[data-follows] [data-your-themes-slot] {
+    min-height: 10rem;
+  }
+}

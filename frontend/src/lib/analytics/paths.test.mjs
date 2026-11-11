@@ -13,6 +13,7 @@ test("known pages keep their path", () => {
     "/upcoming",
     "/recessions",
     "/declines",
+    "/this-week",
   ]) {
     assert.equal(pageTemplate(path), path);
   }
@@ -52,6 +53,12 @@ test("year pages map to their template", () => {
   assert.equal(pageTemplate("/dates/2027/fomc-meetings"), "/dates/[year]/[list]");
   assert.equal(pageTemplate("/dates/2027/eclipses"), "/dates/[year]/[list]");
   assert.equal(pageTemplate("/dates/2027"), "404");
+});
+
+test("roundup pages map to their template", () => {
+  assert.equal(pageTemplate("/this-week/2026-W46"), "/this-week/[week]");
+  assert.equal(pageTemplate("/this-week/2026-W46/"), "/this-week/[week]");
+  assert.equal(pageTemplate("/this-week/not-a-week"), "404");
 });
 
 test("anything else is 404", () => {

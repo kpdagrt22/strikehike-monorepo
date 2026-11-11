@@ -22,6 +22,8 @@ type Props = {
   breadcrumb?: ReactNode;
   showFilterSubscribes?: boolean;
   share?: ReactNode;
+  changeNote?: ReactNode;
+  footer?: ReactNode;
 };
 
 /**
@@ -43,6 +45,8 @@ export function UpcomingRail({
   breadcrumb = null,
   showFilterSubscribes = true,
   share = null,
+  changeNote = null,
+  footer = null,
 }: Props) {
   return (
     <aside className="min-w-0 lg:sticky lg:top-(--sh-header-clear) lg:max-h-[calc(100dvh-var(--sh-header-clear)-1.5rem)] lg:self-start lg:overflow-y-auto lg:pr-2 lg:[scrollbar-width:thin]">
@@ -63,6 +67,8 @@ export function UpcomingRail({
           </p>
         ) : null}
       </header>
+
+      {changeNote}
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
         <p className="text-meta text-(--sh-text-3)">
@@ -110,6 +116,8 @@ export function UpcomingRail({
           .
         </p>
       ) : null}
+
+      {footer}
     </aside>
   );
 }
