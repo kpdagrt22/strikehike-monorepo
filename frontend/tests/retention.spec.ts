@@ -464,7 +464,7 @@ test.describe("what changed since your last visit", () => {
         });
         const changeNote = home.locator("[data-home-change-note]");
         await expect(changeNote).toBeVisible();
-        await home.waitForTimeout(600);
+        await home.waitForTimeout(1_200);
         const noteBox = await changeNote.boundingBox();
         const probe = await home.evaluate(
           () =>
