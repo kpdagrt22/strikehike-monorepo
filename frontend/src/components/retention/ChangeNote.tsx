@@ -119,6 +119,7 @@ export function ChangeNote({ where }: { where: "home" | "upcoming" }) {
   useEffect(() => {
     if (sessionFlag(SESSION_NOTED)) return;
     let cancelled = false;
+    let timer = 0;
 
     const run = async () => {
       const record = readLastVisit();
@@ -145,9 +146,12 @@ export function ChangeNote({ where }: { where: "home" | "upcoming" }) {
       setSessionFlag(SESSION_NOTED, "1");
     };
 
-    void run();
+    // Off the first paint: the note is not part of LCP, and the small snapshot
+    // fetch must not compete with the orrery or the Upcoming list.
+    timer = window.setTimeout(run, 2_500);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, []);
 
@@ -171,7 +175,9 @@ export function ChangeNote({ where }: { where: "home" | "upcoming" }) {
       data-change-note={where}
       data-home-change-note={where === "home" ? "" : undefined}
       className={`pointer-events-auto rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-card) p-3 text-left shadow-(--sh-shadow-float) ${
-        where === "home" ? "mt-3 w-full" : "mt-4"
+        where === "home"
+          ? "mt-3 w-full lg:fixed lg:left-1/2 lg:top-[22rem] lg:z-30 lg:mt-0 lg:w-[24rem] lg:-translate-x-1/2"
+          : "mt-4"
       }`}
     >
       <p className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">
