@@ -7,8 +7,9 @@ import {
 } from "@playwright/test";
 import { mockHomeData } from "./fixtures/homeData";
 
-// The Sky activity gauge: a legible score on an opaque face, and the fire from
-// 85. The score is forced through the /api/chrono/** mock (energy.score).
+// The Sky activity gauge: a legible score on an opaque face, and the solar
+// corona from 85. The score is forced through the /api/chrono/** mock
+// (energy.score).
 
 const TIERS = [
   { tier: 1, score: 87 },
@@ -20,7 +21,7 @@ const SIZES = [
   { label: "1440", width: 1440, height: 900 },
   { label: "390", width: 390, height: 844 },
 ] as const;
-const MAX_AURA_ELEMENTS = 60;
+const MAX_AURA_ELEMENTS = 8;
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -102,12 +103,6 @@ async function faceAndScore(page: Page) {
 
 function circleOf(face: Box) {
   return { cx: face.x + face.width / 2, cy: face.y + face.height / 2, r: face.width / 2 };
-}
-
-function boxReachesCircle(box: Box, circle: { cx: number; cy: number; r: number }) {
-  const nearestX = Math.max(box.x, Math.min(circle.cx, box.x + box.width));
-  const nearestY = Math.max(box.y, Math.min(circle.cy, box.y + box.height));
-  return Math.hypot(nearestX - circle.cx, nearestY - circle.cy) < circle.r;
 }
 
 function channels(value: string) {
@@ -204,28 +199,29 @@ test.describe("gauge fire", () => {
     });
 
     for (const size of SIZES) {
-      test(`tier ${tier} (${score}): no flame box reaches the face at ${size.label}`, async ({
+      test(`tier ${tier} (${score}): the opaque face sits above the corona at ${size.label}`, async ({
         page,
       }) => {
         const errors = watchErrors(page);
         await openGauge(page, { score, width: size.width, height: size.height });
-        await page.waitForTimeout(500); // past the aura's entrance
-        for (let sample = 0; sample < 6; sample += 1) {
-          const { face } = await faceAndScore(page);
-          const circle = circleOf(face);
-          const boxes = await page
-            .locator(".sh-flame, .sh-ember")
-            .evaluateAll((elements) =>
-              elements.map((element) => {
-                const rect = element.getBoundingClientRect();
-                return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-              }),
-            );
-          expect(boxes.length).toBeGreaterThan(0);
-          const inside = boxes.filter((box) => boxReachesCircle(box, circle));
-          expect(inside, JSON.stringify({ circle, inside })).toEqual([]);
-          await page.waitForTimeout(170);
-        }
+        const order = await page.evaluate(() => {
+          const face = document.querySelector("[data-gauge-face]")!;
+          const aura = document.querySelector(".sh-aura")!;
+          const layers = [aura, ...aura.querySelectorAll("*")];
+          return {
+            faceAlpha: getComputedStyle(face).backgroundColor,
+            // Every corona layer comes before the face in the same stacking
+            // context, and none lifts itself with a z-index.
+            allBefore: layers.every(
+              (layer) =>
+                Boolean(layer.compareDocumentPosition(face) & Node.DOCUMENT_POSITION_FOLLOWING),
+            ),
+            zIndexes: layers.map((layer) => getComputedStyle(layer).zIndex),
+          };
+        });
+        expect(channels(order.faceAlpha).a).toBe(1);
+        expect(order.allBefore).toBe(true);
+        expect(order.zIndexes.every((value) => value === "auto")).toBe(true);
         expect(errors).toEqual([]);
       });
     }
@@ -254,7 +250,7 @@ test.describe("gauge score", () => {
         );
         expect(circle.r - farthest).toBeGreaterThanOrEqual(6);
         const numerals = await page
-          .locator("[data-gauge-number], [data-gauge-of]")
+          .locator("[data-gauge-number]")
           .evaluateAll((elements) =>
             elements.map((element) => getComputedStyle(element).fontVariantNumeric),
           );
@@ -265,26 +261,18 @@ test.describe("gauge score", () => {
   }
 
   for (const theme of ["dark", "light"] as const) {
-    test(`the number and "/ 100" contrast with the face, ${theme}`, async ({ page }) => {
+    test(`the number contrasts with the face, ${theme}`, async ({ page }) => {
       await openGauge(page, { score: 99, width: 1440, height: 900, theme });
-      const colors = await page.evaluate(() => {
-        const color = (selector: string) =>
-          getComputedStyle(document.querySelector(selector)!).color;
-        return {
-          face: getComputedStyle(document.querySelector("[data-gauge-face]")!).backgroundColor,
-          number: color("[data-gauge-number]"),
-          of: color("[data-gauge-of]"),
-        };
-      });
+      const colors = await page.evaluate(() => ({
+        face: getComputedStyle(document.querySelector("[data-gauge-face]")!).backgroundColor,
+        number: getComputedStyle(document.querySelector("[data-gauge-number]")!).color,
+        of: document.querySelectorAll("[data-gauge-of]").length,
+      }));
       expect(channels(colors.face).a).toBe(1); // opaque
+      expect(colors.of).toBe(0); // the number stands alone
       const number = contrast(over(colors.number, colors.face), colors.face);
-      const of = contrast(over(colors.of, colors.face), colors.face);
-      console.log(
-        `contrast ${theme}: number ${number.toFixed(2)}:1, "/ 100" ${of.toFixed(2)}:1`,
-        JSON.stringify(colors),
-      );
+      console.log(`contrast ${theme}: number ${number.toFixed(2)}:1`, JSON.stringify(colors));
       expect(number).toBeGreaterThanOrEqual(7);
-      expect(of).toBeGreaterThanOrEqual(4.5);
     });
   }
 });

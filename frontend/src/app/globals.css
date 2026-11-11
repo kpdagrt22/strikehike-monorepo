@@ -323,18 +323,17 @@
   border-radius: 9999px;
 }
 
-/* Sky activity fire (GaugeAura.jsx, geometry in lib/aura/crown.ts): from 85.
-   Continuous by the owner's choice, transform and opacity only. Tongues are
-   grouped into short sectors; each sector runs two loops on separate transform
-   properties (`scale` for the lick, `transform` for the bend) about its own
-   base, and the sectors run out of phase, so the crown shimmers without one
-   animation per tongue: the compositor's per-frame work stays small. Each
-   tongue is one masked element with its lean a static `rotate`; no animated
-   element reads a var(). The whole crown sways, the blurred glow only
-   breathes. Paused offscreen, in a hidden tab and under a phone sheet;
-   reduced motion shows the still frame at the end of this block. */
+/* Sky activity corona (GaugeAura.jsx): from 85, the ring reads like the Sun's
+   rim in a total eclipse. Continuous by the owner's choice; transform and
+   opacity only, so it runs on the compositor. A soft glow and a thin rim
+   breathe; two streamer layers turn in opposite directions at different
+   speeds, so their rays cross and shimmer; at 95+ a bead of light travels
+   round the rim. Paused offscreen, in a hidden tab and under a phone sheet;
+   reduced motion shows the still frame at the end of this block.
+   Colours are existing palette values: pearl and gold on the dark sky,
+   ember and amber on the light one. */
 .sh-aura {
-  animation: sh-aura-in 420ms var(--sh-ease-out) both;
+  animation: sh-aura-in 700ms var(--sh-ease-out) both;
 }
 
 .sh-aura[data-paused="true"],
@@ -342,163 +341,195 @@
   animation-play-state: paused;
 }
 
-.sh-aura-sway,
-.sh-aura-glow {
+.sh-corona {
+  --corona-core: 255 233 194; /* pearl gold */
+  --corona-mid: 247 197 107;
+  --corona-edge: 240 93 73;
+  --corona-strength: 1;
+}
+
+.sh-corona[data-theme="light"] {
+  --corona-core: 232 137 47;
+  --corona-mid: 217 138 43;
+  --corona-edge: 192 68 47;
+  --corona-strength: 0.75;
+}
+
+.sh-corona-glow,
+.sh-corona-rays,
+.sh-corona-orbit {
   position: absolute;
   inset: 0;
-}
-
-.sh-aura-sway {
-  transform-origin: 50% 50%;
-  animation-name: sh-aura-sway;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-}
-
-.sh-aura-glow {
-  animation: sh-aura-breathe 5.4s ease-in-out infinite alternate;
-}
-
-.sh-sector {
-  position: absolute;
-  inset: 0;
-  animation-name: sh-flame-flicker;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-.sh-flame {
-  position: absolute;
-  display: block;
-  transform-origin: 50% 100%;
-  mask-size: 100% 100%;
-  mask-repeat: no-repeat;
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-}
-
-/* The tongue shapes (crown.ts flameMask, mirrored from data-v 4), each with
-   slightly translucent edges. */
-.sh-flame[data-v="0"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M-0.42 0C-0.5 -0.2 -0.34 -0.36 -0.26 -0.52C-0.18 -0.68 -0.2 -0.84 -0.04 -1C0 -0.88 0.12 -0.8 0.18 -0.66C0.24 -0.52 0.36 -0.46 0.4 -0.3C0.46 -0.14 0.44 -0.04 0.36 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="1"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M-0.38 0C-0.5 -0.18 -0.36 -0.34 -0.3 -0.48C-0.24 -0.62 -0.32 -0.76 -0.24 -0.9C-0.14 -0.78 -0.06 -0.7 -0.02 -0.6C0.02 -0.74 0.1 -0.88 0.2 -1C0.22 -0.84 0.34 -0.68 0.38 -0.5C0.44 -0.3 0.5 -0.1 0.4 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="2"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M-0.3 0C-0.46 -0.16 -0.18 -0.32 -0.18 -0.5C-0.18 -0.68 -0.06 -0.8 0.06 -1C0.1 -0.86 0.2 -0.74 0.22 -0.58C0.24 -0.4 0.4 -0.2 0.32 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="3"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M-0.44 0C-0.5 -0.24 -0.28 -0.4 -0.24 -0.58C-0.2 -0.72 -0.3 -0.86 -0.42 -0.96C-0.22 -0.96 -0.04 -0.86 0.04 -0.72C0.14 -0.56 0.38 -0.5 0.44 -0.3C0.5 -0.14 0.48 -0.04 0.4 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="4"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M0.42 0C0.5 -0.2 0.34 -0.36 0.26 -0.52C0.18 -0.68 0.2 -0.84 0.04 -1C0 -0.88 -0.12 -0.8 -0.18 -0.66C-0.24 -0.52 -0.36 -0.46 -0.4 -0.3C-0.46 -0.14 -0.44 -0.04 -0.36 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="5"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M0.38 0C0.5 -0.18 0.36 -0.34 0.3 -0.48C0.24 -0.62 0.32 -0.76 0.24 -0.9C0.14 -0.78 0.06 -0.7 0.02 -0.6C-0.02 -0.74 -0.1 -0.88 -0.2 -1C-0.22 -0.84 -0.34 -0.68 -0.38 -0.5C-0.44 -0.3 -0.5 -0.1 -0.4 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="6"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M0.3 0C0.46 -0.16 0.18 -0.32 0.18 -0.5C0.18 -0.68 0.06 -0.8 -0.06 -1C-0.1 -0.86 -0.2 -0.74 -0.22 -0.58C-0.24 -0.4 -0.4 -0.2 -0.32 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-.sh-flame[data-v="7"] {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.5 -1 1 1' preserveAspectRatio='none'%3E%3Cpath d='M0.44 0C0.5 -0.24 0.28 -0.4 0.24 -0.58C0.2 -0.72 0.3 -0.86 0.42 -0.96C0.22 -0.96 0.04 -0.86 -0.04 -0.72C-0.14 -0.56 -0.38 -0.5 -0.44 -0.3C-0.5 -0.14 -0.48 -0.04 -0.4 0Z'/%3E%3C/svg%3E"), linear-gradient(to right, rgb(0 0 0 / 0.45), #000 34%, #000 66%, rgb(0 0 0 / 0.45));
-}
-
-/* Deep red at the base, then ember orange and gold; pearl tips from 95. Light
-   runs deeper so the fire holds on the beige sky. Existing palette values. */
-.sh-aura[data-tier="1"] .sh-flame {
-  background-image: linear-gradient(to top, #c0442f, #e8533f 30%, #e8533f 60%, #e8892f 86%, #e8892f);
-}
-
-.sh-aura[data-tier="2"] .sh-flame {
-  background-image: linear-gradient(to top, #c0442f, #e8533f 30%, #e8892f 60%, #d98a2b 86%, #d98a2b);
-}
-
-.sh-aura[data-tier="3"] .sh-flame {
-  background-image: linear-gradient(to top, #c0442f, #e8533f 30%, #e8892f 60%, #d98a2b 86%, #f7c46a);
-}
-
-.sh-aura[data-tier="2"] .sh-flame[data-layer="core"] {
-  background-image: linear-gradient(to top, #e8892f, #d98a2b 48%, #d98a2b);
-}
-
-.sh-aura[data-tier="3"] .sh-flame[data-layer="core"] {
-  background-image: linear-gradient(to top, #e8892f, #d98a2b 48%, #f7c46a);
-}
-
-.sh-aura .sh-ember {
-  background-image: radial-gradient(circle, #f7c46a 0 30%, #d98a2b 55%, transparent 72%);
-}
-
-.dark .sh-aura[data-tier="1"] .sh-flame {
-  background-image: linear-gradient(to top, #c0442f, #f05d49 30%, #f05d49 60%, #f2a54a 86%, #f2a54a);
-}
-
-.dark .sh-aura[data-tier="2"] .sh-flame {
-  background-image: linear-gradient(to top, #c0442f, #f05d49 30%, #f2a54a 60%, #f7c56b 86%, #f7c56b);
-}
-
-.dark .sh-aura[data-tier="3"] .sh-flame {
-  background-image: linear-gradient(to top, #c0442f, #f05d49 30%, #f2a54a 60%, #f7c56b 86%, #ffe9c2);
-}
-
-.dark .sh-aura[data-tier="2"] .sh-flame[data-layer="core"] {
-  background-image: linear-gradient(to top, #f2a54a, #f7c56b 48%, #f7c56b);
-}
-
-.dark .sh-aura[data-tier="3"] .sh-flame[data-layer="core"] {
-  background-image: linear-gradient(to top, #f2a54a, #f7c56b 48%, #ffe9c2);
-}
-
-.dark .sh-aura .sh-ember {
-  background-image: radial-gradient(circle, #ffe9c2 0 30%, #f7c56b 55%, transparent 72%);
-}
-
-.sh-ember {
-  position: absolute;
-  display: block;
   border-radius: 9999px;
-  opacity: 0;
-  animation-timing-function: cubic-bezier(0.3, 0.6, 0.6, 1);
+}
+
+/* The glow: a bright band at the ring that fades into the sky. Its stops
+   are pixel distances set in GaugeAura.jsx (glowFill). */
+.sh-corona-glow {
+  animation: sh-corona-breathe 7.2s ease-in-out infinite alternate;
+}
+
+.sh-corona[data-theme="light"] .sh-corona-glow {
+  animation-name: sh-corona-breathe-light;
+}
+
+/* Streamers: irregular soft rays, set A fine and long, set B broad and faint. */
+.sh-corona-rays {
+  filter: blur(2px);
+  animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
 
-.sh-ember[data-path="l"] {
-  animation-name: sh-ember-l;
+.sh-corona-rays[data-set="a"] {
+  background: conic-gradient(
+    from 4deg,
+    transparent 0deg,
+    rgb(var(--corona-core) / 0.5) 5deg,
+    transparent 11deg,
+    transparent 31deg,
+    rgb(var(--corona-mid) / 0.35) 36deg,
+    transparent 44deg,
+    rgb(var(--corona-core) / 0.42) 52deg,
+    transparent 57deg,
+    transparent 83deg,
+    rgb(var(--corona-core) / 0.55) 90deg,
+    transparent 97deg,
+    transparent 122deg,
+    rgb(var(--corona-mid) / 0.32) 129deg,
+    transparent 138deg,
+    rgb(var(--corona-core) / 0.38) 151deg,
+    transparent 156deg,
+    transparent 181deg,
+    rgb(var(--corona-core) / 0.5) 188deg,
+    transparent 194deg,
+    transparent 214deg,
+    rgb(var(--corona-mid) / 0.3) 222deg,
+    transparent 231deg,
+    rgb(var(--corona-core) / 0.45) 246deg,
+    transparent 252deg,
+    transparent 274deg,
+    rgb(var(--corona-core) / 0.52) 281deg,
+    transparent 288deg,
+    transparent 305deg,
+    rgb(var(--corona-mid) / 0.34) 313deg,
+    transparent 322deg,
+    rgb(var(--corona-core) / 0.4) 337deg,
+    transparent 343deg,
+    transparent 360deg
+  );
+  opacity: calc(0.85 * var(--corona-strength));
+  animation-name: sh-corona-turn;
+  animation-duration: 140s;
 }
 
-.sh-ember[data-path="r"] {
-  animation-name: sh-ember-r;
+.sh-corona-rays[data-set="b"] {
+  background: conic-gradient(
+    from 21deg,
+    transparent 0deg,
+    rgb(var(--corona-mid) / 0.24) 10deg,
+    transparent 24deg,
+    transparent 58deg,
+    rgb(var(--corona-edge) / 0.18) 70deg,
+    transparent 86deg,
+    transparent 112deg,
+    rgb(var(--corona-mid) / 0.22) 124deg,
+    transparent 139deg,
+    transparent 176deg,
+    rgb(var(--corona-edge) / 0.16) 190deg,
+    transparent 205deg,
+    transparent 236deg,
+    rgb(var(--corona-mid) / 0.24) 249deg,
+    transparent 262deg,
+    transparent 298deg,
+    rgb(var(--corona-edge) / 0.18) 311deg,
+    transparent 326deg,
+    transparent 360deg
+  );
+  opacity: calc(0.9 * var(--corona-strength));
+  animation-name: sh-corona-turn-back;
+  animation-duration: 96s;
 }
 
-.sh-ember[data-path="s"] {
-  animation-name: sh-ember-s;
+.sh-corona[data-theme="light"] .sh-corona-rays[data-set="a"] {
+  opacity: 0.5;
 }
 
-.sh-aura[data-mode="compact"] .sh-ember[data-path="l"] {
-  animation-name: sh-ember-l-c;
+.sh-corona[data-theme="light"] .sh-corona-rays[data-set="b"] {
+  opacity: 0.55;
 }
 
-.sh-aura[data-mode="compact"] .sh-ember[data-path="r"] {
-  animation-name: sh-ember-r-c;
+/* Reach and brightness by tier: a static scale, not an animated one. */
+.sh-aura[data-tier="1"] .sh-corona-rays {
+  scale: 0.8;
 }
 
-.sh-aura[data-mode="compact"] .sh-ember[data-path="s"] {
-  animation-name: sh-ember-s-c;
+.sh-aura[data-tier="1"] .sh-corona-rays[data-set="a"] {
+  opacity: calc(0.55 * var(--corona-strength));
+}
+
+.sh-aura[data-tier="2"] .sh-corona-rays {
+  scale: 0.9;
+}
+
+/* The rim: the chromosphere's thin bright line, right on the ring. */
+.sh-corona-rim {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 9999px;
+  box-shadow:
+    0 0 0 1px rgb(var(--corona-core) / 0.55),
+    0 0 6px 1px rgb(var(--corona-core) / 0.45),
+    0 0 16px 2px rgb(var(--corona-mid) / 0.3);
+  animation: sh-corona-rim 4.6s ease-in-out infinite alternate;
+}
+
+.sh-corona[data-theme="light"] .sh-corona-rim {
+  animation-name: sh-corona-rim-light;
+}
+
+.sh-aura[data-tier="3"] .sh-corona-rim {
+  box-shadow:
+    0 0 0 1px rgb(var(--corona-core) / 0.7),
+    0 0 8px 1px rgb(var(--corona-core) / 0.55),
+    0 0 22px 3px rgb(var(--corona-mid) / 0.36);
+}
+
+/* 95+: the diamond-ring bead, travelling slowly round the rim. */
+.sh-corona-orbit {
+  animation: sh-corona-turn 38s linear infinite;
+}
+
+.sh-corona-bead {
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.95) 0 22%,
+    rgb(var(--corona-core) / 0.85) 40%,
+    transparent 72%
+  );
+  box-shadow: 0 0 10px 3px rgb(var(--corona-core) / 0.45);
+  animation: sh-corona-twinkle 2.6s ease-in-out infinite alternate;
+}
+
+.sh-corona[data-theme="light"] .sh-corona-bead {
+  background: radial-gradient(
+    circle,
+    rgb(255 248 236 / 0.95) 0 22%,
+    rgb(var(--corona-core) / 0.9) 42%,
+    transparent 72%
+  );
 }
 
 @keyframes sh-aura-in {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.94);
   }
   to {
     opacity: 1;
@@ -506,155 +537,78 @@
   }
 }
 
-@keyframes sh-aura-sway {
-  from {
-    transform: rotate(-1.4deg);
-  }
-  to {
-    transform: rotate(1.4deg);
-  }
-}
-
-@keyframes sh-aura-breathe {
+@keyframes sh-corona-breathe {
   from {
     opacity: 0.62;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes sh-corona-breathe-light {
+  from {
+    opacity: 0.46;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 0.75;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes sh-corona-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sh-corona-turn-back {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes sh-corona-rim {
+  from {
+    opacity: 0.55;
   }
   to {
     opacity: 1;
   }
 }
 
-/* Each sector's extremes are mirrored in crown.ts (MOTION), which keeps every
-   tongue's box clear of the score's face. One track: a lengthening lick with a
-   bend, so a sector needs one animation, not one per tongue. */
-@keyframes sh-flame-flicker {
-  0%,
-  100% {
-    transform: skewX(-6deg) scaleY(0.9) translateX(0);
+@keyframes sh-corona-rim-light {
+  from {
+    opacity: 0.42;
   }
-  30% {
-    transform: skewX(1deg) scaleY(1.1) translateX(0.8px);
-  }
-  64% {
-    transform: skewX(6deg) scaleY(0.97) translateX(-0.4px);
+  to {
+    opacity: 0.75;
   }
 }
 
-@keyframes sh-ember-l {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1);
+@keyframes sh-corona-twinkle {
+  from {
+    opacity: 0.55;
+    transform: scale(0.8);
   }
-  14% {
+  to {
     opacity: 1;
-  }
-  55% {
-    transform: translate(-3px, -19px) scale(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-9px, -34px) scale(0.3);
+    transform: scale(1.15);
   }
 }
 
-@keyframes sh-ember-r {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1);
-  }
-  14% {
-    opacity: 1;
-  }
-  55% {
-    transform: translate(3px, -19px) scale(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(9px, -34px) scale(0.3);
-  }
-}
-
-@keyframes sh-ember-s {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1);
-  }
-  14% {
-    opacity: 1;
-  }
-  55% {
-    transform: translate(1px, -19px) scale(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(2px, -34px) scale(0.3);
-  }
-}
-
-@keyframes sh-ember-l-c {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1);
-  }
-  14% {
-    opacity: 1;
-  }
-  55% {
-    transform: translate(-3px, -9px) scale(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-9px, -16px) scale(0.3);
-  }
-}
-
-@keyframes sh-ember-r-c {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1);
-  }
-  14% {
-    opacity: 1;
-  }
-  55% {
-    transform: translate(3px, -9px) scale(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(9px, -16px) scale(0.3);
-  }
-}
-
-@keyframes sh-ember-s-c {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(1);
-  }
-  14% {
-    opacity: 1;
-  }
-  55% {
-    transform: translate(1px, -9px) scale(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(2px, -16px) scale(0.3);
-  }
-}
-
-/* The still frame: no animation at all, each sector at its own scale and the
-   embers resting in the crown. */
+/* The still frame: no animation at all, the corona at rest. */
 @media (prefers-reduced-motion: reduce) {
   .sh-aura,
   .sh-aura * {
     animation: none !important;
   }
 
-  .sh-ember {
-    opacity: 0.7;
-  }
-
-  .sh-aura-glow {
+  .sh-corona-glow,
+  .sh-corona-rim {
     opacity: 0.85;
   }
 }

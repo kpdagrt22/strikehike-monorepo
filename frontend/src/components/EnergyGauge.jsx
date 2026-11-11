@@ -183,7 +183,7 @@ export function EnergyGauge({
         mobileSheet ? "max-lg:opacity-0" : ""
       }`}
     >
-      {/* From 85 the ring gains an animated flame aura (GaugeAura.jsx). */}
+      {/* From 85 the ring gains a solar corona (GaugeAura.jsx). */}
       <div className="relative h-[116px] w-[116px]">
         <div
           aria-hidden="true"
@@ -261,24 +261,17 @@ export function EnergyGauge({
           />
         </svg>
 
-        {/* "/ 100" sits under the number at every size: side by side, "100"
-            would not clear the face's edge. */}
+        {/* The number alone (owner's choice, 11 Nov 2026): the ring's arc
+            already shows it out of 100, and the svg's label says so. */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            data-gauge-score
-            className="flex flex-col items-center tabular-nums"
-          >
+          <span data-gauge-score className="flex items-center tabular-nums">
             <span
               data-gauge-number
-              className="text-[30px] font-light leading-none tracking-[-0.05em] text-(--sh-ink) dark:text-(--sh-pearl)"
+              className={`translate-y-[1px] font-extralight leading-none tracking-[-0.045em] text-(--sh-ink) dark:text-(--sh-pearl) ${
+                score !== null && Math.round(score) >= 100 ? "text-[31px]" : "text-[36px]"
+              }`}
             >
               {score === null ? "—" : Math.round(score)}
-            </span>
-            <span
-              data-gauge-of
-              className="mt-0.5 font-mono text-meta leading-none tracking-[0.02em] text-(--sh-text-2)"
-            >
-              / 100
             </span>
           </span>
         </div>
