@@ -9,6 +9,7 @@ const BOXES = {
   gauge: '[data-hud="gauge"]',
   aura: ".sh-aura",
   intro: "[data-home-intro]",
+  changeNote: "[data-home-change-note]",
   left: "[data-home-left-column]",
   right: "#chrono-alignment-sheet",
   timeline: '[data-hud="timeline"]',
@@ -63,9 +64,13 @@ function measure() {
   // The flame aura is larger than the gauge's box; it owns that space too.
   if (boxes.aura) top = Math.max(top, boxes.aura.bottom + GAP);
   // The intro sits above the left column; when it reaches into the free width,
-  // the scene starts below it.
+  // the scene starts below it. The change note is part of the intro's column
+  // but is measured on its own too, so a taller note always clears the sky.
   if (boxes.intro && boxes.intro.right > left + 4) {
     top = Math.max(top, boxes.intro.bottom + GAP);
+  }
+  if (boxes.changeNote && boxes.changeNote.right > left + 4) {
+    top = Math.max(top, boxes.changeNote.bottom + GAP);
   }
 
   let bottom = height - EDGE;
