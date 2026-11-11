@@ -6,6 +6,7 @@ import { ReferenceSparkline } from "@/components/reference/ReferenceSparkline";
 import { ShareButton } from "@/components/reference/ShareButton";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { RecentTracker } from "@/components/retention/RecentTracker";
 import {
   formatDate,
   formatNumber,
@@ -104,6 +105,7 @@ export default async function DeclinePage({ params }: Params) {
 
   return (
     <PageShell data-reference-detail="decline">
+      <RecentTracker kind="decline" id={fall.id} title={fall.name} />
       <JsonLd
         data={referenceDetailGraph({
           path,

@@ -7,6 +7,7 @@ import { PageShell } from "@/components/PageShell";
 import { ShareButton } from "@/components/reference/ShareButton";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
+import { RecentTracker } from "@/components/retention/RecentTracker";
 import { eventCalendarPath, eventIdFromSlug, eventSlug, skyHref } from "@/lib/events/eventId";
 import { googleCalendarUrl } from "@/lib/events/googleCalendar";
 import { isIndexableEvent } from "@/lib/events/indexing";
@@ -134,6 +135,7 @@ export default async function EventPage({
 
   return (
     <PageShell>
+      <RecentTracker kind="event" id={event.event_id} title={event.name} />
       <JsonLd data={eventPageGraph(path, `${event.name} · ${day}`, summary, asOf)} />
       <div className="mx-auto grid w-full max-w-[760px] gap-8 xl:max-w-none xl:grid-cols-[minmax(0,760px)_20rem] xl:justify-center xl:gap-12">
         <div className="min-w-0">
