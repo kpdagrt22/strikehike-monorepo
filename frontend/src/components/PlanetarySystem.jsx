@@ -10,8 +10,8 @@ import { useChronoStore } from "@/store/chronoStore";
 import { viewOpened } from "@/lib/analytics/events";
 import { useEntityStore } from "@/store/entityStore";
 
-const EARTH_RADIUS = 1.66;
-const EARTH_SIZE = 0.09;
+export const EARTH_RADIUS = 1.66;
+export const EARTH_SIZE = 0.09;
 const MOON_SIZE = EARTH_SIZE * 0.42;
 const MOON_ORBIT_RADIUS = EARTH_SIZE * 2.8;
 const SATURN_TILT = Math.PI / 2 + 0.47;
@@ -47,7 +47,7 @@ const TEXTURE_PATHS = [
  * the scene is a legible orrery, not a scale model of the solar system. The
  * Sun is the central anchor; the rest are perceptual relative sizes.
  */
-const PLANETS = [
+export const PLANETS = [
   {
     name: "Sun",
     symbol: "☉",

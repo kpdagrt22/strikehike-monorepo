@@ -14,6 +14,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import gsap from "gsap";
 import { AmbientCosmos } from "@/components/AmbientCosmos";
+import { OrreryFallback } from "@/components/OrreryFallback";
 import { PlanetarySystem } from "@/components/PlanetarySystem";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import {
@@ -440,10 +441,26 @@ export const Canvas3D = memo(function Canvas3D({
   // rest; reduced motion renders on demand from the first frame.
   const [resting, setResting] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
+  const [webgl, setWebgl] = useState(null);
   const ambientRef = useRef(reducedMotion ? 0 : 1);
+  const positions = useChronoStore((state) => state.positions);
   const clearPinnedEntity = useEntityStore(
     (state) => state.clearPinnedEntity,
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const canvas = document.createElement("canvas");
+        const context =
+          canvas.getContext("webgl2") || canvas.getContext("webgl");
+        setWebgl(Boolean(context));
+      } catch {
+        setWebgl(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   // The scene probe is opt-in (?orreryProbe=1 or NEXT_PUBLIC_ORRERY_PROBE=1):
   // the layout tests read the planets' screen boxes; nothing is sent anywhere.
   const [probe] = useState(
@@ -460,10 +477,12 @@ export const Canvas3D = memo(function Canvas3D({
   return (
     <div
       className="absolute inset-0"
-      aria-hidden="true"
+      aria-hidden={webgl === false ? undefined : "true"}
       data-orrery-probe={probe ? "true" : undefined}
       data-orrery-ready={probe && introComplete ? "true" : undefined}
     >
+      {webgl === false ? <OrreryFallback positions={positions} /> : null}
+      {webgl === true ? (
       <Canvas
         dpr={[1, 1.5]}
         frameloop={reducedMotion || resting ? "demand" : "always"}
@@ -478,6 +497,14 @@ export const Canvas3D = memo(function Canvas3D({
         onCreated={({ gl, camera }) => {
           gl.setClearColor(0x000000, 0);
           camera.lookAt(0, 0, 0);
+          gl.domElement.addEventListener(
+            "webglcontextlost",
+            (event) => {
+              event.preventDefault();
+              setWebgl(false);
+            },
+            { once: true },
+          );
         }}
         // A tap or click on empty sky closes a pinned planet readout.
         onPointerMissed={clearPinnedEntity}
@@ -508,6 +535,7 @@ export const Canvas3D = memo(function Canvas3D({
           </>
         ) : null}
       </Canvas>
+      ) : null}
     </div>
   );
 });

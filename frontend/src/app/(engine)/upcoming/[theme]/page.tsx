@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { DataUnavailable } from "@/components/states/DataUnavailable";
 import { ShareButton } from "@/components/reference/ShareButton";
 import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
@@ -99,6 +100,7 @@ export default async function ThemePage({
     getEventsHealth().catch(() => null),
   ]);
   const events = payload?.themes?.[name]?.events ?? [];
+  const unavailable = !payload || Boolean(payload.message);
   const decision = isIndexableTheme({ name, upcoming: events.length });
   const history = archiveCount(health, name);
   const path = `/upcoming/${theme}`;
@@ -171,11 +173,22 @@ export default async function ThemePage({
         />
 
         <div className="mt-8 min-w-0 lg:mt-0">
-          {events.length > 0 ? (
+          {unavailable ? (
+            <DataUnavailable
+              title={`${name} dates are unavailable right now.`}
+              detail="The calendar service did not answer. Try again in a moment."
+            />
+          ) : events.length > 0 ? (
             <UpcomingGroups groups={groups} />
           ) : (
-            <p className="mt-6 text-body text-(--sh-text-2)">
-              No {name} dates are scheduled in the next 12 months.
+            <p className="mt-6 max-w-xl text-body leading-relaxed text-(--sh-text-2)">
+              Nothing scheduled in the next 12 months for {name}.{" "}
+              <Link
+                href="/upcoming"
+                className="underline decoration-current/30 underline-offset-2 hover:text-(--sh-text-1) hover:decoration-current"
+              >
+                See all upcoming dates.
+              </Link>
             </p>
           )}
 

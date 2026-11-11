@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
+import { DataUnavailable } from "@/components/states/DataUnavailable";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingPageTracker } from "@/components/upcoming/UpcomingPageTracker";
@@ -65,9 +66,10 @@ export default async function UpcomingPage() {
 
         <div className="mt-8 min-w-0 lg:mt-0">
           {unavailable ? (
-            <p className="mt-6 max-w-xl border-t border-(--sh-line-1) pt-5 text-body leading-relaxed text-(--sh-text-2)">
-              Upcoming dates are unavailable right now. Please check back soon.
-            </p>
+            <DataUnavailable
+              title="Upcoming dates are unavailable right now."
+              detail="The calendar service did not answer. Try again in a moment."
+            />
           ) : groups.length === 0 ? (
             <p className="mt-6 text-body text-(--sh-text-2)">
               No dates are scheduled in the next 12 months.{" "}
