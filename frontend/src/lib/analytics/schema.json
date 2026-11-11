@@ -155,6 +155,13 @@
         "method": { "type": "enum", "values": ["apple", "google", "outlook", "copy", "download"] }
       }
     },
+    "sound_changed": {
+      "required": ["choice", "trigger"],
+      "properties": {
+        "choice": { "type": "enum", "values": ["off", "drift", "orbit", "wind"] },
+        "trigger": { "type": "enum", "values": ["auto", "click"] }
+      }
+    },
     "share_clicked": {
       "required": ["surface", "method"],
       "properties": {

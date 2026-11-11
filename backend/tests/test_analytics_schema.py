@@ -94,6 +94,7 @@ def test_schema_has_only_the_live_events_and_no_future_ones():
         "theme_followed",
         "change_note",
         "experiment_exposed",
+        "sound_changed",
     }
     assert "link_shared" not in names
     assert set(load_schema()["paths"]) == {
@@ -157,6 +158,29 @@ def test_share_clicked_accepts_only_the_known_surfaces_and_methods():
         {"surface": "page", "method": "clipboard"},
         {"surface": "event", "method": "email"},
         {"surface": "event"},
+    ):
+        bad = {**good, "pr": props}
+        _, events, _, _, invalid = validate_batch(payload(ev=[bad]))
+        assert events == []
+        assert invalid == 1
+
+
+def test_sound_changed_accepts_only_the_known_choices_and_triggers():
+    good = {
+        "n": "sound_changed",
+        "t": 1,
+        "pv": "a" * 12,
+        "p": "/",
+        "pr": {"choice": "orbit", "trigger": "click"},
+    }
+    _, events, _, _, invalid = validate_batch(payload(ev=[good]))
+    assert invalid == 0
+    assert events[0]["props"] == {"choice": "orbit", "trigger": "click"}
+
+    for props in (
+        {"choice": "jazz", "trigger": "click"},
+        {"choice": "off", "trigger": "hover"},
+        {"choice": "drift"},
     ):
         bad = {**good, "pr": props}
         _, events, _, _, invalid = validate_batch(payload(ev=[bad]))
