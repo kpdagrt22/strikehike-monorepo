@@ -375,3 +375,117 @@ def test_experiment_split_counts_engaged_sessions_per_variant(tmp_path):
     text = json.dumps(payload)
     for aid in ("A" * 22, "B" * 22, "C" * 22):
         assert aid not in text
+
+
+def put_ctx(store, aid, sid, events, when, vw, tz):
+    envelope = {
+        "v": 1,
+        "aid": aid,
+        "sid": sid,
+        "new": 1,
+        "eph": 0,
+        "ctx": {"vw": vw, "tz": tz, "app": "abc1234"},
+        "exp": [],
+        "ev": events,
+    }
+    parsed, valid, stripped, vis, _invalid = validate_batch(envelope)
+    store.ingest(
+        parsed,
+        valid,
+        vis,
+        "Mozilla/5.0 (Windows NT 10.0) Chrome/124",
+        f"net-{aid}",
+        now_ms=int(when.timestamp() * 1000),
+        stripped_props=stripped,
+    )
+
+
+def test_v2_engagement_device_region_and_funnels(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    letters = "DEFGHIJKLMNOP"
+    # Six phone sessions in India: each views home and travels a date; the
+    # first five also go Upcoming -> an event page -> its source.
+    for index in range(6):
+        aid = letters[index] * 22
+        sid = letters[index] * 16
+        pv = f"{index:x}" * 12
+        rows = [
+            event("page_viewed", NOW, pv),
+            event(
+                "date_travelled",
+                NOW,
+                pv,
+                method="scrub",
+                target_year=2020,
+                is_future=0,
+            ),
+        ]
+        if index < 5:
+            rows += [
+                event("page_viewed", NOW, pv, path="/upcoming"),
+                event("page_viewed", NOW, pv, path="/events/[id]"),
+                event(
+                    "event_source_clicked",
+                    NOW,
+                    pv,
+                    path="/events/[id]",
+                    event_id="finance:fred_release_dates:53-2026-11",
+                    theme="finance",
+                ),
+            ]
+        put_ctx(store, aid, sid, rows, NOW, 390, "Asia/Kolkata")
+    # Five desktop sessions in the US that only view a reference page.
+    for index in range(6, 11):
+        aid = letters[index] * 22
+        sid = letters[index] * 16
+        pv = f"{index:x}" * 12
+        put_ctx(
+            store,
+            aid,
+            sid,
+            [event("page_viewed", NOW, pv, path="/recessions/[id]")],
+            NOW,
+            1440,
+            "America/New_York",
+        )
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    try:
+        payload = build_weekly_export(store, WEEK, logs)
+    finally:
+        store.close()
+
+    assert payload["export_version"] == 2
+    product = payload["product"]
+    assert product["engagement"]["sessions"] == {"value": 11}
+    assert product["engagement"]["engaged_sessions"] == {"value": 6}
+    assert product["engagement"]["engagement_rate"] == {"value": 54.5, "n": 11}
+
+    phone = product["by_device"]["phone"]
+    assert phone["sessions"] == {"value": 6}
+    assert phone["engagement_rate"] == {"value": 100.0, "n": 6}
+    desktop = product["by_device"]["desktop"]
+    assert desktop["visitors"] == {"value": 5}
+    assert desktop["engaged_sessions"]["value"] is None  # 0 is under five
+    assert product["by_device"]["tablet"]["sessions"]["value"] is None
+
+    assert product["by_region"]["IN"]["visitors"] == {"value": 6}
+    assert product["by_region"]["US"]["sessions"] == {"value": 5}
+    assert product["by_region"]["EU"]["visitors"]["value"] is None
+
+    home, action = product["funnels"]["home_to_action"]
+    assert home["sessions"] == {"value": 6} and home["from_previous"] is None
+    assert action["sessions"] == {"value": 6}
+    assert action["from_previous"] == {"value": 100.0, "n": 6}
+    upcoming = product["funnels"]["upcoming_to_source"]
+    assert [step["sessions"] for step in upcoming] == [{"value": 5}] * 3
+    reference, shared = product["funnels"]["reference_to_share"]
+    assert reference["sessions"] == {"value": 5}
+    assert shared["sessions"]["value"] is None
+    assert shared["from_previous"] == {"value": 0.0, "n": 5}
+
+    # Nothing identifying leaves the export.
+    text = json.dumps(payload)
+    for index in range(11):
+        assert letters[index] * 16 not in text
+        assert letters[index] * 22 not in text

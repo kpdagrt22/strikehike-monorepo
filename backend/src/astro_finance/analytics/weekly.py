@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .routes import PAGE_TEMPLATES, page_template
 from .serverlogs import aggregate as aggregate_server_logs
@@ -65,7 +65,8 @@ def _meaningful(name: str, props: dict[str, Any]) -> bool:
 def _week_events(store: AnalyticsStore, week: str) -> list[dict[str, Any]]:
     rows = store.connection.execute(
         "SELECT id, received_at, session_id, anon_id, name, path, props, "
-        "day_ist, ephemeral FROM events WHERE week_ist=? ORDER BY received_at, id",
+        "day_ist, ephemeral, device_class, geo_bucket "
+        "FROM events WHERE week_ist=? ORDER BY received_at, id",
         (week,),
     ).fetchall()
     return [dict(row) for row in rows]
@@ -173,6 +174,114 @@ def _experiment_split(events: list[dict[str, Any]]) -> dict[str, Any]:
     return split
 
 
+EXPORT_VERSION = 2
+DEVICES = ("phone", "tablet", "desktop")
+REGIONS = ("IN", "UK", "EU", "US", "other", "unknown")
+UPCOMING_PAGES = frozenset({"/upcoming", "/upcoming/[theme]"})
+REFERENCE_PAGES = frozenset({"/recessions/[id]", "/declines/[id]", "/tested/[claim]"})
+
+
+def _engaging(name: str, props: dict[str, Any]) -> bool:
+    """A real action: meaningful, but not merely being shown an experiment."""
+    return name != "experiment_exposed" and _meaningful(name, props)
+
+
+def _viewed(*pages: str) -> Callable[[str, str, dict[str, Any]], bool]:
+    wanted = frozenset(pages)
+    return lambda name, path, props: name == "page_viewed" and path in wanted
+
+
+# Each funnel is an ordered list of (step, matcher). A session reaches a step
+# when it has a matching event after reaching the previous one.
+FUNNELS: dict[str, list[tuple[str, Callable[[str, str, dict[str, Any]], bool]]]] = {
+    "home_to_action": [
+        ("viewed home", _viewed("/")),
+        ("took an action", lambda name, path, props: _engaging(name, props)),
+    ],
+    "upcoming_to_source": [
+        ("viewed Upcoming", _viewed(*UPCOMING_PAGES)),
+        ("opened an event page", _viewed("/events/[id]")),
+        (
+            "opened the source or a calendar",
+            lambda name, path, props: name
+            in {"event_source_clicked", "calendar_subscribed"},
+        ),
+    ],
+    "reference_to_share": [
+        ("viewed a reference page", _viewed(*REFERENCE_PAGES)),
+        ("shared it", lambda name, path, props: name == "share_clicked"),
+    ],
+}
+
+
+def _sessions(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Per session: who, its device and region (from its first event), and
+    whether it took a real action."""
+    sessions: dict[str, dict[str, Any]] = {}
+    for row in events:
+        props = _props(row["props"])
+        session = sessions.setdefault(
+            row["session_id"],
+            {
+                "anon_id": row["anon_id"],
+                "device": row.get("device_class") or "unknown",
+                "region": row.get("geo_bucket") or "unknown",
+                "engaged": False,
+                "rows": [],
+            },
+        )
+        session["rows"].append((row["name"], row["path"], props))
+        if _engaging(row["name"], props):
+            session["engaged"] = True
+    return sessions
+
+
+def _breakdown(
+    sessions: dict[str, dict[str, Any]], key: str, values: tuple[str, ...]
+) -> dict[str, Any]:
+    groups: dict[str, dict[str, Any]] = {
+        value: {"ids": set(), "sessions": 0, "engaged": 0} for value in values
+    }
+    for session in sessions.values():
+        bucket = session[key] if session[key] in groups else values[-1]
+        group = groups[bucket]
+        group["ids"].add(session["anon_id"])
+        group["sessions"] += 1
+        group["engaged"] += int(session["engaged"])
+    return {
+        value: {
+            "visitors": people_cell(len(group["ids"])),
+            "sessions": people_cell(group["sessions"]),
+            "engaged_sessions": people_cell(group["engaged"]),
+            "engagement_rate": _rate(group["engaged"], group["sessions"]),
+        }
+        for value, group in groups.items()
+    }
+
+
+def _funnels(sessions: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for funnel, steps in FUNNELS.items():
+        reached = [0] * len(steps)
+        for session in sessions.values():
+            step = 0
+            for name, path, props in session["rows"]:
+                if step < len(steps) and steps[step][1](name, path, props):
+                    reached[step] += 1
+                    step += 1
+        result[funnel] = [
+            {
+                "step": label,
+                "sessions": people_cell(reached[index]),
+                "from_previous": (
+                    None if index == 0 else _rate(reached[index], reached[index - 1])
+                ),
+            }
+            for index, (label, _match) in enumerate(steps)
+        ]
+    return result
+
+
 def build_weekly_export(
     store: AnalyticsStore, week: str, log_dir: str | Path = "/app/data/caddy-logs"
 ) -> dict[str, Any]:
@@ -260,6 +369,7 @@ def build_weekly_export(
 
         retention = _retention(store, start)
         experiments = _experiment_split(events)
+        week_sessions = _sessions(events)
 
         stats = store.connection.execute(
             "SELECT * FROM ingest_stats WHERE day_ist BETWEEN ? AND ?",
@@ -313,7 +423,9 @@ def build_weekly_export(
         else {"value": None, "reason": "insufficient data (no earlier week)"}
     )
 
+    engaged_sessions = sum(int(s["engaged"]) for s in week_sessions.values())
     return {
+        "export_version": EXPORT_VERSION,
         "week": week,
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "product": {
@@ -328,6 +440,16 @@ def build_weekly_export(
             "weekly_returning_explorers": wre_cell,
             "retention": retention,
             "experiments": experiments,
+            # v2: engagement, device, region and funnels. Session counts are
+            # treated as people counts and suppressed below five.
+            "engagement": {
+                "sessions": people_cell(len(week_sessions)),
+                "engaged_sessions": people_cell(engaged_sessions),
+                "engagement_rate": _rate(engaged_sessions, len(week_sessions)),
+            },
+            "by_device": _breakdown(week_sessions, "device", (*DEVICES, "unknown")),
+            "by_region": _breakdown(week_sessions, "region", REGIONS),
+            "funnels": _funnels(week_sessions),
         },
         "server": _server(log_dir, week),
         "feedback": feedback,
