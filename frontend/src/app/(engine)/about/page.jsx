@@ -154,6 +154,15 @@ export default function AboutPage() {
           it off are set out below; the switch stops the counting on this
           browser.
         </p>
+        <p>
+          <strong>Weekly email.</strong> If you subscribe, we store the email
+          address, its status (pending, active or unsubscribed) and the
+          timestamps for those changes so we can send the weekly roundup and
+          honour unsubscribe requests. Resend sends the email for us. We do
+          not share the list or use it for anything else. Every email has a
+          one-click unsubscribe link, and you can ask for the address to be
+          deleted through the contact link below.
+        </p>
         <MeasurementToggle />
       </section>
 

@@ -9,8 +9,9 @@ import { PERSON_URL } from "@/lib/seo/site";
 // Composed only from what the views already say: the "not investment advice"
 // and "not a forecast" lines, the data and sky notes in Method & limits, and
 // the Info panel's heading and enquiry link; plus the owner-approved maker and
-// sources paragraph (SEO plan 3.7f). No terms, privacy or liability text (the
-// owner's). A server component: static, no motion. The light-theme
+// sources paragraph (SEO plan 3.7f) and the factual weekly-email storage note.
+// No terms or liability text (the owner's). A server component: static, no
+// motion. The light-theme
 // eyebrow is #a83a27, not #c0442f, to keep 4.5:1 over the brand pill's shadow.
 // "month-precise" stays whole through nowrap, not U+2011: Onest has no U+2011
 // glyph, so a non-breaking hyphen would fall back to a system font.
@@ -92,6 +93,15 @@ export default function DisclaimerPage() {
             score and the dates whose geometry echoes a past event are a
             historical correspondence lens: not an economic input and not a
             causal input to the Core Index.
+          </p>
+          <p>
+            <strong>Weekly email.</strong> If you subscribe, we store the email
+            address, its status (pending, active or unsubscribed) and the
+            timestamps for those changes so we can send the weekly roundup and
+            honour unsubscribe requests. Resend sends the email for us. We do
+            not share the list or use it for anything else. Every email has a
+            one-click unsubscribe link, and you can ask for the address to be
+            deleted through the contact link below.
           </p>
           <p>
             StrikeHike is built and run by Prakash Kantumutchu (KP),{" "}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PERSON_URL, REPO_URL } from "@/lib/seo/site";
+import { DigestFooterLink } from "@/components/digest/DigestFooterLink";
 import { FooterSupportLink } from "@/components/support/FooterSupportLink";
 import {
   SUPPORT_NOTE,
@@ -62,6 +63,10 @@ export function SiteColophon({ current }: { current: string }) {
           </a>
         </p>
       </div>
+
+      <p>
+        <DigestFooterLink className={LINK} />
+      </p>
 
       <section
         aria-label={SUPPORT_TITLE}
