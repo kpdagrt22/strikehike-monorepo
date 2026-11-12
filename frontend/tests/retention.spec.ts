@@ -4,6 +4,15 @@ import { expect, test, type Page } from "@playwright/test";
 
 const FIXTURE_WEEK = "2099-W01";
 const FIXTURE_PATH = join(process.cwd(), "content", "roundups", `${FIXTURE_WEEK}.json`);
+// A second fixture that is present but not approved: the store must ignore it.
+// (The real 2026-W46 is approved now, so it cannot stand in for this case.)
+const UNPUBLISHED_WEEK = "2099-W03";
+const UNPUBLISHED_PATH = join(
+  process.cwd(),
+  "content",
+  "roundups",
+  `${UNPUBLISHED_WEEK}.json`,
+);
 
 const FIXTURE = {
   week: FIXTURE_WEEK,
@@ -19,6 +28,14 @@ const FIXTURE = {
     change: 1.3,
   },
   lines: { regime: "Core Index +12.3 (Steady), +1.3 from last week." },
+};
+
+const UNPUBLISHED = {
+  ...FIXTURE,
+  week: UNPUBLISHED_WEEK,
+  start: "2099-01-12",
+  end: "2099-01-18",
+  approved: false,
 };
 
 function watchErrors(page: Page) {
@@ -104,10 +121,12 @@ test.describe("weekly roundup", () => {
       recursive: true,
     });
     await writeFile(FIXTURE_PATH, `${JSON.stringify(FIXTURE, null, 2)}\n`, "utf8");
+    await writeFile(UNPUBLISHED_PATH, `${JSON.stringify(UNPUBLISHED, null, 2)}\n`, "utf8");
   });
 
   test.afterAll(async () => {
     await rm(FIXTURE_PATH, { force: true });
+    await rm(UNPUBLISHED_PATH, { force: true });
   });
 
   test(
@@ -123,10 +142,10 @@ test.describe("weekly roundup", () => {
       await expect(page.locator("h1")).toContainText("This week: macro + sky");
       await expect(page.locator('[data-share-surface="roundup"]')).toBeVisible();
 
-      const unapproved = await page.goto("/this-week/2026-W46", {
+      const unpublished = await page.goto(`/this-week/${UNPUBLISHED_WEEK}`, {
         waitUntil: "networkidle",
       });
-      expect(unapproved?.status()).toBe(404);
+      expect(unpublished?.status()).toBe(404);
       const unknown = await page.goto("/this-week/2099-W02", {
         waitUntil: "networkidle",
       });
@@ -148,7 +167,7 @@ test.describe("weekly roundup", () => {
       expect(feed).toContain("<channel>");
       expect(feed).toContain("<item>");
       expect(feed).toContain(`/this-week/${FIXTURE_WEEK}`);
-      expect(feed).not.toContain("/this-week/2026-W46");
+      expect(feed).not.toContain(`/this-week/${UNPUBLISHED_WEEK}`);
 
       const sitemap = await request.get("/sitemap.xml");
       expect(sitemap.status()).toBe(200);
@@ -156,7 +175,7 @@ test.describe("weekly roundup", () => {
       expect(map.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
       expect(map).toContain("<urlset");
       expect(map).toContain(`/this-week/${FIXTURE_WEEK}`);
-      expect(map).not.toContain("/this-week/2026-W46");
+      expect(map).not.toContain(`/this-week/${UNPUBLISHED_WEEK}`);
 
       const html = await (await request.get(`/this-week/${FIXTURE_WEEK}`)).text();
       const og = /property="og:image" content="([^"]+)"/.exec(html)?.[1];
@@ -311,10 +330,12 @@ test.describe("retention screenshots", () => {
       recursive: true,
     });
     await writeFile(FIXTURE_PATH, `${JSON.stringify(FIXTURE, null, 2)}\n`, "utf8");
+    await writeFile(UNPUBLISHED_PATH, `${JSON.stringify(UNPUBLISHED, null, 2)}\n`, "utf8");
   });
 
   test.afterAll(async () => {
     await rm(FIXTURE_PATH, { force: true });
+    await rm(UNPUBLISHED_PATH, { force: true });
   });
 
   test("this-week, followed themes, the change note and recently viewed at 1366 and 390", async ({
