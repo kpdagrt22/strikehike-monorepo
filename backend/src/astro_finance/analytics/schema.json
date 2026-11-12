@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "/tested", "/tested/[claim]", "/about", "404"],
+  "paths": ["/", "/regime", "/convergence", "/patterns", "/disclaimer", "/upcoming", "/events/[id]", "/upcoming/[theme]", "/dates/[year]/[list]", "/recessions", "/recessions/[id]", "/declines", "/declines/[id]", "/this-week", "/this-week/[week]", "/tested", "/tested/[claim]", "/about", "/digest/confirmed", "/digest/unsubscribed", "/digest/unsubscribe", "/digest/invalid", "404"],
   "limits": {
     "max_body_bytes": 8192,
     "max_events": 25,
@@ -184,6 +184,10 @@
       "properties": {
         "action": { "type": "enum", "values": ["shown", "dismissed", "clicked"] }
       }
+    },
+    "digest_subscribed": {
+      "required": ["surface"],
+      "properties": { "surface": { "type": "enum", "values": ["this_week", "footer"] } }
     },
     "experiment_exposed": {
       "required": ["exp", "variant"],

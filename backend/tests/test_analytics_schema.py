@@ -93,6 +93,7 @@ def test_schema_has_only_the_live_events_and_no_future_ones():
         "share_clicked",
         "theme_followed",
         "change_note",
+        "digest_subscribed",
         "experiment_exposed",
         "sound_changed",
     }
@@ -116,8 +117,38 @@ def test_schema_has_only_the_live_events_and_no_future_ones():
         "/tested",
         "/tested/[claim]",
         "/about",
+        "/digest/confirmed",
+        "/digest/unsubscribed",
+        "/digest/unsubscribe",
+        "/digest/invalid",
         "404",
     }
+
+
+def test_digest_subscribed_accepts_only_the_two_surfaces_and_no_email():
+    good = {
+        "n": "digest_subscribed",
+        "t": 1,
+        "pv": "a" * 12,
+        "p": "/this-week",
+        "pr": {"surface": "footer"},
+    }
+    _, events, _, _, invalid = validate_batch(payload(ev=[good]))
+    assert invalid == 0
+    assert events[0]["props"] == {"surface": "footer"}
+
+    for props in ({"surface": "home"}, {}):
+        bad = {**good, "pr": props}
+        _, events, _, _, invalid = validate_batch(payload(ev=[bad]))
+        assert events == []
+        assert invalid == 1
+
+    # An email smuggled into the properties is stripped, never stored.
+    with_email = {**good, "pr": {"surface": "this_week", "email": "reader@example.com"}}
+    _, events, stripped, _, invalid = validate_batch(payload(ev=[with_email]))
+    assert invalid == 0
+    assert stripped == 1
+    assert events[0]["props"] == {"surface": "this_week"}
 
 
 def test_calendar_subscribed_accepts_only_the_known_scopes_and_methods():
