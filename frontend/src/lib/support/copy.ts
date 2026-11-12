@@ -1,6 +1,7 @@
 // The support copy, in one place so the footer block and the home panel say the
-// same words (the owner approves the final text; decision D-14). Nothing here
-// promises a result, and the copy guard scans it with everything else.
+// same words (decision D-14; the owner approved this text on 11 Nov 2026).
+// Nothing here promises a result, and the copy guard scans it with everything
+// else.
 
 export const PAYPAL_URL = "https://paypal.me/kpdagrt22";
 
