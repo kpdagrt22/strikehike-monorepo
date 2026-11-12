@@ -106,21 +106,6 @@ EPOCH_LABELS = {
     "recent": "Recent Manifestations",
 }
 
-# Known systemic stress sessions. The market feature frame begins in 1992, so
-# 1929 has no market row; these dates use the calibrated historical-geometry
-# percentile with an explicit stress floor. They are historical calendar data,
-# not model inference.
-STRESS_ENERGY_FLOORS = {
-    "1929-10-24": 96,
-    "1929-10-28": 96,
-    "1929-10-29": 97,
-    "1987-10-19": 95,
-    "2008-09-15": 96,
-    "2008-09-16": 94,
-    "2008-10-10": 92,
-    "2020-03-16": 93,
-}
-
 FLAGS = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
 swe.set_sid_mode(swe.SIDM_LAHIRI)
 
@@ -313,14 +298,13 @@ def geometry_energy_object(score: int) -> dict:
 
 def calibrated_geometry_score(
     raw_score: int,
-    target_date: str,
     reference_scores: list[int] | tuple[int, ...],
 ) -> tuple[int, float, str]:
     """Map a raw geometry score onto a uniform historical percentile.
 
-    The curated event roster provides the reference distribution. Known systemic
-    stress sessions receive an explicit 90+ floor because their market-era
-    volatility is either unavailable (1929) or belongs to the market model.
+    The curated event roster provides the reference distribution. Every score is
+    that percentile alone: decision D-17 removed the fixed stress-window floors,
+    so no date is pinned above its own percentile.
     """
     if reference_scores:
         percentile = (
@@ -331,9 +315,6 @@ def calibrated_geometry_score(
     else:
         percentile = float(raw_score)
 
-    stress_floor = STRESS_ENERGY_FLOORS.get(target_date)
-    if stress_floor is not None:
-        return max(stress_floor, round(percentile)), round(percentile, 1), "stress_window"
     return int(round(percentile)), round(percentile, 1), "historical_percentile"
 
 
@@ -683,7 +664,7 @@ def find_historical_parallels(
     event_rows = _load_events()
     reference_scores = [int(row["energy_score"]) for row in event_rows]
     target_energy, target_percentile, target_calibration = calibrated_geometry_score(
-        raw_target_energy, target_date, reference_scores
+        raw_target_energy, reference_scores
     )
 
     scored = []
@@ -701,7 +682,6 @@ def find_historical_parallels(
         event_raw_energy = int(row["energy_score"])
         event_energy, _, _ = calibrated_geometry_score(
             event_raw_energy,
-            str(row["event_date"]),
             reference_scores,
         )
         energy_delta = abs(target_energy - event_energy)
