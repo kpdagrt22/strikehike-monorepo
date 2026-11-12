@@ -11,7 +11,7 @@ import { RecentTracker } from "@/components/retention/RecentTracker";
 import { eventCalendarPath, eventIdFromSlug, eventSlug, skyHref } from "@/lib/events/eventId";
 import { googleCalendarUrl } from "@/lib/events/googleCalendar";
 import { isIndexableEvent } from "@/lib/events/indexing";
-import { isHiddenTheme, themeSlug } from "@/lib/events/upcoming";
+import { hasNoThemePage, themeSlug } from "@/lib/events/upcoming";
 import { getEvent, getUpcomingAll } from "@/lib/seo/data";
 import { eventPageGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
@@ -107,7 +107,7 @@ export default async function EventPage({
   const status = event.status === "scheduled" ? null : (STATUS_LABELS[event.status] ?? event.status);
   const sky = skyHref(event);
   const slugTheme = themeSlug(event.theme);
-  const hasThemePage = !isHiddenTheme(event.theme);
+  const hasThemePage = !hasNoThemePage(event.theme);
   const authority = event.authority_url && event.authority_url !== event.source_url ? event.authority_url : null;
   const sourceLabel = event.verification === "computed" ? "Method" : "Source";
   const past = event.kind === "historical" || event.status === "completed" || event.start_date < new Date().toISOString().slice(0, 10);

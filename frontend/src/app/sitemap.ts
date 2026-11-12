@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { eventPath } from "@/lib/events/eventId";
 import { isIndexableEvent, isIndexableTheme } from "@/lib/events/indexing";
 import { themeSlug } from "@/lib/events/upcoming";
+import { hasNoThemePage, isHiddenTheme } from "@/lib/events/hidden";
 import { YEAR_LISTS, yearListPath, yearListStatus } from "@/lib/events/yearLists";
 import {
   getCaseCatalogue,
@@ -68,7 +69,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Events: only those whose page is indexable, over the bundle's whole horizon (curated
   // central-bank dates run past 12 months).
   const events: Generated[] = [];
-  for (const theme of Object.values(everything?.themes ?? {})) {
+  for (const [name, theme] of Object.entries(everything?.themes ?? {})) {
+    // Decision D-12: a hidden theme's pages stay out of the sitemap.
+    if (isHiddenTheme(name)) continue;
     for (const event of theme.events ?? []) {
       if (isIndexableEvent(event).index) {
         events.push({ url: urlFor(eventPath(event.event_id)), lastModified: bundleDate });
@@ -79,6 +82,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Themes: at least three upcoming dates, never Politics or Natural Disasters.
   const themes: Generated[] = [];
   for (const [name, theme] of Object.entries(upcoming?.themes ?? {})) {
+    if (hasNoThemePage(name)) continue;
     const count = theme.events?.length ?? 0;
     if (isIndexableTheme({ name, upcoming: count }).index) {
       themes.push({ url: urlFor(`/upcoming/${themeSlug(name)}`), lastModified: bundleDate });
