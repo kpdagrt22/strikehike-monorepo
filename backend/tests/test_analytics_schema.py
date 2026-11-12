@@ -115,6 +115,7 @@ def test_schema_has_only_the_live_events_and_no_future_ones():
         "/this-week/[week]",
         "/tested",
         "/tested/[claim]",
+        "/about",
         "404",
     }
 

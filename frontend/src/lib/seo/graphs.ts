@@ -167,6 +167,10 @@ export function disclaimerGraph(): JsonLdGraph {
   return graph(webPage("/disclaimer"), breadcrumb("/disclaimer"));
 }
 
+export function aboutGraph(): JsonLdGraph {
+  return graph(webPage("/about"), breadcrumb("/about"));
+}
+
 // ---------------------------------------------------------------------------------------------
 // Generated pages (/events/[id], /upcoming/[theme], /dates/[year]/[list]). Their paths are not
 // in CONTENT_DATES, so they carry their own WebPage and BreadcrumbList; no schema.org Event:

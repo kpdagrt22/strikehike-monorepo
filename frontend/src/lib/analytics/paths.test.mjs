@@ -15,6 +15,7 @@ test("known pages keep their path", () => {
     "/declines",
     "/this-week",
     "/tested",
+    "/about",
   ]) {
     assert.equal(pageTemplate(path), path);
   }
