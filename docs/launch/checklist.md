@@ -13,7 +13,7 @@ The launch material for each channel is in this folder:
 | r/dataisbeautiful | `reddit-dataisbeautiful.md` | `img/oc-chart.png` |
 | LinkedIn | `linkedin.md` | `img/linkedin-1200x1500.png` |
 | X | `x-thread.md` | `img/x-1200x675.png` |
-| (any) demo clip | — | `img/demo.webm` (27 s, sound on) |
+| (any) demo clip | — | `img/demo.webm` (23 s, sound shown on) |
 
 Clock note: the launch week is on US Eastern Standard Time (UTC−5) and India
 Standard Time (UTC+5:30). **IST = ET + 10 h 30 m**, so the US morning reaches
@@ -80,10 +80,10 @@ Watch these, in this order, and reply where a reply is warranted (see below).
       that `launch-check` measured must not have grown. If the site is slow or
       down, stop posting and treat it as an incident, not a launch.
 - [ ] **The one number people repeat.** If a number is quoted back at you,
-      check it against the page before agreeing. The tested figures (Mercury
-      retrograde 0.48 % vs 0.29 %, p = 0.62; full moon 0.08 % vs 0.09 %,
-      p = 0.91; eclipses 0.12 % vs −0.07 %, p = 0.25) and the roundup's
-      Core Index line are the ones most likely to be misread.
+      check it against the page before agreeing. The tested figures (mean per
+      window: Mercury retrograde 0.48 % vs 0.29 %, p = 0.62; full moon 0.08 %
+      vs 0.09 %, p = 0.91; eclipses 0.12 % vs −0.07 %, p = 0.25) and the
+      roundup's Core Index line are the ones most likely to be misread.
 - [ ] **Politics.** If someone asks where Politics went, the answer is D-12:
       the theme has no verified source yet, so it is not shown while it would be
       a guess. It is not deleted; the model and the older events still exist.

@@ -13,25 +13,25 @@ I tested three market legends against 99 years of the S&P 500: Mercury retrograd
 **2/**
 
 ```
-The record: daily S&P 500 / Cowles chain, 1928–2026. For each claim I compared the mean in-window daily return with every other day, using a 2,000-draw permutation test.
+The record: daily S&P 500 / Cowles chain, 1928–2026. For each claim I compared the S&P return over each whole event window with the nearest non-overlapping window of the same length, using a 2,000-draw permutation test.
 ```
 
 **3/**
 
 ```
-Mercury retrograde: 0.48%/day in-window vs 0.29%/day outside. p = 0.62. No meaningful difference in this record.
+Mercury retrograde: +0.48% average over each ~3-week window vs +0.29% over matched windows. p = 0.62. No meaningful difference in this record.
 ```
 
 **4/**
 
 ```
-Full moon: 0.08%/day in-window vs 0.09%/day outside. p = 0.91. No meaningful difference in this record.
+Full moon: +0.08% average over each 7-day window vs +0.09% over matched windows. p = 0.91. No meaningful difference in this record.
 ```
 
 **5/**
 
 ```
-Eclipses: 0.12%/day in-window vs −0.07%/day outside. p = 0.25. No meaningful difference in this record.
+Eclipses: +0.12% average over each 7-day window vs −0.07% over matched windows. p = 0.25. No meaningful difference in this record.
 ```
 
 **6/**
