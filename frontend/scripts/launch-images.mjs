@@ -7,9 +7,12 @@
 //   docs/launch/img/linkedin-1200x1500.png 1200 x 1500 (LinkedIn card)
 //
 // With DEMO_BASE set, it also records the home orrery to
-// docs/launch/img/demo.webm (Playwright video), turning the sound on first:
+// docs/launch/img/demo.webm (Playwright video) and captures demo-poster.png:
 //
 //   DEMO_BASE=http://127.0.0.1:3000 node scripts/launch-images.mjs
+//
+// DEMO_BASE must be a production server (next start, or https://strikehike.com),
+// never next dev: the recording includes the page exactly as visitors see it.
 //
 // Run from frontend/. Uses the Playwright Chromium already installed for the
 // smoke suite; no new dependency and no server needed for the three cards.
@@ -51,7 +54,7 @@ async function loadClaims() {
 const pct2 = (value) => `${(value * 100).toFixed(2)}%`;
 const p3 = (value) => value.toFixed(3);
 
-// The mean in-window return each year, drawn as the site's own ClaimChart does.
+// The mean return per window each year, drawn as the site's own ClaimChart does.
 function sparkline(points, width, height) {
   const pad = 10;
   const span = Math.max(1, ...points.map((point) => Math.abs(point.value)));
@@ -103,7 +106,7 @@ function ocChart(claims, fonts) {
         Do the Moon and Mercury move the S&amp;P&nbsp;500?
       </div>
       <div class="muted" style="margin-top: 12px; font-size: 24px; font-weight: 300;">
-        Three claims, the same daily record, 1927&ndash;2026. Each line is the mean in-window return per year (%). The middle line is zero.
+        Three claims, the same daily record, 1928&ndash;2026. Each line is the mean return per window each year (%). The middle line is zero.
       </div>
     </div>`;
 
@@ -117,11 +120,11 @@ function ocChart(claims, fonts) {
         <div style="height: 210px; border: 1px solid ${FAINT}; border-radius: 14px; padding: 8px 6px;">
           ${sparkline(claim.chart, 480, 192)}
         </div>
-        <div class="muted" style="font-size: 18px;">mean in-window return each year, ${span}</div>
+        <div class="muted" style="font-size: 18px;">mean return per window each year, ${span}</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; font-size: 22px;">
           <div class="muted">Windows</div><div class="num" style="text-align: right;">${cmp.in.n}</div>
-          <div class="muted">Mean in-window</div><div class="num" style="text-align: right;">${pct2(cmp.in.mean_return)}/day</div>
-          <div class="muted">Mean outside</div><div class="num" style="text-align: right;">${pct2(cmp.out.mean_return)}/day</div>
+          <div class="muted">Mean per window</div><div class="num" style="text-align: right;">${pct2(cmp.in.mean_return)}</div>
+          <div class="muted">Matched windows</div><div class="num" style="text-align: right;">${pct2(cmp.out.mean_return)}</div>
           <div class="muted">p-value</div><div class="num" style="text-align: right;">${p3(cmp.p_value)}</div>
         </div>
         <div style="margin-top: 2px; display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding: 8px 16px; border: 1px solid rgba(255,139,119,0.4); border-radius: 999px; color: ${CORAL}; font-size: 20px; font-weight: 500;">
@@ -177,14 +180,21 @@ function xCard(claims, fonts) {
 }
 
 function linkedinCard(claims, fonts) {
+  const head = `
+        <div style="display: grid; grid-template-columns: 1.15fr 1.2fr 1.2fr 0.55fr; gap: 10px; padding: 18px 0 10px; border-top: 1px solid ${FAINT}; align-items: baseline;">
+          <div class="muted" style="font-size: 17px;">Claim</div>
+          <div class="muted" style="font-size: 17px; text-align: right;">Mean per window</div>
+          <div class="muted" style="font-size: 17px; text-align: right;">Matched windows</div>
+          <div class="muted" style="font-size: 17px; text-align: right;">p-value</div>
+        </div>`;
   const rows = claims
     .map((claim) => {
       const c = claim.comparison;
       return `
-        <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 0.8fr; gap: 10px; padding: 20px 0; border-top: 1px solid ${FAINT}; align-items: baseline;">
+        <div style="display: grid; grid-template-columns: 1.15fr 1.2fr 1.2fr 0.55fr; gap: 10px; padding: 20px 0; border-top: 1px solid ${FAINT}; align-items: baseline;">
           <div style="font-size: 26px; font-weight: 500;">${claim.short}</div>
-          <div class="num" style="font-size: 24px; text-align: right;">${pct2(c.in.mean_return)}<span class="muted" style="font-size: 17px;">/day in</span></div>
-          <div class="num" style="font-size: 24px; text-align: right;">${pct2(c.out.mean_return)}<span class="muted" style="font-size: 17px;">/day out</span></div>
+          <div class="num" style="font-size: 24px; text-align: right;">${pct2(c.in.mean_return)}</div>
+          <div class="num" style="font-size: 24px; text-align: right;">${pct2(c.out.mean_return)}</div>
           <div class="num" style="font-size: 24px; text-align: right;">p&nbsp;${p3(c.p_value)}</div>
         </div>`;
     })
@@ -197,13 +207,16 @@ function linkedinCard(claims, fonts) {
           Three claims, one 99-year record, no meaningful difference.
         </div>
         <div class="muted" style="margin-top: 18px; font-size: 26px; font-weight: 300; line-height: 1.35;">
-          I put three market legends against the daily S&amp;P&nbsp;500 / Cowles record (1927&ndash;2026), using 2,000-draw permutation tests.
+          I put three market legends against the daily S&amp;P&nbsp;500 / Cowles record (1928&ndash;2026), using 2,000-draw permutation tests.
         </div>
-        <div style="margin-top: 34px;">${rows}
+        <div style="margin-top: 34px;">${head}${rows}
           <div style="border-top: 1px solid ${FAINT};"></div>
         </div>
-        <div class="muted" style="margin-top: 22px; font-size: 21px; font-weight: 300; line-height: 1.4;">
-          In-window daily returns sit within noise of every other day for all three. Descriptive research, not investment advice; the site shows the method and every number.
+        <div class="muted" style="margin-top: 14px; font-size: 20px; font-weight: 300; line-height: 1.4;">
+          Mercury retrograde windows average about 22 days; full moon and eclipse windows are 7 days.
+        </div>
+        <div class="muted" style="margin-top: 20px; font-size: 21px; font-weight: 300; line-height: 1.4;">
+          Mean per-window returns sit within noise of their matched windows for all three. Descriptive research, not investment advice; the site shows the method and every number.
         </div>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 22px; color: ${MUTED}; border-top: 1px solid rgba(240,93,73,0.35); padding-top: 18px;">
@@ -221,38 +234,100 @@ async function shoot(browser, html, file, width, height) {
   await page.close();
 }
 
+// Every card reports a return per window. A "/day" label would state a daily
+// rate the tested JSON does not contain, so fail the build instead of shipping it.
+function assertNoPerDayLabels(documents) {
+  for (const [name, html] of Object.entries(documents)) {
+    const match = html.match(/>[^<]*\/day[^<]*</i);
+    if (match) {
+      throw new Error(
+        `${name}: label contains "/day" ("${match[0].slice(1, -1).trim()}"); returns are per window.`,
+      );
+    }
+  }
+}
+
 async function recordDemo(base) {
   const dir = path.join(os.tmpdir(), "strikehike-launch-demo");
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     recordVideo: { dir, size: { width: 1440, height: 900 } },
+    colorScheme: "dark",
+  });
+  // Dark theme and no first-visit hint. The theme is next-themes' class mode
+  // (layout.tsx, storageKey "strikehike-theme"); the hint is hasSeenIntro.
+  await context.addInitScript(() => {
+    try {
+      window.localStorage.setItem("strikehike-theme", "dark");
+      window.localStorage.setItem("hasSeenIntro", "1");
+    } catch {
+      // Storage can be unavailable; the recording still runs.
+    }
   });
   const page = await context.newPage();
-  await page.goto(base, { waitUntil: "load" });
-  // Turn the site's ambient sound on before recording the orrery: open the sound
-  // panel (SoundToggle.tsx, data-shell="sound"), pick the first soundscape, then
-  // close it so the sky is clear. The recording is video only; the sound switch
-  // is left on so the on-screen control shows sound running.
+  // The probe flag is test-only and invisible: it gives the wrapper a
+  // data-orrery-ready attribute once the camera intro has settled, so the
+  // poster is never captured over an empty scene.
+  const demoUrl = new URL(base);
+  demoUrl.searchParams.set("orreryProbe", "1");
+  await page.goto(demoUrl.toString(), { waitUntil: "load" });
+  // Wait for the Sky activity reading and the settled orrery, then hold the
+  // opening shot long enough that the corona is visible in poster and video.
+  await page
+    .waitForFunction(
+      () => {
+        const gauge = document.querySelector('[data-hud="gauge"] [role="img"]');
+        const orrery = document.querySelector('[data-orrery-ready="true"]');
+        return (
+          Boolean(orrery) &&
+          /Sky activity \d+ out of 100/.test(gauge?.getAttribute("aria-label") ?? "")
+        );
+      },
+      { timeout: 20_000 },
+    )
+    .catch(() => {});
+  await page.waitForTimeout(1_000);
+  const gaugeLabel = await page
+    .locator('[data-hud="gauge"] [role="img"]')
+    .first()
+    .getAttribute("aria-label")
+    .catch(() => null);
+  const score = Number((gaugeLabel?.match(/Sky activity (\d+) out of 100/) ?? [])[1]);
+  if (!Number.isFinite(score) || score < 85) {
+    throw new Error(
+      `demo needs the corona visible (Sky activity >= 85); got ${gaugeLabel ?? "no gauge"}`,
+    );
+  }
+  const poster = path.join(OUT, "demo-poster.png");
+  await page.screenshot({ path: poster, type: "png" });
+
+  // A slow drag in the open sky so the orrery is visibly alive without opening
+  // a body's detail popover.
+  await page.mouse.move(1000, 420);
+  await page.mouse.down();
+  for (let step = 0; step < 18; step += 1) {
+    await page.mouse.move(1000 - step * 8, 420 + (step % 2 ? 3 : -3));
+    await page.waitForTimeout(90);
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(3_000);
+
+  // One sound-panel open: pick the first soundscape, leave the panel visible,
+  // then close it for the final beat. Open once, close once.
   const soundTrigger = page.locator('[data-shell="sound"] button').first();
   if (await soundTrigger.count().catch(() => 0)) {
     await soundTrigger.click().catch(() => {});
+    await page.waitForTimeout(800);
     const firstScape = page.locator("[data-scape]").first();
     if (await firstScape.count().catch(() => 0)) {
       await firstScape.click().catch(() => {});
     }
+    await page.waitForTimeout(3_000);
     await soundTrigger.click().catch(() => {});
   }
-  // A slow drag in the open sky (away from the planets) so the orrery is
-  // visibly alive without opening a body's detail popover.
-  await page.mouse.move(980, 720);
-  await page.mouse.down();
-  for (let step = 0; step < 18; step += 1) {
-    await page.mouse.move(980 - step * 8, 720 + (step % 2 ? 3 : -3));
-    await page.waitForTimeout(90);
-  }
-  await page.mouse.up();
-  await page.waitForTimeout(15_000);
+  await page.waitForTimeout(3_000);
+
   const video = page.video();
   await context.close();
   const source = await video.path();
@@ -260,27 +335,46 @@ async function recordDemo(base) {
   const target = path.join(OUT, "demo.webm");
   const bytes = await readFile(source);
   await writeFile(target, bytes);
-  return target;
+  return { video: target, poster };
 }
 
 async function main() {
   await mkdir(OUT, { recursive: true });
   const claims = await loadClaims();
   const fonts = await fontFaces();
+  const cards = [
+    { file: "oc-chart.png", width: 1600, height: 1000, html: ocChart(claims, fonts) },
+    { file: "x-1200x675.png", width: 1200, height: 675, html: xCard(claims, fonts) },
+    {
+      file: "linkedin-1200x1500.png",
+      width: 1200,
+      height: 1500,
+      html: linkedinCard(claims, fonts),
+    },
+  ];
+  assertNoPerDayLabels(
+    Object.fromEntries(cards.map((card) => [card.file, card.html])),
+  );
   const browser = await chromium.launch();
   try {
-    await shoot(browser, ocChart(claims, fonts), path.join(OUT, "oc-chart.png"), 1600, 1000);
-    await shoot(browser, xCard(claims, fonts), path.join(OUT, "x-1200x675.png"), 1200, 675);
-    await shoot(browser, linkedinCard(claims, fonts), path.join(OUT, "linkedin-1200x1500.png"), 1200, 1500);
+    for (const card of cards) {
+      await shoot(
+        browser,
+        card.html,
+        path.join(OUT, card.file),
+        card.width,
+        card.height,
+      );
+    }
   } finally {
     await browser.close();
   }
-  console.log("wrote oc-chart.png, x-1200x675.png, linkedin-1200x1500.png to", OUT);
+  console.log("wrote", cards.map((card) => card.file).join(", "), "to", OUT);
 
   const demoBase = process.env.DEMO_BASE;
   if (demoBase) {
-    const file = await recordDemo(demoBase);
-    console.log("wrote", file);
+    const { video, poster } = await recordDemo(demoBase);
+    console.log("wrote", video, "and", poster);
   } else if (!existsSync(path.join(OUT, "demo.webm"))) {
     console.log("DEMO_BASE not set: skipped demo.webm (set DEMO_BASE=http://127.0.0.1:3000 to record it).");
   }
