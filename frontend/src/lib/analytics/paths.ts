@@ -14,6 +14,7 @@ const STATIC = new Set([
   "/declines",
   "/this-week",
   "/tested",
+  "/about",
 ]);
 const THEMES = new Set(["science", "finance", "culture-religion"]);
 const EVENT = /^\/events\/[^/]+\/?$/;

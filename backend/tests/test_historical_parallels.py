@@ -110,15 +110,37 @@ def test_events_grouped_by_category(seeded_db):
     )
 
 
-def test_crisis_waypoints_are_calibrated_above_85(seeded_db):
-    for waypoint in ("2008-09-15", "1929-10-24"):
-        result = hp.find_historical_parallels(waypoint)
-        assert result["energy"]["score"] > 85
-        assert result["energy"]["calibration"] in {
-            "stress_window",
-            "historical_percentile",
-        }
-        assert result["energy"]["raw_score"] <= 100
+def test_no_stress_floors_remain():
+    # D-17: the fixed stress-window floors were removed, so nothing is pinned.
+    assert not hasattr(hp, "STRESS_ENERGY_FLOORS")
+
+
+def test_scores_come_from_the_historical_percentile_alone(seeded_db):
+    # Every score is the calibrated percentile of the raw score, with no floor
+    # lifting the eight former stress dates above their own percentile.
+    reference_scores = [int(row["energy_score"]) for row in hp._load_events()]
+    assert reference_scores
+    for waypoint in (
+        "1929-10-24",
+        "1929-10-28",
+        "1929-10-29",
+        "1987-10-19",
+        "2008-09-15",
+        "2008-09-16",
+        "2008-10-10",
+        "2020-03-16",
+    ):
+        energy = hp.find_historical_parallels(waypoint)["energy"]
+        expected = round(
+            sum(1 for score in reference_scores if score <= energy["raw_score"])
+            / len(reference_scores)
+            * 100.0
+        )
+        assert energy["calibration"] == "historical_percentile"
+        assert energy["score"] == expected
+        # The reported score may differ from the rounded percentile only by the
+        # integer rounding, never by a floor.
+        assert energy["score"] <= energy["percentile"] + 0.5
 
 
 def test_dual_epoch_partition(seeded_db):

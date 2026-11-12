@@ -27,6 +27,7 @@ export const CONTENT_DATES = {
   "/patterns": "2026-11-03",
   "/disclaimer": "2026-11-03",
   "/upcoming": "2026-11-05",
+  "/about": "2026-11-12",
 } as const;
 export type SitePath = keyof typeof CONTENT_DATES;
 
@@ -66,6 +67,12 @@ export const PAGES: Record<SitePath, { title: string; description: string; crumb
     description:
       "Scheduled US economic releases, central-bank decisions, eclipses, solstices and religious festivals for the next 12 months, from official calendars. Subscribe in your calendar.",
     crumb: "Upcoming dates",
+  },
+  "/about": {
+    title: "About StrikeHike",
+    description:
+      "What StrikeHike is and is not: descriptive historical research, not advice and not a forecast. How it works, where the data come from, who builds it, and how visits are counted.",
+    crumb: "About",
   },
 };
 

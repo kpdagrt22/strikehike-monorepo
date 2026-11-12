@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { changeNote } from "@/lib/analytics/events";
-import { isHiddenTheme, themeName } from "@/lib/events/upcoming";
+import { hasNoThemePage, themeName } from "@/lib/events/upcoming";
 import { newDatesSentence } from "@/lib/retention/copy";
 import {
   followedSnapshot,
@@ -51,7 +51,7 @@ async function loadCurrent(): Promise<Current> {
       ?.themes ?? {};
   const events: string[] = [];
   for (const [name, theme] of Object.entries(themes)) {
-    if (isHiddenTheme(name)) continue;
+    if (hasNoThemePage(name)) continue;
     for (const event of theme.events ?? []) {
       if (typeof event.event_id === "string") events.push(event.event_id);
     }

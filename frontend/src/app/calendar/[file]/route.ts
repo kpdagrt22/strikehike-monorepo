@@ -4,6 +4,7 @@ import {
   textResponse,
   type RouteLoadResult,
 } from "@/lib/server/routeCache";
+import { isHiddenTheme } from "@/lib/events/hidden";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,6 @@ const THEMES: Record<string, string> = {
   science: "Science",
   finance: "Finance",
   "culture-religion": "Culture/Religion",
-  politics: "Politics",
   "natural-disasters": "Natural Disasters",
 };
 const UNAVAILABLE = "Calendar feed is unavailable.";
@@ -65,6 +65,10 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
   const slug = file.slice(0, -4);
+  // Decision D-12: a hidden theme's feed is a 404, like its page.
+  if (isHiddenTheme(slug)) {
+    return new Response("Not found", { status: 404 });
+  }
   if (slug !== "all" && !(slug in THEMES)) {
     return new Response("Not found", { status: 404 });
   }

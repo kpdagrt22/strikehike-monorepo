@@ -1,6 +1,8 @@
 // localStorage keys for retention features. Every read and write is wrapped:
 // a browser that blocks storage still gets the in-memory behaviour for the
 // current page, and never an exception.
+import { isHiddenTheme } from "@/lib/events/hidden";
+
 export const FOLLOW_KEY = "sh.follow.v1";
 export const RECENT_KEY = "sh.recent.v1";
 export const LAST_VISIT_KEY = "sh.lastvisit.v1";
@@ -73,6 +75,9 @@ function cleanFollowed(value: unknown): readonly string[] {
     if (typeof item !== "string") continue;
     const id = item.trim().toLowerCase();
     if (!id || seen.has(id)) continue;
+    // Decision D-12: a theme that is hidden cannot be followed, even if an
+    // older build saved it in sh.follow.v1.
+    if (isHiddenTheme(id)) continue;
     seen.add(id);
     out.push(id);
   }

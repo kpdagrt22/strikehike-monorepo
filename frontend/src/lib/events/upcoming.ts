@@ -2,6 +2,9 @@ import type {
   UpcomingPayload,
   UpcomingThemePayload,
 } from "@/lib/seo/data";
+import { hasNoThemePage, isHiddenTheme, HIDDEN_THEMES } from "./hidden";
+
+export { HIDDEN_THEMES, isHiddenTheme, hasNoThemePage };
 
 export type ThemeSlug =
   | "politics"
@@ -9,8 +12,6 @@ export type ThemeSlug =
   | "finance"
   | "culture-religion"
   | "natural-disasters";
-
-export const HIDDEN_THEMES = new Set(["Politics", "Natural Disasters"]);
 
 const SLUG_BY_THEME: Record<string, ThemeSlug> = {
   Politics: "politics",
@@ -38,10 +39,6 @@ export function themeName(slug: string): string | null {
   return THEME_BY_SLUG[slug as ThemeSlug] ?? null;
 }
 
-export function isHiddenTheme(name: string) {
-  return HIDDEN_THEMES.has(name);
-}
-
 export type OrderedTheme = {
   name: string;
   slug: ThemeSlug;
@@ -56,7 +53,7 @@ export type OrderedTheme = {
 export function orderedThemes(payload: UpcomingPayload | null): OrderedTheme[] {
   if (!payload?.themes) return [];
   return Object.entries(payload.themes)
-    .filter(([name]) => !isHiddenTheme(name))
+    .filter(([name]) => !hasNoThemePage(name))
     .map(([name, data]) => {
       const events = data.events ?? [];
       return {

@@ -3,6 +3,7 @@ import { Onest } from "next/font/google";
 import "./globals.css";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { ThemeProvider } from "@/components/theme-provider";
+import { HIDDEN_THEMES } from "@/lib/events/hidden";
 import {
   APP_ID,
   ORG_ID,
@@ -228,12 +229,13 @@ export default function RootLayout({
           }}
         />
         {/* Before first paint: reserve the "Your themes" slot only when this
-            browser follows something, so the client-rendered group shifts
-            nothing. The group itself is never in the server HTML. */}
+            browser follows a theme that still has a page (a saved Politics
+            follow from before D-12 is ignored here too), so the client-rendered
+            group shifts nothing. The group itself is never in the server HTML. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              'try{var f=JSON.parse(localStorage.getItem("sh.follow.v1")||"[]");if(Array.isArray(f)&&f.length)document.documentElement.setAttribute("data-follows","");}catch(e){}',
+              `try{var h=${JSON.stringify(HIDDEN_THEMES)};var f=JSON.parse(localStorage.getItem("sh.follow.v1")||"[]");if(Array.isArray(f)&&f.some(function(t){return h.indexOf(t)<0}))document.documentElement.setAttribute("data-follows","");}catch(e){}`,
           }}
         />
       </head>
