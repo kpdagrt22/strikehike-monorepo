@@ -9,6 +9,15 @@ export async function GET() {
       signal: AbortSignal.timeout(3_000),
     });
     const body = await response.text();
+    // The UI probe is not a digest action. When the backend feature is off it
+    // answers 404; translate that to a clean 200 so the browser console stays
+    // quiet while the form and footer line remain hidden.
+    if (response.status === 404) {
+      return Response.json(
+        { enabled: false },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     return new Response(body || null, {
       status: response.status,
       headers: {

@@ -45,8 +45,10 @@ def base_url() -> str:
 def content_base_url() -> str:
     """Where the approved-roundup JSON route is read from.
 
-    The public site is the default. A private content origin can be supplied
-    for an isolated dry run without changing the links inside the email.
+    Compose sets this to the internal frontend origin (``http://frontend:3000``)
+    so the sender never has to leave the compose network. A local CLI without
+    that variable falls back to the public site; links inside the email still
+    always use ``DIGEST_BASE_URL``.
     """
 
     return (

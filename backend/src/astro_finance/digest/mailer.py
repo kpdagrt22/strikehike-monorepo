@@ -26,6 +26,7 @@ class Mail:
     headers: dict[str, str] = field(default_factory=dict)
     from_address: str = ""
     reply_to: str | None = None
+    idempotency_key: str | None = None
 
 
 class ResendError(RuntimeError):
@@ -77,13 +78,23 @@ class ResendMailer:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if mail.idempotency_key:
+            headers["Idempotency-Key"] = mail.idempotency_key
         with httpx.Client(
             transport=self.transport,
             timeout=self.timeout,
             follow_redirects=False,
         ) as client:
             for attempt in range(1, MAX_ATTEMPTS + 1):
-                response = client.post(RESEND_URL, json=payload, headers=headers)
+                try:
+                    response = client.post(
+                        RESEND_URL, json=payload, headers=headers
+                    )
+                except httpx.TransportError:
+                    if attempt == MAX_ATTEMPTS:
+                        raise
+                    self.sleep(self.backoff_seconds * (2 ** (attempt - 1)))
+                    continue
                 if 200 <= response.status_code < 300:
                     try:
                         provider_id = response.json().get("id")

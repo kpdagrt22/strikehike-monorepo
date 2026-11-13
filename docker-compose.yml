@@ -21,6 +21,7 @@ services:
       DIGEST_FROM: "${DIGEST_FROM:-StrikeHike <digest@strikehike.com>}"
       DIGEST_REPLY_TO: "${DIGEST_REPLY_TO:-}"
       DIGEST_BASE_URL: "${DIGEST_BASE_URL:-https://strikehike.com}"
+      DIGEST_CONTENT_URL: "${DIGEST_CONTENT_URL:-http://frontend:3000}"
       DIGEST_DB: /app/data/runtime/analytics/digest.sqlite
       PYTHONUNBUFFERED: "1"
     ports:

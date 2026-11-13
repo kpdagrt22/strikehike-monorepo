@@ -24,6 +24,9 @@ export function DigestSignup({ surface = "this_week" }: { surface?: Surface }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, consent, website }),
       });
+      // Consume the body on every status; an unread response can keep the
+      // connection open and delay networkidle.
+      const text = await response.text();
       if (response.status === 202) {
         setState("pending");
         setMessage("Check your inbox to confirm. The link lasts 48 hours.");
@@ -38,10 +41,12 @@ export function DigestSignup({ surface = "this_week" }: { surface?: Surface }) {
         return;
       }
       if (response.status === 422) {
-        const detail = await response
-          .json()
-          .then((payload) => payload?.detail)
-          .catch(() => "");
+        let detail = "";
+        try {
+          detail = JSON.parse(text)?.detail || "";
+        } catch {
+          detail = "";
+        }
         setState("error");
         setMessage(
           detail === "consent_required"

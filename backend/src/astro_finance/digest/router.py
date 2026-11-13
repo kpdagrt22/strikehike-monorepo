@@ -178,6 +178,32 @@ async def subscribe(request: Request) -> JSONResponse:
 
 @router.get("/confirm")
 async def confirm(request: Request, t: str | None = None) -> RedirectResponse:
+    """Open the confirmation page; a bare GET never changes subscriber state."""
+
+    _require_enabled()
+    del request
+    if not t:
+        return _invalid()
+    secret = _secret()
+    try:
+        payload = verify_token(secret, t, "confirm")
+    except TokenError:
+        return _invalid()
+    store: DigestStore = get_store()
+    row = await run_in_threadpool(store.get_by_id, int(payload["s"]))
+    if row is None or str(row["token_nonce"]) != str(payload["n"]):
+        return _invalid()
+    if row["status"] == "active":
+        return _redirect("/digest/confirmed")
+    if row["status"] != "pending":
+        return _invalid()
+    return _redirect(f"/digest/confirm?t={quote(t, safe='')}")
+
+
+@router.post("/confirm")
+async def confirm_post(request: Request, t: str | None = None) -> RedirectResponse:
+    """The explicit button press: verify the token, then activate."""
+
     _require_enabled()
     del request
     if not t:

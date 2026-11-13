@@ -19,6 +19,8 @@ export async function GET(request: Request) {
         signal: AbortSignal.timeout(8_000),
       },
     );
+    // Consume the upstream body even when it is a 404 or a redirect.
+    await response.text();
     if (response.status === 404) {
       return new Response(null, {
         status: 404,

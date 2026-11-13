@@ -16,6 +16,7 @@ test("known pages keep their path", () => {
     "/this-week",
     "/tested",
     "/about",
+    "/digest/confirm",
     "/digest/confirmed",
     "/digest/unsubscribed",
     "/digest/unsubscribe",

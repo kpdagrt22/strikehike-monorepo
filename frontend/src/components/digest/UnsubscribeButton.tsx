@@ -15,6 +15,8 @@ export function UnsubscribeButton({ token }: { token: string }) {
         `/api/digest/unsubscribe?t=${encodeURIComponent(token)}`,
         { method: "POST" },
       );
+      // Consume the body before navigating or showing the error state.
+      await response.text();
       if (response.ok) {
         router.push("/digest/unsubscribed");
         return;

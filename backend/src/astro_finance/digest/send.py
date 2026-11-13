@@ -41,6 +41,7 @@ class SendResult:
     sent: int = 0
     failed: int = 0
     skipped: int = 0
+    stuck: int = 0
     sample_email: str | None = None
     sample_html: str | None = None
     sample_text: str | None = None
@@ -79,12 +80,19 @@ def send_week(
 
     roundup = fetch(week)
     subscribers = store.active_subscribers()
-    eligible = [
-        subscriber
-        for subscriber in subscribers
-        if not store.send_exists(int(subscriber["id"]), week)
-    ]
-    already_sent = len(subscribers) - len(eligible)
+    eligible = []
+    already_sent = 0
+    stuck = 0
+    for subscriber in subscribers:
+        row = store.get_send(int(subscriber["id"]), week)
+        if row is None or row["status"] == "failed":
+            eligible.append(subscriber)
+        elif row["status"] == "sending":
+            # A crash left this claim behind. Do not retry it automatically:
+            # the provider may already have accepted the message.
+            stuck += 1
+        else:
+            already_sent += 1
     if limit is not None:
         eligible = eligible[:limit]
 
@@ -94,6 +102,7 @@ def send_week(
         recipients=len(subscribers),
         eligible=len(eligible),
         already_sent=already_sent,
+        stuck=stuck,
     )
 
     if dry_run:
@@ -131,11 +140,12 @@ def send_week(
         result.sample_html = str(html_path)
         result.sample_text = str(text_path)
         logger.info(
-            "digest dry run week=%s recipients=%s eligible=%s already_sent=%s sample=%s",
+            "digest dry run week=%s recipients=%s eligible=%s already_sent=%s stuck=%s sample=%s",
             week,
             result.recipients,
             result.eligible,
             result.already_sent,
+            result.stuck,
             result.sample_email,
         )
         return result
@@ -180,6 +190,7 @@ def send_week(
             },
             from_address=settings.from_address(),
             reply_to=settings.reply_to(),
+            idempotency_key=f"digest-{week}-{subscriber_id}",
         )
         try:
             provider_id = mailer.send(mail)
@@ -207,13 +218,14 @@ def send_week(
         result.sent += 1
 
     logger.info(
-        "digest send week=%s recipients=%s eligible=%s sent=%s failed=%s skipped=%s",
+        "digest send week=%s recipients=%s eligible=%s sent=%s failed=%s skipped=%s stuck=%s",
         week,
         result.recipients,
         result.eligible,
         result.sent,
         result.failed,
         result.skipped,
+        result.stuck,
     )
     return result
 
@@ -264,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "week={week} dry_run={dry_run} recipients={recipients} "
         "eligible={eligible} already_sent={already_sent} sent={sent} "
-        "failed={failed} skipped={skipped}".format(
+        "failed={failed} skipped={skipped} stuck={stuck}".format(
             week=result.week,
             dry_run=1 if result.dry_run else 0,
             recipients=result.recipients,
@@ -273,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
             sent=result.sent,
             failed=result.failed,
             skipped=result.skipped,
+            stuck=result.stuck,
         )
     )
     if result.sample_email:

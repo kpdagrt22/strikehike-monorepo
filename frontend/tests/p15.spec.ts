@@ -10,7 +10,9 @@ async function enableDigest(page: Page) {
 }
 
 async function disableDigest(page: Page) {
-  await page.route(STATUS, (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route(STATUS, (route) =>
+    route.fulfill({ status: 404, json: { detail: "Not found" } }),
+  );
 }
 
 test.describe("P15: the weekly email form", () => {
@@ -31,6 +33,15 @@ test.describe("P15: the weekly email form", () => {
       await expect(page.locator("[data-digest-footer-link]")).toHaveCount(0);
     },
   );
+
+  test("a digest-off page reaches networkidle within five seconds", async ({
+    page,
+  }) => {
+    await disableDigest(page);
+    await page.goto("/disclaimer", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 5_000 });
+    await expect(page.locator("[data-digest-footer-link]")).toHaveCount(0);
+  });
 
   test("the footer line opens the form with the footer surface", async ({ page }) => {
     await enableDigest(page);
@@ -148,6 +159,27 @@ test.describe("P15: the approved-roundup JSON route", () => {
 
     const missing = await request.get("/this-week/1900-W01/data.json");
     expect(missing.status()).toBe(404);
+  });
+});
+
+test.describe("P15: digest confirmation page", () => {
+  test("the button posts and lands on the confirmed page", async ({ page }) => {
+    await disableDigest(page);
+    await page.route("**/api/digest/confirm**", (route) => {
+      if (route.request().method() === "POST") {
+        return route.fulfill({
+          status: 303,
+          headers: { Location: "/digest/confirmed" },
+        });
+      }
+      return route.continue();
+    });
+    await page.goto("/digest/confirm?t=test-token", {
+      waitUntil: "networkidle",
+    });
+    await page.getByRole("button", { name: "Confirm subscription" }).click();
+    await page.waitForURL("**/digest/confirmed");
+    await expect(page.locator("h1")).toContainText("You're on the list.");
   });
 });
 

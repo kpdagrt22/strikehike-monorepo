@@ -223,7 +223,7 @@ def render_confirmation(confirm_url: str, *, base_url: str) -> Rendered:
     subject = "Confirm your StrikeHike weekly email"
     text = (
         "Confirm your StrikeHike weekly email\n\n"
-        f"Open this link to confirm: {confirm_url}\n\n"
+        f"Open this link and press Confirm subscription: {confirm_url}\n\n"
         "The link expires in 48 hours. If you did not ask for this, ignore this email."
     )
     html = (
@@ -233,7 +233,7 @@ def render_confirmation(confirm_url: str, *, base_url: str) -> Rendered:
         '<p style="font-size:12px;letter-spacing:0.14em;text-transform:uppercase;'
         'color:#a83a27;margin:0 0 6px">StrikeHike weekly</p>'
         '<h1 style="font-size:24px;margin:0 0 10px">Confirm your email</h1>'
-        "<p>One click confirms the weekly roundup. The link expires in 48 hours.</p>"
+        "<p>Open the link and press Confirm subscription. The link expires in 48 hours.</p>"
         f'<p><a href="{escape(confirm_url, quote=True)}" '
         'style="display:inline-block;background:#14121a;color:#fff;padding:10px 16px;'
         'border-radius:999px;text-decoration:none">Confirm subscription</a></p>'

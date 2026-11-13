@@ -56,11 +56,13 @@ jobs:
               FLAG="--send"
             fi
 
+            # Names only: docker takes the values from the environment, so the
+            # secrets never appear in the server's process list.
             docker compose -p strikehike-chrono exec -T \
-              -e RESEND_API_KEY="$RESEND_API_KEY" \
-              -e DIGEST_TOKEN_SECRET="$DIGEST_TOKEN_SECRET" \
-              -e DIGEST_ENABLED="${DIGEST_ENABLED:-}" \
-              -e DIGEST_POSTAL_ADDRESS="${DIGEST_POSTAL_ADDRESS:-}" \
+              -e RESEND_API_KEY \
+              -e DIGEST_TOKEN_SECRET \
+              -e DIGEST_ENABLED \
+              -e DIGEST_POSTAL_ADDRESS \
               backend python -m astro_finance.digest send \
                 --week "$DIGEST_WEEK" \
                 "$FLAG" \

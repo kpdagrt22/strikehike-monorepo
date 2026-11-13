@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from astro_finance.digest import router as router_module
+from astro_finance.digest import settings
 from astro_finance.digest.content import RoundupNotFound, fetch_roundup
 from astro_finance.digest.mailer import (
     Mail,
@@ -133,7 +134,13 @@ def test_subscribe_confirm_unsubscribe_and_resubscribe(digest):
     assert len(mailer.sent) == 1
 
     confirm_token = token_from(mailer.sent[0].text)
-    confirmed = client.get(f"/api/digest/confirm?t={confirm_token}")
+    page = client.get(f"/api/digest/confirm?t={confirm_token}")
+    assert page.status_code == 303
+    assert "/digest/confirm?t=" in page.headers["location"]
+    row = store.get_by_email("kate@example.com")
+    assert row["status"] == "pending" and row["confirmed_at"] is None
+
+    confirmed = client.post(f"/api/digest/confirm?t={confirm_token}")
     assert confirmed.status_code == 303
     assert confirmed.headers["location"].endswith("/digest/confirmed")
     row = store.get_by_email("kate@example.com")
@@ -161,6 +168,8 @@ def test_subscribe_confirm_unsubscribe_and_resubscribe(digest):
     new_token = token_from(mailer.sent[1].text)
     assert new_token != confirm_token
     assert client.get(f"/api/digest/confirm?t={new_token}").status_code == 303
+    assert store.get_by_email("kate@example.com")["status"] == "pending"
+    assert client.post(f"/api/digest/confirm?t={new_token}").status_code == 303
     assert store.get_by_email("kate@example.com")["status"] == "active"
 
 
@@ -172,7 +181,7 @@ def test_subscribe_answer_is_identical_for_every_status(digest):
     assert len(mailer.sent) == 1  # pending resend is throttled for ten minutes
 
     row = store.get_by_email("same@example.com")
-    assert client.get(
+    assert client.post(
         f"/api/digest/confirm?t={token_from(mailer.sent[0].text)}"
     ).status_code == 303
     active = subscribe(client, "same@example.com")
@@ -233,6 +242,7 @@ def test_off_switch_returns_404(digest, monkeypatch):
     assert client.get("/api/digest/status").status_code == 404
     assert subscribe(client, "off@example.com").status_code == 404
     assert client.get("/api/digest/confirm?t=anything").status_code == 404
+    assert client.post("/api/digest/confirm?t=anything").status_code == 404
     assert client.post("/api/digest/unsubscribe?t=anything").status_code == 404
 
 
@@ -265,6 +275,7 @@ def test_dry_run_writes_one_sample_and_sends_nothing(tmp_path, digest):
     )
     assert result.recipients == 2
     assert result.eligible == 2
+    assert result.stuck == 0
     assert result.sent == 0
     assert result.sample_email == "o***@e***.com"
     assert mailer.sent == []
@@ -291,6 +302,11 @@ def test_send_is_idempotent_and_uses_unsubscribe_headers(digest):
     assert first.sent == 2
     assert len(mailer.sent) == 2
     assert store.send_counts("2026-W46") == {"sent": 2}
+    expected_keys = {
+        f"digest-2026-W46-{subscriber['id']}"
+        for subscriber in store.active_subscribers()
+    }
+    assert {mail.idempotency_key for mail in mailer.sent} == expected_keys
     for mail in mailer.sent:
         assert mail.headers["List-Unsubscribe"].startswith("<https://strikehike.com/api/digest/unsubscribe?t=")
         assert mail.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
@@ -308,6 +324,7 @@ def test_send_is_idempotent_and_uses_unsubscribe_headers(digest):
     )
     assert second.sent == 0
     assert second.already_sent == 2
+    assert second.stuck == 0
     assert len(mailer.sent) == 2
 
 
@@ -334,6 +351,7 @@ def test_resend_mock_transport_retries_and_stops_on_auth():
             "List-Unsubscribe": "<https://strikehike.com/api/digest/unsubscribe?t=x>",
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
+        idempotency_key="digest-2026-W46-7",
     )
     assert mailer.send(mail) == "provider-1"
     assert len(requests) == 1
@@ -341,6 +359,7 @@ def test_resend_mock_transport_retries_and_stops_on_auth():
     assert body["from"] == "StrikeHike <digest@strikehike.com>"
     assert body["headers"]["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
     assert requests[0].headers["authorization"] == "Bearer test-key"
+    assert requests[0].headers["idempotency-key"] == "digest-2026-W46-7"
 
     calls = {"n": 0}
 
@@ -386,7 +405,105 @@ def test_resend_mock_transport_retries_and_stops_on_auth():
         failing.send(mail)
 
 
-def test_send_stops_on_auth_and_does_not_double_send(digest):
+def test_resend_transport_errors_retry_with_backoff_then_succeed():
+    calls = {"n": 0}
+    sleeps: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise httpx.ConnectTimeout("timeout")
+        return httpx.Response(200, json={"id": "provider-3"})
+
+    mailer = ResendMailer(
+        "test-key",
+        "StrikeHike <digest@strikehike.com>",
+        transport=httpx.MockTransport(handler),
+        sleep=sleeps.append,
+    )
+    mail = Mail(
+        to="one@example.com",
+        subject="Subject",
+        html="<p>Hi</p>",
+        text="Hi",
+        idempotency_key="digest-2026-W46-7",
+    )
+    assert mailer.send(mail) == "provider-3"
+    assert calls["n"] == 3
+    assert sleeps == [1.0, 2.0]
+
+
+def test_failed_send_is_retried_once_and_then_skipped(digest):
+    _, store, _ = digest
+    subscriber = add_active(store, "one@example.com")
+
+    class FailingMailer(FakeMailer):
+        def send(self, mail: Mail) -> str:
+            self.sent.append(mail)
+            raise RuntimeError("provider unavailable")
+
+    failing = FailingMailer()
+    first = send_week(
+        "2026-W46",
+        dry_run=False,
+        store=store,
+        mailer=failing,
+        fetch=lambda week: ROUNDUP,
+    )
+    assert first.failed == 1
+    assert store.send_counts("2026-W46") == {"failed": 1}
+
+    retry = FakeMailer()
+    second = send_week(
+        "2026-W46",
+        dry_run=False,
+        store=store,
+        mailer=retry,
+        fetch=lambda week: ROUNDUP,
+    )
+    assert second.sent == 1
+    assert second.already_sent == 0
+    assert retry.sent[0].idempotency_key == f"digest-2026-W46-{subscriber['id']}"
+    assert store.send_counts("2026-W46") == {"sent": 1}
+
+    third = send_week(
+        "2026-W46",
+        dry_run=False,
+        store=store,
+        mailer=retry,
+        fetch=lambda week: ROUNDUP,
+    )
+    assert third.sent == 0
+    assert third.already_sent == 1
+    assert len(retry.sent) == 1
+
+
+def test_sending_row_is_stuck_and_not_retried(digest):
+    _, store, _ = digest
+    subscriber = add_active(store, "one@example.com")
+    assert store.reserve_send(subscriber["id"], "2026-W46", 10) is True
+
+    mailer = FakeMailer()
+    result = send_week(
+        "2026-W46",
+        dry_run=False,
+        store=store,
+        mailer=mailer,
+        fetch=lambda week: ROUNDUP,
+    )
+    assert result.stuck == 1
+    assert result.eligible == 0
+    assert result.sent == 0
+    assert mailer.sent == []
+    assert store.send_counts("2026-W46") == {"sending": 1}
+
+
+def test_content_base_url_prefers_the_internal_origin(monkeypatch):
+    monkeypatch.setenv("DIGEST_CONTENT_URL", "http://frontend:3000")
+    assert settings.content_base_url() == "http://frontend:3000"
+
+
+def test_auth_failure_stops_first_run_and_can_be_retried(digest):
     _, store, _ = digest
     add_active(store, "one@example.com")
 
@@ -406,16 +523,18 @@ def test_send_stops_on_auth_and_does_not_double_send(digest):
     assert first.failed == 1
     assert store.send_counts("2026-W46") == {"failed": 1}
 
+    retry = FakeMailer()
     second = send_week(
         "2026-W46",
         dry_run=False,
         store=store,
-        mailer=mailer,
+        mailer=retry,
         fetch=lambda week: ROUNDUP,
     )
-    assert second.sent == 0
-    assert second.already_sent == 1
-    assert len(mailer.sent) == 1
+    assert second.sent == 1
+    assert second.failed == 0
+    assert len(retry.sent) == 1
+    assert store.send_counts("2026-W46") == {"sent": 1}
 
 
 def test_roundup_route_only_serves_approved_weeks():

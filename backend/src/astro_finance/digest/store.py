@@ -203,29 +203,38 @@ class DigestStore:
                 ).fetchall()
             ]
 
-    def send_exists(self, subscriber_id: int, week: str) -> bool:
+    def get_send(self, subscriber_id: int, week: str) -> dict[str, Any] | None:
         with self.lock:
-            row = self.connection.execute(
-                "SELECT 1 FROM sends WHERE subscriber_id=? AND week=?",
-                (subscriber_id, week),
-            ).fetchone()
-            return row is not None
+            return self._row(
+                self.connection.execute(
+                    "SELECT * FROM sends WHERE subscriber_id=? AND week=?",
+                    (subscriber_id, week),
+                ).fetchone()
+            )
+
+    def send_exists(self, subscriber_id: int, week: str) -> bool:
+        return self.get_send(subscriber_id, week) is not None
 
     def reserve_send(
         self, subscriber_id: int, week: str, now_ms: int | None = None
     ) -> bool:
         """Claim (subscriber, week) before the provider call.
 
-        The UNIQUE constraint is the idempotency lock: a second run, or a
-        concurrent one, cannot claim the same pair.
+        A new pair is inserted as ``sending``. A previous ``failed`` row may be
+        claimed again; ``sent`` and ``sending`` rows may not. The UNIQUE
+        constraint is the idempotency lock, and the conditional upsert makes a
+        concurrent retry lose the claim.
         """
 
         now = int(time.time() * 1000) if now_ms is None else int(now_ms)
         with self.lock, self.connection:
             cursor = self.connection.execute(
-                "INSERT OR IGNORE INTO sends("
+                "INSERT INTO sends("
                 "subscriber_id, week, sent_at, status"
-                ") VALUES(?,?,?,'sending')",
+                ") VALUES(?,?,?,'sending') "
+                "ON CONFLICT(subscriber_id, week) DO UPDATE SET "
+                "status='sending', sent_at=excluded.sent_at "
+                "WHERE sends.status='failed'",
                 (subscriber_id, week, now),
             )
             return cursor.rowcount == 1
