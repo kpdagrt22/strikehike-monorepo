@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { DigestSignupGate } from "@/components/digest/DigestSignupGate";
+import { RoundupLayout } from "@/components/roundup/RoundupLayout";
 import { RoundupView } from "@/components/roundup/RoundupView";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { ledgerForWeek } from "@/lib/ledger/store";
 import { latestApprovedRoundup } from "@/lib/roundup/store";
-import { weekLabel } from "@/lib/roundup/week";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +41,13 @@ type Props = {
 export default async function ThisWeekPage({ searchParams }: Props) {
   const [roundup, params] = await Promise.all([latestApprovedRoundup(), searchParams]);
   const surface = params.digest === "footer" ? "footer" : "this_week";
+  const ledger = roundup ? await ledgerForWeek(roundup.week).catch(() => null) : null;
   return (
     <PageShell data-this-week="">
       {roundup ? (
-        <RoundupView roundup={roundup} />
+        <RoundupLayout ledger={ledger} surface={surface}>
+          <RoundupView roundup={roundup} />
+        </RoundupLayout>
       ) : (
         <div className="max-w-[760px]">
           <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
@@ -65,12 +69,11 @@ export default async function ThisWeekPage({ searchParams }: Props) {
           </div>
         </div>
       )}
-      {roundup ? (
-        <p className="mt-8 max-w-[760px] border-t border-(--sh-line-1) pt-4 text-micro text-(--sh-text-3)">
-          {weekLabel(roundup.week)} · approved roundup
-        </p>
-      ) : null}
-      <DigestSignupGate surface={surface} />
+      {roundup ? null : (
+        <div className="mt-8 max-w-[520px]">
+          <DigestSignupGate surface={surface} />
+        </div>
+      )}
       <SiteColophon current="/this-week" />
     </PageShell>
   );

@@ -90,6 +90,15 @@
   --sh-press: rgb(20 18 26 / 0.08);
   --sh-selected: rgb(20 18 26 / 0.07);
   --sh-focus: rgb(192 68 47);
+  /* The weekly roundup: one gold accent, used only for the roundup, its
+     promos and the email signup, never for data series. Text step passes
+     4.5:1 on the cream sky. */
+  --sh-weekly: #855404;
+  --sh-weekly-dot: #d99a2b;
+  --sh-weekly-soft: rgb(216 180 122 / 0.16);
+  --sh-weekly-line: rgb(176 124 40 / 0.36);
+  --sh-weekly-fill: #1d160c;
+  --sh-weekly-on-fill: #f6dfae;
   /* Top clearance for page content under the fixed brand row: corner inset +
      48 px brand + 16 px gap (0.75rem + 3rem + 1rem below sm, 1.25rem + 3rem
      + 1rem from sm). Engine pages pad their content by it; /regime's HUD
@@ -129,6 +138,12 @@
   --sh-press: rgb(255 255 255 / 0.1);
   --sh-selected: rgb(255 255 255 / 0.08);
   --sh-focus: rgb(255 139 119 / 0.75);
+  --sh-weekly: #f0c674;
+  --sh-weekly-dot: #f5b942;
+  --sh-weekly-soft: rgb(240 198 116 / 0.08);
+  --sh-weekly-line: rgb(240 198 116 / 0.3);
+  --sh-weekly-fill: #f0c674;
+  --sh-weekly-on-fill: #1d160c;
 }
 
 /* Where the engine views open as a list under the cue (touch, or a window
@@ -689,4 +704,16 @@ html[data-follows] [data-your-themes-slot] {
 
 .sh-sound-volume {
   accent-color: var(--sh-signal);
+}
+
+/* The weekly mark: a small gold dot with a soft halo. Static, so it needs no
+   reduced-motion rule. */
+.sh-weekly-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--sh-weekly-dot);
+  box-shadow: 0 0 0 3px rgb(217 154 43 / 0.16), 0 0 10px rgb(245 185 66 / 0.45);
 }

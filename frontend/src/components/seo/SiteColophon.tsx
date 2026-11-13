@@ -35,9 +35,43 @@ const VIEWS: { href: string; label: string }[] = [
  * (owner approves the final text; decision D-14) and the only support link here, so the footer
  * link reports both support events with surface "footer".
  */
+function WeeklyPromo() {
+  return (
+    <aside
+      aria-label="The weekly roundup"
+      data-weekly-promo
+      className="flex flex-col gap-3 rounded-2xl border border-(--sh-weekly-line) bg-(--sh-weekly-soft) p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-5"
+    >
+      <div className="min-w-0">
+        <p className="flex items-center gap-2 font-medium uppercase tracking-[0.18em] text-(--sh-weekly)">
+          <span className="sh-weekly-dot" aria-hidden="true" />
+          Weekly roundup
+        </p>
+        <p className="mt-1.5 text-meta leading-snug text-(--sh-text-1)">
+          The Regime reading, the dates ahead and the sky, in one short note
+          each week.
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+        <Link
+          href="/this-week"
+          prefetch={false}
+          data-weekly-promo-link
+          className="inline-flex min-h-10 items-center rounded-full bg-(--sh-weekly-fill) px-4 text-micro font-semibold text-(--sh-weekly-on-fill) transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-weekly)"
+        >
+          Read this week&apos;s roundup
+        </Link>
+        <DigestFooterLink className={LINK} />
+      </div>
+    </aside>
+  );
+}
+
 export function SiteColophon({ current }: { current: string }) {
   return (
     <footer className="mt-10 flex flex-col gap-3 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
+      {/* The roundup pages carry their own weekly column. */}
+      {current === "/this-week" ? null : <WeeklyPromo />}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label="StrikeHike pages" className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {VIEWS.map((view) =>
@@ -64,10 +98,6 @@ export function SiteColophon({ current }: { current: string }) {
           </a>
         </p>
       </div>
-
-      <p>
-        <DigestFooterLink className={LINK} />
-      </p>
 
       <section
         aria-label={SUPPORT_TITLE}

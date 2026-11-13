@@ -6,31 +6,43 @@ import { useEffect, useRef } from "react";
 import { useMounted } from "@/hooks/useMounted";
 import { useChronoStore } from "@/store/chronoStore";
 
-// The five views in nav order.
+// The five views in nav order, then the weekly roundup. The roundup carries
+// the gold weekly mark; in the desktop pill it appears from lg, where the six
+// labels still clear the brand and the menu (below lg it stays in the menu and
+// the phone row).
 export const VIEWS = [
   { href: "/", label: "Orrery", prefetch: false },
   { href: "/regime", label: "Regime" },
   { href: "/convergence", label: "Convergence" },
   { href: "/patterns", label: "Patterns" },
   { href: "/upcoming", label: "Upcoming" },
+  { href: "/this-week", label: "This week", prefetch: false, weekly: true },
 ];
 
 // Pages outside the five views: only the menu carries these.
 const PAGES = [{ href: "/disclaimer", label: "Disclaimer" }];
 
-// The view (or page) a pathname belongs to; anything else outside the five
-// views is the Orrery.
+// A page that belongs to no view (/tested, /about, /recessions ...): no tab is
+// marked current, and the header lays out as on any scrolling page.
+export const NO_VIEW = { href: null, label: null };
+
+// The view (or page) a pathname belongs to. Only "/" itself is the Orrery.
 export function viewForPath(pathname) {
+  if (!pathname || pathname === "/") return VIEWS[0];
   // The event, theme and year pages belong to the Upcoming view.
-  if (pathname?.startsWith("/events/") || pathname?.startsWith("/dates/")) {
-    return VIEWS.find((view) => view.href === "/upcoming") ?? VIEWS[0];
+  if (pathname.startsWith("/events/") || pathname.startsWith("/dates/")) {
+    return VIEWS.find((view) => view.href === "/upcoming") ?? NO_VIEW;
+  }
+  // Every week, the ledger and the email pages belong to the weekly roundup.
+  if (pathname.startsWith("/ledger") || pathname.startsWith("/digest/")) {
+    return VIEWS.find((view) => view.href === "/this-week") ?? NO_VIEW;
   }
   return (
     [...VIEWS, ...PAGES].find(
       (view) =>
         view.href !== "/" &&
-        (pathname === view.href || pathname?.startsWith(`${view.href}/`)),
-    ) ?? VIEWS[0]
+        (pathname === view.href || pathname.startsWith(`${view.href}/`)),
+    ) ?? NO_VIEW
   );
 }
 
@@ -51,9 +63,14 @@ const LAYOUT = {
   },
 };
 
-function tabClass(active, layout) {
+function tabClass(active, layout, weekly = false) {
+  const base = LAYOUT[layout]?.tab ?? LAYOUT.list.tab;
   return [
-    LAYOUT[layout]?.tab ?? LAYOUT.list.tab,
+    // The pill keeps the weekly tab for lg and up; one display utility only.
+    weekly && layout === "row"
+      ? base.replace("inline-flex", "hidden lg:inline-flex") + " lg:gap-2"
+      : base,
+    weekly && layout === "scroll" ? "gap-2" : "",
     "font-medium uppercase transition-colors duration-(--sh-dur-micro)",
     active
       ? "bg-(--sh-selected) text-(--sh-text-1)"
@@ -92,9 +109,12 @@ export function ModeSwitch({ layout = "list", onNavigate }) {
             prefetch={view.prefetch}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            className={tabClass(active, layout)}
+            data-weekly-nav={view.weekly ? "" : undefined}
+            className={tabClass(active, layout, view.weekly)}
           >
-            {layout === "list" ? (
+            {view.weekly ? (
+              <span className="sh-weekly-dot" aria-hidden="true" />
+            ) : layout === "list" ? (
               <span
                 className={`h-1 w-1 shrink-0 rounded-full ${
                   active ? "bg-current" : "bg-(--sh-text-4)"
