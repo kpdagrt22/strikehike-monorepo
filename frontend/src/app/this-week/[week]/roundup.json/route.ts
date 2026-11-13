@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isIsoWeek } from "@/lib/roundup/week";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,12 @@ const DIR = join(process.cwd(), "content", "roundups");
 
 export async function GET(_request: Request, { params }: Params) {
   const { week } = await params;
+  if (!isIsoWeek(week)) {
+    return new Response("Not found\n", {
+      status: 404,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
   try {
     const raw = await readFile(join(DIR, `${week}.json`), "utf8");
     const text = raw.replace(/\r\n/g, "\n");
