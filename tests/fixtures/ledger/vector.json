@@ -1,0 +1,158 @@
+{
+  "vectors": [
+    {
+      "entry": {
+        "seq": 1,
+        "week": "2026-W46",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": "15.8",
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "hash": "f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"15.8\",\"label\":\"Steady\"},\"roundup_sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"seq\":\"1\",\"week\":\"2026-W46\"}",
+      "hash": "f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800"
+    },
+    {
+      "entry": {
+        "seq": 2,
+        "week": "2026-W46",
+        "published_at": "2026-11-13T00:00:00Z",
+        "kind": "correction",
+        "corrects_seq": 1,
+        "reason": "The label was corrected after a typo.",
+        "reading": {
+          "core_index": "15.8",
+          "label": "Calm",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_hash": "f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800",
+        "hash": "af4f75cc894c696aa6019094606cd051c4818155ca46ba1c5911c583917617cf"
+      },
+      "canonical": "{\"corrects_seq\":\"1\",\"kind\":\"correction\",\"prev_hash\":\"f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800\",\"published_at\":\"2026-11-13T00:00:00Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"15.8\",\"label\":\"Calm\"},\"reason\":\"The label was corrected after a typo.\",\"roundup_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"seq\":\"2\",\"week\":\"2026-W46\"}",
+      "hash": "af4f75cc894c696aa6019094606cd051c4818155ca46ba1c5911c583917617cf"
+    },
+    {
+      "entry": {
+        "seq": 3,
+        "week": "2026-W47",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": "16.0",
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "prev_hash": "af4f75cc894c696aa6019094606cd051c4818155ca46ba1c5911c583917617cf",
+        "hash": "8d5bfcb171b057c051d860968c52f281e903fc890e7db70d0ed454222d7d587c"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"af4f75cc894c696aa6019094606cd051c4818155ca46ba1c5911c583917617cf\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"16.0\",\"label\":\"Steady\"},\"roundup_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"seq\":\"3\",\"week\":\"2026-W47\"}",
+      "hash": "8d5bfcb171b057c051d860968c52f281e903fc890e7db70d0ed454222d7d587c"
+    },
+    {
+      "entry": {
+        "seq": 4,
+        "week": "2026-W48",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": "-3.0",
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "prev_hash": "8d5bfcb171b057c051d860968c52f281e903fc890e7db70d0ed454222d7d587c",
+        "hash": "d7a4b92d2e5ffe891d421989a6e0e2fb618eee7549d518b82dbdaba4dce7c30e"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"8d5bfcb171b057c051d860968c52f281e903fc890e7db70d0ed454222d7d587c\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"-3.0\",\"label\":\"Steady\"},\"roundup_sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"seq\":\"4\",\"week\":\"2026-W48\"}",
+      "hash": "d7a4b92d2e5ffe891d421989a6e0e2fb618eee7549d518b82dbdaba4dce7c30e"
+    },
+    {
+      "entry": {
+        "seq": 5,
+        "week": "2026-W49",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": "0.0",
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "prev_hash": "d7a4b92d2e5ffe891d421989a6e0e2fb618eee7549d518b82dbdaba4dce7c30e",
+        "hash": "3285b7798bcf383aab762f121db7fb18e3a633f18cfd01f8bbb8ec5840846ba8"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"d7a4b92d2e5ffe891d421989a6e0e2fb618eee7549d518b82dbdaba4dce7c30e\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"0.0\",\"label\":\"Steady\"},\"roundup_sha256\":\"5555555555555555555555555555555555555555555555555555555555555555\",\"seq\":\"5\",\"week\":\"2026-W49\"}",
+      "hash": "3285b7798bcf383aab762f121db7fb18e3a633f18cfd01f8bbb8ec5840846ba8"
+    },
+    {
+      "entry": {
+        "seq": 6,
+        "week": "2026-W50",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": "-0.0",
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "prev_hash": "3285b7798bcf383aab762f121db7fb18e3a633f18cfd01f8bbb8ec5840846ba8",
+        "hash": "277d15808ffe5e78d90aafee35f48326dd10cb41c86ea6ac4f0577413fecbc83"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"3285b7798bcf383aab762f121db7fb18e3a633f18cfd01f8bbb8ec5840846ba8\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"-0.0\",\"label\":\"Steady\"},\"roundup_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\",\"seq\":\"6\",\"week\":\"2026-W50\"}",
+      "hash": "277d15808ffe5e78d90aafee35f48326dd10cb41c86ea6ac4f0577413fecbc83"
+    },
+    {
+      "entry": {
+        "seq": 7,
+        "week": "2026-W51",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": "12.4",
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "prev_hash": "277d15808ffe5e78d90aafee35f48326dd10cb41c86ea6ac4f0577413fecbc83",
+        "hash": "b2f6827f84ed2e67dc9d992adf2c71aa7fb801f66813d293ccaa1d23203ffc4c"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"277d15808ffe5e78d90aafee35f48326dd10cb41c86ea6ac4f0577413fecbc83\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"12.4\",\"label\":\"Steady\"},\"roundup_sha256\":\"7777777777777777777777777777777777777777777777777777777777777777\",\"seq\":\"7\",\"week\":\"2026-W51\"}",
+      "hash": "b2f6827f84ed2e67dc9d992adf2c71aa7fb801f66813d293ccaa1d23203ffc4c"
+    }
+  ],
+  "rounding": [
+    {
+      "input": 15.76,
+      "stored": "15.8"
+    },
+    {
+      "input": 16.0,
+      "stored": "16.0"
+    },
+    {
+      "input": -3.0,
+      "stored": "-3.0"
+    },
+    {
+      "input": 0.0,
+      "stored": "0.0"
+    },
+    {
+      "input": -0.0,
+      "stored": "-0.0"
+    },
+    {
+      "input": 12.35,
+      "stored": "12.4"
+    }
+  ]
+}

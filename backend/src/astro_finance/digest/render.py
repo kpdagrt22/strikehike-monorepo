@@ -104,6 +104,7 @@ def render_roundup(
     unsubscribe_url: str,
     postal_address: str,
     base_url: str,
+    ledger: dict[str, Any] | None = None,
 ) -> Rendered:
     week = str(roundup.get("week") or "")
     label = week_label(week)
@@ -190,6 +191,15 @@ def render_roundup(
             DISCLAIMER,
             "",
             WHY,
+        ]
+    )
+    if ledger:
+        text_parts.append(
+            f"Ledger #{ledger['seq']} · {str(ledger['hash'])[:12]} — "
+            "strikehike.com/ledger"
+        )
+    text_parts.extend(
+        [
             f"Unsubscribe: {unsubscribe_url}",
         ]
     )
@@ -204,10 +214,20 @@ def render_roundup(
             '<hr style="border:none;border-top:1px solid #ddd;margin:22px 0">',
             f'<p style="color:#666;font-size:13px;margin:0 0 8px">{escape(DISCLAIMER)}</p>',
             f'<p style="color:#666;font-size:13px;margin:0 0 8px">{escape(WHY)}</p>',
-            f'<p style="color:#666;font-size:13px;margin:0 0 8px">'
-            f'<a href="{escape(unsubscribe_url, quote=True)}" style="color:#666">'
-            f"Unsubscribe in one click</a></p>",
         ]
+    )
+    if ledger:
+        ledger_url = f"{base_url.rstrip('/')}/ledger"
+        html_parts.append(
+            f'<p style="color:#666;font-size:13px;margin:0 0 8px">'
+            f'<a href="{escape(ledger_url, quote=True)}" style="color:#666">'
+            f"Ledger #{ledger['seq']} · {escape(str(ledger['hash'])[:12])} — "
+            "strikehike.com/ledger</a></p>"
+        )
+    html_parts.append(
+        f'<p style="color:#666;font-size:13px;margin:0 0 8px">'
+        f'<a href="{escape(unsubscribe_url, quote=True)}" style="color:#666">'
+        f"Unsubscribe in one click</a></p>"
     )
     if postal_address:
         html_parts.append(

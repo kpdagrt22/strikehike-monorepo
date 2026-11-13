@@ -19,6 +19,7 @@ const VIEWS: { href: string; label: string }[] = [
   { href: "/patterns", label: "Study of Patterns" },
   { href: "/upcoming", label: "Upcoming dates" },
   { href: "/this-week", label: "This week" },
+  { href: "/ledger", label: "Ledger" },
   { href: "/tested", label: "Tested" },
   { href: "/disclaimer", label: "Disclaimer" },
   { href: "/about", label: "About" },
