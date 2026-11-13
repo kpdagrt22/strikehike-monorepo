@@ -24,6 +24,8 @@ loguru>=0.7.0
 
 # Gann/Astronomy (essential only)
 pyswisseph>=2.10.0
+# Claim-test builder and its astronomy accuracy checks
+skyfield>=1.46
 
 # API & Database
 redis>=5.0.0

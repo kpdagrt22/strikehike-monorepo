@@ -1,11 +1,12 @@
-"""Build the three claim-tested explainer datasets ahead of request time.
+"""Build the seven claim-tested explainer datasets ahead of request time.
 
 Run from the backend directory with its astronomy dependencies available:
 
     python scripts/build_claim_tests.py
 
-Skyfield downloads de406.bsp on first use (or set SKYFIELD_EPHEMERIS to a local
-file). The market record and the decline list are the repo's existing artifacts.
+Skyfield uses the repo's committed data/raw/de421.bsp unless SKYFIELD_EPHEMERIS
+names another ephemeris. The market record and the decline list are the repo's
+existing artifacts.
 
 Method summary (also written into each JSON):
 
@@ -40,6 +41,7 @@ PERMUTATIONS = 2_000
 MEANINGFUL_MEAN_DIFFERENCE = 0.005  # half a percentage point
 FULL_MOON_DAYS = 7
 ECLIPSE_DAYS = 7
+MIN_WINDOWS = 30
 EARTH_RADIUS_KM = 6_378.137
 DAILY_SOURCE = "YAHOO_FINANCE_GSPC"
 
@@ -82,6 +84,17 @@ CLAIMS = {
 }
 
 
+def ephemeris_label() -> str:
+    path = os.environ.get("SKYFIELD_EPHEMERIS")
+    if path:
+        name = Path(path).name.lower()
+    elif (REPO_DIR / "backend" / "de406.bsp").exists():
+        name = "de406.bsp"
+    else:
+        name = "de421.bsp"
+    return "DE406" if "406" in name else "DE421"
+
+
 def iso_day(value: datetime) -> str:
     return value.date().isoformat()
 
@@ -102,67 +115,95 @@ def astronomy_windows(start_year: int, end_year: int, after: datetime) -> dict[s
     from skyfield.eclipselib import angle_between, lunar_eclipses
     from skyfield.searchlib import find_minima
 
-    ephemeris = os.environ.get("SKYFIELD_EPHEMERIS", "de406.bsp")
+    default_ephemeris = REPO_DIR / "backend" / "de406.bsp"
+    if not default_ephemeris.exists():
+        default_ephemeris = REPO_DIR / "backend" / "data" / "raw" / "de421.bsp"
+    ephemeris = os.environ.get("SKYFIELD_EPHEMERIS", str(default_ephemeris))
     eph = load(ephemeris)
     ts = load.timescale()
     earth = eph["earth"]
     mercury = eph["mercury"]
+    mars = eph["mars"]
+    # DE406/DE421 carry Saturn's barycenter; the offset is immaterial for a
+    # geocentric longitude conjunction at this precision.
+    saturn = eph["saturn barycenter"]
+    # The committed DE421 starts in 1899; the daily record this script tests
+    # starts in 1928, so clamping only affects the optional monthly history.
+    if Path(ephemeris).name == "de421.bsp":
+        start_year = max(start_year, 1900)
     start = ts.utc(start_year, 1, 1)
     # One extra year is read only so the page can link the next event.
     end = ts.utc(end_year + 2, 1, 1)
 
-    # Mercury: apparent geocentric ecliptic longitude, sampled daily, then
-    # bisected to the minute at each station.
-    times = ts.tt_jd(np.arange(start.tt, end.tt, 1.0))
-    longitudes = earth.at(times).observe(mercury).apparent().ecliptic_latlon()[1].degrees
-    motion = (np.diff(longitudes) + 180.0) % 360.0 - 180.0
-    sign = np.sign(motion)
-
-    def longitude_at(julian: float) -> float:
+    def longitude_at(body, julian: float) -> float:
         time = ts.tt_jd(julian)
-        return float(earth.at(time).observe(mercury).apparent().ecliptic_latlon()[1].degrees)
+        return float(earth.at(time).observe(body).apparent().ecliptic_latlon()[1].degrees)
 
-    stations: list[dict[str, Any]] = []
-    for index in np.where(np.diff(sign) != 0)[0] + 1:
-        before = float(times[index - 1].tt)
-        right_jd = float(times[index].tt)
-        before_sign = float(sign[index - 1])
-        for _ in range(26):
-            middle = (before + right_jd) / 2.0
-            change = (longitude_at(middle) - longitude_at(before) + 180.0) % 360.0 - 180.0
-            if np.sign(change) == before_sign or change == 0:
-                before = middle
-            else:
-                right_jd = middle
-        stations.append(
-            {
-                "date": ts.tt_jd((before + right_jd) / 2.0).utc_datetime(),
-                "kind": "retrograde" if before_sign > 0 else "direct",
-            }
-        )
+    def stations_for(body) -> list[dict[str, Any]]:
+        """Apparent geocentric stations, sampled daily then bisected."""
 
-    mercury_windows = []
-    for left, right in zip(stations, stations[1:]):
-        if left["kind"] == "retrograde" and right["kind"] == "direct":
-            mercury_windows.append(event_json(left["date"], right["date"], "mercury_retrograde"))
+        times = ts.tt_jd(np.arange(start.tt, end.tt, 1.0))
+        longitudes = earth.at(times).observe(body).apparent().ecliptic_latlon()[1].degrees
+        motion = (np.diff(longitudes) + 180.0) % 360.0 - 180.0
+        sign = np.sign(motion)
+        found: list[dict[str, Any]] = []
+        for index in np.where(np.diff(sign) != 0)[0] + 1:
+            before = float(times[index - 1].tt)
+            right_jd = float(times[index].tt)
+            before_sign = float(sign[index - 1])
+            for _ in range(26):
+                middle = (before + right_jd) / 2.0
+                change = (
+                    longitude_at(body, middle) - longitude_at(body, before) + 180.0
+                ) % 360.0 - 180.0
+                if np.sign(change) == before_sign or change == 0:
+                    before = middle
+                else:
+                    right_jd = middle
+            found.append(
+                {
+                    "date": ts.tt_jd((before + right_jd) / 2.0).utc_datetime(),
+                    "kind": "retrograde" if before_sign > 0 else "direct",
+                }
+            )
+        return found
+
+    mercury_stations = stations_for(mercury)
+    mars_stations = stations_for(mars)
+
+    def retrograde_windows(stations: list[dict[str, Any]], kind: str):
+        return [
+            event_json(left["date"], right["date"], kind)
+            for left, right in zip(stations, stations[1:])
+            if left["kind"] == "retrograde" and right["kind"] == "direct"
+        ]
+
+    mercury_windows = retrograde_windows(mercury_stations, "mercury_retrograde")
+    mars_windows = retrograde_windows(mars_stations, "mars_retrograde")
     next_mercury = next(
-        (s for s in stations if s["kind"] == "retrograde" and s["date"] > after), None
+        (s for s in mercury_stations if s["kind"] == "retrograde" and s["date"] > after),
+        None,
+    )
+    next_mars = next(
+        (s for s in mars_stations if s["kind"] == "retrograde" and s["date"] > after),
+        None,
     )
 
-    # Full moons: the exact phase time, tested with a fixed seven-day window.
+    # New and full moons: the exact phase time, tested with a fixed seven-day
+    # window. Codes are 0 new, 1 first quarter, 2 full, 3 last quarter.
     phase_times, phases = almanac.find_discrete(start, end, almanac.moon_phases(eph))
+    new_moons = []
     full_moons = []
     for time, phase in zip(phase_times, phases):
-        if int(phase) != 2:
+        if int(phase) not in (0, 2):
             continue
         moment = time.utc_datetime()
-        full_moons.append(
-            event_json(
-                moment - timedelta(days=FULL_MOON_DAYS // 2),
-                moment + timedelta(days=FULL_MOON_DAYS // 2),
-                "full_moon",
-            )
+        window = event_json(
+            moment - timedelta(days=FULL_MOON_DAYS // 2),
+            moment + timedelta(days=FULL_MOON_DAYS // 2),
+            "new_moon" if int(phase) == 0 else "full_moon",
         )
+        (new_moons if int(phase) == 0 else full_moons).append(window)
     next_full_moon = next(
         (
             time.utc_datetime()
@@ -171,6 +212,84 @@ def astronomy_windows(start_year: int, end_year: int, after: datetime) -> dict[s
         ),
         None,
     )
+    next_new_moon = next(
+        (
+            time.utc_datetime()
+            for time, phase in zip(phase_times, phases)
+            if int(phase) == 0 and time.utc_datetime() > after
+        ),
+        None,
+    )
+
+    # Equinoxes and solstices: codes 0 March, 1 June, 2 September, 3 December.
+    season_times, season_codes = almanac.find_discrete(start, end, almanac.seasons(eph))
+    season_labels = {
+        0: "equinox_march",
+        1: "solstice_june",
+        2: "equinox_september",
+        3: "solstice_december",
+    }
+    seasons = []
+    for time, code in zip(season_times, season_codes):
+        moment = time.utc_datetime()
+        seasons.append(
+            event_json(
+                moment - timedelta(days=FULL_MOON_DAYS // 2),
+                moment + timedelta(days=FULL_MOON_DAYS // 2),
+                season_labels[int(code)],
+            )
+        )
+    next_season = next(
+        (
+            time.utc_datetime()
+            for time in season_times
+            if time.utc_datetime() > after
+        ),
+        None,
+    )
+
+    # Mars-Saturn: apparent geocentric ecliptic longitude equality. Sample
+    # daily, then bisect every zero crossing. Both directions are kept so a
+    # rare triple conjunction is not silently dropped.
+    times = ts.tt_jd(np.arange(start.tt, end.tt, 1.0))
+    mars_longitudes = earth.at(times).observe(mars).apparent().ecliptic_latlon()[1].degrees
+    saturn_longitudes = earth.at(times).observe(saturn).apparent().ecliptic_latlon()[1].degrees
+    differences = (mars_longitudes - saturn_longitudes + 180.0) % 360.0 - 180.0
+    difference_sign = np.sign(differences)
+
+    def conjunction_difference(julian: float) -> float:
+        return (
+            longitude_at(mars, julian) - longitude_at(saturn, julian) + 180.0
+        ) % 360.0 - 180.0
+
+    conjunction_moments: list[datetime] = []
+    for index in np.where(np.diff(difference_sign) != 0)[0] + 1:
+        # A wrap at +/-180 is an opposition, not a conjunction. Only a
+        # crossing near zero is a longitude conjunction.
+        if abs(differences[index - 1]) > 90.0 or abs(differences[index]) > 90.0:
+            continue
+        before = float(times[index - 1].tt)
+        right_jd = float(times[index].tt)
+        before_sign = float(difference_sign[index - 1])
+        if before_sign == 0:
+            before_sign = 1.0 if differences[index - 1] > 0 else -1.0
+        for _ in range(30):
+            middle = (before + right_jd) / 2.0
+            change = conjunction_difference(middle)
+            if np.sign(change) == before_sign or change == 0:
+                before = middle
+            else:
+                right_jd = middle
+        conjunction_moments.append(ts.tt_jd((before + right_jd) / 2.0).utc_datetime())
+    conjunctions = [
+        event_json(
+            moment - timedelta(days=FULL_MOON_DAYS // 2),
+            moment + timedelta(days=FULL_MOON_DAYS // 2),
+            "mars_saturn_conjunction",
+        )
+        for moment in conjunction_moments
+    ]
+    next_conjunction = next((moment for moment in conjunction_moments if moment > after), None)
 
     # Lunar eclipses: Skyfield's eclipse geometry. Codes are the library's
     # 0 penumbral, 1 partial, 2 total.
@@ -246,16 +365,38 @@ def astronomy_windows(start_year: int, end_year: int, after: datetime) -> dict[s
         "mercury": mercury_windows,
         "full_moon": full_moons,
         "eclipses": eclipses,
+        "new_moon": new_moons,
+        "seasons": seasons,
+        "mars_retrograde": mars_windows,
+        "mars_saturn_conjunction": conjunctions,
         "next": {
             "mercury": next_mercury,
             "full_moon": next_full_moon,
             "eclipses": next_eclipse,
+            "new_moon": next_new_moon,
+            "seasons": next_season,
+            "mars_retrograde": next_mars,
+            "mars_saturn_conjunction": next_conjunction,
         },
     }
 
 
 def overlaps(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return left["start"] <= right["end"] and right["start"] <= left["end"]
+
+
+def non_overlapping(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep one window per overlapping cluster, earliest first.
+
+    The minimum-sample rule counts independent windows, so a rare triple
+    conjunction or a pair of eclipses in the same week cannot inflate N.
+    """
+
+    kept: list[dict[str, Any]] = []
+    for event in sorted(events, key=lambda item: item["start"]):
+        if not any(overlaps(event, other) for other in kept):
+            kept.append(event)
+    return kept
 
 
 def daily_window_return(frame: pd.DataFrame, start: str, end: str) -> dict[str, Any] | None:
@@ -484,19 +625,40 @@ def build_claim(
     next_event: Any,
     daily_start: str,
 ) -> dict[str, Any]:
+    events = non_overlapping(events)
     full = build_monthly_comparison(events, monthly)
     daily_events = [event for event in events if event["start"] >= daily_start]
-    comparison = build_daily_comparison(daily_events, daily, DECLINE_PEAKS)
-    result, result_code = result_text(comparison)
+    try:
+        comparison = build_daily_comparison(daily_events, daily, DECLINE_PEAKS)
+    except ValueError:
+        comparison = None
+    window_count = comparison["in"]["n"] if comparison else 0
+    published = window_count >= MIN_WINDOWS
+    result, result_code = (
+        result_text(comparison)
+        if published and comparison is not None
+        else (f"Too few windows to test ({window_count})", "too_few_windows")
+    )
     daily_first = daily["sp500_proxy"].dropna().index[0].date().isoformat()
     daily_last = daily["sp500_proxy"].dropna().index[-1].date().isoformat()
     config = CLAIMS[claim]
-    return {
+    method = [
+        config["windows"],
+        "Returns are the S&P proxy close at the first session in a window to its close at the last session in that window.",
+        "Each event window is paired with the nearest non-overlapping window of the same calendar length, searching backward first, then forward. Control windows never overlap an event or another control.",
+        "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",
+        f"The uncertainty check is a two-sided permutation test of the mean-return difference, {PERMUTATIONS} shuffles with seed {SEED}.",
+        "A difference is called meaningful only when p < 0.05 and the mean-return difference is at least 0.5 percentage points in absolute size.",
+        f"A claim is published only when it has at least {MIN_WINDOWS} non-overlapping daily windows; otherwise the page shows the count and no result.",
+        "The p-value and the sample sizes are reported exactly as computed; the same seed reproduces the same result.",
+    ]
+    payload: dict[str, Any] = {
         "id": claim,
         "title": config["title"],
         "claim": config["claim"],
         "result": result,
         "result_code": result_code,
+        "published": published,
         "series": {
             "name": "S&P 500 / Cowles chained proxy (sp500_proxy)",
             "column": "sp500_proxy",
@@ -516,24 +678,20 @@ def build_claim(
             "meta": "backend/data/processed/macro_regime_history.meta.json",
             "market": "sp500_proxy: NBER M1125AUSM343NNBR (monthly) before "
             f"{daily_start}, Yahoo GSPC (daily) from {daily_start}",
-            "astronomy": "Skyfield with the DE406 ephemeris",
+            "astronomy": f"Skyfield with the JPL {ephemeris_label()} ephemeris",
             "build_date": datetime.now(timezone.utc).date().isoformat(),
             "data_version": meta.get("data_version"),
         },
-        "comparison": {key: value for key, value in comparison.items() if key != "windows"},
+        "comparison": (
+            {key: value for key, value in comparison.items() if key != "windows"}
+            if comparison is not None
+            else None
+        ),
         "full_history": {key: value for key, value in full.items() if key != "windows"},
-        "chart": yearly_chart(comparison["windows"]),
-        "windows": comparison["windows"],
+        "chart": yearly_chart(comparison["windows"]) if published and comparison else [],
+        "windows": comparison["windows"] if published and comparison else [],
         "next_event": next_event_json(next_event),
-        "method": [
-            config["windows"],
-            "Returns are the S&P proxy close at the first session in a window to its close at the last session in that window.",
-            "Each event window is paired with the nearest non-overlapping window of the same calendar length, searching backward first, then forward. Control windows never overlap an event or another control.",
-            "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",
-            f"The uncertainty check is a two-sided permutation test of the mean-return difference, {PERMUTATIONS} shuffles with seed {SEED}.",
-            "A difference is called meaningful only when p < 0.05 and the mean-return difference is at least 0.5 percentage points in absolute size.",
-            "The p-value and the sample sizes are reported exactly as computed; the same seed reproduces the same result.",
-        ],
+        "method": method,
         "limitations": [
             "This is a descriptive comparison of a historical record, not evidence of a cause and not a forecast.",
             "The daily S&P record starts 30 Dec 1927 (Yahoo GSPC). Before that the repo's proxy is monthly (NBER, 1871-1926), so short-window returns there would be mostly forward-filled; the headline test uses the daily record and the full-history test uses monthly returns.",
@@ -543,6 +701,9 @@ def build_claim(
             "Decline starts are only the falls in the current /declines list, not every possible market fall.",
         ],
     }
+    if not published:
+        payload["too_few"] = {"windows": window_count}
+    return payload
 
 
 def main() -> None:
@@ -578,6 +739,10 @@ def main() -> None:
         ("mercury-retrograde", "mercury"),
         ("full-moon", "full_moon"),
         ("eclipses", "eclipses"),
+        ("new-moon", "new_moon"),
+        ("solstices-equinoxes", "seasons"),
+        ("mars-retrograde", "mars_retrograde"),
+        ("mars-saturn-conjunction", "mars_saturn_conjunction"),
     ):
         payload = build_claim(
             claim,
@@ -596,13 +761,14 @@ def main() -> None:
             if full.get("available")
             else "monthly not separable"
         )
-        print(
-            path,
-            "daily n=", payload["comparison"]["in"]["n"],
-            "p=", round(payload["comparison"]["p_value"], 4),
-            "|", monthly_note,
-            "|", payload["result"],
-        )
+        if payload["published"]:
+            daily_note = (
+                f"daily n={payload['comparison']['in']['n']} "
+                f"p={round(payload['comparison']['p_value'], 4)}"
+            )
+        else:
+            daily_note = f"too few windows ({payload['too_few']['windows']})"
+        print(path, daily_note, "|", monthly_note, "|", payload["result"])
 
 
 if __name__ == "__main__":

@@ -67,7 +67,7 @@ export default async function ClaimTestPage({ params }: Params) {
   const claim = await readClaimTest(id);
   if (!claim) notFound();
 
-  const { comparison } = claim;
+  const comparison = claim.comparison;
   const path = `/tested/${claim.id}`;
   const nextLine = nextEventLine(claim.next_event);
   const full = claim.full_history;
@@ -130,63 +130,78 @@ export default async function ClaimTestPage({ params }: Params) {
         </div>
       </header>
 
-      <div className="mt-8 max-w-[760px]">
-        <ClaimChart points={claim.chart} label={`${claim.title}: mean in-window return each year`} />
-      </div>
+      {comparison && claim.published ? (
+        <>
+          <div className="mt-8 max-w-[760px]">
+            <ClaimChart points={claim.chart} label={`${claim.title}: mean in-window return each year`} />
+          </div>
 
-      <section className="mt-8 max-w-[860px]">
-        <h2 className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">
-          The numbers
-        </h2>
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-(--sh-line-1)">
-          <table data-claim-table="" className="w-full min-w-[40rem] border-collapse text-left text-micro">
-            <thead className="bg-(--sh-surface-float) text-(--sh-text-3)">
-              <tr>
-                <th scope="col" className="px-3 py-2.5 font-medium uppercase tracking-[0.12em]">Measure</th>
-                <th scope="col" className="px-3 py-2.5 text-right font-medium uppercase tracking-[0.12em]">
-                  In the window
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-right font-medium uppercase tracking-[0.12em]">
-                  Out of the window
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-t border-(--sh-line-1)">
-                <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">Windows</th>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{comparison.in.n}</td>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{comparison.out.n}</td>
-              </tr>
-              <tr className="border-t border-(--sh-line-1)">
-                <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">Mean return</th>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.in.mean_return)}</td>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.out.mean_return)}</td>
-              </tr>
-              <tr className="border-t border-(--sh-line-1)">
-                <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">Median return</th>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.in.median_return)}</td>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.out.median_return)}</td>
-              </tr>
-              <tr className="border-t border-(--sh-line-1)">
-                <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">
-                  Windows holding a 20% fall start
-                </th>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">
-                  {comparison.in.decline_starts} ({pct(comparison.in.decline_share, 1)})
-                </td>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">
-                  {comparison.out.decline_starts} ({pct(comparison.out.decline_share, 1)})
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p data-claim-stats="" className="mt-3 text-micro leading-relaxed text-(--sh-text-3)">
-          Mean difference {pct(comparison.mean_difference, 3)} · median difference{" "}
-          {pct(comparison.median_difference, 3)} · permutation p = {comparison.p_value.toFixed(4)} (
-          {comparison.permutations} shuffles, seed {comparison.seed}).
-        </p>
-      </section>
+          <section className="mt-8 max-w-[860px]">
+            <h2 className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">
+              The numbers
+            </h2>
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-(--sh-line-1)">
+              <table data-claim-table="" className="w-full min-w-[40rem] border-collapse text-left text-micro">
+                <thead className="bg-(--sh-surface-float) text-(--sh-text-3)">
+                  <tr>
+                    <th scope="col" className="px-3 py-2.5 font-medium uppercase tracking-[0.12em]">Measure</th>
+                    <th scope="col" className="px-3 py-2.5 text-right font-medium uppercase tracking-[0.12em]">
+                      In the window
+                    </th>
+                    <th scope="col" className="px-3 py-2.5 text-right font-medium uppercase tracking-[0.12em]">
+                      Out of the window
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-(--sh-line-1)">
+                    <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">Windows</th>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{comparison.in.n}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{comparison.out.n}</td>
+                  </tr>
+                  <tr className="border-t border-(--sh-line-1)">
+                    <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">Mean return</th>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.in.mean_return)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.out.mean_return)}</td>
+                  </tr>
+                  <tr className="border-t border-(--sh-line-1)">
+                    <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">Median return</th>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.in.median_return)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(comparison.out.median_return)}</td>
+                  </tr>
+                  <tr className="border-t border-(--sh-line-1)">
+                    <th scope="row" className="px-3 py-2.5 font-medium text-(--sh-text-1)">
+                      Windows holding a 20% fall start
+                    </th>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">
+                      {comparison.in.decline_starts} ({pct(comparison.in.decline_share, 1)})
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-(--sh-text-2)">
+                      {comparison.out.decline_starts} ({pct(comparison.out.decline_share, 1)})
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p data-claim-stats="" className="mt-3 text-micro leading-relaxed text-(--sh-text-3)">
+              Mean difference {pct(comparison.mean_difference, 3)} · median difference{" "}
+              {pct(comparison.median_difference, 3)} · permutation p = {comparison.p_value.toFixed(4)} (
+              {comparison.permutations} shuffles, seed {comparison.seed}).
+            </p>
+          </section>
+        </>
+      ) : (
+        <section
+          data-claim-too-few=""
+          className="mt-8 max-w-[760px] rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-card) px-4 py-3 text-meta leading-relaxed text-(--sh-text-2)"
+        >
+          <p className="font-medium text-(--sh-text-1)">{claim.result}</p>
+          <p className="mt-2">
+            A claim is published only when it has at least 30 non-overlapping daily windows. This
+            record does not meet that minimum, so no comparison is shown.
+          </p>
+        </section>
+      )}
 
       <section className="mt-8 max-w-[760px]">
         <h2 className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">
@@ -202,12 +217,13 @@ export default async function ClaimTestPage({ params }: Params) {
         </ul>
       </section>
 
-      <section className="mt-8 max-w-[860px]">
-        <details className="group rounded-2xl border border-(--sh-line-1)">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-2)">
-            <span>Windows ({claim.windows.length})</span>
-            <span aria-hidden="true" className="text-base transition-transform group-open:rotate-45">+</span>
-          </summary>
+      {comparison && claim.published ? (
+        <section className="mt-8 max-w-[860px]">
+          <details className="group rounded-2xl border border-(--sh-line-1)">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-2)">
+              <span>Windows ({claim.windows.length})</span>
+              <span aria-hidden="true" className="text-base transition-transform group-open:rotate-45">+</span>
+            </summary>
           <div className="border-t border-(--sh-line-1)">
             <div className="max-h-[24rem] overflow-y-auto">
               <table data-claim-windows="" className="w-full border-collapse text-left text-micro">
@@ -232,8 +248,9 @@ export default async function ClaimTestPage({ params }: Params) {
               </table>
             </div>
           </div>
-        </details>
-      </section>
+          </details>
+        </section>
+      ) : null}
 
       <section className="mt-8 max-w-[760px]">
         <h2 className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">Limitations</h2>

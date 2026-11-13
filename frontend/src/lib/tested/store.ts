@@ -1,11 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-// The three claim tests, fixed at build time by backend/scripts/build_claim_tests.py
+// The seven claim tests, fixed at build time by backend/scripts/build_claim_tests.py
 // and committed under frontend/content/tested. The pages read them from the
 // working directory, the same way the roundup store reads approved weeklies.
 
-export const CLAIM_IDS = ["mercury-retrograde", "full-moon", "eclipses"] as const;
+export const CLAIM_IDS = [
+  "mercury-retrograde",
+  "full-moon",
+  "eclipses",
+  "new-moon",
+  "solstices-equinoxes",
+  "mars-retrograde",
+  "mars-saturn-conjunction",
+] as const;
 export type ClaimId = (typeof CLAIM_IDS)[number];
 
 export type ClaimWindow = {
@@ -44,7 +52,9 @@ export type ClaimTest = {
   title: string;
   claim: string;
   result: string;
-  result_code: "no_meaningful_difference" | "different";
+  result_code: "no_meaningful_difference" | "different" | "too_few_windows";
+  published: boolean;
+  too_few?: { windows: number };
   series: {
     name: string;
     column: string;
@@ -62,7 +72,7 @@ export type ClaimTest = {
     build_date: string;
     data_version?: string;
   };
-  comparison: ClaimComparison;
+  comparison: ClaimComparison | null;
   full_history: ClaimFullHistory;
   chart: { year: number; value: number }[];
   windows: ClaimWindow[];

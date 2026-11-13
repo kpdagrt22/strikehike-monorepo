@@ -70,6 +70,7 @@ jobs:
             tests/test_analytics_weekly.py \
             tests/test_digest.py \
             tests/test_ledger.py \
+            tests/test_claim_tests.py \
             tests/test_caddy_snippet.py \
             -q
 

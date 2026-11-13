@@ -4,6 +4,7 @@
   "claim": "Mercury retrograde is often said to unsettle the market.",
   "result": "No meaningful difference in this record.",
   "result_code": "no_meaningful_difference",
+  "published": true,
   "series": {
     "name": "S&P 500 / Cowles chained proxy (sp500_proxy)",
     "column": "sp500_proxy",
@@ -22,8 +23,8 @@
     "artifact": "backend/data/processed/macro_regime_history.parquet",
     "meta": "backend/data/processed/macro_regime_history.meta.json",
     "market": "sp500_proxy: NBER M1125AUSM343NNBR (monthly) before 1927-12-30, Yahoo GSPC (daily) from 1927-12-30",
-    "astronomy": "Skyfield with the DE406 ephemeris",
-    "build_date": "2026-11-11",
+    "astronomy": "Skyfield with the JPL DE406 ephemeris",
+    "build_date": "2026-11-13",
     "data_version": "59192d5aa731"
   },
   "comparison": {
@@ -2666,6 +2667,7 @@
     "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",
     "The uncertainty check is a two-sided permutation test of the mean-return difference, 2000 shuffles with seed 20261111.",
     "A difference is called meaningful only when p < 0.05 and the mean-return difference is at least 0.5 percentage points in absolute size.",
+    "A claim is published only when it has at least 30 non-overlapping daily windows; otherwise the page shows the count and no result.",
     "The p-value and the sample sizes are reported exactly as computed; the same seed reproduces the same result."
   ],
   "limitations": [
