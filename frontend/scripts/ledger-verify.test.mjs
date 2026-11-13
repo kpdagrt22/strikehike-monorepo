@@ -7,6 +7,10 @@ import {
   LedgerError,
   verifyLedgerText,
 } from "./ledger-verify.mjs";
+import {
+  canonicalJson as browserCanonicalJson,
+  ledgerHash as browserLedgerHash,
+} from "../src/lib/ledger/canonical.ts";
 
 const vectorUrl = new URL("../../tests/fixtures/ledger/vector.json", import.meta.url);
 const ledgerUrl = new URL("../content/ledger/ledger.jsonl", import.meta.url);
@@ -19,6 +23,18 @@ test("the Node canonical bytes and hashes match the shared vectors", async () =>
     assert.equal(canonicalJson(payload), vector.canonical);
     assert.equal(ledgerHash(vector.entry), vector.hash);
   }
+  assert.throws(() => canonicalJson({ core_index: 16.5 }), /non-integer/);
+});
+
+test("the browser twin matches the vectors and rejects floats", async () => {
+  const { vectors } = JSON.parse(await readFile(vectorUrl, "utf8"));
+  for (const vector of vectors) {
+    const payload = { ...vector.entry };
+    delete payload.hash;
+    assert.equal(browserCanonicalJson(payload), vector.canonical);
+    assert.equal(await browserLedgerHash(vector.entry), vector.hash);
+  }
+  assert.throws(() => browserCanonicalJson({ core_index: 16.5 }), /non-integer/);
 });
 
 test("the real ledger verifies", async () => {

@@ -174,12 +174,16 @@ export default async function LedgerPage() {
         <pre className="mt-2 whitespace-pre-wrap break-words rounded-xl border border-(--sh-line-1) bg-(--sh-surface-card) p-3 text-[11px] leading-relaxed text-(--sh-text-2)">
           <code>{`curl -s https://strikehike.com/ledger.jsonl -o ledger.jsonl
 python -m astro_finance.ledger verify --path ledger.jsonl
-sha256sum ledger.jsonl`}</code>
+sha256sum ledger.jsonl
+curl -s https://strikehike.com/this-week/2026-W46/roundup.json | sha256sum`}</code>
         </pre>
         <p className="mt-2 text-micro leading-relaxed text-(--sh-text-3)">
           The first command downloads the same file this page reads. The second
           recomputes every line hash and every previous-hash link. The third
           records the whole-file hash, so a later copy can be compared with it.
+          The fourth hashes the committed roundup file; it should equal the
+          <code className="mx-1">roundup_sha256</code> in that week&apos;s ledger
+          line.
         </p>
       </section>
 

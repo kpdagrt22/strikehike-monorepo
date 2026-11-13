@@ -44,7 +44,16 @@ export function LedgerVerify() {
         if (typeof entry.hash !== "string" || entry.hash.length !== 64) {
           throw new Break(seq, "bad hash");
         }
-        if ((await ledgerHash(entry)) !== entry.hash) {
+        let computed;
+        try {
+          computed = await ledgerHash(entry);
+        } catch (error) {
+          throw new Break(
+            seq,
+            error instanceof Error ? error.message : "canonical form rejected",
+          );
+        }
+        if (computed !== entry.hash) {
           throw new Break(seq, "hash does not match");
         }
         previous = entry.hash;

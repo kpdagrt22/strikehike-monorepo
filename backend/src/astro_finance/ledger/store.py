@@ -12,6 +12,7 @@ import hmac
 import json
 import re
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Callable
 
@@ -19,12 +20,18 @@ import httpx
 
 from astro_finance.digest import settings
 
-from .canonical import ledger_hash
+from .canonical import CanonicalError, ledger_hash
 
 ZERO_HASH = "0" * 64
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_LEDGER = REPO_ROOT / "frontend" / "content" / "ledger" / "ledger.jsonl"
+ROUNDUPS = REPO_ROOT / "frontend" / "content" / "roundups"
 WEEK_RE = re.compile(r"^\d{4}-W\d{2}$")
+
+
+def normalise_newlines(raw: bytes) -> bytes:
+    """The committed file's stable form: LF only, every OS."""
+    return raw.replace(b"\r\n", b"\n")
 
 
 class LedgerError(ValueError):
@@ -68,7 +75,10 @@ def verify_entries(entries: list[dict[str, Any]]) -> None:
         stored = entry.get("hash")
         if not isinstance(stored, str) or len(stored) != 64:
             raise LedgerError(f"seq {seq}: bad hash")
-        computed = ledger_hash(entry)
+        try:
+            computed = ledger_hash(entry)
+        except CanonicalError as exc:
+            raise LedgerError(f"seq {seq}: {exc}") from exc
         if not hmac.compare_digest(stored, computed):
             raise LedgerError(f"seq {seq}: hash does not match")
         previous = stored
@@ -107,6 +117,18 @@ def _published_at(value: str | None) -> str:
     return moment.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def format_core_index(value: Any) -> str:
+    """The one place a reading becomes its stored string, exactly one decimal."""
+
+    try:
+        core = Decimal(str(value)).quantize(
+            Decimal("0.1"), rounding=ROUND_HALF_UP
+        )
+    except (InvalidOperation, ValueError) as exc:
+        raise LedgerError("roundup Regime score is not a number") from exc
+    return format(core, "f")
+
+
 def _reading(roundup: dict[str, Any]) -> dict[str, Any]:
     regime = roundup.get("regime")
     if not isinstance(regime, dict):
@@ -117,7 +139,7 @@ def _reading(roundup: dict[str, Any]) -> dict[str, Any]:
     if score is None or not label or not as_of:
         raise LedgerError("roundup Regime reading is incomplete")
     return {
-        "core_index": round(float(score), 1),
+        "core_index": format_core_index(score),
         "label": str(label),
         "as_of": str(as_of),
     }
@@ -126,31 +148,28 @@ def _reading(roundup: dict[str, Any]) -> dict[str, Any]:
 def fetch_roundup(
     week: str,
     *,
-    base_url: str | None = None,
-    transport: httpx.BaseTransport | None = None,
+    roundups_dir: str | Path | None = None,
 ) -> tuple[dict[str, Any], bytes]:
-    root = (base_url or settings.content_base_url()).rstrip("/")
-    url = f"{root}/this-week/{week}/data.json"
-    try:
-        with httpx.Client(
-            transport=transport, timeout=15.0, follow_redirects=True
-        ) as client:
-            response = client.get(url)
-    except httpx.HTTPError as exc:
-        raise LedgerError(f"roundup route is unreachable: {exc}") from exc
-    if response.status_code == 404:
+    """Read the committed roundup file and hash its LF-normalised bytes.
+
+    No HTTP call is involved: the file is the permanent record the public
+    ``/roundup.json`` route serves.
+    """
+
+    directory = Path(roundups_dir or ROUNDUPS)
+    path = directory / f"{week}.json"
+    if not path.exists():
         raise LedgerError(f"{week} is not approved")
-    if response.status_code != 200:
-        raise LedgerError(f"roundup route returned HTTP {response.status_code}")
     try:
-        data = response.json()
-    except ValueError as exc:
-        raise LedgerError("roundup route returned invalid JSON") from exc
+        raw = normalise_newlines(path.read_bytes())
+        data = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LedgerError(f"cannot read {path.name}") from exc
     if not isinstance(data, dict) or data.get("approved") is not True:
         raise LedgerError(f"{week} is not approved")
     if data.get("week") != week:
-        raise LedgerError(f"roundup route returned {data.get('week')}, not {week}")
-    return data, response.content
+        raise LedgerError(f"roundup file is {data.get('week')}, not {week}")
+    return data, raw
 
 
 def fetch_ledger_entry(

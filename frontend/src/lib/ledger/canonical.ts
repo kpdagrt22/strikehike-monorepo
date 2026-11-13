@@ -5,7 +5,10 @@ export function canonicalJson(value: unknown): string {
   if (typeof value === "boolean") return value ? "true" : "false";
   if (value === null) return "null";
   if (typeof value === "number") {
-    return JSON.stringify(Number.isInteger(value) ? String(value) : value.toFixed(1));
+    if (!Number.isInteger(value)) {
+      throw new TypeError("non-integer numbers are not allowed");
+    }
+    return JSON.stringify(String(value));
   }
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(",")}]`;

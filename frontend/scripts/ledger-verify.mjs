@@ -12,7 +12,10 @@ export function canonicalJson(value) {
   if (typeof value === "boolean") return value ? "true" : "false";
   if (value === null) return "null";
   if (typeof value === "number") {
-    return JSON.stringify(Number.isInteger(value) ? String(value) : value.toFixed(1));
+    if (!Number.isInteger(value)) {
+      throw new TypeError("non-integer numbers are not allowed");
+    }
+    return JSON.stringify(String(value));
   }
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(",")}]`;
@@ -62,7 +65,13 @@ export function verifyLedgerText(text) {
     if (typeof entry.hash !== "string" || entry.hash.length !== 64) {
       throw new LedgerError(seq, "bad hash");
     }
-    if (ledgerHash(entry) !== entry.hash) {
+    let computed;
+    try {
+      computed = ledgerHash(entry);
+    } catch (error) {
+      throw new LedgerError(seq, error.message);
+    }
+    if (computed !== entry.hash) {
       throw new LedgerError(seq, "hash does not match");
     }
     previous = entry.hash;

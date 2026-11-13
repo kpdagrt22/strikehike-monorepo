@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -7,20 +8,24 @@ from pathlib import Path
 
 import pytest
 
-from astro_finance.ledger.canonical import canonical_json, ledger_hash
+from astro_finance.ledger.canonical import CanonicalError, canonical_json, ledger_hash
 from astro_finance.ledger.store import (
     REPO_ROOT,
+    ROUNDUPS,
     LedgerError,
     append_entry,
+    fetch_roundup,
+    format_core_index,
     latest_for_week,
+    normalise_newlines,
     read_entries,
     verify_file,
 )
 
 VECTOR = REPO_ROOT / "tests" / "fixtures" / "ledger" / "vector.json"
-ROUNDUPS = REPO_ROOT / "frontend" / "content" / "roundups"
 REAL_LEDGER = REPO_ROOT / "frontend" / "content" / "ledger" / "ledger.jsonl"
 NODE_SCRIPT = REPO_ROOT / "frontend" / "scripts" / "ledger-verify.mjs"
+BROWSER_SCRIPT = REPO_ROOT / "frontend" / "scripts" / "ledger-browser-verify.mjs"
 
 ROUNDUP = {
     "week": "2026-W46",
@@ -41,12 +46,101 @@ def fake_fetch(week: str):
 
 
 def test_shared_vector_matches_python_canonical_bytes_and_hash():
-    vectors = json.loads(VECTOR.read_text(encoding="utf-8"))["vectors"]
-    for vector in vectors:
+    data = json.loads(VECTOR.read_text(encoding="utf-8"))
+    for vector in data["vectors"]:
         entry = vector["entry"]
         payload = {key: value for key, value in entry.items() if key != "hash"}
         assert canonical_json(payload) == vector["canonical"]
         assert ledger_hash(entry) == vector["hash"]
+    for case in data["rounding"]:
+        assert format_core_index(case["input"]) == case["stored"]
+
+
+def test_whole_number_readings_are_strings_and_both_twins_verify(tmp_path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    scores = [15.76, 16.0, -3.0, 0.0, -0.0, 12.35]
+    weeks = [f"2026-W{46 + index}" for index in range(len(scores))]
+
+    def fake(week: str):
+        score = scores[weeks.index(week)]
+        return (
+            {
+                "week": week,
+                "approved": True,
+                "regime": {
+                    "as_of": "2026-10-27",
+                    "score": score,
+                    "label": "Steady",
+                },
+            },
+            b"{}",
+        )
+
+    path = tmp_path / "whole-numbers.jsonl"
+    for week in weeks:
+        append_entry(week, path=path, fetch=fake)
+
+    entries = verify_file(path)
+    assert [entry["reading"]["core_index"] for entry in entries] == [
+        "15.8",
+        "16.0",
+        "-3.0",
+        "0.0",
+        "-0.0",
+        "12.4",
+    ]
+
+    subprocess.run(
+        [node, str(NODE_SCRIPT), "--path", str(path)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            node,
+            "--experimental-strip-types",
+            str(BROWSER_SCRIPT),
+            "--path",
+            str(path),
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_crlf_roundup_hashes_like_lf(tmp_path):
+    source = ROUNDUPS / "2026-W46.json"
+    lf = normalise_newlines(source.read_bytes())
+    crlf = lf.replace(b"\n", b"\r\n")
+    for name, raw in (("lf", lf), ("crlf", crlf)):
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / "2026-W46.json").write_bytes(raw)
+
+    _, lf_raw = fetch_roundup("2026-W46", roundups_dir=tmp_path / "lf")
+    _, crlf_raw = fetch_roundup("2026-W46", roundups_dir=tmp_path / "crlf")
+    assert lf_raw == crlf_raw
+    assert hashlib.sha256(lf_raw).hexdigest() == hashlib.sha256(crlf_raw).hexdigest()
+
+
+def test_genesis_roundup_hash_matches_committed_file():
+    entries = verify_file(REAL_LEDGER)
+    expected = hashlib.sha256(
+        normalise_newlines((ROUNDUPS / "2026-W46.json").read_bytes())
+    ).hexdigest()
+    assert entries[0]["roundup_sha256"] == expected
+    assert entries[0]["reading"]["core_index"] == "15.8"
+
+
+def test_canonical_rejects_non_integer_numbers():
+    with pytest.raises(CanonicalError, match="non-integer"):
+        canonical_json({"core_index": 16.5})
 
 
 def test_append_dry_run_writes_nothing(tmp_path):
@@ -54,6 +148,8 @@ def test_append_dry_run_writes_nothing(tmp_path):
     entry = append_entry("2026-W46", path=path, dry_run=True, fetch=fake_fetch)
     assert entry["seq"] == 1
     assert entry["kind"] == "roundup"
+    assert entry["reading"]["core_index"] == "15.8"
+    assert isinstance(entry["reading"]["core_index"], str)
     assert not path.exists()
 
 
@@ -70,7 +166,7 @@ def test_append_refuses_a_broken_chain(tmp_path):
     path = tmp_path / "ledger.jsonl"
     append_entry("2026-W46", path=path, fetch=fake_fetch)
     entry = json.loads(path.read_text(encoding="utf-8"))
-    entry["reading"]["core_index"] = 99.9
+    entry["reading"]["core_index"] = "99.9"
     path.write_text(json.dumps(entry) + "\n", encoding="utf-8")
     with pytest.raises(LedgerError, match="hash does not match"):
         append_entry("2026-W46", path=path, fetch=fake_fetch)

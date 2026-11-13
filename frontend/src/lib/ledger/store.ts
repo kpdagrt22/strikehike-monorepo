@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export type LedgerReading = {
-  core_index: number;
+  core_index: string;
   label: string;
   as_of: string;
 };
@@ -39,6 +39,6 @@ export function shortHash(value: string): string {
   return (value || "").slice(0, 12);
 }
 
-export function signedReading(value: number): string {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
+export function signedReading(value: string): string {
+  return value.startsWith("-") ? value : `+${value}`;
 }

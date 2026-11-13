@@ -1,8 +1,10 @@
-"""Canonical JSON and hashes shared with the Node verifier.
+"""Canonical JSON and hashes shared with the Node and browser verifiers.
 
-Rules: keys sorted, no whitespace, UTF-8, every number written as a string.
-Integers stay bare (``"seq": "1"``); floats use one fixed decimal
-(``"core_index": "15.8"``). The hash excludes the ``hash`` field itself.
+Rules: keys sorted, no whitespace, UTF-8. Strings, booleans, null, integers
+and nested objects/arrays are allowed. Integers become strings (``"seq":"1"``);
+a non-integer number is rejected. Decimal readings are stored as strings by the
+writer, formatted once with exactly one decimal (``"core_index":"15.8"``).
+The hash excludes the ``hash`` field itself.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ def canonical_json(value: Any) -> str:
     if isinstance(value, int):
         return _string(str(value))
     if isinstance(value, float):
-        return _string(f"{value:.1f}")
+        raise CanonicalError("non-integer numbers are not allowed")
     if isinstance(value, (list, tuple)):
         return "[" + ",".join(canonical_json(item) for item in value) + "]"
     if isinstance(value, dict):

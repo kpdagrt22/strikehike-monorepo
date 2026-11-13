@@ -1,0 +1,3 @@
+# Published records are byte-stable across operating systems.
+frontend/content/ledger/*.jsonl text eol=lf
+frontend/content/roundups/*.json text eol=lf

@@ -19,22 +19,25 @@ roundup file and its ledger line. Both are committed together.
 
    ```bash
    cd backend
-   DIGEST_CONTENT_URL=http://127.0.0.1:3000 \
-     python -m astro_finance.ledger append --week 2026-W47
+   python -m astro_finance.ledger append --week 2026-W47
    ```
 
-   This reads the approved roundup, hashes the exact JSON served at
-   `/this-week/2026-W47/data.json`, and appends one line to
+   This reads `frontend/content/roundups/2026-W47.json` from disk, hashes its
+   LF-normalised bytes, and appends one line to
    `frontend/content/ledger/ledger.jsonl`. It refuses an unapproved week, a week
-   that already has a line, or a ledger whose chain does not verify.
+   that already has a line, or a ledger whose chain does not verify. The public
+   `/this-week/2026-W47/roundup.json` route serves those same bytes.
 
-4. Verify the chain and commit both files:
+4. Verify the chain and the roundup hash, then commit both files:
 
    ```bash
    python -m astro_finance.ledger verify
+   curl -s https://strikehike.com/this-week/2026-W47/roundup.json | sha256sum
    git add frontend/content/roundups/2026-W47.json \
      frontend/content/ledger/ledger.jsonl
    ```
+
+   The `sha256sum` must equal `roundup_sha256` in the new ledger line.
 
 5. Deploy. The `/ledger` page and `/ledger.jsonl` read the committed file.
 

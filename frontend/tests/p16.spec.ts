@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-const GENESIS_SHORT = "f54026acb558";
+const GENESIS_SHORT = "088f0d925c2d";
+const GENESIS_ROUNDUP_SHA =
+  "b17185b3854046174df42d5420235f9d4de3c5b506e033470cda2efe4724ba44";
 
 function watchErrors(page: Page) {
   const errors: string[] = [];
@@ -41,6 +44,16 @@ test.describe("P16: the published ledger", () => {
       const body = await raw.text();
       expect(body).toContain('"week":"2026-W46"');
       expect(body.trim().split(/\r?\n/)).toHaveLength(1);
+
+      const roundup = await request.get("/this-week/2026-W46/roundup.json");
+      expect(roundup.status()).toBe(200);
+      const roundupBody = await roundup.text();
+      expect(createHash("sha256").update(roundupBody).digest("hex")).toBe(
+        GENESIS_ROUNDUP_SHA,
+      );
+      expect(
+        (await request.get("/this-week/1900-W01/roundup.json")).status(),
+      ).toBe(404);
       expect(errors).toEqual([]);
     },
   );
