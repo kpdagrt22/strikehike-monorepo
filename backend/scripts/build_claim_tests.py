@@ -59,6 +59,26 @@ CLAIMS = {
         "claim": "Eclipses are often said to mark turning points in the market.",
         "windows": "Every solar eclipse visible anywhere on Earth (partial, annular or total) and every lunar eclipse (penumbral, partial or total) in the record, using the seven calendar days from three days before to three days after it.",
     },
+    "new-moon": {
+        "title": "The new moon and the market",
+        "claim": "A new moon is often said to mark a quiet or turning point in the market.",
+        "windows": "Every new moon in the record, using the seven calendar days from three days before to three days after it.",
+    },
+    "solstices-equinoxes": {
+        "title": "Solstices, equinoxes and the market",
+        "claim": "Solstices and equinoxes are often said to mark turning points in the market.",
+        "windows": "Every March and September equinox and every June and December solstice in the record, using the seven calendar days from three days before to three days after the exact moment.",
+    },
+    "mars-retrograde": {
+        "title": "Mars retrograde and the market",
+        "claim": "Mars retrograde is often said to unsettle the market.",
+        "windows": "Every Mars retrograde station-to-station window in the record, with no exclusions by year or outcome.",
+    },
+    "mars-saturn-conjunction": {
+        "title": "Mars\u2013Saturn conjunctions and the market",
+        "claim": "A Mars\u2013Saturn conjunction is often said to mark a turning point in the market.",
+        "windows": "Every geocentric Mars\u2013Saturn conjunction in ecliptic longitude in the record, using the seven calendar days from three days before to three days after the exact moment.",
+    },
 }
 
 
