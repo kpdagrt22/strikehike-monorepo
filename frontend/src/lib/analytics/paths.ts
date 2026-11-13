@@ -15,6 +15,7 @@ const STATIC = new Set([
   "/this-week",
   "/tested",
   "/about",
+  "/ledger",
   "/digest/confirm",
   "/digest/confirmed",
   "/digest/unsubscribed",

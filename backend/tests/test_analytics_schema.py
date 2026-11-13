@@ -117,6 +117,7 @@ def test_schema_has_only_the_live_events_and_no_future_ones():
         "/tested",
         "/tested/[claim]",
         "/about",
+        "/ledger",
         "/digest/confirm",
         "/digest/confirmed",
         "/digest/unsubscribed",

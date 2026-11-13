@@ -1,0 +1,42 @@
+{
+  "vectors": [
+    {
+      "entry": {
+        "seq": 1,
+        "week": "2026-W46",
+        "published_at": "2026-11-12T11:07:41Z",
+        "kind": "roundup",
+        "reading": {
+          "core_index": 15.8,
+          "label": "Steady",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "hash": "f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800"
+      },
+      "canonical": "{\"kind\":\"roundup\",\"prev_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"published_at\":\"2026-11-12T11:07:41Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"15.8\",\"label\":\"Steady\"},\"roundup_sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"seq\":\"1\",\"week\":\"2026-W46\"}",
+      "hash": "f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800"
+    },
+    {
+      "entry": {
+        "seq": 2,
+        "week": "2026-W46",
+        "published_at": "2026-11-13T00:00:00Z",
+        "kind": "correction",
+        "corrects_seq": 1,
+        "reason": "The label was corrected after a typo.",
+        "reading": {
+          "core_index": 15.8,
+          "label": "Calm",
+          "as_of": "2026-10-27"
+        },
+        "roundup_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_hash": "f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800",
+        "hash": "af4f75cc894c696aa6019094606cd051c4818155ca46ba1c5911c583917617cf"
+      },
+      "canonical": "{\"corrects_seq\":\"1\",\"kind\":\"correction\",\"prev_hash\":\"f03d0176b675d84167b1c52ebaf77022dd9723b0bd4fe30ccbb46cce42f64800\",\"published_at\":\"2026-11-13T00:00:00Z\",\"reading\":{\"as_of\":\"2026-10-27\",\"core_index\":\"15.8\",\"label\":\"Calm\"},\"reason\":\"The label was corrected after a typo.\",\"roundup_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"seq\":\"2\",\"week\":\"2026-W46\"}",
+      "hash": "af4f75cc894c696aa6019094606cd051c4818155ca46ba1c5911c583917617cf"
+    }
+  ]
+}

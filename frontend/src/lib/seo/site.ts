@@ -28,6 +28,7 @@ export const CONTENT_DATES = {
   "/disclaimer": "2026-11-03",
   "/upcoming": "2026-11-05",
   "/about": "2026-11-12",
+  "/ledger": "2026-11-13",
 } as const;
 export type SitePath = keyof typeof CONTENT_DATES;
 
@@ -73,6 +74,12 @@ export const PAGES: Record<SitePath, { title: string; description: string; crumb
     description:
       "What StrikeHike is and is not: descriptive historical research, not advice and not a forecast. How it works, where the data come from, who builds it, and how visits are counted.",
     crumb: "About",
+  },
+  "/ledger": {
+    title: "Published ledger",
+    description:
+      "A public, append-only record of the weekly StrikeHike roundups: the week, the reading, the publication time and a hash chain.",
+    crumb: "Ledger",
   },
 };
 

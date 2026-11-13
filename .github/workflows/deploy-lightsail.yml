@@ -64,8 +64,34 @@ jobs:
             tests/test_analytics_serverlogs.py \
             tests/test_analytics_weekly.py \
             tests/test_digest.py \
+            tests/test_ledger.py \
             tests/test_caddy_snippet.py \
             -q
+
+      - name: Verify the published ledger
+        run: python -m astro_finance.ledger verify
+
+      - name: Ledger is append-only
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          file="frontend/content/ledger/ledger.jsonl"
+          if ! git cat-file -e "$base:$file" 2>/dev/null; then
+            echo "ledger file is new; every line is an append"
+            exit 0
+          fi
+          git show "$base:$file" > /tmp/ledger-base.jsonl
+          python - <<'PY'
+          from pathlib import Path
+          base = Path("/tmp/ledger-base.jsonl").read_bytes()
+          head = Path("frontend/content/ledger/ledger.jsonl").read_bytes()
+          if not head.startswith(base):
+              raise SystemExit("ledger.jsonl must only append lines")
+          print("ledger append-only check passed")
+          PY
 
       - name: Caddy migration restores the host Caddyfile on a failed pull
         working-directory: .
@@ -470,6 +496,7 @@ jobs:
           DIGEST_TOKEN_SECRET: ${{ secrets.DIGEST_TOKEN_SECRET }}
           DIGEST_ENABLED: ${{ vars.DIGEST_ENABLED }}
           DIGEST_POSTAL_ADDRESS: ${{ vars.DIGEST_POSTAL_ADDRESS }}
+          DIGEST_REPLY_TO: ${{ vars.DIGEST_REPLY_TO }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -480,7 +507,7 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO
           script: |
             set -euo pipefail
 

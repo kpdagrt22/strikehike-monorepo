@@ -23,6 +23,7 @@ from .privacy import mask_email
 from .render import render_roundup
 from .store import DigestStore, get_store
 from .tokens import sign_token
+from astro_finance.ledger.store import fetch_ledger_entry
 
 logger = logging.getLogger("astro_finance.digest")
 
@@ -69,6 +70,7 @@ def send_week(
     fetch: Callable[[str], dict] | None = None,
     now_ms: int | None = None,
     sample_dir: str | Path | None = None,
+    ledger: dict[str, Any] | None = None,
 ) -> SendResult:
     if limit is not None and limit < 1:
         raise SendError("--limit must be at least 1")
@@ -79,6 +81,12 @@ def send_week(
         raise SendError("DIGEST_TOKEN_SECRET is not configured")
 
     roundup = fetch(week)
+    if ledger is None:
+        ledger = fetch_ledger_entry(week)
+    if not ledger:
+        raise SendError(
+            f"no ledger entry for {week}; append it before sending"
+        )
     subscribers = store.active_subscribers()
     eligible = []
     already_sent = 0
@@ -126,6 +134,7 @@ def send_week(
             unsubscribe_url=unsubscribe_url,
             postal_address=postal,
             base_url=settings.base_url(),
+            ledger=ledger,
         )
         directory = Path(
             sample_dir
@@ -178,6 +187,7 @@ def send_week(
             unsubscribe_url=unsubscribe_url,
             postal_address=postal,
             base_url=settings.base_url(),
+            ledger=ledger,
         )
         mail = Mail(
             to=str(subscriber["email"]),

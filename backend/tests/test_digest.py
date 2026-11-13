@@ -27,6 +27,12 @@ from astro_finance.digest.tokens import TokenError, sign_token, verify_token
 
 SECRET = "test-secret"
 BASE = "https://strikehike.com"
+LEDGER_ENTRY = {
+    "seq": 1,
+    "week": "2026-W46",
+    "hash": "a" * 64,
+}
+
 ROUNDUP = {
     "week": "2026-W46",
     "start": "2026-11-09",
@@ -232,6 +238,7 @@ def test_real_send_requires_a_postal_address(digest, monkeypatch):
             store=store,
             mailer=FakeMailer(),
             fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
         )
     assert "DIGEST_POSTAL_ADDRESS" in str(exc.value)
 
@@ -271,6 +278,7 @@ def test_dry_run_writes_one_sample_and_sends_nothing(tmp_path, digest):
         store=store,
         mailer=mailer,
         fetch=fetch,
+        ledger=LEDGER_ENTRY,
         sample_dir=tmp_path / "samples",
     )
     assert result.recipients == 2
@@ -297,6 +305,7 @@ def test_send_is_idempotent_and_uses_unsubscribe_headers(digest):
         store=store,
         mailer=mailer,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
         now_ms=100,
     )
     assert first.sent == 2
@@ -320,6 +329,7 @@ def test_send_is_idempotent_and_uses_unsubscribe_headers(digest):
         store=store,
         mailer=mailer,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
         now_ms=200,
     )
     assert second.sent == 0
@@ -405,6 +415,33 @@ def test_resend_mock_transport_retries_and_stops_on_auth():
         failing.send(mail)
 
 
+def test_resend_payload_carries_reply_to_only_when_set():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"id": "provider-reply"})
+
+    mailer = ResendMailer(
+        "test-key",
+        "StrikeHike <digest@strikehike.com>",
+        transport=httpx.MockTransport(handler),
+        sleep=lambda _: None,
+    )
+    base = {
+        "to": "one@example.com",
+        "subject": "Subject",
+        "html": "<p>Hi</p>",
+        "text": "Hi",
+    }
+    mailer.send(Mail(**base, reply_to="kp@example.com"))
+    mailer.send(Mail(**base))
+    first = json.loads(requests[0].content)
+    second = json.loads(requests[1].content)
+    assert first["reply_to"] == "kp@example.com"
+    assert "reply_to" not in second
+
+
 def test_resend_transport_errors_retry_with_backoff_then_succeed():
     calls = {"n": 0}
     sleeps: list[float] = []
@@ -449,6 +486,7 @@ def test_failed_send_is_retried_once_and_then_skipped(digest):
         store=store,
         mailer=failing,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
     )
     assert first.failed == 1
     assert store.send_counts("2026-W46") == {"failed": 1}
@@ -460,6 +498,7 @@ def test_failed_send_is_retried_once_and_then_skipped(digest):
         store=store,
         mailer=retry,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
     )
     assert second.sent == 1
     assert second.already_sent == 0
@@ -472,6 +511,7 @@ def test_failed_send_is_retried_once_and_then_skipped(digest):
         store=store,
         mailer=retry,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
     )
     assert third.sent == 0
     assert third.already_sent == 1
@@ -490,6 +530,7 @@ def test_sending_row_is_stuck_and_not_retried(digest):
         store=store,
         mailer=mailer,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
     )
     assert result.stuck == 1
     assert result.eligible == 0
@@ -519,6 +560,7 @@ def test_auth_failure_stops_first_run_and_can_be_retried(digest):
         store=store,
         mailer=mailer,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
     )
     assert first.failed == 1
     assert store.send_counts("2026-W46") == {"failed": 1}
@@ -530,6 +572,7 @@ def test_auth_failure_stops_first_run_and_can_be_retried(digest):
         store=store,
         mailer=retry,
         fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
     )
     assert second.sent == 1
     assert second.failed == 0
@@ -559,12 +602,15 @@ def test_render_has_no_tracking_and_carries_the_footer():
         unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
         postal_address="1 Test Street, Test City",
         base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
     )
     assert "This week: macro + sky" in rendered.html
     assert "Unsubscribe in one click" in rendered.html
     assert "You&#x27;re getting this because you subscribed on strikehike.com." in rendered.html
     assert "You're getting this because you subscribed on strikehike.com." in rendered.text
     assert "not investment advice and not a forecast" in rendered.text
+    assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.text
+    assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.html
     assert "1 Test Street, Test City" in rendered.text
     assert "<img" not in rendered.html.lower()
     assert "https://strikehike.com/this-week/2026-W46" in rendered.text

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
 import { RoundupView } from "@/components/roundup/RoundupView";
 import { SiteColophon } from "@/components/seo/SiteColophon";
+import { ledgerForWeek, shortHash } from "@/lib/ledger/store";
 import { approvedRoundup } from "@/lib/roundup/store";
 import { weekLabel } from "@/lib/roundup/week";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
@@ -44,9 +46,20 @@ export default async function WeekPage({ params }: Params) {
   const { week } = await params;
   const roundup = await approvedRoundup(week);
   if (!roundup) notFound();
+  const ledger = await ledgerForWeek(week).catch(() => null);
   return (
     <PageShell>
       <RoundupView roundup={roundup!} />
+      {ledger ? (
+        <p data-ledger-line className="mt-4 text-micro text-(--sh-text-3)">
+          <Link
+            href={`/ledger#${ledger.seq}`}
+            className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
+          >
+            Ledger #{ledger.seq} · {shortHash(ledger.hash)}
+          </Link>
+        </p>
+      ) : null}
       <SiteColophon current="/this-week" />
     </PageShell>
   );

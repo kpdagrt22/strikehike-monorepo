@@ -31,6 +31,7 @@ jobs:
           DIGEST_TOKEN_SECRET: ${{ secrets.DIGEST_TOKEN_SECRET }}
           DIGEST_ENABLED: ${{ vars.DIGEST_ENABLED }}
           DIGEST_POSTAL_ADDRESS: ${{ vars.DIGEST_POSTAL_ADDRESS }}
+          DIGEST_REPLY_TO: ${{ vars.DIGEST_REPLY_TO }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -38,7 +39,7 @@ jobs:
           port: 22
           # No script_stop: the script's own set -euo pipefail handles failures.
           command_timeout: 30m
-          envs: DIGEST_WEEK,DIGEST_DRY_RUN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS
+          envs: DIGEST_WEEK,DIGEST_DRY_RUN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO
           script: |
             set -euo pipefail
 
@@ -63,6 +64,7 @@ jobs:
               -e DIGEST_TOKEN_SECRET \
               -e DIGEST_ENABLED \
               -e DIGEST_POSTAL_ADDRESS \
+              -e DIGEST_REPLY_TO \
               backend python -m astro_finance.digest send \
                 --week "$DIGEST_WEEK" \
                 "$FLAG" \
