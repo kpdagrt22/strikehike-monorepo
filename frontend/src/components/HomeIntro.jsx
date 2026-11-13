@@ -37,14 +37,26 @@ export function HomeIntro({ compact = false }) {
       >
         <HomeCta />
         {compact ? null : (
-          <Link
-            href="/upcoming"
-            prefetch={false}
-            data-home-secondary
-            className="inline-flex min-h-11 items-center text-micro font-medium text-(--sh-text-2) underline decoration-current/30 underline-offset-4 transition-colors hover:text-(--sh-text-1) hover:decoration-current focus-visible:text-(--sh-text-1) focus-visible:decoration-current"
-          >
-            Upcoming dates
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-5">
+            {/* The weekly roundup gets the gold mark wherever it is offered. */}
+            <Link
+              href="/this-week"
+              prefetch={false}
+              data-home-weekly
+              className="inline-flex min-h-11 items-center gap-2 text-micro font-medium text-(--sh-weekly) underline decoration-current/30 underline-offset-4 transition-colors hover:decoration-current focus-visible:decoration-current"
+            >
+              <span className="sh-weekly-dot" aria-hidden="true" />
+              This week&apos;s roundup
+            </Link>
+            <Link
+              href="/upcoming"
+              prefetch={false}
+              data-home-secondary
+              className="inline-flex min-h-11 items-center text-micro font-medium text-(--sh-text-2) underline decoration-current/30 underline-offset-4 transition-colors hover:text-(--sh-text-1) hover:decoration-current focus-visible:text-(--sh-text-1) focus-visible:decoration-current"
+            >
+              Upcoming dates
+            </Link>
+          </div>
         )}
       </div>
       <ChangeNote where="home" />

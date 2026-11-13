@@ -12,6 +12,12 @@ const DATE = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+// Signed, one decimal, with a true minus sign.
+function signed(value: number) {
+  const text = Math.abs(value).toFixed(1);
+  return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
+}
+
 export function RoundupView({ roundup }: { roundup: Roundup }) {
   const path = `/this-week/${roundup.week}`;
   const readingDate = roundup.regime
@@ -38,14 +44,18 @@ export function RoundupView({ roundup }: { roundup: Roundup }) {
       </nav>
 
       <header className="mt-4 max-w-[760px]">
-        <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
+        <p className="flex flex-wrap items-center gap-2 text-micro font-medium uppercase tracking-[0.2em] text-(--sh-weekly)">
+          <span className="sh-weekly-dot" aria-hidden="true" />
           Weekly roundup
+          <span className="rounded-full border border-(--sh-weekly-line) bg-(--sh-weekly-soft) px-2 py-0.5 text-[0.6875rem] tracking-[0.12em]">
+            {roundup.week}
+          </span>
         </p>
         <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-(--sh-text-1) sm:text-5xl">
           This week: macro + sky
         </h1>
         <p className="mt-3 text-body text-(--sh-text-2)">
-          {weekLabel(roundup.week)} · {roundup.week}
+          {weekLabel(roundup.week)}
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <ShareButton
@@ -63,20 +73,53 @@ export function RoundupView({ roundup }: { roundup: Roundup }) {
       </header>
 
       {roundup.regime ? (
-        <section aria-labelledby="roundup-regime" className="mt-8 max-w-[760px]">
-          <h2 id="roundup-regime" className="text-strong font-semibold tracking-[-0.02em] text-(--sh-text-1)">
-            Regime
+        <section
+          aria-labelledby="roundup-regime"
+          data-roundup-regime
+          className="mt-8 max-w-[760px] rounded-2xl border border-(--sh-line-1) bg-(--sh-surface-card) p-5"
+        >
+          <h2 id="roundup-regime" className="text-micro font-medium uppercase tracking-[0.18em] text-(--sh-text-3)">
+            Regime · Core Index
           </h2>
-          <p className="mt-1 text-meta leading-relaxed text-(--sh-text-2)">
-            {roundup.lines?.regime}{" "}
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[2.75rem] font-light leading-none tracking-[-0.04em] text-(--sh-text-1) tabular-nums">
+              {signed(roundup.regime.score)}
+            </span>
+            <span className="rounded-full border border-(--sh-line-2) px-2.5 py-0.5 text-micro font-medium text-(--sh-text-1)">
+              {roundup.regime.label}
+            </span>
+            {typeof roundup.regime.change === "number" ? (
+              <span className="text-meta text-(--sh-text-2) tabular-nums">
+                {signed(roundup.regime.change)} from the week before
+              </span>
+            ) : null}
+          </p>
+          <p className="mt-3 text-meta leading-relaxed text-(--sh-text-2)">
             Latest reading: week of{" "}
             {readingDate ? DATE.format(readingDate) : roundup.regime.as_of}
             {staleReading && readingWeek
               ? ` (from ${readingWeek}, before ${roundup.week})`
               : ""}
-            .
+            .{" "}
+            <Link
+              href="/regime"
+              className="whitespace-nowrap underline decoration-current/30 underline-offset-2 hover:decoration-current"
+            >
+              Open the Regime chart
+            </Link>
           </p>
         </section>
+      ) : null}
+
+      {!roundup.themes?.length && !roundup.sky?.length ? (
+        <p data-roundup-quiet className="mt-4 max-w-[760px] text-meta leading-relaxed text-(--sh-text-3)">
+          No scheduled dates or sky events fell inside this week, so this
+          roundup is the Regime reading alone.{" "}
+          <Link href="/upcoming" className="underline decoration-current/30 underline-offset-2 hover:decoration-current">
+            See what comes next
+          </Link>
+          .
+        </p>
       ) : null}
 
       {roundup.themes?.length ? (

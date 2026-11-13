@@ -379,18 +379,18 @@ test.describe("P12-0 polish", () => {
     await page.goto("/this-week/2098-W40", { waitUntil: "networkidle" });
     const fresh = page.locator('section[aria-labelledby="roundup-regime"]');
     await expect(fresh).toHaveCount(1);
-    await expect(fresh.locator("p")).toHaveCount(1);
-    await expect(fresh).toContainText("Core Index +12.3 (Steady), +1.3 from last week.");
+    // The reading is a stat card: the score, its label and its change, each once.
+    await expect(fresh).toContainText("Steady");
+    await expect(fresh).toContainText("+1.3 from the week before");
     await expect(fresh).toContainText(/Latest reading: week of \w{3},? \d{1,2} \w{3} 2098\./);
     expect(
-      occurrences(await fresh.innerText(), "Core Index +12.3"),
-      "the Regime line appears once",
+      occurrences(await fresh.innerText(), "+12.3"),
+      "the score appears once",
     ).toBe(1);
 
     // A reading more than a week before the roundup names its own week.
     await page.goto("/this-week/2098-W41", { waitUntil: "networkidle" });
     const stale = page.locator('section[aria-labelledby="roundup-regime"]');
-    await expect(stale.locator("p")).toHaveCount(1);
     await expect(stale).toContainText(/\(from 2098-W\d{2}, before 2098-W41\)/);
     expect(errors).toEqual([]);
   });
