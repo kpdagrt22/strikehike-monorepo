@@ -1,18 +1,46 @@
 # Verified Culture/Religion festivals.
 #
-# Western and Orthodox Easter are computed by the culture_computed source, so
-# they do not belong here.  Add a festival only after opening the official
-# organiser, church or government page that publishes the date.
-#
-# Example (commented out so the file contributes no events):
-#
-# [[events]]
-# theme = "Culture/Religion"
-# name = "Example public holiday"
-# date = "2027-01-01"
-# source_url = "https://www.example.gov/holidays/2027"
-# verified_on = "2026-11-03"
-# status = "scheduled"
-# time = "00:00"
-# timezone = "Asia/Kolkata"
-# description = "Optional plain-language note."
+# Western and Orthodox Easter, Chinese New Year, Rosh Hashanah, Passover and
+# Christmas are computed by the culture_computed source, so they do not belong
+# here.  Add a festival only after opening the official organiser, church or
+# government page that publishes the date.  Never extrapolate a year.
+
+[[events]]
+theme = "Culture/Religion"
+name = "Holi 2027"
+date = "2027-03-23"
+external_id = "holi-2027"
+source_url = "https://documents.doptcirculars.nic.in/D2/D02est/Holiday%20list%202027Cj0HU.PDF"
+verified_on = "2026-11-13"
+status = "scheduled"
+description = "Holi, a gazetted Central Government holiday in the Government of India's 2027 list."
+
+[[events]]
+theme = "Culture/Religion"
+name = "Diwali 2027"
+date = "2027-10-29"
+external_id = "diwali-2027"
+source_url = "https://documents.doptcirculars.nic.in/D2/D02est/Holiday%20list%202027Cj0HU.PDF"
+verified_on = "2026-11-13"
+status = "scheduled"
+description = "Diwali (Deepavali), a gazetted Central Government holiday in the Government of India's 2027 list."
+
+[[events]]
+theme = "Culture/Religion"
+name = "Eid al-Fitr 2027"
+date = "2027-03-09"
+external_id = "eid-al-fitr-2027"
+source_url = "https://www.ummulqura.org.sa/"
+verified_on = "2026-11-13"
+status = "scheduled"
+description = "expected date; may shift by a day with moon sighting"
+
+[[events]]
+theme = "Culture/Religion"
+name = "Eid al-Adha 2027"
+date = "2027-05-16"
+external_id = "eid-al-adha-2027"
+source_url = "https://www.ummulqura.org.sa/"
+verified_on = "2026-11-13"
+status = "scheduled"
+description = "expected date; may shift by a day with moon sighting"

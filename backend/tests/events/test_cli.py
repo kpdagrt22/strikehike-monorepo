@@ -80,7 +80,7 @@ def test_cli_build_without_network_sources_can_exit_zero(tmp_path):
             "--out",
             str(tmp_path / "local-only"),
             "--today",
-            "2026-11-03",
+            "2026-11-13",
             "--sources",
             "historical_curated,astronomy_computed,culture_computed,curated_upcoming",
         ]
