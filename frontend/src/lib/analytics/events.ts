@@ -56,6 +56,7 @@ type ShareSurface =
   | "roundup"
   | "tested";
 type SupportSurface = "home" | "footer";
+type DigestSurface = "this_week" | "footer";
 
 function ordinary(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 64);
@@ -234,6 +235,12 @@ export function themeFollowed(theme: string, action: "follow" | "unfollow") {
 
 export function changeNote(action: "shown" | "dismissed" | "clicked") {
   trackEvent("change_note", { action });
+}
+
+// Fired only after the digest endpoint accepts the address. The event carries
+// the surface and nothing else: never the email or any part of it.
+export function digestSubscribed(surface: DigestSurface) {
+  trackEvent("digest_subscribed", { surface });
 }
 
 const EXP_TOKEN = /^[a-z0-9-]{1,32}$/;

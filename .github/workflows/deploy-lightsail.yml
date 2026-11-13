@@ -63,6 +63,7 @@ jobs:
             tests/test_analytics_activation.py \
             tests/test_analytics_serverlogs.py \
             tests/test_analytics_weekly.py \
+            tests/test_digest.py \
             tests/test_caddy_snippet.py \
             -q
 
@@ -465,6 +466,10 @@ jobs:
         env:
           REHEARSE_ROLLBACK: ${{ github.event.inputs.rehearse_rollback || 'false' }}
           GROWTH_EXPORT_TOKEN: ${{ secrets.GROWTH_EXPORT_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGEST_TOKEN_SECRET: ${{ secrets.DIGEST_TOKEN_SECRET }}
+          DIGEST_ENABLED: ${{ vars.DIGEST_ENABLED }}
+          DIGEST_POSTAL_ADDRESS: ${{ vars.DIGEST_POSTAL_ADDRESS }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -475,7 +480,7 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS
           script: |
             set -euo pipefail
 

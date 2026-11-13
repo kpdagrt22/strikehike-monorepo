@@ -47,6 +47,15 @@ function watchErrors(page: Page) {
   return errors;
 }
 
+// Opt-in CPU throttle for the layout benchmark. Playwright has no runner flag
+// for this, so the test applies the same CDP rate a slow CI runner sees.
+async function throttleCpu(page: Page) {
+  const rate = Number(process.env.PLAYWRIGHT_CPU_THROTTLE || 0);
+  if (!rate) return;
+  const session = await page.context().newCDPSession(page);
+  await session.send("Emulation.setCPUThrottlingRate", { rate });
+}
+
 async function mockChangeNoteData(page: Page, week: string | null = FIXTURE_WEEK) {
   await page.route("**/api/v1/regime/macro-history**", async (route) => {
     if (!route.request().url().includes("resolution=monthly")) {
@@ -440,6 +449,7 @@ test.describe("what changed since your last visit", () => {
     { tag: "@deploy" },
     async ({ browser, page }) => {
       test.setTimeout(150_000);
+      await throttleCpu(page);
       const firstErrors = watchErrors(page);
       await page.goto("/upcoming", { waitUntil: "networkidle" });
       await page.waitForTimeout(800);
@@ -450,6 +460,7 @@ test.describe("what changed since your last visit", () => {
         viewport: { width: 390, height: 844 },
       });
       const returnPage = await returnContext.newPage();
+      await throttleCpu(returnPage);
       const returnErrors = watchErrors(returnPage);
       await seedReturnVisit(returnPage);
       await mockChangeNoteData(returnPage);
@@ -476,6 +487,7 @@ test.describe("what changed since your last visit", () => {
       ] as const) {
         const context = await browser.newContext({ viewport: { width, height } });
         const home = await context.newPage();
+        await throttleCpu(home);
         const errors = watchErrors(home);
         await seedReturnVisit(home);
         await mockChangeNoteData(home);
@@ -485,33 +497,44 @@ test.describe("what changed since your last visit", () => {
         });
         const changeNote = home.locator("[data-home-change-note]");
         await expect(changeNote).toBeVisible();
-        await home.waitForTimeout(1_200);
-        const noteBox = await changeNote.boundingBox();
-        const probe = await home.evaluate(
-          () =>
-            (
-              window as unknown as {
-                __shOrreryScreen?: {
-                  planets: Array<{ name: string; x: number; y: number; r: number }>;
-                };
-              }
-            ).__shOrreryScreen ?? null,
-        );
-        expect(probe).not.toBeNull();
-        for (const planet of probe!.planets) {
-          const x = Math.max(
-            noteBox!.x,
-            Math.min(planet.x, noteBox!.x + noteBox!.width),
+        // The note mounts after its data arrives and the orrery refits from the
+        // ResizeObserver. Poll the live geometry instead of trusting one fixed
+        // wait: a cold or throttled CI runner can take well over a second to
+        // settle, and the planets' projected boxes move every frame.
+        const smallestClearance = async () => {
+          const noteBox = await changeNote.boundingBox();
+          if (!noteBox) return Number.NEGATIVE_INFINITY;
+          const probe = await home.evaluate(
+            () =>
+              (
+                window as unknown as {
+                  __shOrreryScreen?: {
+                    planets: Array<{ name: string; x: number; y: number; r: number }>;
+                  };
+                }
+              ).__shOrreryScreen ?? null,
           );
-          const y = Math.max(
-            noteBox!.y,
-            Math.min(planet.y, noteBox!.y + noteBox!.height),
+          if (!probe?.planets.length) return Number.NEGATIVE_INFINITY;
+          return Math.min(
+            ...probe.planets.map((planet) => {
+              const x = Math.max(
+                noteBox.x,
+                Math.min(planet.x, noteBox.x + noteBox.width),
+              );
+              const y = Math.max(
+                noteBox.y,
+                Math.min(planet.y, noteBox.y + noteBox.height),
+              );
+              return Math.hypot(x - planet.x, y - planet.y) - planet.r;
+            }),
           );
-          expect(
-            Math.hypot(x - planet.x, y - planet.y),
-            `${width}: ${planet.name} clears the change note`,
-          ).toBeGreaterThanOrEqual(planet.r + 8);
-        }
+        };
+        await expect
+          .poll(smallestClearance, {
+            timeout: 8_000,
+            message: `${width}: planets clear the change note`,
+          })
+          .toBeGreaterThanOrEqual(8);
         expect(errors).toEqual([]);
         await context.close();
       }

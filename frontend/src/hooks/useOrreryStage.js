@@ -9,6 +9,8 @@ const BOXES = {
   gauge: '[data-hud="gauge"]',
   aura: ".sh-aura",
   intro: "[data-home-intro]",
+  // The change note mounts after its data arrives; observing it here refits
+  // the scene as soon as it has a size, rather than on a fixed delay.
   changeNote: "[data-home-change-note]",
   left: "[data-home-left-column]",
   right: "#chrono-alignment-sheet",

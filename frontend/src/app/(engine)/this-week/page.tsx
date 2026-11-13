@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
+import { DigestSignupGate } from "@/components/digest/DigestSignupGate";
 import { RoundupView } from "@/components/roundup/RoundupView";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { latestApprovedRoundup } from "@/lib/roundup/store";
@@ -32,8 +33,13 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: `${TITLE} · ${SITE_NAME}`, description: DESCRIPTION },
 };
 
-export default async function ThisWeekPage() {
-  const roundup = await latestApprovedRoundup();
+type Props = {
+  searchParams: Promise<{ digest?: string | string[] }>;
+};
+
+export default async function ThisWeekPage({ searchParams }: Props) {
+  const [roundup, params] = await Promise.all([latestApprovedRoundup(), searchParams]);
+  const surface = params.digest === "footer" ? "footer" : "this_week";
   return (
     <PageShell data-this-week="">
       {roundup ? (
@@ -64,6 +70,7 @@ export default async function ThisWeekPage() {
           {weekLabel(roundup.week)} · approved roundup
         </p>
       ) : null}
+      <DigestSignupGate surface={surface} />
       <SiteColophon current="/this-week" />
     </PageShell>
   );

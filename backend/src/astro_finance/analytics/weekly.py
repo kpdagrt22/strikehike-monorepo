@@ -29,6 +29,7 @@ MEANINGFUL = frozenset(
         "link_shared",
         "theme_followed",
         "change_note",
+        "digest_subscribed",
         "experiment_exposed",
     }
 )
