@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import re
+import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import swisseph as swe
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from astro_finance import sky_week as sky_week_module
+from astro_finance.historical_parallels import geometry_for_date
 from astro_finance.sky_week import router, sky_week
 
 UTC = timezone.utc
@@ -155,3 +158,36 @@ def test_route_serves_the_hidden_safe_closest_past():
     assert closest["category"] == "Finance"
     assert closest["for_date"] == "2026-11-16"
     assert closest["similarity_percent"] == 79.5
+
+
+def test_lahiri_mode_survives_a_worker_thread_with_a_different_mode():
+    result = {}
+
+    def worker():
+        swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
+        result["geometry"] = geometry_for_date("2026-11-16")
+        result["sky"] = sky_week(date(2026, 11, 16))
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join()
+
+    assert result["geometry"]["Sun"]["lon"] == 209.4
+    ingress = next(
+        item for item in result["sky"]["ingresses"] if item["body"] == "Sun"
+    )
+    assert ingress["at"] == "2026-11-16T14:13:13Z"
+
+
+def test_real_api_server_historical_parallels_use_lahiri():
+    from api_server import app as api_app
+
+    client = TestClient(api_app)
+    response = client.get(
+        "/api/v1/historical-parallels?date=2026-11-16&limit=2"
+    )
+    assert response.status_code == 200
+    matches = response.json()["matches"]
+    assert [
+        round(float(match["similarity_percent"]), 1) for match in matches
+    ] == [81.3, 79.5, 78.8, 78.2]
