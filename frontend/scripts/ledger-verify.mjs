@@ -97,7 +97,8 @@ async function main() {
     if (json) {
       console.log(JSON.stringify(entries.map(({ seq, hash }) => ({ seq, hash }))));
     } else {
-      console.log(`✓ chain intact (${entries.length} entries)`);
+      const count = entries.length;
+      console.log(`✓ chain intact (${count} ${count === 1 ? "entry" : "entries"})`);
     }
   } catch (error) {
     const seq = error instanceof LedgerError ? error.seq : 0;

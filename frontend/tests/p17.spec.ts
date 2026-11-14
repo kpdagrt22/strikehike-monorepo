@@ -48,6 +48,27 @@ test.describe("P17: more claim tests and culture dates", () => {
     }
   });
 
+  test("every claim page is axe clean at 390 px", async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const theme of ["light", "dark"] as const) {
+      for (const id of CLAIMS) {
+        await seedTheme(page, theme);
+        const response = await page.goto(`/tested/${id}`, {
+          waitUntil: "domcontentloaded",
+        });
+        expect(response?.status(), `${id} ${theme}`).toBe(200);
+        const results = await new AxeBuilder({ page }).analyze();
+        expect(
+          results.violations.filter((violation) =>
+            ["serious", "critical"].includes(violation.impact ?? ""),
+          ),
+          `${id} ${theme} 390`,
+        ).toEqual([]);
+      }
+    }
+  });
+
   test(
     "Culture/Religion shows the new computed and curated dates",
     { tag: "@deploy" },

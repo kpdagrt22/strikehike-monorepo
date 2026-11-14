@@ -38,7 +38,8 @@ async function main() {
     }
     previous = entry.hash;
   }
-  console.log(`browser twin ok: ${lines.length} entries`);
+  const count = lines.length;
+  console.log(`browser twin ok: ${count} ${count === 1 ? "entry" : "entries"}`);
 }
 
 main().catch((error) => {

@@ -49,6 +49,91 @@ ROUNDUP = {
     "lines": {"regime": "Core Index +15.8 (Steady), -0.8 from last week."},
 }
 
+ROUNDUP_V2 = {
+    **ROUNDUP,
+    "schema": 2,
+    "week": "2026-W47",
+    "start": "2026-11-16",
+    "end": "2026-11-22",
+    "regime": {
+        "as_of": "2026-11-13",
+        "score": 13.2,
+        "label": "Steady",
+        "previous_score": 12.8,
+        "change": 0.4,
+        "weekly": [
+            {"date": "2026-10-23", "score": 11.1},
+            {"date": "2026-10-30", "score": 11.8},
+            {"date": "2026-11-06", "score": 12.4},
+            {"date": "2026-11-13", "score": 13.2},
+        ],
+    },
+    "themes": [
+        {
+            "id": "finance",
+            "name": "Finance",
+            "events": [
+                {
+                    "id": "finance:test:cpi",
+                    "name": "CPI release",
+                    "start_date": "2026-11-18",
+                    "start_time": "13:30:00",
+                    "timezone": "America/New_York",
+                    "start_utc": "2026-11-18T13:30:00Z",
+                    "path": "/events/finance~test~cpi",
+                }
+            ],
+        }
+    ],
+    "sky_week_items": [
+        {
+            "kind": "new_moon",
+            "body": "Moon",
+            "at": "2026-11-17T11:47:47Z",
+            "path": "/upcoming/science",
+            "label": "New moon",
+        }
+    ],
+    "activity": {
+        "daily": [{"date": "2026-11-16", "score": 40}],
+        "min": 40,
+        "max": 70,
+        "peak_date": "2026-11-20",
+        "closest_past": {
+            "date": "1990-04-24",
+            "name": "Hubble Space Telescope launched",
+            "similarity_percent": 83.8,
+        },
+        "note": "Geometry match compares planet positions only; it predicts nothing.",
+    },
+    "next_two_weeks": [
+        {
+            "id": "finance:fred_release_dates:53-2026-11",
+            "name": "Gross Domestic Product (November 2026)",
+            "start_date": "2026-11-25",
+            "start_time": "08:30:00",
+            "timezone": "America/New_York",
+            "start_utc": "2026-11-25T13:30:00Z",
+            "path": "/events/finance~fred_release_dates~53-2026-11",
+        }
+    ],
+    "from_record": {
+        "claim_id": "new-moon",
+        "title": "The new moon and the market",
+        "result": "No meaningful difference in this record.",
+        "result_code": "no_meaningful_difference",
+        "path": "/tested/new-moon",
+    },
+    "lines": {
+        "regime": "Core Index +13.2 (Steady), +0.4 from last week.",
+        "dates": "1 date in 1 theme.",
+        "sky": "1 sky event this week.",
+        "activity": "Sky activity ran 40–70, highest on Fri 20 Nov.",
+        "next": "1 date in the next two weeks.",
+        "record": "From the record: The new moon and the market — No meaningful difference in this record.",
+    },
+}
+
 
 class FakeMailer:
     def __init__(self) -> None:
@@ -614,3 +699,62 @@ def test_render_has_no_tracking_and_carries_the_footer():
     assert "1 Test Street, Test City" in rendered.text
     assert "<img" not in rendered.html.lower()
     assert "https://strikehike.com/this-week/2026-W46" in rendered.text
+    assert rendered.subject == "StrikeHike weekly · 9–15 Nov 2026"
+
+
+def test_render_v2_carries_every_section_and_the_new_subject():
+    rendered = render_roundup(
+        ROUNDUP_V2,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert rendered.subject == "StrikeHike weekly · 16–22 Nov 2026 · Core Index +13.2"
+    for heading in ("SKY THIS WEEK", "SKY ACTIVITY", "NEXT TWO WEEKS", "FROM THE RECORD"):
+        assert heading in rendered.text
+    assert "New moon · 17 Nov 2026 · 11:47 UTC · 17:17 IST" in rendered.text
+    assert (
+        "CPI release · 18 Nov 2026 · 13:30 UTC · 19:00 IST"
+        in rendered.text
+    )
+    assert (
+        "Gross Domestic Product (November 2026) · 25 Nov 2026 · "
+        "13:30 UTC · 19:00 IST" in rendered.text
+    )
+    assert (
+        "Closest past sky: Hubble Space Telescope launched on Tue 24 Apr 1990 "
+        "(83.8% geometry match)." in rendered.text
+    )
+    assert rendered.text.count("Closest past sky") == 1
+    assert "1990-04-24" not in rendered.text
+    assert "Sky activity ran 40–70, highest on Fri 20 Nov." in rendered.text
+    assert "2026-11-20" not in rendered.text
+    assert "13:30 UTC · 19:00 IST" in rendered.html
+    assert "17:17 IST" in rendered.html
+    assert "The new moon and the market" in rendered.text
+    assert "No meaningful difference in this record." in rendered.text
+    assert "Geometry match compares planet positions only; it predicts nothing." in rendered.text
+    assert "Unsubscribe in one click" in rendered.html
+    assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.html
+    assert "1 Test Street, Test City" in rendered.html
+    assert "<img" not in rendered.html.lower()
+
+
+def test_render_v2_flat_activity_has_no_peak_day():
+    roundup = json.loads(json.dumps(ROUNDUP_V2))
+    roundup["activity"]["min"] = 99
+    roundup["activity"]["max"] = 99
+    roundup["activity"]["peak_date"] = None
+    roundup["lines"]["activity"] = "Sky activity stayed at 99 all week."
+    rendered = render_roundup(
+        roundup,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert "Sky activity stayed at 99 all week." in rendered.text
+    assert "peak" not in rendered.text.lower()
+    assert "1990-04-24" not in rendered.text
+    assert rendered.text.count("Closest past sky") == 1

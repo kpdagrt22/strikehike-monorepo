@@ -73,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         entries = verify_file(args.path)
-        print(f"ledger ok: {len(entries)} entries")
+        count = len(entries)
+        print(f"ledger ok: {count} {'entry' if count == 1 else 'entries'}")
         return 0
     except LedgerError as exc:
         print(f"ledger error: {exc}", file=sys.stderr)

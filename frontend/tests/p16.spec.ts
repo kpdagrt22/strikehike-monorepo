@@ -35,6 +35,10 @@ test.describe("P16: the published ledger", () => {
       await expect(page.locator("table")).toContainText("2026-W46");
       await expect(page.locator("table")).toContainText("Steady");
       await expect(page.locator("table")).toContainText(GENESIS_SHORT);
+      const fullHash = page.locator('details[id^="hash-"] code').first();
+      await expect(fullHash).toBeHidden();
+      await page.locator('details[id^="hash-"] summary').first().click();
+      await expect(fullHash).toBeVisible();
       await expect(page.getByText("starts at 2026-W46", { exact: false })).toBeVisible();
       await expect(page.locator("[data-ledger-verify]")).toBeVisible();
 

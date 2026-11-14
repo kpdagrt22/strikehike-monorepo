@@ -59,7 +59,9 @@ export function LedgerVerify() {
         previous = entry.hash;
       }
       setState("ok");
-      setMessage(`✓ chain intact (${lines.length} entries)`);
+      setMessage(
+        `✓ chain intact (${lines.length} ${lines.length === 1 ? "entry" : "entries"})`,
+      );
     } catch (error) {
       if (error instanceof Break) {
         setState("broken");
