@@ -47,7 +47,16 @@ test.describe("P16: the published ledger", () => {
       expect(raw.headers()["content-type"]).toContain("text/plain");
       const body = await raw.text();
       expect(body).toContain('"week":"2026-W46"');
-      expect(body.trim().split(/\r?\n/)).toHaveLength(1);
+      // Append-only: the genesis line stays first and seq counts up from 1,
+      // so the check holds as each approved week adds a line.
+      const lines = body
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => JSON.parse(line));
+      expect(lines[0].week).toBe("2026-W46");
+      expect(lines.map((line) => line.seq)).toEqual(
+        lines.map((_, index) => index + 1),
+      );
 
       const roundup = await request.get("/this-week/2026-W46/roundup.json");
       expect(roundup.status()).toBe(200);
