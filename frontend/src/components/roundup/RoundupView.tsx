@@ -88,7 +88,13 @@ function RoundupDateLine({
   );
 }
 
-function RoundupViewV1({ roundup }: { roundup: Roundup }) {
+function RoundupViewV1({
+  roundup,
+  heading,
+}: {
+  roundup: Roundup;
+  heading: string;
+}) {
   const path = `/this-week/${roundup.week}`;
   const readingDate = roundup.regime
     ? new Date(`${roundup.regime.as_of}T00:00:00Z`)
@@ -122,7 +128,7 @@ function RoundupViewV1({ roundup }: { roundup: Roundup }) {
           </span>
         </p>
         <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-(--sh-text-1) sm:text-5xl">
-          This week: macro + sky
+          {heading}
         </h1>
         <p className="mt-3 text-body text-(--sh-text-2)">
           {weekLabel(roundup.week)}
@@ -336,7 +342,13 @@ function SkyRow({ item }: { item: RoundupSkyItem }) {
   );
 }
 
-function RoundupHeader({ roundup }: { roundup: Roundup }) {
+function RoundupHeader({
+  roundup,
+  heading,
+}: {
+  roundup: Roundup;
+  heading: string;
+}) {
   const path = `/this-week/${roundup.week}`;
   return (
     <header className="mt-4 max-w-[760px]">
@@ -348,7 +360,7 @@ function RoundupHeader({ roundup }: { roundup: Roundup }) {
         </span>
       </p>
       <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-(--sh-text-1) sm:text-5xl">
-        This week: macro + sky
+        {heading}
       </h1>
       <p className="mt-3 text-body text-(--sh-text-2)">{weekLabel(roundup.week)}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -368,7 +380,13 @@ function RoundupHeader({ roundup }: { roundup: Roundup }) {
   );
 }
 
-function RoundupViewV2({ roundup }: { roundup: Roundup }) {
+function RoundupViewV2({
+  roundup,
+  heading,
+}: {
+  roundup: Roundup;
+  heading: string;
+}) {
   const readingDate = roundup.regime
     ? new Date(`${roundup.regime.as_of}T00:00:00Z`)
     : null;
@@ -401,7 +419,7 @@ function RoundupViewV2({ roundup }: { roundup: Roundup }) {
         <span>{roundup.week}</span>
       </nav>
 
-      <RoundupHeader roundup={roundup} />
+      <RoundupHeader roundup={roundup} heading={heading} />
 
       {roundup.regime ? (
         <section
@@ -609,10 +627,16 @@ function RoundupViewV2({ roundup }: { roundup: Roundup }) {
   );
 }
 
-export function RoundupView({ roundup }: { roundup: Roundup }) {
+export function RoundupView({
+  roundup,
+  heading = "This week: macro + sky",
+}: {
+  roundup: Roundup;
+  heading?: string;
+}) {
   return roundup.schema === 2 ? (
-    <RoundupViewV2 roundup={roundup} />
+    <RoundupViewV2 roundup={roundup} heading={heading} />
   ) : (
-    <RoundupViewV1 roundup={roundup} />
+    <RoundupViewV1 roundup={roundup} heading={heading} />
   );
 }

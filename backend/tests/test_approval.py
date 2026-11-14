@@ -83,7 +83,6 @@ def test_approve_flips_one_range_appends_and_verifies(tmp_path):
     before = read_entries(ledger)
 
     result = approve_roundup("2026-W48", repo_root=root)
-
     approved = roundup.read_bytes()
     assert approved == original.replace(
         b'"approved": false', b'"approved": true', 1
@@ -100,6 +99,29 @@ def test_approve_flips_one_range_appends_and_verifies(tmp_path):
 
     with pytest.raises(LedgerError, match="already approved"):
         approve_roundup("2026-W48", repo_root=root)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_approve_regenerates_llms_with_the_new_week(tmp_path):
+    root, _, _ = _setup(tmp_path)
+    frontend = root / "frontend"
+    (frontend / "public").mkdir()
+    script = frontend / "scripts" / "llms-build.mjs"
+    script.parent.mkdir(parents=True)
+    script.write_text(
+        "import { readFile, writeFile } from 'node:fs/promises';\n"
+        "const data = JSON.parse(await readFile("
+        "'content/roundups/2026-W48.json', 'utf8'));\n"
+        "await writeFile('public/llms.txt', "
+        "`Latest: ${data.week} approved=${data.approved}\\n`);\n",
+        encoding="utf-8",
+    )
+
+    approve_roundup("2026-W48", repo_root=root)
+
+    text = (frontend / "public" / "llms.txt").read_text(encoding="utf-8")
+    assert "2026-W48" in text
+    assert "approved=true" in text
 
 
 def test_approve_refuses_an_already_approved_week(tmp_path):

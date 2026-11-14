@@ -38,6 +38,12 @@ function clip(value: string, limit = 155) {
   const text = value.replace(/\s+/g, " ").trim();
   if (text.length <= limit) return text;
   const cut = text.slice(0, limit - 1);
+  const sentence = Math.max(
+    cut.lastIndexOf(". "),
+    cut.lastIndexOf("! "),
+    cut.lastIndexOf("? "),
+  );
+  if (sentence > 80) return text.slice(0, sentence + 1);
   const space = cut.lastIndexOf(" ");
   return `${cut.slice(0, space > 80 ? space : cut.length)}…`;
 }
@@ -62,7 +68,7 @@ export async function generateMetadata({
     return { title: "Event not found", robots: { index: false, follow: true } };
   }
   const day = dateOf(event.start_date);
-  const title = `${event.name} · ${day} · ${SITE_NAME}`;
+  const title = `${event.name} · ${day} — ${SITE_NAME}`;
   const description = clip(
     `${event.name} on ${day} (${event.theme}). ${event.description || "Its date, time and source."}`,
   );
@@ -127,6 +133,9 @@ export default async function EventPage({
   const summary = clip(
     `${event.name} on ${day} (${event.theme}). ${event.description || "Its date, time and source."}`,
   );
+  const eventStart = event.all_day
+    ? event.start_date
+    : event.start_utc ?? `${event.start_date}T${event.start_time ?? "00:00:00"}`;
   const google = past
     ? null
     : googleCalendarUrl(event, {
@@ -136,7 +145,19 @@ export default async function EventPage({
   return (
     <PageShell>
       <RecentTracker kind="event" id={event.event_id} title={event.name} />
-      <JsonLd data={eventPageGraph(path, `${event.name} · ${day}`, summary, asOf)} />
+      <JsonLd
+        data={eventPageGraph(
+          path,
+          `${event.name} · ${day}`,
+          summary,
+          asOf,
+          {
+            startDate: eventStart,
+            description: event.description || summary,
+            status: event.status,
+          },
+        )}
+      />
       <div className="mx-auto grid w-full max-w-[760px] gap-8 xl:max-w-none xl:grid-cols-[minmax(0,760px)_20rem] xl:justify-center xl:gap-12">
         <div className="min-w-0">
           <nav aria-label="Breadcrumb" className="text-micro text-(--sh-text-3)">

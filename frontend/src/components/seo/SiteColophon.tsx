@@ -67,11 +67,23 @@ function WeeklyPromo() {
   );
 }
 
-export function SiteColophon({ current }: { current: string }) {
+export function SiteColophon({
+  current,
+  compact = false,
+}: {
+  current: string;
+  compact?: boolean;
+}) {
   return (
-    <footer className="mt-10 flex flex-col gap-3 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60">
+    <footer
+      className={
+        compact
+          ? "mt-4 flex flex-col gap-2 border-t border-black/5 pt-3 text-micro text-black/60 dark:border-white/5 dark:text-white/60"
+          : "mt-10 flex flex-col gap-3 border-t border-black/5 pt-4 text-micro text-black/60 dark:border-white/5 dark:text-white/60"
+      }
+    >
       {/* The roundup pages carry their own weekly column. */}
-      {current === "/this-week" ? null : <WeeklyPromo />}
+      {!compact && current !== "/this-week" ? <WeeklyPromo /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label="StrikeHike pages" className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {VIEWS.map((view) =>
@@ -99,19 +111,26 @@ export function SiteColophon({ current }: { current: string }) {
         </p>
       </div>
 
-      <section
-        aria-label={SUPPORT_TITLE}
-        data-support-block
-        className="flex flex-col gap-1 border-t border-black/5 pt-3 dark:border-white/5"
-      >
-        <p className="font-medium uppercase tracking-[0.14em]">{SUPPORT_TITLE}</p>
-        <p className="max-w-prose break-words">{SUPPORT_WHAT}</p>
-        <p className="max-w-prose break-words">
-          {SUPPORT_PAYS}{" "}
-          <FooterSupportLink className={LINK}>Support via PayPal</FooterSupportLink>
+      {compact ? (
+        <p>
+          <FooterSupportLink className={LINK}>Support StrikeHike</FooterSupportLink>
+          . {SUPPORT_NOTE}
         </p>
-        <p>{SUPPORT_NOTE}</p>
-      </section>
+      ) : (
+        <section
+          aria-label={SUPPORT_TITLE}
+          data-support-block
+          className="flex flex-col gap-1 border-t border-black/5 pt-3 dark:border-white/5"
+        >
+          <p className="font-medium uppercase tracking-[0.14em]">{SUPPORT_TITLE}</p>
+          <p className="max-w-prose break-words">{SUPPORT_WHAT}</p>
+          <p className="max-w-prose break-words">
+            {SUPPORT_PAYS}{" "}
+            <FooterSupportLink className={LINK}>Support via PayPal</FooterSupportLink>
+          </p>
+          <p>{SUPPORT_NOTE}</p>
+        </section>
+      )}
     </footer>
   );
 }

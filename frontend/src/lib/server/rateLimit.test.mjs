@@ -6,6 +6,9 @@ import {
   createRateLimiter,
   DAILY_LIMIT_PER_MINUTE,
   API_LIMIT_PER_MINUTE,
+  CHRONO_LIMIT_PER_MINUTE,
+  ROUTE_LIMITS,
+  SKY_LIMIT_PER_MINUTE,
 } from "./rateLimit.js";
 
 test("the general API bucket allows 240 requests a minute", () => {
@@ -36,6 +39,57 @@ test("daily requests have their own 60-request bucket", () => {
 
   // The general bucket still has tokens, and a non-daily request can use them.
   assert.equal(limiter.consume("1.2.3.4", false).allowed, true);
+});
+
+test("the sky week route has its own 30-request bucket", () => {
+  let time = 0;
+  const limiter = createRateLimiter({ now: () => time });
+  const route = "/api/v1/sky/week";
+  assert.equal(ROUTE_LIMITS[route], 30);
+  assert.equal(SKY_LIMIT_PER_MINUTE, 30);
+
+  for (let index = 0; index < SKY_LIMIT_PER_MINUTE; index += 1) {
+    assert.equal(
+      limiter.consume("sky-client", false, route).allowed,
+      true,
+      `sky ${index + 1}`,
+    );
+  }
+  const blocked = limiter.consume("sky-client", false, route);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfterSeconds >= 1);
+
+  // Another client and another route are unaffected.
+  assert.equal(limiter.consume("other-client", false, route).allowed, true);
+  assert.equal(
+    limiter.consume("sky-client", false, "/api/chrono/positions").allowed,
+    true,
+  );
+
+  time = 60_000;
+  assert.equal(limiter.consume("sky-client", false, route).allowed, true);
+});
+
+test("the chrono positions route has its own 120-request bucket", () => {
+  let time = 0;
+  const limiter = createRateLimiter({ now: () => time });
+  const route = "/api/chrono/positions";
+  assert.equal(ROUTE_LIMITS[route], 120);
+  assert.equal(CHRONO_LIMIT_PER_MINUTE, 120);
+
+  for (let index = 0; index < CHRONO_LIMIT_PER_MINUTE; index += 1) {
+    assert.equal(
+      limiter.consume("chrono-client", false, route).allowed,
+      true,
+      `chrono ${index + 1}`,
+    );
+  }
+  const blocked = limiter.consume("chrono-client", false, route);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfterSeconds >= 1);
+
+  time = 60_000;
+  assert.equal(limiter.consume("chrono-client", false, route).allowed, true);
 });
 
 test("idle buckets are evicted after ten minutes", () => {

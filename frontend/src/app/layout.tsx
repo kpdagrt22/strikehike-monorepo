@@ -83,7 +83,7 @@ const structuredData = {
       url: SITE_URL,
       description:
         "A date-addressable research engine that sets Swiss Ephemeris planetary positions (Lahiri sidereal) beside US market and macro history: a 3D orrery, every NBER recession since 1854, a weekly Core Index of US market trend and stress, a catalogue of market declines since 1871, and today's market beside its closest past setups. Descriptive history, not a forecast.",
-      applicationCategory: "FinanceApplication",
+      applicationCategory: "ReferenceApplication",
       applicationSubCategory:
         "Financial astrology, market history, and historical event parallels",
       operatingSystem: "Web",
@@ -99,8 +99,7 @@ const structuredData = {
       publisher: { "@id": ORG_ID },
       audience: {
         "@type": "Audience",
-        audienceType:
-          "Investors, market researchers, historians, and astrology researchers",
+        audienceType: "market historians, researchers and students",
       },
       keywords:
         "market history, NBER recessions, stock market crashes, market declines, Core Index, S&P 500 history, Nifty 50, Bitcoin, gold, planetary positions, Swiss Ephemeris, financial astrology, StrikeHike",
@@ -131,7 +130,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: HOME.title,
-    template: "%s | StrikeHike",
+    template: "%s — StrikeHike",
   },
   description: HOME.description,
   applicationName: SITE_NAME,
@@ -220,8 +219,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={onest.variable} suppressHydrationWarning>
       <head>
-        {/* thisiskp.in links here with rel="me"; this closes the pair. */}
-        <link rel="me" href={PERSON_URL} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

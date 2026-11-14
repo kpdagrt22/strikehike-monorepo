@@ -15,7 +15,7 @@ Show HN: StrikeHike – the market record beside the planetary sky
 https://strikehike.com
 ```
 
-## First comment (287 words)
+## First comment (283 words)
 
 I built StrikeHike because claims that link the sky to markets almost always
 arrive with no method and no misses shown. So this site shows both.
@@ -35,7 +35,7 @@ What is on it:
   against the daily S&P 500 record since 1928 with 2,000-draw permutation tests.
   All three come back "no meaningful difference in this record".
 - **This week** — a weekly roundup of the Regime reading, the dates ahead and
-  the sky events, with a Saturday draft and an email you can subscribe to.
+  the sky events, with an email you can subscribe to.
 
 For each tested claim, the S&P return over each whole event window is compared
 with the nearest non-overlapping window of the same length: about 22 days for

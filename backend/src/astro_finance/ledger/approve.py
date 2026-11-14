@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -63,6 +65,39 @@ def _require_clean_ledger(repo_root: Path, ledger: Path) -> None:
         raise LedgerError(f"{rel} has uncommitted changes")
 
 
+def _regenerate_llms(root: Path) -> None:
+    """Run the frontend generator after approval, so the deploy gate agrees.
+
+    The npm wrapper sets SKIP_LLMS and regenerates in-process; the direct
+    ``python -m astro_finance.ledger approve`` path uses this hook. A checkout
+    without the frontend script (unit-test fixtures) is left alone.
+    """
+
+    if os.environ.get("SKIP_LLMS") == "1":
+        return
+    frontend = root / "frontend"
+    script = frontend / "scripts" / "llms-build.mjs"
+    if not script.exists():
+        return
+    node = shutil.which("node")
+    if not node:
+        raise LedgerError(
+            "node is required to regenerate public/llms.txt after approval"
+        )
+    result = subprocess.run(
+        [node, "--experimental-strip-types", "scripts/llms-build.mjs"],
+        cwd=frontend,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise LedgerError(
+            "approval wrote the ledger, but public/llms.txt regeneration "
+            "failed; run `cd frontend && npm run build` and commit the file"
+        )
+
+
 def approve_roundup(
     week: str,
     *,
@@ -110,6 +145,7 @@ def approve_roundup(
         path.write_bytes(original)
         raise
     verify_file(ledger)
+    _regenerate_llms(root)
     return {
         "entry": entry,
         "sha256": hashlib.sha256(normalise_newlines(approved)).hexdigest(),

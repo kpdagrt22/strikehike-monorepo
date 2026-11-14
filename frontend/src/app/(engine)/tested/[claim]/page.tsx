@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!claim) {
     return { title: "Claim test not found", robots: { index: false, follow: true } };
   }
-  const title = `${claim.title} · ${SITE_NAME}`;
+  const title = `${claim.title} — ${SITE_NAME}`;
   const description = descriptionFor(claim);
   return {
     title: { absolute: title },
@@ -62,6 +62,20 @@ function nextEventLine(next: ClaimTest["next_event"]) {
   return null;
 }
 
+function resultSentence(claim: ClaimTest) {
+  const dataTo = claim.series.end;
+  if (claim.published && claim.comparison) {
+    const verdict =
+      claim.result_code === "no_meaningful_difference"
+        ? "no meaningful difference"
+        : claim.result_code === "different"
+          ? "a difference in this record"
+          : "too few windows to test";
+    return `Result: ${claim.claim} — ${verdict} (n = ${claim.comparison.in.n} windows, permutation p = ${claim.comparison.p_value.toFixed(2)}, data to ${dataTo}).`;
+  }
+  return `Result: ${claim.claim} — ${claim.result} (data to ${dataTo}).`;
+}
+
 export default async function ClaimTestPage({ params }: Params) {
   const { claim: id } = await params;
   const claim = await readClaimTest(id);
@@ -80,6 +94,8 @@ export default async function ClaimTestPage({ params }: Params) {
           name: claim.title,
           description: descriptionFor(claim),
           dateModified: claim.source.build_date,
+          datePublished: claim.source.build_date,
+          image: `${urlFor(path)}/card.png`,
           start: claim.series.start,
           end: claim.series.end,
           crumbs: [
@@ -103,6 +119,12 @@ export default async function ClaimTestPage({ params }: Params) {
         <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-[-0.05em] text-(--sh-text-1) sm:text-5xl">
           {claim.title}
         </h1>
+        <p
+          data-claim-result-line
+          className="mt-3 text-body leading-relaxed text-(--sh-text-2)"
+        >
+          {resultSentence(claim)}
+        </p>
         <p className="mt-3 text-body leading-relaxed text-(--sh-text-2)">
           <span className="text-(--sh-text-3)">The claim: </span>
           {claim.claim}
@@ -305,6 +327,20 @@ export default async function ClaimTestPage({ params }: Params) {
             <span>{nextLine}</span>
           </>
         ) : null}
+      </p>
+
+      <p
+        data-claim-cite
+        className="mt-6 max-w-[760px] text-micro leading-relaxed text-(--sh-text-3)"
+      >
+        Cite as: StrikeHike, <cite>{claim.title}</cite>,{" "}
+        <Link
+          href={path}
+          className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
+        >
+          strikehike.com/tested/{claim.id}
+        </Link>
+        , data to {claim.series.end}.
       </p>
 
       <SiteColophon current="/tested" />

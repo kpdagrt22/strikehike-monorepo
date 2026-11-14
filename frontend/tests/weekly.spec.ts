@@ -80,7 +80,7 @@ test.describe("weekly roundup spotlight", () => {
     [390, 844, "dark"],
     [390, 844, "light"],
   ] as const) {
-    test(`/this-week at ${width} in ${scheme}: stat card, side column, axe clean`, async ({ browser }) => {
+    test(`/this-week at ${width} in ${scheme}: latest card, archive, axe clean`, async ({ browser }) => {
       const context = await browser.newContext({
         viewport: { width, height },
         colorScheme: scheme,
@@ -88,8 +88,8 @@ test.describe("weekly roundup spotlight", () => {
       const page = await context.newPage();
       const errors = watchErrors(page);
       await page.goto("/this-week", { waitUntil: "networkidle" });
-      await expect(page.locator("[data-roundup-regime]")).toBeVisible();
-      await expect(page.locator("[data-weekly-aside]")).toBeVisible();
+      await expect(page.locator("[data-latest-roundup]")).toBeVisible();
+      await expect(page.locator("[data-roundup-archive]")).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth,
       );

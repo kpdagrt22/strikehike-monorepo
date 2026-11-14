@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const atlas = await getRegimeAtlas().catch(() => null);
   const complete = declinesComplete(atlas?.meta);
   return {
-    title: { absolute: `${TITLE} · ${SITE_NAME}` },
+    title: { absolute: `${TITLE} — ${SITE_NAME}` },
     description: DESCRIPTION,
     alternates: { canonical: PATH },
     robots: complete
@@ -43,12 +43,12 @@ export async function generateMetadata(): Promise<Metadata> {
       alternateLocale: ["en_US"],
       siteName: SITE_NAME,
       url: urlFor(PATH),
-      title: `${TITLE} · ${SITE_NAME}`,
+      title: `${TITLE} — ${SITE_NAME}`,
       description: DESCRIPTION,
     },
     twitter: {
       card: "summary_large_image",
-      title: `${TITLE} · ${SITE_NAME}`,
+      title: `${TITLE} — ${SITE_NAME}`,
       description: DESCRIPTION,
     },
   };

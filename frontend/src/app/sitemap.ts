@@ -15,6 +15,7 @@ import {
   patternsAsOf,
 } from "@/lib/seo/data";
 import { approvedRoundups } from "@/lib/roundup/store";
+import { readLedger } from "@/lib/ledger/store";
 import { readClaimTests } from "@/lib/tested/store";
 import {
   declinePath,
@@ -42,7 +43,7 @@ type Generated = { url: string; lastModified: string };
 // the D-06 rules (lib/events/indexing.ts). noindex pages stay out. lastmod is the day the
 // bundle was built, never the build or request time.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [regime, cases, patterns, upcoming, everything, atlas, roundups, claims] =
+  const [regime, cases, patterns, upcoming, everything, atlas, roundups, claims, ledger] =
     await Promise.all([
       getRegimeSummary().catch(() => null),
       getCaseCatalogue().catch(() => null),
@@ -52,19 +53,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       getRegimeAtlas().catch(() => null),
       approvedRoundups(),
       readClaimTests(),
+      readLedger().catch(() => []),
     ]);
+  const bundleDate =
+    upcoming?.as_of?.slice(0, 10) ?? everything?.as_of?.slice(0, 10) ?? CONTENT_DATES["/upcoming"];
+  const latestRoundupDate = roundups[0]?.generated_at?.slice(0, 10);
+  const ledgerDate = ledger.at(-1)?.published_at?.slice(0, 10);
   const asOf: Partial<Record<SitePath, string | undefined>> = {
+    "/": latestRoundupDate,
     "/regime": regime?.as_of?.slice(0, 10),
     "/convergence": cases?.as_of?.slice(0, 10),
     "/patterns": patternsAsOf(patterns),
+    "/upcoming": bundleDate,
+    "/ledger": ledgerDate,
   };
   const fixed = (Object.keys(CONTENT_DATES) as SitePath[]).map((path) => ({
     url: absoluteUrl(path),
     lastModified: later(CONTENT_DATES[path], asOf[path]),
   }));
-
-  const bundleDate =
-    upcoming?.as_of?.slice(0, 10) ?? everything?.as_of?.slice(0, 10) ?? CONTENT_DATES["/upcoming"];
 
   // Events: only those whose page is indexable, over the bundle's whole horizon (curated
   // central-bank dates run past 12 months).

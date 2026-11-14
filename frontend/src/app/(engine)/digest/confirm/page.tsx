@@ -6,7 +6,7 @@ import { SiteColophon } from "@/components/seo/SiteColophon";
 import { SITE_NAME } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  title: { absolute: `Confirm subscription · ${SITE_NAME}` },
+  title: { absolute: `Confirm subscription — ${SITE_NAME}` },
   robots: { index: false, follow: false },
 };
 

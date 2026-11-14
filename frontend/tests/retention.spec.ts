@@ -148,7 +148,7 @@ test.describe("weekly roundup", () => {
       });
       expect(approved?.status()).toBe(200);
       await expect(page.locator(`[data-roundup="${FIXTURE_WEEK}"]`)).toBeVisible();
-      await expect(page.locator("h1")).toContainText("This week: macro + sky");
+      await expect(page.locator("h1")).toContainText("Week of ");
       await expect(page.locator('[data-share-surface="roundup"]')).toBeVisible();
 
       const unpublished = await page.goto(`/this-week/${UNPUBLISHED_WEEK}`, {
@@ -162,7 +162,10 @@ test.describe("weekly roundup", () => {
 
       const latest = await page.goto("/this-week", { waitUntil: "networkidle" });
       expect(latest?.status()).toBe(200);
-      await expect(page.locator(`[data-roundup="${FIXTURE_WEEK}"]`)).toBeVisible();
+      await expect(page.locator("[data-latest-roundup]")).toBeVisible();
+      await expect(
+        page.locator(`[data-latest-roundup] a[href="/this-week/${FIXTURE_WEEK}"]`).first(),
+      ).toBeVisible();
       await expect(
         page.locator('link[rel="alternate"][href$="/this-week/rss.xml"]'),
       ).toHaveCount(1);
@@ -172,7 +175,7 @@ test.describe("weekly roundup", () => {
       expect(rss.headers()["content-type"]).toContain("application/rss+xml");
       const feed = await rss.text();
       expect(feed.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
-      expect(feed).toContain('<rss version="2.0">');
+      expect(feed).toContain('<rss version="2.0"');
       expect(feed).toContain("<channel>");
       expect(feed).toContain("<item>");
       expect(feed).toContain(`/this-week/${FIXTURE_WEEK}`);

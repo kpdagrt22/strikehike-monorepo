@@ -28,7 +28,7 @@ test.describe("P14: the roundup is published", () => {
       });
       expect(response?.status()).toBe(200);
       await expect(page.locator(`[data-roundup="${ROUNDUP_WEEK}"]`)).toBeVisible();
-      await expect(page.locator("h1")).toContainText("This week: macro + sky");
+      await expect(page.locator("h1")).toContainText("Week of ");
 
       const rss = await request.get("/this-week/rss.xml");
       expect(rss.status()).toBe(200);
