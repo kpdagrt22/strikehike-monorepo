@@ -41,6 +41,11 @@ None clears the bar, so all three read "no meaningful difference in this record"
 Tools: Python and pandas for the analysis, the site's own Next.js charts for the
 image.
 
+The weekly roundup carries the same record forward: the Regime reading, the dates
+ahead and the sky events, with an email you can subscribe to. Every published
+roundup is fingerprinted into an append-only public ledger:
+https://strikehike.com/ledger
+
 Caveat: descriptive historical research, not investment advice and not a
 forecast. The method, the windows and every number — including the null results —
 are on the page.

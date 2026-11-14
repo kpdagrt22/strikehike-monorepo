@@ -25,5 +25,9 @@ All three come back the same way: no meaningful difference in this record. I
 publish the misses, not just the hits — the method, the windows and every number
 sit on the page.
 
+The weekly roundup carries the same record forward: the Regime reading, the dates
+ahead and the sky events, with an email. Every published roundup is fingerprinted
+into an append-only public ledger.
+
 Descriptive historical research, not advice and not a forecast. The write-up and
 the chart: https://strikehike.com/tested

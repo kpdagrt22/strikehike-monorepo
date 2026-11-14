@@ -1,0 +1,91 @@
+name: Draft weekly roundup
+
+on:
+  schedule:
+    # Saturday 04:30 UTC = 10:00 IST. The week is the next ISO week.
+    - cron: "30 4 * * 6"
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "ISO week, for example 2026-W48 (blank = next ISO week in Asia/Kolkata)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  draft:
+    name: Draft the next roundup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.9"
+
+      - name: Resolve the week
+        id: week
+        env:
+          INPUT_WEEK: ${{ inputs.week }}
+        run: |
+          set -euo pipefail
+          week="${INPUT_WEEK:-}"
+          if [ -z "$week" ]; then
+            week="$(TZ=Asia/Kolkata date -d 'next monday' +%G-W%V)"
+          fi
+          if ! printf '%s' "$week" | grep -Eq '^[0-9]{4}-W[0-9]{2}$'; then
+            echo "::error::week must look like 2026-W48"
+            exit 1
+          fi
+          echo "week=$week" >> "$GITHUB_OUTPUT"
+          echo "Drafting $week"
+
+      - name: Refuse to overwrite an approved week
+        working-directory: frontend
+        env:
+          WEEK: ${{ steps.week.outputs.week }}
+        run: |
+          set -euo pipefail
+          file="content/roundups/$WEEK.json"
+          if [ -f "$file" ] && grep -q '"approved": true' "$file"; then
+            echo "::error::$WEEK is already approved; refusing to draft over it."
+            exit 1
+          fi
+
+      - name: Draft against production
+        working-directory: frontend
+        env:
+          ROUNDUP_API_URL: https://strikehike.com
+          SKY_API_URL: https://strikehike.com
+          WEEK: ${{ steps.week.outputs.week }}
+        run: |
+          set -euo pipefail
+          if ! npm run roundup:draft -- --week "$WEEK"; then
+            echo "::error::Roundup draft failed: the Regime reading is stale or a source did not respond."
+            exit 1
+          fi
+
+      - name: Write the job summary
+        env:
+          WEEK: ${{ steps.week.outputs.week }}
+        run: |
+          set -euo pipefail
+          python backend/scripts/roundup_summary.py \
+            "frontend/content/roundups/$WEEK.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the draft
+        uses: actions/upload-artifact@v4
+        with:
+          name: roundup-${{ steps.week.outputs.week }}
+          path: frontend/content/roundups/${{ steps.week.outputs.week }}.json
+          if-no-files-found: error

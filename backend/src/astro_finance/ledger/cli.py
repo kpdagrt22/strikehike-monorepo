@@ -43,12 +43,46 @@ def _parser() -> argparse.ArgumentParser:
 
     verify = commands.add_parser("verify", help="recompute every hash and link")
     verify.add_argument("--path", default=None, help="ledger file override")
+
+    approve = commands.add_parser(
+        "approve", help="approve one roundup and append its ledger line"
+    )
+    approve.add_argument("--week", required=True, help="ISO week, e.g. 2026-W48")
+    approve.add_argument("--path", default=None, help="ledger file override")
+    approve.add_argument(
+        "--roundups-dir", default=None, help="roundups directory override"
+    )
+    approve.add_argument(
+        "--repo-root", default=None, help="repository root override"
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "approve":
+            from .approve import approve_roundup
+
+            result = approve_roundup(
+                args.week,
+                repo_root=args.repo_root,
+                roundups_dir=args.roundups_dir,
+                ledger_path=args.path,
+            )
+            entry = result["entry"]
+            print(
+                json.dumps(
+                    entry,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+            )
+            print(f"roundup_sha256={result['sha256']}")
+            print(f"approved {entry['week']} as seq {entry['seq']}")
+            return 0
+
         if args.command == "append":
             entry = append_entry(
                 args.week,
