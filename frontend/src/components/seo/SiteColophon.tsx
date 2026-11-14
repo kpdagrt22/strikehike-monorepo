@@ -114,7 +114,7 @@ export function SiteColophon({
       {compact ? (
         <p>
           <FooterSupportLink className={LINK}>Support StrikeHike</FooterSupportLink>
-          . No ads, no tracking cookies.
+          . {SUPPORT_NOTE}
         </p>
       ) : (
         <section

@@ -1,5 +1,5 @@
-// A stable URL for a claim test's share card.
-import { testedCard } from "@/app/_og/cards";
+// A stable URL for a claim test's share card. Unknown ids are 404s.
+import { testedCardIfFound } from "@/app/_og/cards";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +8,6 @@ export async function GET(
   { params }: { params: Promise<{ claim: string }> },
 ) {
   const { claim } = await params;
-  return testedCard(claim);
+  const card = await testedCardIfFound(claim);
+  return card ?? new Response("Not found", { status: 404 });
 }

@@ -26,7 +26,7 @@ const RESEARCH = [
   {
     href: "/tested",
     label: "Tested",
-    what: "Seven popular claims, measured against the daily S&P 500 record.",
+    what: "Popular sky claims, measured against the daily S&P 500 record.",
   },
   {
     href: "/recessions",
@@ -36,7 +36,7 @@ const RESEARCH = [
   {
     href: "/declines",
     label: "20% falls",
-    what: "Market declines since 1871, compared side by side.",
+    what: "Every fall of 20% or more in the daily S&P 500 since 1928.",
   },
 ];
 

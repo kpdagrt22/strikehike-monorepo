@@ -1,8 +1,9 @@
 // Page-level JSON-LD (plan 3.6). The root layout already declares the Person, Organization,
 // WebSite, WebApplication and SoftwareSourceCode nodes; these graphs point to them by @id and
-// never repeat them. Rules: no `license` on pages whose text is all rights reserved, no
-// `distribution` unless there is a real download (the ledger JSONL is the exception), no counts
-// in static strings, and every fact here is also visible on its page.
+// never repeat them. Rules: no `license` on pages whose text is all rights reserved; the ledger
+// Dataset is the one CC BY 4.0 exception. No `distribution` unless there is a real download (the
+// ledger JSONL is the exception), no counts in static strings, and every fact here is also visible
+// on its page.
 import type { LedgerEntry } from "@/lib/ledger/store";
 import type { Roundup } from "@/lib/roundup/store";
 import { weekLabel } from "@/lib/roundup/week";
@@ -540,8 +541,6 @@ export function eventPageGraph(
               : "https://schema.org/EventScheduled",
         isAccessibleForFree: true,
         url,
-        organizer: ref(ORG_ID),
-        publisher: ref(ORG_ID),
       },
     ],
   };

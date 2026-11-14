@@ -109,3 +109,26 @@ export async function declineCard(id: string) {
     path: declinePath(fall.id),
   });
 }
+
+/** Strict variants for the stable `card.png` routes: no record means 404. */
+export async function weekCardIfApproved(week: string) {
+  const roundup = await approvedRoundup(week).catch(() => null);
+  return roundup ? weekCard(week) : null;
+}
+
+export async function testedCardIfFound(id: string) {
+  const claim = await readClaimTest(id).catch(() => null);
+  return claim ? testedCard(id) : null;
+}
+
+export async function recessionCardIfFound(id: string) {
+  const atlas = await getRegimeAtlas().catch(() => null);
+  const crash = recessionsComplete(atlas) ? findRecession(atlas, id) : null;
+  return atlas && crash ? recessionCard(id) : null;
+}
+
+export async function declineCardIfFound(id: string) {
+  const atlas = await getRegimeAtlas().catch(() => null);
+  const fall = declinesComplete(atlas?.meta) ? findDecline(atlas?.meta, id) : null;
+  return fall ? declineCard(id) : null;
+}

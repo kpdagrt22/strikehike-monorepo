@@ -70,12 +70,12 @@ test("the sky week route has its own 30-request bucket", () => {
   assert.equal(limiter.consume("sky-client", false, route).allowed, true);
 });
 
-test("the chrono positions route has its own 60-request bucket", () => {
+test("the chrono positions route has its own 120-request bucket", () => {
   let time = 0;
   const limiter = createRateLimiter({ now: () => time });
   const route = "/api/chrono/positions";
-  assert.equal(ROUTE_LIMITS[route], 60);
-  assert.equal(CHRONO_LIMIT_PER_MINUTE, 60);
+  assert.equal(ROUTE_LIMITS[route], 120);
+  assert.equal(CHRONO_LIMIT_PER_MINUTE, 120);
 
   for (let index = 0; index < CHRONO_LIMIT_PER_MINUTE; index += 1) {
     assert.equal(

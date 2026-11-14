@@ -85,6 +85,16 @@ export default async function LedgerPage() {
           Every new line carries the hash of the line before it, and a
           correction is a new line; old lines are never edited.
         </p>
+        <p className="mt-2 text-micro text-(--sh-text-3)">
+          The ledger JSONL is published under{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
+          >
+            CC BY 4.0
+          </a>
+          .
+        </p>
         <LedgerVerify />
       </header>
 

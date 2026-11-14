@@ -520,6 +520,12 @@ jobs:
           script: |
             set -euo pipefail
 
+            INDEXNOW_KEY="${INDEXNOW_KEY:-}"
+            if [ -n "$INDEXNOW_KEY" ] && ! [[ "$INDEXNOW_KEY" =~ ^[A-Za-z0-9-]{8,128}$ ]]; then
+              echo "::warning::INDEXNOW_KEY is not a valid IndexNow key; skipping IndexNow."
+              INDEXNOW_KEY=""
+            fi
+
             APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
             cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
             echo "Deploying from $(pwd)"
@@ -933,9 +939,13 @@ jobs:
                 "urlList": urls,
             }))
             PY
-                )"
-                CODE="$(printf '%s' "$PAYLOAD" | curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 -H 'Content-Type: application/json; charset=utf-8' --data-binary @- https://api.indexnow.org/indexnow || true)"
-                echo "IndexNow answered ${CODE:-no response}"
+                )" || PAYLOAD=""
+                if [ -z "$PAYLOAD" ]; then
+                  echo "::warning::IndexNow payload could not be built; skipped."
+                else
+                  CODE="$(printf '%s' "$PAYLOAD" | curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 -H 'Content-Type: application/json; charset=utf-8' --data-binary @- https://api.indexnow.org/indexnow || true)"
+                  echo "IndexNow answered ${CODE:-no response}"
+                fi
               else
                 echo "IndexNow: no approved roundup or ledger change; skipped."
               fi

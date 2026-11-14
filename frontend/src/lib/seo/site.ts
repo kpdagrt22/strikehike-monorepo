@@ -21,13 +21,13 @@ export const PERSON_SAME_AS = [
 // Hand-maintained: the day each page's own copy last changed (YYYY-MM-DD).
 // Set every page to the SEO merge date; bump one when that page's copy changes.
 export const CONTENT_DATES = {
-  "/": "2026-11-03",
+  "/": "2026-11-15",
   "/regime": "2026-11-03",
   "/convergence": "2026-11-03",
   "/patterns": "2026-11-03",
   "/disclaimer": "2026-11-03",
   "/upcoming": "2026-11-05",
-  "/about": "2026-11-12",
+  "/about": "2026-11-15",
   "/ledger": "2026-11-13",
 } as const;
 export type SitePath = keyof typeof CONTENT_DATES;

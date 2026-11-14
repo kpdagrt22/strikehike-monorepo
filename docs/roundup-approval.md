@@ -16,13 +16,15 @@ roundup file and its ledger line. Both are committed together.
 3. Commit the unapproved draft, so the approval helper has a clean base:
 
    ```bash
-   git add frontend/content/roundups/2026-W48.json
+   git add frontend/content/roundups/2026-W48.json \
+     frontend/public/llms.txt
    git commit -m "Draft 2026-W48 for approval"
    ```
 
 4. Approve with the helper. It flips only the `"approved": false` byte range to
-   `true`, appends the ledger line, verifies the chain, and prints the new line
-   and the LF-normalised sha256:
+   `true`, appends the ledger line, verifies the chain, regenerates
+   `frontend/public/llms.txt` from the newly approved week, and prints the new
+   line and the LF-normalised sha256:
 
    ```bash
    cd frontend
@@ -45,7 +47,8 @@ roundup file and its ledger line. Both are committed together.
    ```bash
    curl -s https://strikehike.com/this-week/2026-W48/roundup.json | sha256sum
    git add frontend/content/roundups/2026-W48.json \
-     frontend/content/ledger/ledger.jsonl
+     frontend/content/ledger/ledger.jsonl \
+     frontend/public/llms.txt
    git commit -m "Publish 2026-W48 roundup + ledger line"
    ```
 

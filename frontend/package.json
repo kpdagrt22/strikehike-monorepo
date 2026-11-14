@@ -13,7 +13,7 @@
     "test:unit": "node --experimental-strip-types --test src/lib/server/routeCache.test.mjs src/lib/server/rateLimit.test.mjs src/lib/server/skyWeek.test.mjs src/lib/analytics/track.test.mjs src/lib/analytics/paths.test.mjs src/lib/experiments/assign.test.mjs src/lib/events/localTime.test.mjs src/lib/events/indexing.test.mjs src/lib/aura/crown.test.mjs src/components/regime/regimeMetrics.test.mjs scripts/roundup-build.test.mjs scripts/ledger-verify.test.mjs src/lib/roundup/week.test.mjs src/lib/seo/lastmod.test.mjs scripts/llms-build.test.mjs src/lib/retention/copy.test.mjs src/lib/sound/scapes.test.mjs",
     "test:smoke": "playwright test",
     "roundup:draft": "node scripts/roundup-draft.mjs",
-    "roundup:approve": "node scripts/roundup-approve.mjs",
+    "roundup:approve": "node --experimental-strip-types scripts/roundup-approve.mjs",
     "check:tracker": "node scripts/check-tracker-size.mjs"
   },
   "dependencies": {

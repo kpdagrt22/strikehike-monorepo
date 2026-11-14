@@ -5,7 +5,7 @@
 export const API_LIMIT_PER_MINUTE = 240;
 export const DAILY_LIMIT_PER_MINUTE = 60;
 export const SKY_LIMIT_PER_MINUTE = 30;
-export const CHRONO_LIMIT_PER_MINUTE = 60;
+export const CHRONO_LIMIT_PER_MINUTE = 120;
 /** @type {Readonly<Record<string, number>>} */
 export const ROUTE_LIMITS = Object.freeze({
   "/api/v1/sky/week": SKY_LIMIT_PER_MINUTE,

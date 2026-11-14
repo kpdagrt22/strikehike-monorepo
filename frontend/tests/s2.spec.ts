@@ -94,6 +94,9 @@ test.describe("S2: JSON-LD and crawlable links", () => {
     expect(card.status()).toBe(200);
     expect(card.headers()["content-type"]).toContain("image/png");
 
+    const missing = await request.get("/this-week/2026-W99/card.png");
+    expect(missing.status()).toBe(404);
+
     const sky = typed(nodes, "Dataset").find((node) =>
       String(node["@id"]).endsWith("#sky-dataset"),
     );
@@ -132,6 +135,7 @@ test.describe("S2: JSON-LD and crawlable links", () => {
     expect(
       String((dataset!["distribution"] as Node)["contentUrl"]),
     ).toContain("/ledger.jsonl");
+    await expect(page.locator("body")).toContainText("CC BY 4.0");
 
     await expect(page.locator('a[href="/this-week/2026-W46"]')).toBeVisible();
     await expect(page.locator('a[href="/this-week/2026-W47"]')).toBeVisible();
@@ -167,9 +171,11 @@ test.describe("S2: JSON-LD and crawlable links", () => {
       "https://schema.org/OnlineEventAttendanceMode",
     );
     expect(event!["startDate"]).toBeTruthy();
+    expect(event!["organizer"]).toBeUndefined();
+    expect(event!["publisher"]).toBeUndefined();
   });
 
-  test("a tested claim shows its result and cite lines", async ({ page }) => {
+  test("a tested claim shows its result and cite lines", async ({ page, request }) => {
     await page.goto("/tested/full-moon", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-claim-result-line]")).toContainText(
       /^Result: /,
@@ -181,6 +187,9 @@ test.describe("S2: JSON-LD and crawlable links", () => {
     await expect(page.locator("[data-claim-cite]")).toContainText(
       "strikehike.com/tested/full-moon",
     );
+
+    const missing = await request.get("/tested/not-a-claim/card.png");
+    expect(missing.status()).toBe(404);
   });
 
   test("about exposes its FAQ and terms both visibly and in JSON-LD", async ({
