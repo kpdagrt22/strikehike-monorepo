@@ -1,0 +1,96 @@
+{
+  "schema": 2,
+  "week": "2099-W01",
+  "start": "2098-12-29",
+  "end": "2099-01-04",
+  "generated_at": "2099-01-01T00:00:00.000Z",
+  "approved": true,
+  "regime": {
+    "as_of": "2098-12-24",
+    "score": 13.2,
+    "label": "Steady",
+    "previous_score": 12.8,
+    "change": 0.4,
+    "weekly": [
+      { "date": "2098-12-03", "score": 11.4 },
+      { "date": "2098-12-10", "score": 12.1 },
+      { "date": "2098-12-17", "score": 12.8 },
+      { "date": "2098-12-24", "score": 13.2 }
+    ]
+  },
+  "themes": [
+    {
+      "id": "finance",
+      "name": "Finance",
+      "events": [
+        {
+          "id": "finance:test:cpi",
+          "name": "CPI release",
+          "start_date": "2098-12-31",
+          "start_time": "13:30:00",
+          "path": "/events/finance~test~cpi"
+        }
+      ]
+    }
+  ],
+  "sky_week_items": [
+    {
+      "kind": "new_moon",
+      "body": "Moon",
+      "at": "2098-12-30T00:00:00Z",
+      "path": "/upcoming/science",
+      "label": "New moon"
+    },
+    {
+      "kind": "station_retrograde",
+      "body": "Mercury",
+      "at": "2099-01-02T00:00:00Z",
+      "path": "/upcoming/science",
+      "label": "Mercury retrograde begins"
+    }
+  ],
+  "activity": {
+    "daily": [
+      { "date": "2098-12-29", "score": 40 },
+      { "date": "2098-12-30", "score": 44 },
+      { "date": "2098-12-31", "score": 48 },
+      { "date": "2099-01-01", "score": 70 },
+      { "date": "2099-01-02", "score": 61 },
+      { "date": "2099-01-03", "score": 55 },
+      { "date": "2099-01-04", "score": 51 }
+    ],
+    "min": 40,
+    "max": 70,
+    "peak_date": "2099-01-01",
+    "closest_past": {
+      "date": "1990-04-24",
+      "name": "Hubble Space Telescope launched",
+      "similarity_percent": 83.8
+    },
+    "note": "Geometry match compares planet positions only; it predicts nothing."
+  },
+  "next_two_weeks": [
+    {
+      "id": "finance:test:next",
+      "name": "Employment Situation",
+      "start_date": "2099-01-08",
+      "start_time": "13:30:00",
+      "path": "/events/finance~test~next"
+    }
+  ],
+  "from_record": {
+    "claim_id": "new-moon",
+    "title": "The new moon and the market",
+    "result": "No meaningful difference in this record.",
+    "result_code": "no_meaningful_difference",
+    "path": "/tested/new-moon"
+  },
+  "lines": {
+    "regime": "Core Index +13.2 (Steady), +0.4 from last week.",
+    "dates": "1 date in 1 theme.",
+    "sky": "2 sky events this week.",
+    "activity": "Sky activity ran 40–70, peaking on 2099-01-01; the closest past sky was 1990-04-24 at 83.8% geometry match.",
+    "next": "1 date in the next two weeks.",
+    "record": "From the record: The new moon and the market — No meaningful difference in this record."
+  }
+}

@@ -1,4 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
+import { readFile, unlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 // The weekly roundup is offered everywhere with one gold mark: the nav, the
@@ -99,6 +101,85 @@ test.describe("weekly roundup spotlight", () => {
       expect(serious).toEqual([]);
       await page.screenshot({
         path: `smoke-screens/weekly-this-week-${width}-${scheme}.png`,
+        fullPage: true,
+      });
+      expect(errors).toEqual([]);
+      await context.close();
+    });
+  }
+});
+
+test.describe("v2 roundup rendering", () => {
+  const fixturePath = join(process.cwd(), "content", "roundups", "2099-W01.json");
+
+  test.beforeAll(async () => {
+    const fixture = await readFile(
+      join(process.cwd(), "tests", "fixtures", "roundup-v2.json"),
+      "utf8",
+    );
+    await writeFile(fixturePath, fixture, "utf8");
+  });
+
+  test.afterAll(async () => {
+    await unlink(fixturePath).catch(() => undefined);
+  });
+
+  test("W46 stays on the v1 one-line layout", async ({ page }) => {
+    await page.goto("/this-week/2026-W46", { waitUntil: "networkidle" });
+    await expect(page.locator("[data-roundup-schema='2']")).toHaveCount(0);
+    await expect(page.locator("[data-roundup-sparkline]")).toHaveCount(0);
+    await expect(page.locator("[data-roundup-quiet]")).toBeVisible();
+  });
+
+  for (const [width, height, scheme] of [
+    [1440, 900, "dark"],
+    [1440, 900, "light"],
+    [390, 844, "dark"],
+    [390, 844, "light"],
+  ] as const) {
+    test(`v2 fixture at ${width} in ${scheme}: every section, axe clean, no overflow`, async ({
+      browser,
+      request,
+    }) => {
+      const context = await browser.newContext({
+        viewport: { width, height },
+        colorScheme: scheme,
+      });
+      const page = await context.newPage();
+      const errors = watchErrors(page);
+      await page.goto("/this-week/2099-W01", { waitUntil: "networkidle" });
+      await expect(page.locator("[data-roundup-schema='2']")).toBeVisible();
+      await expect(page.locator("[data-roundup-sparkline]")).toBeVisible();
+      await expect(page.locator("[data-roundup-sky]")).toContainText("New moon");
+      await expect(page.locator("[data-roundup-activity]")).toContainText(
+        "Geometry match compares planet positions only",
+      );
+      await expect(page.locator("[data-roundup-next]")).toContainText(
+        "Employment Situation",
+      );
+      await expect(page.locator("[data-roundup-record]")).toContainText(
+        "The new moon and the market",
+      );
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth,
+      );
+      expect(overflow).toBe(false);
+      const axe = await new AxeBuilder({ page }).analyze();
+      expect(
+        axe.violations.filter(
+          (violation) =>
+            violation.impact === "serious" || violation.impact === "critical",
+        ),
+      ).toEqual([]);
+      const og = await page
+        .locator('meta[property="og:image"]')
+        .getAttribute("content");
+      expect(og).toBeTruthy();
+      const image = await request.get(new URL(og!).pathname);
+      expect(image.status()).toBe(200);
+      expect(image.headers()["content-type"]).toContain("image/png");
+      await page.screenshot({
+        path: `smoke-screens/weekly-v2-${width}-${scheme}.png`,
         fullPage: true,
       });
       expect(errors).toEqual([]);

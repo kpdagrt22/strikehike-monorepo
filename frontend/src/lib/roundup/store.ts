@@ -9,7 +9,38 @@ export type RoundupDate = {
   path: string;
 };
 export type RoundupTheme = { id: string; name: string; events: RoundupDate[] };
+export type RoundupSkyItem = {
+  kind: string;
+  body: string;
+  at: string;
+  path: string;
+  label?: string;
+  rashi?: number;
+  eclipse_type?: string;
+  season?: string;
+  name?: string;
+};
+export type RoundupActivity = {
+  daily: { date: string; score: number }[];
+  min: number;
+  max: number;
+  peak_date: string;
+  closest_past: {
+    date: string;
+    name: string;
+    similarity_percent: number;
+  } | null;
+  note: string;
+};
+export type RoundupRecord = {
+  claim_id: string;
+  title: string;
+  result: string;
+  result_code: string;
+  path: string;
+};
 export type Roundup = {
+  schema?: number;
   week: string;
   start: string;
   end: string;
@@ -21,10 +52,22 @@ export type Roundup = {
     label: string;
     previous_score: number | null;
     change: number | null;
+    weekly?: { date: string; score: number }[];
   };
   themes?: RoundupTheme[];
   sky?: RoundupDate[];
-  lines?: { regime?: string; dates?: string; sky?: string };
+  sky_week_items?: RoundupSkyItem[];
+  activity?: RoundupActivity;
+  next_two_weeks?: RoundupDate[];
+  from_record?: RoundupRecord;
+  lines?: {
+    regime?: string;
+    dates?: string;
+    sky?: string;
+    activity?: string;
+    next?: string;
+    record?: string;
+  };
 };
 
 const DIR = join(process.cwd(), "content", "roundups");
