@@ -7,6 +7,7 @@ import { formatDate, formatPercent } from "@/components/regime/regimeUtils";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { ClaimChart } from "@/components/tested/ClaimChart";
+import { ClaimWindows } from "@/components/tested/ClaimWindows";
 import { referenceDetailGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 import { CLAIM_IDS, readClaimTest, type ClaimTest } from "@/lib/tested/store";
@@ -246,41 +247,7 @@ export default async function ClaimTestPage({ params }: Params) {
 
       {comparison && claim.published ? (
         <section className="mt-8 max-w-[860px]">
-          <details className="group rounded-2xl border border-(--sh-line-1)">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-2)">
-              <span>Windows ({claim.windows.length})</span>
-              <span aria-hidden="true" className="text-base transition-transform group-open:rotate-45">+</span>
-            </summary>
-          <div className="border-t border-(--sh-line-1)">
-            <div
-              role="region"
-              aria-label="Claim windows table"
-              tabIndex={0}
-              className="max-h-[24rem] overflow-y-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus)"
-            >
-              <table data-claim-windows="" className="w-full border-collapse text-left text-micro">
-                <thead className="sticky top-0 bg-(--sh-surface-float) text-(--sh-text-3)">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 font-medium uppercase tracking-[0.12em]">Start</th>
-                    <th scope="col" className="px-3 py-2 font-medium uppercase tracking-[0.12em]">End</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium uppercase tracking-[0.12em]">Return</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium uppercase tracking-[0.12em]">20% fall start</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {claim.windows.map((window) => (
-                    <tr key={`${window.start}-${window.end}-${window.kind}`} className="border-t border-(--sh-line-1)">
-                      <td className="whitespace-nowrap px-3 py-2 text-(--sh-text-2)">{formatDate(window.start)}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-(--sh-text-2)">{formatDate(window.end)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-(--sh-text-2)">{pct(window.return)}</td>
-                      <td className="px-3 py-2 text-right text-(--sh-text-3)">{window.decline_start ? "yes" : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          </details>
+          <ClaimWindows claimId={claim.id} count={claim.windows.length} />
         </section>
       ) : null}
 

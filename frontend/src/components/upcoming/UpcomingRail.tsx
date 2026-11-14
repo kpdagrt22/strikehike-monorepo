@@ -7,6 +7,7 @@ import type { OrderedTheme } from "@/lib/events/upcoming";
 import type { UpcomingEventPayload } from "@/lib/seo/data";
 
 type Item = { event: UpcomingEventPayload; theme: OrderedTheme };
+type FilterTheme = Pick<OrderedTheme, "name" | "slug" | "available">;
 
 type Props = {
   eyebrow?: string;
@@ -15,7 +16,7 @@ type Props = {
   note?: ReactNode;
   subscribeScope?: string;
   subscribeLabel?: string;
-  themes?: OrderedTheme[];
+  themes?: FilterTheme[];
   current?: string;
   total?: number;
   next?: Item | null;

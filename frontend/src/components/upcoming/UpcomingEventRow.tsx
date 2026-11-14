@@ -97,7 +97,13 @@ export function UpcomingEventRow({
           </div>
           {actions ? (
             <EventActions
-              event={event}
+              event={{
+                event_id: event.event_id,
+                start_date: event.start_date,
+                start_utc: event.start_utc,
+                all_day: event.all_day,
+                status: event.status,
+              }}
               themeSlug={themeSlug}
               className="mt-1.5 pointer-fine:absolute pointer-fine:right-2 pointer-fine:top-1/2 pointer-fine:z-10 pointer-fine:mt-0 pointer-fine:-translate-y-1/2 pointer-fine:rounded-full pointer-fine:bg-(--sh-surface-overlay) pointer-fine:px-1 pointer-fine:shadow-(--sh-shadow-float) pointer-fine:backdrop-blur-xl"
             />

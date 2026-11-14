@@ -237,7 +237,7 @@ test.describe("upcoming calendar", () => {
 
   test("Show all opens and a subscribe link points at the feed", async ({ page, request }) => {
     await waitForUpcoming(request);
-    await page.goto("/upcoming", { waitUntil: "domcontentloaded" });
+    await page.goto("/upcoming?all=1", { waitUntil: "domcontentloaded" });
     const details = page.locator("details").filter({ hasText: "Show all" }).first();
     await expect(details).toBeVisible();
     await details.locator("summary").click();
@@ -256,6 +256,9 @@ test.describe("upcoming calendar", () => {
     await waitForUpcoming(request);
     const data = await fetchUpcoming(request);
     await page.goto("/upcoming", { waitUntil: "networkidle" });
+    await expect(page.locator("[data-upcoming-group]")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: /Show all \d+ dates/ })).toBeVisible();
+    await page.goto("/upcoming?all=1", { waitUntil: "networkidle" });
 
     const themes = Object.entries(data.themes).filter(
       ([name, entry]) =>

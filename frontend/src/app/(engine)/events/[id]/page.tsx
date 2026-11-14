@@ -213,6 +213,23 @@ export default async function EventPage({
               {event.description}
             </p>
           ) : null}
+          <p
+            data-event-factual
+            className="mt-3 max-w-[760px] text-meta leading-relaxed text-(--sh-text-2)"
+          >
+            {event.description
+              ? `${event.name} is listed for ${day}.`
+              : `${event.name} is a ${event.theme.toLowerCase()} date on ${day}.`}{" "}
+            <a
+              href={authority ?? event.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
+            >
+              {sourceLabel}: {event.source_id?.replaceAll("_", " ") ?? "official calendar"}
+            </a>
+            .
+          </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-(--sh-line-1) pt-4 text-meta text-(--sh-text-3)">
             <a
