@@ -37,6 +37,8 @@ India in the Indian evening. Every time below is IST.
       orrery, the corona gauge and the sound control.
 - [ ] Check the five things a visitor lands on: the home orrery, `/this-week`
       (the new roundup), `/about`, `/upcoming` (no Politics chip), `/tested`.
+- [ ] Check `/this-week` is the current approved roundup, `/ledger` shows its
+      line, and the weekly email form is present.
 - [ ] Have `img/demo.webm` and each card ready to attach; re-read the drafts once
       for typos and remove nothing that is checkable on the site.
 - [ ] Set aside two clear hours for the first-six-hours watch (below).
@@ -84,6 +86,9 @@ Watch these, in this order, and reply where a reply is warranted (see below).
       window: Mercury retrograde 0.48 % vs 0.29 %, p = 0.62; full moon 0.08 %
       vs 0.09 %, p = 0.91; eclipses 0.12 % vs −0.07 %, p = 0.25) and the
       roundup's Core Index line are the ones most likely to be misread.
+- [ ] **How the record is kept.** If someone asks whether a roundup can be
+      edited, point to `/ledger`: every published roundup is fingerprinted into
+      an append-only public ledger.
 - [ ] **Politics.** If someone asks where Politics went, the answer is D-12:
       the theme has no verified source yet, so it is not shown while it would be
       a guess. It is not deleted; the model and the older events still exist.
@@ -132,6 +137,8 @@ it brings the tagged images back automatically.
 
 ## After the launch
 
+- [ ] Subscribe to the weekly email yourself and confirm the Monday send is off
+      unless the `DIGEST_AUTOSEND` repository variable is set to `1`.
 - [ ] Collect the questions that came up more than once; they are the next
       FAQ or `/about` tweak.
 - [ ] Note which card and which opening line did the work; keep the winners in

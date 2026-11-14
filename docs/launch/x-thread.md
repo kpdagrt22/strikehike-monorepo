@@ -1,7 +1,7 @@
 # X / Twitter thread — StrikeHike
 
 Draft only. Nothing here is posted by this repository; see `checklist.md`.
-Seven posts, each inside X's 270-character count, using the `img/x-1200x675.png`
+Eight posts, each inside X's 270-character count, using the `img/x-1200x675.png`
 card on post 1. Post them as one thread, in order.
 
 **1/**
@@ -41,6 +41,12 @@ I publish the misses too. The method, the windows and every result — including
 ```
 
 **7/**
+
+```
+The weekly roundup carries the same record forward: the Regime reading, the dates ahead and the sky events, with an email you can subscribe to. Every published roundup is fingerprinted into an append-only public ledger: strikehike.com/this-week
+```
+
+**8/**
 
 ```
 Descriptive historical research, not advice and not a forecast. Have a claim you want tested against the record? Tell me which.

@@ -15,7 +15,7 @@ Show HN: StrikeHike – the market record beside the planetary sky
 https://strikehike.com
 ```
 
-## First comment (248 words)
+## First comment (287 words)
 
 I built StrikeHike because claims that link the sky to markets almost always
 arrive with no method and no misses shown. So this site shows both.
@@ -34,6 +34,8 @@ What is on it:
 - **Tested** — Mercury retrograde, the full moon and eclipses, each measured
   against the daily S&P 500 record since 1928 with 2,000-draw permutation tests.
   All three come back "no meaningful difference in this record".
+- **This week** — a weekly roundup of the Regime reading, the dates ahead and
+  the sky events, with a Saturday draft and an email you can subscribe to.
 
 For each tested claim, the S&P return over each whole event window is compared
 with the nearest non-overlapping window of the same length: about 22 days for
@@ -41,6 +43,7 @@ Mercury retrograde, 7 days for the full moon and eclipses.
 
 It is descriptive historical research: not advice, and not a forecast. No ads and
 no tracking cookies, and the first-party analytics has an off switch. Every page
-carries its own method note; the sources and the code are linked.
+carries its own method note; the sources and the code are linked. Every published
+roundup is fingerprinted into an append-only public ledger.
 
 Feedback and corrections are welcome.
