@@ -1,0 +1,655 @@
+{
+  "id": "mars-saturn-conjunction",
+  "title": "Mars\u2013Saturn conjunctions and the market",
+  "claim": "A Mars\u2013Saturn conjunction is often said to mark a turning point in the market.",
+  "result": "No meaningful difference in this record.",
+  "result_code": "no_meaningful_difference",
+  "published": true,
+  "series": {
+    "name": "S&P 500 / Cowles chained proxy (sp500_proxy)",
+    "column": "sp500_proxy",
+    "frequency": "daily",
+    "start": "1927-12-30",
+    "end": "2026-10-27",
+    "years": "1927\u20132026",
+    "full_record": {
+      "start": "1871-01-01",
+      "end": "2026-10-27",
+      "years": "1871\u20132026",
+      "monthly_before": "1927-12-30"
+    }
+  },
+  "source": {
+    "artifact": "backend/data/processed/macro_regime_history.parquet",
+    "meta": "backend/data/processed/macro_regime_history.meta.json",
+    "market": "sp500_proxy: NBER M1125AUSM343NNBR (monthly) before 1927-12-30, Yahoo GSPC (daily) from 1927-12-30",
+    "astronomy": "Skyfield with the JPL DE406 ephemeris",
+    "build_date": "2026-11-13",
+    "data_version": "59192d5aa731"
+  },
+  "comparison": {
+    "in": {
+      "n": 51,
+      "mean_return": 0.0034917462235986955,
+      "median_return": 0.002892648999578862,
+      "decline_starts": 0,
+      "decline_share": 0.0
+    },
+    "out": {
+      "n": 51,
+      "mean_return": 0.0024061032534345036,
+      "median_return": 0.000616281680495101,
+      "decline_starts": 0,
+      "decline_share": 0.0
+    },
+    "mean_difference": 0.001085642970164192,
+    "median_difference": 0.0022763673190837608,
+    "p_value": 0.8180909545227386,
+    "permutations": 2000,
+    "seed": 20261111,
+    "meaningful": false
+  },
+  "full_history": {
+    "in": {
+      "n": 80,
+      "mean_return": -0.005129730777979002,
+      "median_return": 0.008227805174464309,
+      "decline_starts": 1,
+      "decline_share": 0.0125
+    },
+    "out": {
+      "n": 1789,
+      "mean_return": 0.005025618367428346,
+      "median_return": 0.006932165418227054,
+      "decline_starts": 15,
+      "decline_share": 0.008384572386808273
+    },
+    "mean_difference": -0.010155349145407349,
+    "median_difference": 0.0012956397562372546,
+    "p_value": 0.08945527236381809,
+    "permutations": 2000,
+    "seed": 20261111,
+    "meaningful": false,
+    "available": true
+  },
+  "chart": [
+    {
+      "year": 1929,
+      "value": 0.2331
+    },
+    {
+      "year": 1932,
+      "value": 3.8506
+    },
+    {
+      "year": 1934,
+      "value": 8.5402
+    },
+    {
+      "year": 1936,
+      "value": 1.8169
+    },
+    {
+      "year": 1938,
+      "value": -0.0948
+    },
+    {
+      "year": 1940,
+      "value": -0.7276
+    },
+    {
+      "year": 1942,
+      "value": -0.4706
+    },
+    {
+      "year": 1944,
+      "value": 1.6807
+    },
+    {
+      "year": 1945,
+      "value": -1.6888
+    },
+    {
+      "year": 1946,
+      "value": 0.4792
+    },
+    {
+      "year": 1947,
+      "value": -0.7838
+    },
+    {
+      "year": 1949,
+      "value": 1.118
+    },
+    {
+      "year": 1951,
+      "value": 0.5991
+    },
+    {
+      "year": 1953,
+      "value": 1.3732
+    },
+    {
+      "year": 1956,
+      "value": 0.2028
+    },
+    {
+      "year": 1958,
+      "value": 0.8706
+    },
+    {
+      "year": 1960,
+      "value": 0.3385
+    },
+    {
+      "year": 1962,
+      "value": 0.9598
+    },
+    {
+      "year": 1964,
+      "value": 0.1681
+    },
+    {
+      "year": 1966,
+      "value": -1.6448
+    },
+    {
+      "year": 1968,
+      "value": -2.6199
+    },
+    {
+      "year": 1970,
+      "value": -0.8944
+    },
+    {
+      "year": 1972,
+      "value": 0.2893
+    },
+    {
+      "year": 1974,
+      "value": -2.7024
+    },
+    {
+      "year": 1976,
+      "value": -0.53
+    },
+    {
+      "year": 1978,
+      "value": 2.8454
+    },
+    {
+      "year": 1980,
+      "value": 1.7009
+    },
+    {
+      "year": 1982,
+      "value": 1.0961
+    },
+    {
+      "year": 1984,
+      "value": -0.3583
+    },
+    {
+      "year": 1986,
+      "value": 1.1194
+    },
+    {
+      "year": 1988,
+      "value": 0.3249
+    },
+    {
+      "year": 1990,
+      "value": 3.5138
+    },
+    {
+      "year": 1992,
+      "value": -1.8506
+    },
+    {
+      "year": 1994,
+      "value": 0.9562
+    },
+    {
+      "year": 1996,
+      "value": -0.2532
+    },
+    {
+      "year": 1998,
+      "value": 2.6609
+    },
+    {
+      "year": 2000,
+      "value": -1.7421
+    },
+    {
+      "year": 2002,
+      "value": -3.4028
+    },
+    {
+      "year": 2004,
+      "value": 2.48
+    },
+    {
+      "year": 2006,
+      "value": -0.3153
+    },
+    {
+      "year": 2008,
+      "value": -1.0237
+    },
+    {
+      "year": 2010,
+      "value": 1.2955
+    },
+    {
+      "year": 2012,
+      "value": 0.8742
+    },
+    {
+      "year": 2014,
+      "value": 0.4194
+    },
+    {
+      "year": 2016,
+      "value": -0.6791
+    },
+    {
+      "year": 2018,
+      "value": 0.8319
+    },
+    {
+      "year": 2020,
+      "value": -2.0783
+    },
+    {
+      "year": 2022,
+      "value": -1.2666
+    },
+    {
+      "year": 2024,
+      "value": -1.555
+    },
+    {
+      "year": 2026,
+      "value": 1.3722
+    }
+  ],
+  "windows": [
+    {
+      "start": "1929-12-31",
+      "end": "1930-01-06",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.002331,
+      "decline_start": false
+    },
+    {
+      "start": "1932-01-08",
+      "end": "1932-01-14",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.038506,
+      "decline_start": false
+    },
+    {
+      "start": "1934-01-14",
+      "end": "1934-01-20",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.085402,
+      "decline_start": false
+    },
+    {
+      "start": "1936-01-22",
+      "end": "1936-01-28",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.018169,
+      "decline_start": false
+    },
+    {
+      "start": "1938-01-29",
+      "end": "1938-02-04",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.000948,
+      "decline_start": false
+    },
+    {
+      "start": "1940-02-08",
+      "end": "1940-02-14",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.007276,
+      "decline_start": false
+    },
+    {
+      "start": "1942-02-19",
+      "end": "1942-02-25",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.004706,
+      "decline_start": false
+    },
+    {
+      "start": "1944-03-04",
+      "end": "1944-03-10",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.016807,
+      "decline_start": false
+    },
+    {
+      "start": "1945-10-23",
+      "end": "1945-10-29",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.016888,
+      "decline_start": false
+    },
+    {
+      "start": "1946-01-17",
+      "end": "1946-01-23",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.014722,
+      "decline_start": false
+    },
+    {
+      "start": "1946-03-17",
+      "end": "1946-03-23",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.024306,
+      "decline_start": false
+    },
+    {
+      "start": "1947-11-09",
+      "end": "1947-11-15",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.007838,
+      "decline_start": false
+    },
+    {
+      "start": "1949-11-27",
+      "end": "1949-12-03",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.01118,
+      "decline_start": false
+    },
+    {
+      "start": "1951-12-15",
+      "end": "1951-12-21",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.005991,
+      "decline_start": false
+    },
+    {
+      "start": "1953-12-30",
+      "end": "1954-01-05",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.013732,
+      "decline_start": false
+    },
+    {
+      "start": "1956-01-11",
+      "end": "1956-01-17",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.002028,
+      "decline_start": false
+    },
+    {
+      "start": "1958-01-20",
+      "end": "1958-01-26",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.008706,
+      "decline_start": false
+    },
+    {
+      "start": "1960-01-28",
+      "end": "1960-02-03",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.003385,
+      "decline_start": false
+    },
+    {
+      "start": "1962-02-04",
+      "end": "1962-02-10",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.009598,
+      "decline_start": false
+    },
+    {
+      "start": "1964-02-11",
+      "end": "1964-02-17",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.001681,
+      "decline_start": false
+    },
+    {
+      "start": "1966-02-18",
+      "end": "1966-02-24",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.016448,
+      "decline_start": false
+    },
+    {
+      "start": "1968-02-28",
+      "end": "1968-03-05",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.026199,
+      "decline_start": false
+    },
+    {
+      "start": "1970-03-12",
+      "end": "1970-03-18",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.008944,
+      "decline_start": false
+    },
+    {
+      "start": "1972-03-28",
+      "end": "1972-04-03",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.002893,
+      "decline_start": false
+    },
+    {
+      "start": "1974-04-17",
+      "end": "1974-04-23",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.027024,
+      "decline_start": false
+    },
+    {
+      "start": "1976-05-09",
+      "end": "1976-05-15",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.0053,
+      "decline_start": false
+    },
+    {
+      "start": "1978-06-01",
+      "end": "1978-06-07",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.028454,
+      "decline_start": false
+    },
+    {
+      "start": "1980-06-21",
+      "end": "1980-06-27",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.017009,
+      "decline_start": false
+    },
+    {
+      "start": "1982-07-04",
+      "end": "1982-07-10",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.010961,
+      "decline_start": false
+    },
+    {
+      "start": "1984-02-11",
+      "end": "1984-02-17",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.003583,
+      "decline_start": false
+    },
+    {
+      "start": "1986-02-14",
+      "end": "1986-02-20",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.011194,
+      "decline_start": false
+    },
+    {
+      "start": "1988-02-20",
+      "end": "1988-02-26",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.003249,
+      "decline_start": false
+    },
+    {
+      "start": "1990-02-25",
+      "end": "1990-03-03",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.035138,
+      "decline_start": false
+    },
+    {
+      "start": "1992-03-03",
+      "end": "1992-03-09",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.018506,
+      "decline_start": false
+    },
+    {
+      "start": "1994-03-11",
+      "end": "1994-03-17",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.009562,
+      "decline_start": false
+    },
+    {
+      "start": "1996-03-19",
+      "end": "1996-03-25",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.002532,
+      "decline_start": false
+    },
+    {
+      "start": "1998-03-30",
+      "end": "1998-04-05",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.026609,
+      "decline_start": false
+    },
+    {
+      "start": "2000-04-12",
+      "end": "2000-04-18",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.017421,
+      "decline_start": false
+    },
+    {
+      "start": "2002-05-01",
+      "end": "2002-05-07",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.034028,
+      "decline_start": false
+    },
+    {
+      "start": "2004-05-22",
+      "end": "2004-05-28",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.0248,
+      "decline_start": false
+    },
+    {
+      "start": "2006-06-15",
+      "end": "2006-06-21",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.003153,
+      "decline_start": false
+    },
+    {
+      "start": "2008-07-07",
+      "end": "2008-07-13",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.010237,
+      "decline_start": false
+    },
+    {
+      "start": "2010-07-28",
+      "end": "2010-08-03",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.012955,
+      "decline_start": false
+    },
+    {
+      "start": "2012-08-12",
+      "end": "2012-08-18",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.008742,
+      "decline_start": false
+    },
+    {
+      "start": "2014-08-22",
+      "end": "2014-08-28",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.004194,
+      "decline_start": false
+    },
+    {
+      "start": "2016-08-21",
+      "end": "2016-08-27",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.006791,
+      "decline_start": false
+    },
+    {
+      "start": "2018-03-30",
+      "end": "2018-04-05",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.008319,
+      "decline_start": false
+    },
+    {
+      "start": "2020-03-28",
+      "end": "2020-04-03",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.020783,
+      "decline_start": false
+    },
+    {
+      "start": "2022-04-02",
+      "end": "2022-04-08",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.012666,
+      "decline_start": false
+    },
+    {
+      "start": "2024-04-07",
+      "end": "2024-04-13",
+      "kind": "mars_saturn_conjunction",
+      "return": -0.01555,
+      "decline_start": false
+    },
+    {
+      "start": "2026-04-16",
+      "end": "2026-04-22",
+      "kind": "mars_saturn_conjunction",
+      "return": 0.013722,
+      "decline_start": false
+    }
+  ],
+  "next_event": null,
+  "method": [
+    "Every geocentric Mars\u2013Saturn conjunction in ecliptic longitude in the record, using the seven calendar days from three days before to three days after the exact moment.",
+    "Returns are the S&P proxy close at the first session in a window to its close at the last session in that window.",
+    "Each event window is paired with the nearest non-overlapping window of the same calendar length, searching backward first, then forward. Control windows never overlap an event or another control.",
+    "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",
+    "The uncertainty check is a two-sided permutation test of the mean-return difference, 2000 shuffles with seed 20261111.",
+    "A difference is called meaningful only when p < 0.05 and the mean-return difference is at least 0.5 percentage points in absolute size.",
+    "A claim is published only when it has at least 30 non-overlapping daily windows; otherwise the page shows the count and no result.",
+    "The p-value and the sample sizes are reported exactly as computed; the same seed reproduces the same result."
+  ],
+  "limitations": [
+    "This is a descriptive comparison of a historical record, not evidence of a cause and not a forecast.",
+    "The daily S&P record starts 30 Dec 1927 (Yahoo GSPC). Before that the repo's proxy is monthly (NBER, 1871-1926), so short-window returns there would be mostly forward-filled; the headline test uses the daily record and the full-history test uses monthly returns.",
+    "The early S&P series is a chained Cowles/S&P proxy, and daily sessions before 1957 do not match the modern S&P 500 exactly.",
+    "Control windows follow a fixed rule, but seasonality, volatility clustering and overlapping macro events remain in the record.",
+    "Permutation p-values measure how unusual the mean difference is under relabelling; they do not remove those dependencies.",
+    "Decline starts are only the falls in the current /declines list, not every possible market fall."
+  ]
+}

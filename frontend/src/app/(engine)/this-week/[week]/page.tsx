@@ -6,7 +6,7 @@ import { RoundupView } from "@/components/roundup/RoundupView";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { ledgerForWeek } from "@/lib/ledger/store";
 import { approvedRoundup } from "@/lib/roundup/store";
-import { weekLabel } from "@/lib/roundup/week";
+import { isIsoWeek, weekLabel } from "@/lib/roundup/week";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,9 @@ type Params = { params: Promise<{ week: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { week } = await params;
+  if (!isIsoWeek(week)) {
+    return { title: "Roundup not found", robots: { index: false, follow: true } };
+  }
   const roundup = await approvedRoundup(week);
   if (!roundup) {
     return { title: "Roundup not found", robots: { index: false, follow: true } };
@@ -44,6 +47,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function WeekPage({ params }: Params) {
   const { week } = await params;
+  if (!isIsoWeek(week)) notFound();
   const roundup = await approvedRoundup(week);
   if (!roundup) notFound();
   const ledger = await ledgerForWeek(week).catch(() => null);

@@ -1,6 +1,13 @@
 // ISO week helpers shared by the roundup script, pages, RSS and tests.
 // Monday to Sunday, UTC.
 
+/** The only week shape any public route may pass to the filesystem. */
+export const WEEK_PATTERN = /^\d{4}-W\d{2}$/;
+
+export function isIsoWeek(value: string): boolean {
+  return WEEK_PATTERN.test(value);
+}
+
 export function parseIsoWeek(value: string) {
   const match = /^(\d{4})-W(\d{2})$/.exec(value);
   if (!match) return null;

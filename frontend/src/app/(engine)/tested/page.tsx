@@ -11,7 +11,7 @@ import { readClaimTests } from "@/lib/tested/store";
 const PATH = "/tested";
 const TITLE = "Tested: popular claims, against the record";
 const DESCRIPTION =
-  "Three popular sky claims tested against the daily S&P 500 record since 1928: Mercury retrograde, the full moon and eclipses. Method, windows and results shown, including no difference.";
+  "Seven popular sky claims tested against the daily S&P 500 record since 1928: Mercury and Mars retrograde, the full and new moon, eclipses, solstices and equinoxes, and Mars-Saturn conjunctions. Method, windows and results shown, including no difference.";
 
 export const metadata: Metadata = {
   title: { absolute: `${TITLE} · ${SITE_NAME}` },
@@ -71,9 +71,9 @@ export default async function TestedIndexPage() {
           Popular claims, tested against the record
         </h1>
         <p className="mt-3 text-body leading-relaxed text-(--sh-text-2)">
-          Three claims that link the sky to the market, each measured the same way against the
+          Seven claims that link the sky to the market, each measured the same way against the
           daily S&amp;P 500 record. Every result is shown, including the ones that find no
-          difference.
+          difference and the ones with too few windows to test.
         </p>
       </header>
 
@@ -97,7 +97,9 @@ export default async function TestedIndexPage() {
                 <span className="mt-2 text-meta leading-relaxed text-(--sh-text-2)">{claim.claim}</span>
                 <span className="mt-3 text-micro font-medium text-(--sh-text-1)">{claim.result}</span>
                 <span className="mt-3 text-micro text-(--sh-text-3)">
-                  {claim.comparison.in.n} windows · p = {claim.comparison.p_value.toFixed(4)}
+                  {claim.published && claim.comparison
+                    ? `${claim.comparison.in.n} windows · p = ${claim.comparison.p_value.toFixed(4)}`
+                    : `${claim.too_few?.windows ?? 0} windows · not published`}
                 </span>
               </Link>
             </li>

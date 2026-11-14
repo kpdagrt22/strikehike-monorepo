@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from astro_finance.events.pipeline import PipelineOptions, run_pipeline
@@ -21,12 +21,19 @@ def _copy_data(tmp_path: Path) -> Path:
     return target_dir
 
 
-def _run(tmp_path: Path, data_dir: Path, *, previous: Path | None = None, name: str = "out"):
+def _run(
+    tmp_path: Path,
+    data_dir: Path,
+    *,
+    previous: Path | None = None,
+    name: str = "out",
+    today=TODAY,
+):
     return run_pipeline(
         PipelineOptions(
             out_dir=tmp_path / name,
             previous_dir=previous,
-            today=TODAY,
+            today=today,
             now=NOW,
             data_dir=data_dir,
             offline_dir=FIXTURES / "offline",
@@ -38,7 +45,7 @@ def _run(tmp_path: Path, data_dir: Path, *, previous: Path | None = None, name: 
 
 def test_pipeline_writes_stage_records_and_raw_cache(tmp_path):
     data_dir = _copy_data(tmp_path)
-    result = _run(tmp_path, data_dir)
+    result = _run(tmp_path, data_dir, today=date(2026, 11, 13))
     assert not result.publishable
     assert result.exit_code == 2
     log_path = result.out_dir / "runs" / "run-out.jsonl"
@@ -64,7 +71,10 @@ def test_pipeline_writes_stage_records_and_raw_cache(tmp_path):
     assert (result.out_dir / "raw" / "astronomy_computed" / "computed_events.json").exists()
     assert (result.out_dir / "raw" / "curated_upcoming" / "finance.toml").exists()
     rejects = json.loads((result.out_dir / "rejects.json").read_text("utf-8"))
-    assert rejects["rejects"] == []
+    assert [item["name"] for item in rejects["rejects"]] == [
+        "Bank of England Monetary Policy Committee decision"
+    ]
+    assert rejects["rejects"][0]["reasons"] == ["upcoming event is before today"]
 
 
 def test_pipeline_reschedule_archives_the_previous_record(tmp_path):

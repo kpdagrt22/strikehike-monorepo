@@ -15,7 +15,15 @@ const SIZES = [
   [390, 844],
 ] as const;
 
-const CLAIMS = ["mercury-retrograde", "full-moon", "eclipses"] as const;
+const CLAIMS = [
+  "mercury-retrograde",
+  "full-moon",
+  "eclipses",
+  "new-moon",
+  "solstices-equinoxes",
+  "mars-retrograde",
+  "mars-saturn-conjunction",
+] as const;
 
 // Usage batches are kept in sessionStorage, which survives the navigations
 // inside one test; Playwright cannot read a beacon body directly.
@@ -77,6 +85,7 @@ type ClaimJson = {
   title: string;
   result: string;
   result_code: string;
+  published: boolean;
   method: string[];
 };
 
@@ -87,7 +96,7 @@ async function claimJson(id: string): Promise<ClaimJson> {
 
 test.describe("claim tests", () => {
   test(
-    "the three claim pages and the index render, match their JSON, and ship SEO",
+    "the seven claim pages and the index render, match their JSON, and ship SEO",
     { tag: "@deploy" },
     async ({ page, request }) => {
       const errors = watchErrors(page);
@@ -109,19 +118,23 @@ test.describe("claim tests", () => {
         await expect(page.locator(`[data-claim-result="${data.result_code}"]`)).toHaveText(
           data.result,
         );
-        // The numbers table and the permutation line.
-        await expect(page.locator("[data-claim-table]")).toBeVisible();
-        await expect(page.locator("[data-claim-stats]")).toContainText("permutation p =");
+        if (data.published) {
+          // The numbers table and the permutation line.
+          await expect(page.locator("[data-claim-table]")).toBeVisible();
+          await expect(page.locator("[data-claim-stats]")).toContainText("permutation p =");
+          // The window list stays collapsed until asked for.
+          const details = page.locator("details", { has: page.locator("[data-claim-windows]") });
+          await expect(details).toHaveCount(1);
+          await expect(page.locator("[data-claim-windows]")).toBeHidden();
+          await details.locator("summary").click();
+          await expect(page.locator("[data-claim-windows]")).toBeVisible();
+        } else {
+          await expect(page.locator("[data-claim-too-few]")).toBeVisible();
+        }
         // The method box lists every choice the builder recorded.
         for (const line of data.method) {
           await expect(page.locator("body")).toContainText(line);
         }
-        // The window list stays collapsed until asked for.
-        const details = page.locator("details", { has: page.locator("[data-claim-windows]") });
-        await expect(details).toHaveCount(1);
-        await expect(page.locator("[data-claim-windows]")).toBeHidden();
-        await details.locator("summary").click();
-        await expect(page.locator("[data-claim-windows]")).toBeVisible();
         // JSON-LD, share surface and cross-links.
         expect(await jsonLdTypes(page)).toContain("Article");
         await expect(page.locator('[data-share-surface="tested"]')).toBeVisible();

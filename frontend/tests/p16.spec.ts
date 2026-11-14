@@ -58,6 +58,24 @@ test.describe("P16: the published ledger", () => {
     },
   );
 
+  test("week routes reject traversal and malformed weeks with 404", async ({
+    request,
+  }) => {
+    const paths = [
+      "/this-week/..%2F2026-W46/roundup.json",
+      "/this-week/%2E%2E%2F2026-W46/roundup.json",
+      "/this-week/2026-W46%2F..%2F2026-W46/roundup.json",
+      "/this-week/..%2F2026-W46/data.json",
+      "/this-week/%2E%2E%2F2026-W46/data.json",
+      "/this-week/2026-W46%2F..%2F2026-W46/data.json",
+      "/this-week/not-a-week/roundup.json",
+      "/this-week/not-a-week/data.json",
+    ];
+    for (const path of paths) {
+      expect((await request.get(path)).status(), path).toBe(404);
+    }
+  });
+
   test("the browser verifier says the real chain is intact", async ({ page }) => {
     await page.goto("/ledger", { waitUntil: "networkidle" });
     await page.locator("[data-ledger-verify]").click();

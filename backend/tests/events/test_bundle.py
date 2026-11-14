@@ -4,7 +4,7 @@ import hashlib
 import json
 import shutil
 import sqlite3
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -116,11 +116,11 @@ def _finalize(tmp_path: Path, artifact) -> dict:
     return result.manifest
 
 
-def _build(out: Path, *, created_at):
+def _build(out: Path, *, created_at, today=TODAY):
     return run_pipeline(
         PipelineOptions(
             out_dir=out,
-            today=TODAY,
+            today=today,
             now=NOW,
             offline_dir=FIXTURES / "offline",
             created_at=created_at,
@@ -232,7 +232,7 @@ def test_quality_report_and_summary_carry_the_macro_sibling_warnings(tmp_path):
     result = run_pipeline(
         PipelineOptions(
             out_dir=tmp_path / "out",
-            today=TODAY,
+            today=date(2026, 11, 13),
             now=NOW,
             offline_dir=FIXTURES / "offline",
             macro_parquet=carried,
@@ -316,7 +316,7 @@ def test_bundle_version_is_a_short_sha_of_the_content(tmp_path):
 
 
 def test_quality_report_has_counts_for_every_theme(tmp_path):
-    result = _build(tmp_path / "out", created_at=NOW)
+    result = _build(tmp_path / "out", created_at=NOW, today=date(2026, 11, 13))
     report = json.loads((result.bundle_dir / "quality_report.json").read_text("utf-8"))
     assert report["test_build"] is True
     assert report["publishable"] is False
@@ -331,9 +331,9 @@ def test_quality_report_has_counts_for_every_theme(tmp_path):
     }
     for theme in report["upcoming_counts"].values():
         assert set(theme) == {"30", "90", "365"}
-    assert report["summary"]["events_total"] == 232
+    assert report["summary"]["events_total"] == 240
     assert report["summary"]["historical_total"] == 159
-    assert report["summary"]["upcoming_total"] == 73
+    assert report["summary"]["upcoming_total"] == 81
     assert all(gate["status"] == "pass" for gate in report["gates"])
 
 

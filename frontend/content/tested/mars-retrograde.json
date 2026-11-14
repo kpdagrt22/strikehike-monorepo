@@ -1,0 +1,607 @@
+{
+  "id": "mars-retrograde",
+  "title": "Mars retrograde and the market",
+  "claim": "Mars retrograde is often said to unsettle the market.",
+  "result": "No meaningful difference in this record.",
+  "result_code": "no_meaningful_difference",
+  "published": true,
+  "series": {
+    "name": "S&P 500 / Cowles chained proxy (sp500_proxy)",
+    "column": "sp500_proxy",
+    "frequency": "daily",
+    "start": "1927-12-30",
+    "end": "2026-10-27",
+    "years": "1927\u20132026",
+    "full_record": {
+      "start": "1871-01-01",
+      "end": "2026-10-27",
+      "years": "1871\u20132026",
+      "monthly_before": "1927-12-30"
+    }
+  },
+  "source": {
+    "artifact": "backend/data/processed/macro_regime_history.parquet",
+    "meta": "backend/data/processed/macro_regime_history.meta.json",
+    "market": "sp500_proxy: NBER M1125AUSM343NNBR (monthly) before 1927-12-30, Yahoo GSPC (daily) from 1927-12-30",
+    "astronomy": "Skyfield with the JPL DE406 ephemeris",
+    "build_date": "2026-11-13",
+    "data_version": "59192d5aa731"
+  },
+  "comparison": {
+    "in": {
+      "n": 46,
+      "mean_return": 0.014761810182382571,
+      "median_return": 0.015502594601583208,
+      "decline_starts": 0,
+      "decline_share": 0.0
+    },
+    "out": {
+      "n": 46,
+      "mean_return": 0.02024316435045264,
+      "median_return": 0.030795398697900045,
+      "decline_starts": 3,
+      "decline_share": 0.06521739130434782
+    },
+    "mean_difference": -0.005481354168070069,
+    "median_difference": -0.015292804096316837,
+    "p_value": 0.6891554222888556,
+    "permutations": 2000,
+    "seed": 20261111,
+    "meaningful": false
+  },
+  "full_history": {
+    "in": {
+      "n": 73,
+      "mean_return": 0.006534933880684831,
+      "median_return": 0.004716981132075526,
+      "decline_starts": 0,
+      "decline_share": 0.0
+    },
+    "out": {
+      "n": 1796,
+      "mean_return": 0.004511916828396992,
+      "median_return": 0.0069564063087845796,
+      "decline_starts": 16,
+      "decline_share": 0.008908685968819599
+    },
+    "mean_difference": 0.002023017052287839,
+    "median_difference": -0.0022394251767090534,
+    "p_value": 0.7216391804097951,
+    "permutations": 2000,
+    "seed": 20261111,
+    "meaningful": false,
+    "available": true
+  },
+  "chart": [
+    {
+      "year": 1928,
+      "value": 12.9933
+    },
+    {
+      "year": 1930,
+      "value": 13.7976
+    },
+    {
+      "year": 1933,
+      "value": -7.7904
+    },
+    {
+      "year": 1935,
+      "value": 13.8794
+    },
+    {
+      "year": 1937,
+      "value": -10.289
+    },
+    {
+      "year": 1939,
+      "value": -4.8908
+    },
+    {
+      "year": 1941,
+      "value": -6.4642
+    },
+    {
+      "year": 1943,
+      "value": -1.0008
+    },
+    {
+      "year": 1945,
+      "value": 1.7222
+    },
+    {
+      "year": 1948,
+      "value": -3.9843
+    },
+    {
+      "year": 1950,
+      "value": 5.9745
+    },
+    {
+      "year": 1952,
+      "value": 1.8387
+    },
+    {
+      "year": 1954,
+      "value": 5.8641
+    },
+    {
+      "year": 1956,
+      "value": -5.8871
+    },
+    {
+      "year": 1958,
+      "value": 5.9158
+    },
+    {
+      "year": 1960,
+      "value": 11.4654
+    },
+    {
+      "year": 1962,
+      "value": 5.269
+    },
+    {
+      "year": 1965,
+      "value": 1.1774
+    },
+    {
+      "year": 1967,
+      "value": 3.308
+    },
+    {
+      "year": 1969,
+      "value": -2.6445
+    },
+    {
+      "year": 1971,
+      "value": 0.1092
+    },
+    {
+      "year": 1973,
+      "value": -6.0824
+    },
+    {
+      "year": 1975,
+      "value": 10.8918
+    },
+    {
+      "year": 1977,
+      "value": -6.8781
+    },
+    {
+      "year": 1980,
+      "value": -8.0889
+    },
+    {
+      "year": 1982,
+      "value": 5.4761
+    },
+    {
+      "year": 1984,
+      "value": -1.5673
+    },
+    {
+      "year": 1986,
+      "value": -2.0312
+    },
+    {
+      "year": 1988,
+      "value": 6.7776
+    },
+    {
+      "year": 1990,
+      "value": 5.6772
+    },
+    {
+      "year": 1992,
+      "value": 3.3522
+    },
+    {
+      "year": 1995,
+      "value": 9.0796
+    },
+    {
+      "year": 1997,
+      "value": -1.6588
+    },
+    {
+      "year": 1999,
+      "value": -1.292
+    },
+    {
+      "year": 2001,
+      "value": -2.4605
+    },
+    {
+      "year": 2003,
+      "value": 0.0331
+    },
+    {
+      "year": 2005,
+      "value": 2.487
+    },
+    {
+      "year": 2007,
+      "value": -7.8044
+    },
+    {
+      "year": 2009,
+      "value": 3.913
+    },
+    {
+      "year": 2012,
+      "value": 4.1231
+    },
+    {
+      "year": 2014,
+      "value": 1.3784
+    },
+    {
+      "year": 2016,
+      "value": -0.4787
+    },
+    {
+      "year": 2018,
+      "value": 6.3781
+    },
+    {
+      "year": 2020,
+      "value": 5.4779
+    },
+    {
+      "year": 2022,
+      "value": 2.1048
+    },
+    {
+      "year": 2024,
+      "value": -1.2666
+    }
+  ],
+  "windows": [
+    {
+      "start": "1928-11-11",
+      "end": "1929-01-27",
+      "kind": "mars_retrograde",
+      "return": 0.129933,
+      "decline_start": false
+    },
+    {
+      "start": "1930-12-18",
+      "end": "1931-03-08",
+      "kind": "mars_retrograde",
+      "return": 0.137976,
+      "decline_start": false
+    },
+    {
+      "start": "1933-01-20",
+      "end": "1933-04-11",
+      "kind": "mars_retrograde",
+      "return": -0.077904,
+      "decline_start": false
+    },
+    {
+      "start": "1935-02-27",
+      "end": "1935-05-17",
+      "kind": "mars_retrograde",
+      "return": 0.138794,
+      "decline_start": false
+    },
+    {
+      "start": "1937-04-14",
+      "end": "1937-06-26",
+      "kind": "mars_retrograde",
+      "return": -0.10289,
+      "decline_start": false
+    },
+    {
+      "start": "1939-06-22",
+      "end": "1939-08-23",
+      "kind": "mars_retrograde",
+      "return": -0.048908,
+      "decline_start": false
+    },
+    {
+      "start": "1941-09-06",
+      "end": "1941-11-09",
+      "kind": "mars_retrograde",
+      "return": -0.064642,
+      "decline_start": false
+    },
+    {
+      "start": "1943-10-27",
+      "end": "1944-01-09",
+      "kind": "mars_retrograde",
+      "return": -0.010008,
+      "decline_start": false
+    },
+    {
+      "start": "1945-12-04",
+      "end": "1946-02-21",
+      "kind": "mars_retrograde",
+      "return": 0.017222,
+      "decline_start": false
+    },
+    {
+      "start": "1948-01-08",
+      "end": "1948-03-29",
+      "kind": "mars_retrograde",
+      "return": -0.039843,
+      "decline_start": false
+    },
+    {
+      "start": "1950-02-11",
+      "end": "1950-05-03",
+      "kind": "mars_retrograde",
+      "return": 0.059745,
+      "decline_start": false
+    },
+    {
+      "start": "1952-03-24",
+      "end": "1952-06-09",
+      "kind": "mars_retrograde",
+      "return": 0.018387,
+      "decline_start": false
+    },
+    {
+      "start": "1954-05-23",
+      "end": "1954-07-29",
+      "kind": "mars_retrograde",
+      "return": 0.058641,
+      "decline_start": false
+    },
+    {
+      "start": "1956-08-10",
+      "end": "1956-10-09",
+      "kind": "mars_retrograde",
+      "return": -0.058871,
+      "decline_start": false
+    },
+    {
+      "start": "1958-10-09",
+      "end": "1958-12-19",
+      "kind": "mars_retrograde",
+      "return": 0.059158,
+      "decline_start": false
+    },
+    {
+      "start": "1960-11-20",
+      "end": "1961-02-05",
+      "kind": "mars_retrograde",
+      "return": 0.114654,
+      "decline_start": false
+    },
+    {
+      "start": "1962-12-25",
+      "end": "1963-03-16",
+      "kind": "mars_retrograde",
+      "return": 0.05269,
+      "decline_start": false
+    },
+    {
+      "start": "1965-01-28",
+      "end": "1965-04-19",
+      "kind": "mars_retrograde",
+      "return": 0.011774,
+      "decline_start": false
+    },
+    {
+      "start": "1967-03-08",
+      "end": "1967-05-25",
+      "kind": "mars_retrograde",
+      "return": 0.03308,
+      "decline_start": false
+    },
+    {
+      "start": "1969-04-26",
+      "end": "1969-07-07",
+      "kind": "mars_retrograde",
+      "return": -0.026445,
+      "decline_start": false
+    },
+    {
+      "start": "1971-07-10",
+      "end": "1971-09-09",
+      "kind": "mars_retrograde",
+      "return": 0.001092,
+      "decline_start": false
+    },
+    {
+      "start": "1973-09-19",
+      "end": "1973-11-25",
+      "kind": "mars_retrograde",
+      "return": -0.060824,
+      "decline_start": false
+    },
+    {
+      "start": "1975-11-05",
+      "end": "1976-01-20",
+      "kind": "mars_retrograde",
+      "return": 0.108918,
+      "decline_start": false
+    },
+    {
+      "start": "1977-12-12",
+      "end": "1978-03-01",
+      "kind": "mars_retrograde",
+      "return": -0.068781,
+      "decline_start": false
+    },
+    {
+      "start": "1980-01-15",
+      "end": "1980-04-05",
+      "kind": "mars_retrograde",
+      "return": -0.080889,
+      "decline_start": false
+    },
+    {
+      "start": "1982-02-20",
+      "end": "1982-05-11",
+      "kind": "mars_retrograde",
+      "return": 0.054761,
+      "decline_start": false
+    },
+    {
+      "start": "1984-04-05",
+      "end": "1984-06-19",
+      "kind": "mars_retrograde",
+      "return": -0.015673,
+      "decline_start": false
+    },
+    {
+      "start": "1986-06-08",
+      "end": "1986-08-11",
+      "kind": "mars_retrograde",
+      "return": -0.020312,
+      "decline_start": false
+    },
+    {
+      "start": "1988-08-26",
+      "end": "1988-10-27",
+      "kind": "mars_retrograde",
+      "return": 0.067776,
+      "decline_start": false
+    },
+    {
+      "start": "1990-10-20",
+      "end": "1991-01-01",
+      "kind": "mars_retrograde",
+      "return": 0.056772,
+      "decline_start": false
+    },
+    {
+      "start": "1992-11-28",
+      "end": "1993-02-14",
+      "kind": "mars_retrograde",
+      "return": 0.033522,
+      "decline_start": false
+    },
+    {
+      "start": "1995-01-02",
+      "end": "1995-03-24",
+      "kind": "mars_retrograde",
+      "return": 0.090796,
+      "decline_start": false
+    },
+    {
+      "start": "1997-02-05",
+      "end": "1997-04-27",
+      "kind": "mars_retrograde",
+      "return": -0.016588,
+      "decline_start": false
+    },
+    {
+      "start": "1999-03-18",
+      "end": "1999-06-03",
+      "kind": "mars_retrograde",
+      "return": -0.01292,
+      "decline_start": false
+    },
+    {
+      "start": "2001-05-11",
+      "end": "2001-07-19",
+      "kind": "mars_retrograde",
+      "return": -0.024605,
+      "decline_start": false
+    },
+    {
+      "start": "2003-07-28",
+      "end": "2003-09-26",
+      "kind": "mars_retrograde",
+      "return": 0.000331,
+      "decline_start": false
+    },
+    {
+      "start": "2005-10-01",
+      "end": "2005-12-09",
+      "kind": "mars_retrograde",
+      "return": 0.02487,
+      "decline_start": false
+    },
+    {
+      "start": "2007-11-14",
+      "end": "2008-01-30",
+      "kind": "mars_retrograde",
+      "return": -0.078044,
+      "decline_start": false
+    },
+    {
+      "start": "2009-12-20",
+      "end": "2010-03-10",
+      "kind": "mars_retrograde",
+      "return": 0.03913,
+      "decline_start": false
+    },
+    {
+      "start": "2012-01-23",
+      "end": "2012-04-13",
+      "kind": "mars_retrograde",
+      "return": 0.041231,
+      "decline_start": false
+    },
+    {
+      "start": "2014-03-01",
+      "end": "2014-05-19",
+      "kind": "mars_retrograde",
+      "return": 0.013784,
+      "decline_start": false
+    },
+    {
+      "start": "2016-04-17",
+      "end": "2016-06-29",
+      "kind": "mars_retrograde",
+      "return": -0.004787,
+      "decline_start": false
+    },
+    {
+      "start": "2018-06-26",
+      "end": "2018-08-27",
+      "kind": "mars_retrograde",
+      "return": 0.063781,
+      "decline_start": false
+    },
+    {
+      "start": "2020-09-09",
+      "end": "2020-11-13",
+      "kind": "mars_retrograde",
+      "return": 0.054779,
+      "decline_start": false
+    },
+    {
+      "start": "2022-10-30",
+      "end": "2023-01-12",
+      "kind": "mars_retrograde",
+      "return": 0.021048,
+      "decline_start": false
+    },
+    {
+      "start": "2024-12-06",
+      "end": "2025-02-23",
+      "kind": "mars_retrograde",
+      "return": -0.012666,
+      "decline_start": false
+    }
+  ],
+  "next_event": {
+    "date": "2027-01-10T13:29:33.000643Z",
+    "kind": "retrograde"
+  },
+  "method": [
+    "Every Mars retrograde station-to-station window in the record, with no exclusions by year or outcome.",
+    "Returns are the S&P proxy close at the first session in a window to its close at the last session in that window.",
+    "Each event window is paired with the nearest non-overlapping window of the same calendar length, searching backward first, then forward. Control windows never overlap an event or another control.",
+    "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",
+    "The uncertainty check is a two-sided permutation test of the mean-return difference, 2000 shuffles with seed 20261111.",
+    "A difference is called meaningful only when p < 0.05 and the mean-return difference is at least 0.5 percentage points in absolute size.",
+    "A claim is published only when it has at least 30 non-overlapping daily windows; otherwise the page shows the count and no result.",
+    "The p-value and the sample sizes are reported exactly as computed; the same seed reproduces the same result."
+  ],
+  "limitations": [
+    "This is a descriptive comparison of a historical record, not evidence of a cause and not a forecast.",
+    "The daily S&P record starts 30 Dec 1927 (Yahoo GSPC). Before that the repo's proxy is monthly (NBER, 1871-1926), so short-window returns there would be mostly forward-filled; the headline test uses the daily record and the full-history test uses monthly returns.",
+    "The early S&P series is a chained Cowles/S&P proxy, and daily sessions before 1957 do not match the modern S&P 500 exactly.",
+    "Control windows follow a fixed rule, but seasonality, volatility clustering and overlapping macro events remain in the record.",
+    "Permutation p-values measure how unusual the mean difference is under relabelling; they do not remove those dependencies.",
+    "Decline starts are only the falls in the current /declines list, not every possible market fall."
+  ]
+}

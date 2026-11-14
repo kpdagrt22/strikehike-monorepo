@@ -1,0 +1,3261 @@
+{
+  "id": "solstices-equinoxes",
+  "title": "Solstices, equinoxes and the market",
+  "claim": "Solstices and equinoxes are often said to mark turning points in the market.",
+  "result": "No meaningful difference in this record.",
+  "result_code": "no_meaningful_difference",
+  "published": true,
+  "series": {
+    "name": "S&P 500 / Cowles chained proxy (sp500_proxy)",
+    "column": "sp500_proxy",
+    "frequency": "daily",
+    "start": "1927-12-30",
+    "end": "2026-10-27",
+    "years": "1927\u20132026",
+    "full_record": {
+      "start": "1871-01-01",
+      "end": "2026-10-27",
+      "years": "1871\u20132026",
+      "monthly_before": "1927-12-30"
+    }
+  },
+  "source": {
+    "artifact": "backend/data/processed/macro_regime_history.parquet",
+    "meta": "backend/data/processed/macro_regime_history.meta.json",
+    "market": "sp500_proxy: NBER M1125AUSM343NNBR (monthly) before 1927-12-30, Yahoo GSPC (daily) from 1927-12-30",
+    "astronomy": "Skyfield with the JPL DE406 ephemeris",
+    "build_date": "2026-11-13",
+    "data_version": "59192d5aa731"
+  },
+  "comparison": {
+    "in": {
+      "n": 395,
+      "mean_return": -0.001040081886404276,
+      "median_return": 0.00028911698804212627,
+      "decline_starts": 0,
+      "decline_share": 0.0
+    },
+    "out": {
+      "n": 395,
+      "mean_return": 0.001246233514037016,
+      "median_return": 0.0028618672614340035,
+      "decline_starts": 2,
+      "decline_share": 0.005063291139240506
+    },
+    "mean_difference": -0.002286315400441292,
+    "median_difference": -0.0025727502733918772,
+    "p_value": 0.18290854572713644,
+    "permutations": 2000,
+    "seed": 20261111,
+    "meaningful": false
+  },
+  "full_history": {
+    "in": {
+      "n": 623,
+      "mean_return": 0.0008238288777318892,
+      "median_return": 0.004032254188043538,
+      "decline_starts": 5,
+      "decline_share": 0.008025682182985553
+    },
+    "out": {
+      "n": 1246,
+      "mean_return": 0.006474484274690229,
+      "median_return": 0.007557332538929096,
+      "decline_starts": 11,
+      "decline_share": 0.00882825040128411
+    },
+    "mean_difference": -0.0056506553969583396,
+    "median_difference": -0.0035250783508855577,
+    "p_value": 0.026986506746626688,
+    "permutations": 2000,
+    "seed": 20261111,
+    "meaningful": true,
+    "available": true
+  },
+  "chart": [
+    {
+      "year": 1928,
+      "value": 1.7235
+    },
+    {
+      "year": 1929,
+      "value": -1.0398
+    },
+    {
+      "year": 1930,
+      "value": -2.9904
+    },
+    {
+      "year": 1931,
+      "value": 2.2264
+    },
+    {
+      "year": 1932,
+      "value": -2.2738
+    },
+    {
+      "year": 1933,
+      "value": -0.6895
+    },
+    {
+      "year": 1934,
+      "value": -0.6649
+    },
+    {
+      "year": 1935,
+      "value": 2.7782
+    },
+    {
+      "year": 1936,
+      "value": 0.4743
+    },
+    {
+      "year": 1937,
+      "value": -1.0557
+    },
+    {
+      "year": 1938,
+      "value": 1.5173
+    },
+    {
+      "year": 1939,
+      "value": 0.4195
+    },
+    {
+      "year": 1940,
+      "value": 0.6989
+    },
+    {
+      "year": 1941,
+      "value": -1.2032
+    },
+    {
+      "year": 1942,
+      "value": 0.3426
+    },
+    {
+      "year": 1943,
+      "value": 0.5253
+    },
+    {
+      "year": 1944,
+      "value": -0.2649
+    },
+    {
+      "year": 1945,
+      "value": -0.6532
+    },
+    {
+      "year": 1946,
+      "value": 0.6359
+    },
+    {
+      "year": 1947,
+      "value": -0.3263
+    },
+    {
+      "year": 1948,
+      "value": 1.5822
+    },
+    {
+      "year": 1949,
+      "value": 1.0702
+    },
+    {
+      "year": 1950,
+      "value": 0.4283
+    },
+    {
+      "year": 1951,
+      "value": -0.937
+    },
+    {
+      "year": 1952,
+      "value": 0.5201
+    },
+    {
+      "year": 1953,
+      "value": 0.159
+    },
+    {
+      "year": 1954,
+      "value": 0.2207
+    },
+    {
+      "year": 1955,
+      "value": -0.075
+    },
+    {
+      "year": 1956,
+      "value": 0.2834
+    },
+    {
+      "year": 1957,
+      "value": -1.4668
+    },
+    {
+      "year": 1958,
+      "value": 0.1097
+    },
+    {
+      "year": 1959,
+      "value": 0.253
+    },
+    {
+      "year": 1960,
+      "value": 0.1244
+    },
+    {
+      "year": 1961,
+      "value": -0.364
+    },
+    {
+      "year": 1962,
+      "value": -2.5458
+    },
+    {
+      "year": 1963,
+      "value": -0.2926
+    },
+    {
+      "year": 1964,
+      "value": 0.1377
+    },
+    {
+      "year": 1965,
+      "value": -0.5341
+    },
+    {
+      "year": 1966,
+      "value": -0.0768
+    },
+    {
+      "year": 1967,
+      "value": 0.3677
+    },
+    {
+      "year": 1968,
+      "value": -0.2244
+    },
+    {
+      "year": 1969,
+      "value": -0.0993
+    },
+    {
+      "year": 1970,
+      "value": -0.5327
+    },
+    {
+      "year": 1971,
+      "value": -0.8994
+    },
+    {
+      "year": 1972,
+      "value": -0.4041
+    },
+    {
+      "year": 1973,
+      "value": -1.0234
+    },
+    {
+      "year": 1974,
+      "value": -2.287
+    },
+    {
+      "year": 1975,
+      "value": -0.1071
+    },
+    {
+      "year": 1976,
+      "value": 0.613
+    },
+    {
+      "year": 1977,
+      "value": 0.057
+    },
+    {
+      "year": 1978,
+      "value": 0.1321
+    },
+    {
+      "year": 1979,
+      "value": 0.2426
+    },
+    {
+      "year": 1980,
+      "value": 0.2102
+    },
+    {
+      "year": 1981,
+      "value": -0.5207
+    },
+    {
+      "year": 1982,
+      "value": 2.1895
+    },
+    {
+      "year": 1983,
+      "value": 1.0292
+    },
+    {
+      "year": 1984,
+      "value": -0.3269
+    },
+    {
+      "year": 1985,
+      "value": 0.1745
+    },
+    {
+      "year": 1986,
+      "value": -0.2297
+    },
+    {
+      "year": 1987,
+      "value": 1.561
+    },
+    {
+      "year": 1988,
+      "value": 0.3038
+    },
+    {
+      "year": 1989,
+      "value": 0.3174
+    },
+    {
+      "year": 1990,
+      "value": -0.9825
+    },
+    {
+      "year": 1991,
+      "value": 0.1902
+    },
+    {
+      "year": 1992,
+      "value": -0.393
+    },
+    {
+      "year": 1993,
+      "value": 0.3861
+    },
+    {
+      "year": 1994,
+      "value": -1.011
+    },
+    {
+      "year": 1995,
+      "value": 0.505
+    },
+    {
+      "year": 1996,
+      "value": 1.3842
+    },
+    {
+      "year": 1997,
+      "value": -1.0829
+    },
+    {
+      "year": 1998,
+      "value": 2.3575
+    },
+    {
+      "year": 1999,
+      "value": -1.847
+    },
+    {
+      "year": 2000,
+      "value": 0.0064
+    },
+    {
+      "year": 2001,
+      "value": 0.0612
+    },
+    {
+      "year": 2002,
+      "value": -0.9299
+    },
+    {
+      "year": 2003,
+      "value": -1.5516
+    },
+    {
+      "year": 2004,
+      "value": -0.614
+    },
+    {
+      "year": 2005,
+      "value": -1.1859
+    },
+    {
+      "year": 2006,
+      "value": -0.296
+    },
+    {
+      "year": 2007,
+      "value": 1.2783
+    },
+    {
+      "year": 2008,
+      "value": -0.9713
+    },
+    {
+      "year": 2009,
+      "value": 0.9496
+    },
+    {
+      "year": 2010,
+      "value": -0.4208
+    },
+    {
+      "year": 2011,
+      "value": 0.8376
+    },
+    {
+      "year": 2012,
+      "value": -0.9521
+    },
+    {
+      "year": 2013,
+      "value": -1.3686
+    },
+    {
+      "year": 2014,
+      "value": -0.0781
+    },
+    {
+      "year": 2015,
+      "value": 0.5644
+    },
+    {
+      "year": 2016,
+      "value": 0.8228
+    },
+    {
+      "year": 2017,
+      "value": -0.4495
+    },
+    {
+      "year": 2018,
+      "value": -3.7842
+    },
+    {
+      "year": 2019,
+      "value": 0.0634
+    },
+    {
+      "year": 2020,
+      "value": -2.9423
+    },
+    {
+      "year": 2021,
+      "value": 0.8959
+    },
+    {
+      "year": 2022,
+      "value": 0.5128
+    },
+    {
+      "year": 2023,
+      "value": -0.9453
+    },
+    {
+      "year": 2024,
+      "value": 1.2852
+    },
+    {
+      "year": 2025,
+      "value": 0.7887
+    },
+    {
+      "year": 2026,
+      "value": -0.8983
+    }
+  ],
+  "windows": [
+    {
+      "start": "1928-03-17",
+      "end": "1928-03-23",
+      "kind": "equinox_march",
+      "return": 0.028478,
+      "decline_start": false
+    },
+    {
+      "start": "1928-06-18",
+      "end": "1928-06-24",
+      "kind": "solstice_june",
+      "return": 0.007609,
+      "decline_start": false
+    },
+    {
+      "start": "1928-09-20",
+      "end": "1928-09-26",
+      "kind": "equinox_september",
+      "return": 0.008483,
+      "decline_start": false
+    },
+    {
+      "start": "1928-12-19",
+      "end": "1928-12-25",
+      "kind": "solstice_december",
+      "return": 0.024369,
+      "decline_start": false
+    },
+    {
+      "start": "1929-03-18",
+      "end": "1929-03-24",
+      "kind": "equinox_march",
+      "return": -0.018817,
+      "decline_start": false
+    },
+    {
+      "start": "1929-06-18",
+      "end": "1929-06-24",
+      "kind": "solstice_june",
+      "return": 0.00757,
+      "decline_start": false
+    },
+    {
+      "start": "1929-09-20",
+      "end": "1929-09-26",
+      "kind": "equinox_september",
+      "return": -0.008283,
+      "decline_start": false
+    },
+    {
+      "start": "1929-12-19",
+      "end": "1929-12-25",
+      "kind": "solstice_december",
+      "return": -0.022062,
+      "decline_start": false
+    },
+    {
+      "start": "1930-03-18",
+      "end": "1930-03-24",
+      "kind": "equinox_march",
+      "return": 0.0159,
+      "decline_start": false
+    },
+    {
+      "start": "1930-06-19",
+      "end": "1930-06-25",
+      "kind": "solstice_june",
+      "return": -0.060125,
+      "decline_start": false
+    },
+    {
+      "start": "1930-09-20",
+      "end": "1930-09-26",
+      "kind": "equinox_september",
+      "return": -0.060445,
+      "decline_start": false
+    },
+    {
+      "start": "1930-12-19",
+      "end": "1930-12-25",
+      "kind": "solstice_december",
+      "return": -0.014945,
+      "decline_start": false
+    },
+    {
+      "start": "1931-03-18",
+      "end": "1931-03-24",
+      "kind": "equinox_march",
+      "return": 0.00393,
+      "decline_start": false
+    },
+    {
+      "start": "1931-06-19",
+      "end": "1931-06-25",
+      "kind": "solstice_june",
+      "return": 0.133888,
+      "decline_start": false
+    },
+    {
+      "start": "1931-09-21",
+      "end": "1931-09-27",
+      "kind": "equinox_september",
+      "return": -0.000915,
+      "decline_start": false
+    },
+    {
+      "start": "1931-12-19",
+      "end": "1931-12-25",
+      "kind": "solstice_december",
+      "return": -0.047847,
+      "decline_start": false
+    },
+    {
+      "start": "1932-03-17",
+      "end": "1932-03-23",
+      "kind": "equinox_march",
+      "return": -0.041063,
+      "decline_start": false
+    },
+    {
+      "start": "1932-06-18",
+      "end": "1932-06-24",
+      "kind": "solstice_june",
+      "return": -0.047619,
+      "decline_start": false
+    },
+    {
+      "start": "1932-09-20",
+      "end": "1932-09-26",
+      "kind": "equinox_september",
+      "return": 0.055118,
+      "decline_start": false
+    },
+    {
+      "start": "1932-12-19",
+      "end": "1932-12-25",
+      "kind": "solstice_december",
+      "return": -0.057389,
+      "decline_start": false
+    },
+    {
+      "start": "1933-03-18",
+      "end": "1933-03-24",
+      "kind": "equinox_march",
+      "return": -0.057315,
+      "decline_start": false
+    },
+    {
+      "start": "1933-06-18",
+      "end": "1933-06-24",
+      "kind": "solstice_june",
+      "return": 0.076453,
+      "decline_start": false
+    },
+    {
+      "start": "1933-09-20",
+      "end": "1933-09-26",
+      "kind": "equinox_september",
+      "return": -0.057998,
+      "decline_start": false
+    },
+    {
+      "start": "1933-12-19",
+      "end": "1933-12-25",
+      "kind": "solstice_december",
+      "return": 0.011282,
+      "decline_start": false
+    },
+    {
+      "start": "1934-03-18",
+      "end": "1934-03-24",
+      "kind": "equinox_march",
+      "return": -0.026802,
+      "decline_start": false
+    },
+    {
+      "start": "1934-06-19",
+      "end": "1934-06-25",
+      "kind": "solstice_june",
+      "return": -0.045142,
+      "decline_start": false
+    },
+    {
+      "start": "1934-09-20",
+      "end": "1934-09-26",
+      "kind": "equinox_september",
+      "return": 0.036488,
+      "decline_start": false
+    },
+    {
+      "start": "1934-12-19",
+      "end": "1934-12-25",
+      "kind": "solstice_december",
+      "return": 0.008859,
+      "decline_start": false
+    },
+    {
+      "start": "1935-03-18",
+      "end": "1935-03-24",
+      "kind": "equinox_march",
+      "return": 0.050369,
+      "decline_start": false
+    },
+    {
+      "start": "1935-06-19",
+      "end": "1935-06-25",
+      "kind": "solstice_june",
+      "return": 0.008798,
+      "decline_start": false
+    },
+    {
+      "start": "1935-09-20",
+      "end": "1935-09-26",
+      "kind": "equinox_september",
+      "return": 0.029307,
+      "decline_start": false
+    },
+    {
+      "start": "1935-12-19",
+      "end": "1935-12-25",
+      "kind": "solstice_december",
+      "return": 0.022656,
+      "decline_start": false
+    },
+    {
+      "start": "1936-03-17",
+      "end": "1936-03-23",
+      "kind": "equinox_march",
+      "return": 0.008713,
+      "decline_start": false
+    },
+    {
+      "start": "1936-06-18",
+      "end": "1936-06-24",
+      "kind": "solstice_june",
+      "return": 0.016086,
+      "decline_start": false
+    },
+    {
+      "start": "1936-09-20",
+      "end": "1936-09-26",
+      "kind": "equinox_september",
+      "return": -0.009357,
+      "decline_start": false
+    },
+    {
+      "start": "1936-12-19",
+      "end": "1936-12-25",
+      "kind": "solstice_december",
+      "return": 0.003529,
+      "decline_start": false
+    },
+    {
+      "start": "1937-03-18",
+      "end": "1937-03-24",
+      "kind": "equinox_march",
+      "return": -0.001692,
+      "decline_start": false
+    },
+    {
+      "start": "1937-06-18",
+      "end": "1937-06-24",
+      "kind": "solstice_june",
+      "return": 0.007092,
+      "decline_start": false
+    },
+    {
+      "start": "1937-09-20",
+      "end": "1937-09-26",
+      "kind": "equinox_september",
+      "return": -0.053085,
+      "decline_start": false
+    },
+    {
+      "start": "1937-12-19",
+      "end": "1937-12-25",
+      "kind": "solstice_december",
+      "return": 0.005455,
+      "decline_start": false
+    },
+    {
+      "start": "1938-03-18",
+      "end": "1938-03-24",
+      "kind": "equinox_march",
+      "return": -0.029441,
+      "decline_start": false
+    },
+    {
+      "start": "1938-06-19",
+      "end": "1938-06-25",
+      "kind": "solstice_june",
+      "return": 0.153051,
+      "decline_start": false
+    },
+    {
+      "start": "1938-09-20",
+      "end": "1938-09-26",
+      "kind": "equinox_september",
+      "return": -0.073171,
+      "decline_start": false
+    },
+    {
+      "start": "1938-12-19",
+      "end": "1938-12-25",
+      "kind": "solstice_december",
+      "return": 0.010252,
+      "decline_start": false
+    },
+    {
+      "start": "1939-03-18",
+      "end": "1939-03-24",
+      "kind": "equinox_march",
+      "return": -0.011466,
+      "decline_start": false
+    },
+    {
+      "start": "1939-06-19",
+      "end": "1939-06-25",
+      "kind": "solstice_june",
+      "return": 0.007005,
+      "decline_start": false
+    },
+    {
+      "start": "1939-09-20",
+      "end": "1939-09-26",
+      "kind": "equinox_september",
+      "return": 0.013138,
+      "decline_start": false
+    },
+    {
+      "start": "1939-12-19",
+      "end": "1939-12-25",
+      "kind": "solstice_december",
+      "return": 0.008104,
+      "decline_start": false
+    },
+    {
+      "start": "1940-03-17",
+      "end": "1940-03-23",
+      "kind": "equinox_march",
+      "return": 0.0058,
+      "decline_start": false
+    },
+    {
+      "start": "1940-06-18",
+      "end": "1940-06-24",
+      "kind": "solstice_june",
+      "return": 0.008991,
+      "decline_start": false
+    },
+    {
+      "start": "1940-09-20",
+      "end": "1940-09-26",
+      "kind": "equinox_september",
+      "return": 0.016997,
+      "decline_start": false
+    },
+    {
+      "start": "1940-12-18",
+      "end": "1940-12-24",
+      "kind": "solstice_december",
+      "return": -0.003831,
+      "decline_start": false
+    },
+    {
+      "start": "1941-03-18",
+      "end": "1941-03-24",
+      "kind": "equinox_march",
+      "return": -0.014896,
+      "decline_start": false
+    },
+    {
+      "start": "1941-06-18",
+      "end": "1941-06-24",
+      "kind": "solstice_june",
+      "return": -0.00202,
+      "decline_start": false
+    },
+    {
+      "start": "1941-09-20",
+      "end": "1941-09-26",
+      "kind": "equinox_september",
+      "return": -0.019436,
+      "decline_start": false
+    },
+    {
+      "start": "1941-12-19",
+      "end": "1941-12-25",
+      "kind": "solstice_december",
+      "return": -0.011778,
+      "decline_start": false
+    },
+    {
+      "start": "1942-03-18",
+      "end": "1942-03-24",
+      "kind": "equinox_march",
+      "return": 0.001218,
+      "decline_start": false
+    },
+    {
+      "start": "1942-06-19",
+      "end": "1942-06-25",
+      "kind": "solstice_june",
+      "return": -0.021428,
+      "decline_start": false
+    },
+    {
+      "start": "1942-09-20",
+      "end": "1942-09-26",
+      "kind": "equinox_september",
+      "return": 0.027714,
+      "decline_start": false
+    },
+    {
+      "start": "1942-12-19",
+      "end": "1942-12-25",
+      "kind": "solstice_december",
+      "return": 0.006198,
+      "decline_start": false
+    },
+    {
+      "start": "1943-03-18",
+      "end": "1943-03-24",
+      "kind": "equinox_march",
+      "return": 0.006416,
+      "decline_start": false
+    },
+    {
+      "start": "1943-06-19",
+      "end": "1943-06-25",
+      "kind": "solstice_june",
+      "return": 0.020903,
+      "decline_start": false
+    },
+    {
+      "start": "1943-09-20",
+      "end": "1943-09-26",
+      "kind": "equinox_september",
+      "return": -0.01063,
+      "decline_start": false
+    },
+    {
+      "start": "1943-12-19",
+      "end": "1943-12-25",
+      "kind": "solstice_december",
+      "return": 0.004325,
+      "decline_start": false
+    },
+    {
+      "start": "1944-03-17",
+      "end": "1944-03-23",
+      "kind": "equinox_march",
+      "return": -0.017059,
+      "decline_start": false
+    },
+    {
+      "start": "1944-06-18",
+      "end": "1944-06-24",
+      "kind": "solstice_june",
+      "return": 0.00624,
+      "decline_start": false
+    },
+    {
+      "start": "1944-09-20",
+      "end": "1944-09-26",
+      "kind": "equinox_september",
+      "return": 0.005529,
+      "decline_start": false
+    },
+    {
+      "start": "1944-12-18",
+      "end": "1944-12-24",
+      "kind": "solstice_december",
+      "return": -0.005307,
+      "decline_start": false
+    },
+    {
+      "start": "1945-03-17",
+      "end": "1945-03-23",
+      "kind": "equinox_march",
+      "return": -0.02484,
+      "decline_start": false
+    },
+    {
+      "start": "1945-06-18",
+      "end": "1945-06-24",
+      "kind": "solstice_june",
+      "return": 0.012591,
+      "decline_start": false
+    },
+    {
+      "start": "1945-09-20",
+      "end": "1945-09-26",
+      "kind": "equinox_september",
+      "return": -0.006862,
+      "decline_start": false
+    },
+    {
+      "start": "1945-12-19",
+      "end": "1945-12-25",
+      "kind": "solstice_december",
+      "return": -0.007018,
+      "decline_start": false
+    },
+    {
+      "start": "1946-03-18",
+      "end": "1946-03-24",
+      "kind": "equinox_march",
+      "return": 0.007399,
+      "decline_start": false
+    },
+    {
+      "start": "1946-06-19",
+      "end": "1946-06-25",
+      "kind": "solstice_june",
+      "return": -0.016269,
+      "decline_start": false
+    },
+    {
+      "start": "1946-09-20",
+      "end": "1946-09-26",
+      "kind": "equinox_september",
+      "return": 0.039483,
+      "decline_start": false
+    },
+    {
+      "start": "1946-12-19",
+      "end": "1946-12-25",
+      "kind": "solstice_december",
+      "return": -0.005178,
+      "decline_start": false
+    },
+    {
+      "start": "1947-03-18",
+      "end": "1947-03-24",
+      "kind": "equinox_march",
+      "return": 0.006662,
+      "decline_start": false
+    },
+    {
+      "start": "1947-06-19",
+      "end": "1947-06-25",
+      "kind": "solstice_june",
+      "return": -0.005284,
+      "decline_start": false
+    },
+    {
+      "start": "1947-09-20",
+      "end": "1947-09-26",
+      "kind": "equinox_september",
+      "return": -0.023026,
+      "decline_start": false
+    },
+    {
+      "start": "1947-12-19",
+      "end": "1947-12-25",
+      "kind": "solstice_december",
+      "return": 0.008598,
+      "decline_start": false
+    },
+    {
+      "start": "1948-03-17",
+      "end": "1948-03-23",
+      "kind": "equinox_march",
+      "return": 0.053763,
+      "decline_start": false
+    },
+    {
+      "start": "1948-06-18",
+      "end": "1948-06-24",
+      "kind": "solstice_june",
+      "return": -0.004127,
+      "decline_start": false
+    },
+    {
+      "start": "1948-09-20",
+      "end": "1948-09-26",
+      "kind": "equinox_september",
+      "return": 0.010363,
+      "decline_start": false
+    },
+    {
+      "start": "1948-12-18",
+      "end": "1948-12-24",
+      "kind": "solstice_december",
+      "return": 0.003289,
+      "decline_start": false
+    },
+    {
+      "start": "1949-03-17",
+      "end": "1949-03-23",
+      "kind": "equinox_march",
+      "return": -0.001336,
+      "decline_start": false
+    },
+    {
+      "start": "1949-06-18",
+      "end": "1949-06-24",
+      "kind": "solstice_june",
+      "return": 0.018746,
+      "decline_start": false
+    },
+    {
+      "start": "1949-09-20",
+      "end": "1949-09-26",
+      "kind": "equinox_september",
+      "return": 0.022383,
+      "decline_start": false
+    },
+    {
+      "start": "1949-12-19",
+      "end": "1949-12-25",
+      "kind": "solstice_december",
+      "return": 0.003014,
+      "decline_start": false
+    },
+    {
+      "start": "1950-03-18",
+      "end": "1950-03-24",
+      "kind": "equinox_march",
+      "return": 0.006304,
+      "decline_start": false
+    },
+    {
+      "start": "1950-06-18",
+      "end": "1950-06-24",
+      "kind": "solstice_june",
+      "return": 0.008962,
+      "decline_start": false
+    },
+    {
+      "start": "1950-09-20",
+      "end": "1950-09-26",
+      "kind": "equinox_september",
+      "return": -0.003644,
+      "decline_start": false
+    },
+    {
+      "start": "1950-12-19",
+      "end": "1950-12-25",
+      "kind": "solstice_december",
+      "return": 0.005511,
+      "decline_start": false
+    },
+    {
+      "start": "1951-03-18",
+      "end": "1951-03-24",
+      "kind": "equinox_march",
+      "return": 0.004159,
+      "decline_start": false
+    },
+    {
+      "start": "1951-06-19",
+      "end": "1951-06-25",
+      "kind": "solstice_june",
+      "return": -0.033152,
+      "decline_start": false
+    },
+    {
+      "start": "1951-09-20",
+      "end": "1951-09-26",
+      "kind": "equinox_september",
+      "return": -0.007213,
+      "decline_start": false
+    },
+    {
+      "start": "1951-12-19",
+      "end": "1951-12-25",
+      "kind": "solstice_december",
+      "return": -0.001273,
+      "decline_start": false
+    },
+    {
+      "start": "1952-03-17",
+      "end": "1952-03-23",
+      "kind": "equinox_march",
+      "return": 0.000418,
+      "decline_start": false
+    },
+    {
+      "start": "1952-06-18",
+      "end": "1952-06-24",
+      "kind": "solstice_june",
+      "return": 0.006959,
+      "decline_start": false
+    },
+    {
+      "start": "1952-09-20",
+      "end": "1952-09-26",
+      "kind": "equinox_september",
+      "return": 0.006512,
+      "decline_start": false
+    },
+    {
+      "start": "1952-12-18",
+      "end": "1952-12-24",
+      "kind": "solstice_december",
+      "return": 0.006915,
+      "decline_start": false
+    },
+    {
+      "start": "1953-03-17",
+      "end": "1953-03-23",
+      "kind": "equinox_march",
+      "return": -0.011774,
+      "decline_start": false
+    },
+    {
+      "start": "1953-06-18",
+      "end": "1953-06-24",
+      "kind": "solstice_june",
+      "return": 0.010487,
+      "decline_start": false
+    },
+    {
+      "start": "1953-09-20",
+      "end": "1953-09-26",
+      "kind": "equinox_september",
+      "return": 0.01525,
+      "decline_start": false
+    },
+    {
+      "start": "1953-12-19",
+      "end": "1953-12-25",
+      "kind": "solstice_december",
+      "return": -0.007603,
+      "decline_start": false
+    },
+    {
+      "start": "1954-03-18",
+      "end": "1954-03-24",
+      "kind": "equinox_march",
+      "return": -0.009727,
+      "decline_start": false
+    },
+    {
+      "start": "1954-06-18",
+      "end": "1954-06-24",
+      "kind": "solstice_june",
+      "return": 0.007576,
+      "decline_start": false
+    },
+    {
+      "start": "1954-09-20",
+      "end": "1954-09-26",
+      "kind": "equinox_september",
+      "return": 0.026291,
+      "decline_start": false
+    },
+    {
+      "start": "1954-12-19",
+      "end": "1954-12-25",
+      "kind": "solstice_december",
+      "return": -0.015312,
+      "decline_start": false
+    },
+    {
+      "start": "1955-03-18",
+      "end": "1955-03-24",
+      "kind": "equinox_march",
+      "return": 0.02073,
+      "decline_start": false
+    },
+    {
+      "start": "1955-06-19",
+      "end": "1955-06-25",
+      "kind": "solstice_june",
+      "return": 0.021446,
+      "decline_start": false
+    },
+    {
+      "start": "1955-09-20",
+      "end": "1955-09-26",
+      "kind": "equinox_september",
+      "return": -0.055839,
+      "decline_start": false
+    },
+    {
+      "start": "1955-12-19",
+      "end": "1955-12-25",
+      "kind": "solstice_december",
+      "return": 0.010662,
+      "decline_start": false
+    },
+    {
+      "start": "1956-03-17",
+      "end": "1956-03-23",
+      "kind": "equinox_march",
+      "return": 0.014333,
+      "decline_start": false
+    },
+    {
+      "start": "1956-06-18",
+      "end": "1956-06-24",
+      "kind": "solstice_june",
+      "return": 0.009097,
+      "decline_start": false
+    },
+    {
+      "start": "1956-09-20",
+      "end": "1956-09-26",
+      "kind": "equinox_september",
+      "return": -0.00844,
+      "decline_start": false
+    },
+    {
+      "start": "1956-12-18",
+      "end": "1956-12-24",
+      "kind": "solstice_december",
+      "return": -0.003653,
+      "decline_start": false
+    },
+    {
+      "start": "1957-03-17",
+      "end": "1957-03-23",
+      "kind": "equinox_march",
+      "return": 0.000227,
+      "decline_start": false
+    },
+    {
+      "start": "1957-06-18",
+      "end": "1957-06-24",
+      "kind": "solstice_june",
+      "return": -0.026228,
+      "decline_start": false
+    },
+    {
+      "start": "1957-09-20",
+      "end": "1957-09-26",
+      "kind": "equinox_september",
+      "return": -0.025635,
+      "decline_start": false
+    },
+    {
+      "start": "1957-12-19",
+      "end": "1957-12-25",
+      "kind": "solstice_december",
+      "return": -0.007035,
+      "decline_start": false
+    },
+    {
+      "start": "1958-03-18",
+      "end": "1958-03-24",
+      "kind": "equinox_march",
+      "return": 0.016472,
+      "decline_start": false
+    },
+    {
+      "start": "1958-06-18",
+      "end": "1958-06-24",
+      "kind": "solstice_june",
+      "return": -0.018086,
+      "decline_start": false
+    },
+    {
+      "start": "1958-09-20",
+      "end": "1958-09-26",
+      "kind": "equinox_september",
+      "return": 0.005263,
+      "decline_start": false
+    },
+    {
+      "start": "1958-12-19",
+      "end": "1958-12-25",
+      "kind": "solstice_december",
+      "return": 0.00074,
+      "decline_start": false
+    },
+    {
+      "start": "1959-03-18",
+      "end": "1959-03-24",
+      "kind": "equinox_march",
+      "return": -0.007625,
+      "decline_start": false
+    },
+    {
+      "start": "1959-06-19",
+      "end": "1959-06-25",
+      "kind": "solstice_june",
+      "return": 0.010502,
+      "decline_start": false
+    },
+    {
+      "start": "1959-09-20",
+      "end": "1959-09-26",
+      "kind": "equinox_september",
+      "return": 0.00961,
+      "decline_start": false
+    },
+    {
+      "start": "1959-12-19",
+      "end": "1959-12-25",
+      "kind": "solstice_december",
+      "return": -0.002367,
+      "decline_start": false
+    },
+    {
+      "start": "1960-03-17",
+      "end": "1960-03-23",
+      "kind": "equinox_march",
+      "return": 0.014192,
+      "decline_start": false
+    },
+    {
+      "start": "1960-06-18",
+      "end": "1960-06-24",
+      "kind": "solstice_june",
+      "return": 0.004178,
+      "decline_start": false
+    },
+    {
+      "start": "1960-09-20",
+      "end": "1960-09-26",
+      "kind": "equinox_september",
+      "return": -0.017589,
+      "decline_start": false
+    },
+    {
+      "start": "1960-12-18",
+      "end": "1960-12-24",
+      "kind": "solstice_december",
+      "return": 0.004196,
+      "decline_start": false
+    },
+    {
+      "start": "1961-03-17",
+      "end": "1961-03-23",
+      "kind": "equinox_march",
+      "return": 0.008281,
+      "decline_start": false
+    },
+    {
+      "start": "1961-06-18",
+      "end": "1961-06-24",
+      "kind": "solstice_june",
+      "return": -0.000307,
+      "decline_start": false
+    },
+    {
+      "start": "1961-09-20",
+      "end": "1961-09-26",
+      "kind": "equinox_september",
+      "return": -0.017622,
+      "decline_start": false
+    },
+    {
+      "start": "1961-12-19",
+      "end": "1961-12-25",
+      "kind": "solstice_december",
+      "return": -0.004912,
+      "decline_start": false
+    },
+    {
+      "start": "1962-03-18",
+      "end": "1962-03-24",
+      "kind": "equinox_march",
+      "return": -0.006907,
+      "decline_start": false
+    },
+    {
+      "start": "1962-06-18",
+      "end": "1962-06-24",
+      "kind": "solstice_june",
+      "return": -0.054898,
+      "decline_start": false
+    },
+    {
+      "start": "1962-09-20",
+      "end": "1962-09-26",
+      "kind": "equinox_september",
+      "return": -0.040827,
+      "decline_start": false
+    },
+    {
+      "start": "1962-12-19",
+      "end": "1962-12-25",
+      "kind": "solstice_december",
+      "return": 0.000799,
+      "decline_start": false
+    },
+    {
+      "start": "1963-03-18",
+      "end": "1963-03-24",
+      "kind": "equinox_march",
+      "return": 0.00884,
+      "decline_start": false
+    },
+    {
+      "start": "1963-06-19",
+      "end": "1963-06-25",
+      "kind": "solstice_june",
+      "return": -0.000713,
+      "decline_start": false
+    },
+    {
+      "start": "1963-09-20",
+      "end": "1963-09-26",
+      "kind": "equinox_september",
+      "return": -0.014052,
+      "decline_start": false
+    },
+    {
+      "start": "1963-12-19",
+      "end": "1963-12-25",
+      "kind": "solstice_december",
+      "return": -0.00578,
+      "decline_start": false
+    },
+    {
+      "start": "1964-03-17",
+      "end": "1964-03-23",
+      "kind": "equinox_march",
+      "return": -0.004917,
+      "decline_start": false
+    },
+    {
+      "start": "1964-06-18",
+      "end": "1964-06-24",
+      "kind": "solstice_june",
+      "return": 0.003342,
+      "decline_start": false
+    },
+    {
+      "start": "1964-09-20",
+      "end": "1964-09-26",
+      "kind": "equinox_september",
+      "return": 0.008745,
+      "decline_start": false
+    },
+    {
+      "start": "1964-12-18",
+      "end": "1964-12-24",
+      "kind": "solstice_december",
+      "return": -0.001661,
+      "decline_start": false
+    },
+    {
+      "start": "1965-03-17",
+      "end": "1965-03-23",
+      "kind": "equinox_march",
+      "return": -0.001034,
+      "decline_start": false
+    },
+    {
+      "start": "1965-06-18",
+      "end": "1965-06-24",
+      "kind": "solstice_june",
+      "return": -0.020858,
+      "decline_start": false
+    },
+    {
+      "start": "1965-09-20",
+      "end": "1965-09-26",
+      "kind": "equinox_september",
+      "return": -0.000666,
+      "decline_start": false
+    },
+    {
+      "start": "1965-12-19",
+      "end": "1965-12-25",
+      "kind": "solstice_december",
+      "return": 0.001195,
+      "decline_start": false
+    },
+    {
+      "start": "1966-03-18",
+      "end": "1966-03-24",
+      "kind": "equinox_march",
+      "return": 0.008585,
+      "decline_start": false
+    },
+    {
+      "start": "1966-06-18",
+      "end": "1966-06-24",
+      "kind": "solstice_june",
+      "return": 0.000809,
+      "decline_start": false
+    },
+    {
+      "start": "1966-09-20",
+      "end": "1966-09-26",
+      "kind": "equinox_september",
+      "return": -0.014929,
+      "decline_start": false
+    },
+    {
+      "start": "1966-12-19",
+      "end": "1966-12-25",
+      "kind": "solstice_december",
+      "return": 0.002461,
+      "decline_start": false
+    },
+    {
+      "start": "1967-03-18",
+      "end": "1967-03-24",
+      "kind": "equinox_march",
+      "return": 0.007645,
+      "decline_start": false
+    },
+    {
+      "start": "1967-06-19",
+      "end": "1967-06-25",
+      "kind": "solstice_june",
+      "return": -0.005513,
+      "decline_start": false
+    },
+    {
+      "start": "1967-09-20",
+      "end": "1967-09-26",
+      "kind": "equinox_september",
+      "return": 0.006554,
+      "decline_start": false
+    },
+    {
+      "start": "1967-12-19",
+      "end": "1967-12-25",
+      "kind": "solstice_december",
+      "return": 0.006023,
+      "decline_start": false
+    },
+    {
+      "start": "1968-03-17",
+      "end": "1968-03-23",
+      "kind": "equinox_march",
+      "return": -0.007632,
+      "decline_start": false
+    },
+    {
+      "start": "1968-06-18",
+      "end": "1968-06-24",
+      "kind": "solstice_june",
+      "return": 0.004,
+      "decline_start": false
+    },
+    {
+      "start": "1968-09-19",
+      "end": "1968-09-25",
+      "kind": "equinox_september",
+      "return": 0.009843,
+      "decline_start": false
+    },
+    {
+      "start": "1968-12-18",
+      "end": "1968-12-24",
+      "kind": "solstice_december",
+      "return": -0.015188,
+      "decline_start": false
+    },
+    {
+      "start": "1969-03-17",
+      "end": "1969-03-23",
+      "kind": "equinox_march",
+      "return": 0.014046,
+      "decline_start": false
+    },
+    {
+      "start": "1969-06-18",
+      "end": "1969-06-24",
+      "kind": "solstice_june",
+      "return": -0.00501,
+      "decline_start": false
+    },
+    {
+      "start": "1969-09-20",
+      "end": "1969-09-26",
+      "kind": "equinox_september",
+      "return": -0.01082,
+      "decline_start": false
+    },
+    {
+      "start": "1969-12-19",
+      "end": "1969-12-25",
+      "kind": "solstice_december",
+      "return": -0.002189,
+      "decline_start": false
+    },
+    {
+      "start": "1970-03-18",
+      "end": "1970-03-24",
+      "kind": "equinox_march",
+      "return": 0.005026,
+      "decline_start": false
+    },
+    {
+      "start": "1970-06-18",
+      "end": "1970-06-24",
+      "kind": "solstice_june",
+      "return": -0.033198,
+      "decline_start": false
+    },
+    {
+      "start": "1970-09-20",
+      "end": "1970-09-26",
+      "kind": "equinox_september",
+      "return": 0.002542,
+      "decline_start": false
+    },
+    {
+      "start": "1970-12-19",
+      "end": "1970-12-25",
+      "kind": "solstice_december",
+      "return": 0.004323,
+      "decline_start": false
+    },
+    {
+      "start": "1971-03-18",
+      "end": "1971-03-24",
+      "kind": "equinox_march",
+      "return": -0.015515,
+      "decline_start": false
+    },
+    {
+      "start": "1971-06-19",
+      "end": "1971-06-25",
+      "kind": "solstice_june",
+      "return": -0.009902,
+      "decline_start": false
+    },
+    {
+      "start": "1971-09-20",
+      "end": "1971-09-26",
+      "kind": "equinox_september",
+      "return": -0.015349,
+      "decline_start": false
+    },
+    {
+      "start": "1971-12-19",
+      "end": "1971-12-25",
+      "kind": "solstice_december",
+      "return": 0.004788,
+      "decline_start": false
+    },
+    {
+      "start": "1972-03-17",
+      "end": "1972-03-23",
+      "kind": "equinox_march",
+      "return": -0.001575,
+      "decline_start": false
+    },
+    {
+      "start": "1972-06-18",
+      "end": "1972-06-24",
+      "kind": "solstice_june",
+      "return": -0.000831,
+      "decline_start": false
+    },
+    {
+      "start": "1972-09-19",
+      "end": "1972-09-25",
+      "kind": "equinox_september",
+      "return": -0.004606,
+      "decline_start": false
+    },
+    {
+      "start": "1972-12-18",
+      "end": "1972-12-24",
+      "kind": "solstice_december",
+      "return": -0.009153,
+      "decline_start": false
+    },
+    {
+      "start": "1973-03-17",
+      "end": "1973-03-23",
+      "kind": "equinox_march",
+      "return": -0.041043,
+      "decline_start": false
+    },
+    {
+      "start": "1973-06-18",
+      "end": "1973-06-24",
+      "kind": "solstice_june",
+      "return": 0.000965,
+      "decline_start": false
+    },
+    {
+      "start": "1973-09-20",
+      "end": "1973-09-26",
+      "kind": "equinox_september",
+      "return": 0.019389,
+      "decline_start": false
+    },
+    {
+      "start": "1973-12-19",
+      "end": "1973-12-25",
+      "kind": "solstice_december",
+      "return": -0.020249,
+      "decline_start": false
+    },
+    {
+      "start": "1974-03-18",
+      "end": "1974-03-24",
+      "kind": "equinox_march",
+      "return": -0.007955,
+      "decline_start": false
+    },
+    {
+      "start": "1974-06-18",
+      "end": "1974-06-24",
+      "kind": "solstice_june",
+      "return": -0.019676,
+      "decline_start": false
+    },
+    {
+      "start": "1974-09-20",
+      "end": "1974-09-26",
+      "kind": "equinox_september",
+      "return": -0.052467,
+      "decline_start": false
+    },
+    {
+      "start": "1974-12-19",
+      "end": "1974-12-25",
+      "kind": "solstice_december",
+      "return": -0.011382,
+      "decline_start": false
+    },
+    {
+      "start": "1975-03-18",
+      "end": "1975-03-24",
+      "kind": "equinox_march",
+      "return": -0.04358,
+      "decline_start": false
+    },
+    {
+      "start": "1975-06-19",
+      "end": "1975-06-25",
+      "kind": "solstice_june",
+      "return": 0.028255,
+      "decline_start": false
+    },
+    {
+      "start": "1975-09-20",
+      "end": "1975-09-26",
+      "kind": "equinox_september",
+      "return": 0.00361,
+      "decline_start": false
+    },
+    {
+      "start": "1975-12-19",
+      "end": "1975-12-25",
+      "kind": "solstice_december",
+      "return": 0.007432,
+      "decline_start": false
+    },
+    {
+      "start": "1976-03-17",
+      "end": "1976-03-23",
+      "kind": "equinox_march",
+      "return": 0.013682,
+      "decline_start": false
+    },
+    {
+      "start": "1976-06-18",
+      "end": "1976-06-24",
+      "kind": "solstice_june",
+      "return": 0.000289,
+      "decline_start": false
+    },
+    {
+      "start": "1976-09-19",
+      "end": "1976-09-25",
+      "kind": "equinox_september",
+      "return": 0.004987,
+      "decline_start": false
+    },
+    {
+      "start": "1976-12-18",
+      "end": "1976-12-24",
+      "kind": "solstice_december",
+      "return": 0.005563,
+      "decline_start": false
+    },
+    {
+      "start": "1977-03-17",
+      "end": "1977-03-23",
+      "kind": "equinox_march",
+      "return": -0.018417,
+      "decline_start": false
+    },
+    {
+      "start": "1977-06-18",
+      "end": "1977-06-24",
+      "kind": "solstice_june",
+      "return": 0.012204,
+      "decline_start": false
+    },
+    {
+      "start": "1977-09-20",
+      "end": "1977-09-26",
+      "kind": "equinox_september",
+      "return": -0.005319,
+      "decline_start": false
+    },
+    {
+      "start": "1977-12-18",
+      "end": "1977-12-24",
+      "kind": "solstice_december",
+      "return": 0.013812,
+      "decline_start": false
+    },
+    {
+      "start": "1978-03-17",
+      "end": "1978-03-23",
+      "kind": "equinox_march",
+      "return": -0.009313,
+      "decline_start": false
+    },
+    {
+      "start": "1978-06-18",
+      "end": "1978-06-24",
+      "kind": "solstice_june",
+      "return": -0.016116,
+      "decline_start": false
+    },
+    {
+      "start": "1978-09-20",
+      "end": "1978-09-26",
+      "kind": "equinox_september",
+      "return": 0.008749,
+      "decline_start": false
+    },
+    {
+      "start": "1978-12-19",
+      "end": "1978-12-25",
+      "kind": "solstice_december",
+      "return": 0.021965,
+      "decline_start": false
+    },
+    {
+      "start": "1979-03-18",
+      "end": "1979-03-24",
+      "kind": "equinox_march",
+      "return": 0.009038,
+      "decline_start": false
+    },
+    {
+      "start": "1979-06-18",
+      "end": "1979-06-24",
+      "kind": "solstice_june",
+      "return": 0.010634,
+      "decline_start": false
+    },
+    {
+      "start": "1979-09-20",
+      "end": "1979-09-26",
+      "kind": "equinox_september",
+      "return": -0.004977,
+      "decline_start": false
+    },
+    {
+      "start": "1979-12-19",
+      "end": "1979-12-25",
+      "kind": "solstice_december",
+      "return": -0.004991,
+      "decline_start": false
+    },
+    {
+      "start": "1980-03-17",
+      "end": "1980-03-23",
+      "kind": "equinox_march",
+      "return": 0.000489,
+      "decline_start": false
+    },
+    {
+      "start": "1980-06-18",
+      "end": "1980-06-24",
+      "kind": "solstice_june",
+      "return": -0.009634,
+      "decline_start": false
+    },
+    {
+      "start": "1980-09-19",
+      "end": "1980-09-25",
+      "kind": "equinox_september",
+      "return": -0.004101,
+      "decline_start": false
+    },
+    {
+      "start": "1980-12-18",
+      "end": "1980-12-24",
+      "kind": "solstice_december",
+      "return": 0.021654,
+      "decline_start": false
+    },
+    {
+      "start": "1981-03-17",
+      "end": "1981-03-23",
+      "kind": "equinox_march",
+      "return": 0.013217,
+      "decline_start": false
+    },
+    {
+      "start": "1981-06-18",
+      "end": "1981-06-24",
+      "kind": "solstice_june",
+      "return": 0.007748,
+      "decline_start": false
+    },
+    {
+      "start": "1981-09-20",
+      "end": "1981-09-26",
+      "kind": "equinox_september",
+      "return": -0.030019,
+      "decline_start": false
+    },
+    {
+      "start": "1981-12-18",
+      "end": "1981-12-24",
+      "kind": "solstice_december",
+      "return": -0.011774,
+      "decline_start": false
+    },
+    {
+      "start": "1982-03-17",
+      "end": "1982-03-23",
+      "kind": "equinox_march",
+      "return": 0.040979,
+      "decline_start": false
+    },
+    {
+      "start": "1982-06-18",
+      "end": "1982-06-24",
+      "kind": "solstice_june",
+      "return": 0.02377,
+      "decline_start": false
+    },
+    {
+      "start": "1982-09-20",
+      "end": "1982-09-26",
+      "kind": "equinox_september",
+      "return": 0.006612,
+      "decline_start": false
+    },
+    {
+      "start": "1982-12-19",
+      "end": "1982-12-25",
+      "kind": "solstice_december",
+      "return": 0.016219,
+      "decline_start": false
+    },
+    {
+      "start": "1983-03-18",
+      "end": "1983-03-24",
+      "kind": "equinox_march",
+      "return": 0.023149,
+      "decline_start": false
+    },
+    {
+      "start": "1983-06-18",
+      "end": "1983-06-24",
+      "kind": "solstice_june",
+      "return": 0.007568,
+      "decline_start": false
+    },
+    {
+      "start": "1983-09-20",
+      "end": "1983-09-26",
+      "kind": "equinox_september",
+      "return": 0.004904,
+      "decline_start": false
+    },
+    {
+      "start": "1983-12-19",
+      "end": "1983-12-25",
+      "kind": "solstice_december",
+      "return": 0.005545,
+      "decline_start": false
+    },
+    {
+      "start": "1984-03-17",
+      "end": "1984-03-23",
+      "kind": "equinox_march",
+      "return": -0.015132,
+      "decline_start": false
+    },
+    {
+      "start": "1984-06-18",
+      "end": "1984-06-24",
+      "kind": "solstice_june",
+      "return": 0.017993,
+      "decline_start": false
+    },
+    {
+      "start": "1984-09-19",
+      "end": "1984-09-25",
+      "kind": "equinox_september",
+      "return": -0.007907,
+      "decline_start": false
+    },
+    {
+      "start": "1984-12-18",
+      "end": "1984-12-24",
+      "kind": "solstice_december",
+      "return": -0.00803,
+      "decline_start": false
+    },
+    {
+      "start": "1985-03-17",
+      "end": "1985-03-23",
+      "kind": "equinox_march",
+      "return": 0.014219,
+      "decline_start": false
+    },
+    {
+      "start": "1985-06-18",
+      "end": "1985-06-24",
+      "kind": "solstice_june",
+      "return": 0.009662,
+      "decline_start": false
+    },
+    {
+      "start": "1985-09-20",
+      "end": "1985-09-26",
+      "kind": "equinox_september",
+      "return": -0.004175,
+      "decline_start": false
+    },
+    {
+      "start": "1985-12-18",
+      "end": "1985-12-24",
+      "kind": "solstice_december",
+      "return": -0.012726,
+      "decline_start": false
+    },
+    {
+      "start": "1986-03-17",
+      "end": "1986-03-23",
+      "kind": "equinox_march",
+      "return": -0.005668,
+      "decline_start": false
+    },
+    {
+      "start": "1986-06-18",
+      "end": "1986-06-24",
+      "kind": "solstice_june",
+      "return": 0.008327,
+      "decline_start": false
+    },
+    {
+      "start": "1986-09-20",
+      "end": "1986-09-26",
+      "kind": "equinox_september",
+      "return": 8.6e-05,
+      "decline_start": false
+    },
+    {
+      "start": "1986-12-19",
+      "end": "1986-12-25",
+      "kind": "solstice_december",
+      "return": -0.011933,
+      "decline_start": false
+    },
+    {
+      "start": "1987-03-18",
+      "end": "1987-03-24",
+      "kind": "equinox_march",
+      "return": 0.030262,
+      "decline_start": false
+    },
+    {
+      "start": "1987-06-18",
+      "end": "1987-06-24",
+      "kind": "solstice_june",
+      "return": 0.003827,
+      "decline_start": false
+    },
+    {
+      "start": "1987-09-20",
+      "end": "1987-09-26",
+      "kind": "equinox_september",
+      "return": 0.016833,
+      "decline_start": false
+    },
+    {
+      "start": "1987-12-19",
+      "end": "1987-12-25",
+      "kind": "solstice_december",
+      "return": 0.011519,
+      "decline_start": false
+    },
+    {
+      "start": "1988-03-17",
+      "end": "1988-03-23",
+      "kind": "equinox_march",
+      "return": -0.008517,
+      "decline_start": false
+    },
+    {
+      "start": "1988-06-18",
+      "end": "1988-06-24",
+      "kind": "solstice_june",
+      "return": 0.011453,
+      "decline_start": false
+    },
+    {
+      "start": "1988-09-19",
+      "end": "1988-09-25",
+      "kind": "equinox_september",
+      "return": 0.003497,
+      "decline_start": false
+    },
+    {
+      "start": "1988-12-18",
+      "end": "1988-12-24",
+      "kind": "solstice_december",
+      "return": 0.005719,
+      "decline_start": false
+    },
+    {
+      "start": "1989-03-17",
+      "end": "1989-03-23",
+      "kind": "equinox_march",
+      "return": -0.012675,
+      "decline_start": false
+    },
+    {
+      "start": "1989-06-18",
+      "end": "1989-06-24",
+      "kind": "solstice_june",
+      "return": 0.020694,
+      "decline_start": false
+    },
+    {
+      "start": "1989-09-20",
+      "end": "1989-09-26",
+      "kind": "equinox_september",
+      "return": -0.006177,
+      "decline_start": false
+    },
+    {
+      "start": "1989-12-18",
+      "end": "1989-12-24",
+      "kind": "solstice_december",
+      "return": 0.010853,
+      "decline_start": false
+    },
+    {
+      "start": "1990-03-17",
+      "end": "1990-03-23",
+      "kind": "equinox_march",
+      "return": -0.013717,
+      "decline_start": false
+    },
+    {
+      "start": "1990-06-18",
+      "end": "1990-06-24",
+      "kind": "solstice_june",
+      "return": -0.004063,
+      "decline_start": false
+    },
+    {
+      "start": "1990-09-20",
+      "end": "1990-09-26",
+      "kind": "equinox_september",
+      "return": -0.020611,
+      "decline_start": false
+    },
+    {
+      "start": "1990-12-19",
+      "end": "1990-12-25",
+      "kind": "solstice_december",
+      "return": -0.000909,
+      "decline_start": false
+    },
+    {
+      "start": "1991-03-18",
+      "end": "1991-03-24",
+      "kind": "equinox_march",
+      "return": -0.012442,
+      "decline_start": false
+    },
+    {
+      "start": "1991-06-18",
+      "end": "1991-06-24",
+      "kind": "solstice_june",
+      "return": -0.020207,
+      "decline_start": false
+    },
+    {
+      "start": "1991-09-20",
+      "end": "1991-09-26",
+      "kind": "equinox_september",
+      "return": -0.003686,
+      "decline_start": false
+    },
+    {
+      "start": "1991-12-19",
+      "end": "1991-12-25",
+      "kind": "solstice_december",
+      "return": 0.043945,
+      "decline_start": false
+    },
+    {
+      "start": "1992-03-17",
+      "end": "1992-03-23",
+      "kind": "equinox_march",
+      "return": 0.000806,
+      "decline_start": false
+    },
+    {
+      "start": "1992-06-18",
+      "end": "1992-06-24",
+      "kind": "solstice_june",
+      "return": 0.007183,
+      "decline_start": false
+    },
+    {
+      "start": "1992-09-19",
+      "end": "1992-09-25",
+      "kind": "equinox_september",
+      "return": -0.020287,
+      "decline_start": false
+    },
+    {
+      "start": "1992-12-18",
+      "end": "1992-12-24",
+      "kind": "solstice_december",
+      "return": -0.003422,
+      "decline_start": false
+    },
+    {
+      "start": "1993-03-17",
+      "end": "1993-03-23",
+      "kind": "equinox_march",
+      "return": 0.001004,
+      "decline_start": false
+    },
+    {
+      "start": "1993-06-18",
+      "end": "1993-06-24",
+      "kind": "solstice_june",
+      "return": 0.006626,
+      "decline_start": false
+    },
+    {
+      "start": "1993-09-20",
+      "end": "1993-09-26",
+      "kind": "equinox_september",
+      "return": 0.00567,
+      "decline_start": false
+    },
+    {
+      "start": "1993-12-18",
+      "end": "1993-12-24",
+      "kind": "solstice_december",
+      "return": 0.002144,
+      "decline_start": false
+    },
+    {
+      "start": "1994-03-17",
+      "end": "1994-03-23",
+      "kind": "equinox_march",
+      "return": -0.005012,
+      "decline_start": false
+    },
+    {
+      "start": "1994-06-18",
+      "end": "1994-06-24",
+      "kind": "solstice_june",
+      "return": -0.034137,
+      "decline_start": false
+    },
+    {
+      "start": "1994-09-20",
+      "end": "1994-09-26",
+      "kind": "equinox_september",
+      "return": -0.005482,
+      "decline_start": false
+    },
+    {
+      "start": "1994-12-19",
+      "end": "1994-12-25",
+      "kind": "solstice_december",
+      "return": 0.004193,
+      "decline_start": false
+    },
+    {
+      "start": "1995-03-18",
+      "end": "1995-03-24",
+      "kind": "equinox_march",
+      "return": 0.010999,
+      "decline_start": false
+    },
+    {
+      "start": "1995-06-18",
+      "end": "1995-06-24",
+      "kind": "solstice_june",
+      "return": 0.018302,
+      "decline_start": false
+    },
+    {
+      "start": "1995-09-20",
+      "end": "1995-09-26",
+      "kind": "equinox_september",
+      "return": -0.009135,
+      "decline_start": false
+    },
+    {
+      "start": "1995-12-19",
+      "end": "1995-12-25",
+      "kind": "solstice_december",
+      "return": 3.3e-05,
+      "decline_start": false
+    },
+    {
+      "start": "1996-03-17",
+      "end": "1996-03-23",
+      "kind": "equinox_march",
+      "return": 0.014327,
+      "decline_start": false
+    },
+    {
+      "start": "1996-06-18",
+      "end": "1996-06-24",
+      "kind": "solstice_june",
+      "return": 0.010256,
+      "decline_start": false
+    },
+    {
+      "start": "1996-09-19",
+      "end": "1996-09-25",
+      "kind": "equinox_september",
+      "return": 0.004144,
+      "decline_start": false
+    },
+    {
+      "start": "1996-12-18",
+      "end": "1996-12-24",
+      "kind": "solstice_december",
+      "return": 0.026642,
+      "decline_start": false
+    },
+    {
+      "start": "1997-03-17",
+      "end": "1997-03-23",
+      "kind": "equinox_march",
+      "return": -0.014591,
+      "decline_start": false
+    },
+    {
+      "start": "1997-06-18",
+      "end": "1997-06-24",
+      "kind": "solstice_june",
+      "return": 0.008188,
+      "decline_start": false
+    },
+    {
+      "start": "1997-09-19",
+      "end": "1997-09-25",
+      "kind": "equinox_september",
+      "return": -0.013256,
+      "decline_start": false
+    },
+    {
+      "start": "1997-12-18",
+      "end": "1997-12-24",
+      "kind": "solstice_december",
+      "return": -0.023657,
+      "decline_start": false
+    },
+    {
+      "start": "1998-03-17",
+      "end": "1998-03-23",
+      "kind": "equinox_march",
+      "return": 0.013976,
+      "decline_start": false
+    },
+    {
+      "start": "1998-06-18",
+      "end": "1998-06-24",
+      "kind": "solstice_june",
+      "return": 0.023961,
+      "decline_start": false
+    },
+    {
+      "start": "1998-09-20",
+      "end": "1998-09-26",
+      "kind": "equinox_september",
+      "return": 0.024174,
+      "decline_start": false
+    },
+    {
+      "start": "1998-12-19",
+      "end": "1998-12-25",
+      "kind": "solstice_december",
+      "return": 0.032188,
+      "decline_start": false
+    },
+    {
+      "start": "1999-03-18",
+      "end": "1999-03-24",
+      "kind": "equinox_march",
+      "return": -0.036429,
+      "decline_start": false
+    },
+    {
+      "start": "1999-06-18",
+      "end": "1999-06-24",
+      "kind": "solstice_june",
+      "return": -0.020151,
+      "decline_start": false
+    },
+    {
+      "start": "1999-09-20",
+      "end": "1999-09-26",
+      "kind": "equinox_september",
+      "return": -0.043556,
+      "decline_start": false
+    },
+    {
+      "start": "1999-12-19",
+      "end": "1999-12-25",
+      "kind": "solstice_december",
+      "return": 0.026256,
+      "decline_start": false
+    },
+    {
+      "start": "2000-03-17",
+      "end": "2000-03-23",
+      "kind": "equinox_march",
+      "return": 0.042937,
+      "decline_start": false
+    },
+    {
+      "start": "2000-06-18",
+      "end": "2000-06-24",
+      "kind": "solstice_june",
+      "return": -0.015692,
+      "decline_start": false
+    },
+    {
+      "start": "2000-09-19",
+      "end": "2000-09-25",
+      "kind": "equinox_september",
+      "return": -0.014295,
+      "decline_start": false
+    },
+    {
+      "start": "2000-12-18",
+      "end": "2000-12-24",
+      "kind": "solstice_december",
+      "return": -0.012693,
+      "decline_start": false
+    },
+    {
+      "start": "2001-03-17",
+      "end": "2001-03-23",
+      "kind": "equinox_march",
+      "return": -0.0093,
+      "decline_start": false
+    },
+    {
+      "start": "2001-06-18",
+      "end": "2001-06-24",
+      "kind": "solstice_june",
+      "return": 0.014002,
+      "decline_start": false
+    },
+    {
+      "start": "2001-09-19",
+      "end": "2001-09-25",
+      "kind": "equinox_september",
+      "return": -0.003769,
+      "decline_start": false
+    },
+    {
+      "start": "2001-12-18",
+      "end": "2001-12-24",
+      "kind": "solstice_december",
+      "return": 0.001514,
+      "decline_start": false
+    },
+    {
+      "start": "2002-03-17",
+      "end": "2002-03-23",
+      "kind": "equinox_march",
+      "return": -0.014972,
+      "decline_start": false
+    },
+    {
+      "start": "2002-06-18",
+      "end": "2002-06-24",
+      "kind": "solstice_june",
+      "return": -0.042829,
+      "decline_start": false
+    },
+    {
+      "start": "2002-09-20",
+      "end": "2002-09-26",
+      "kind": "equinox_september",
+      "return": 0.011308,
+      "decline_start": false
+    },
+    {
+      "start": "2002-12-19",
+      "end": "2002-12-25",
+      "kind": "solstice_december",
+      "return": 0.009296,
+      "decline_start": false
+    },
+    {
+      "start": "2003-03-18",
+      "end": "2003-03-24",
+      "kind": "equinox_march",
+      "return": -0.002562,
+      "decline_start": false
+    },
+    {
+      "start": "2003-06-18",
+      "end": "2003-06-24",
+      "kind": "solstice_june",
+      "return": -0.026374,
+      "decline_start": false
+    },
+    {
+      "start": "2003-09-20",
+      "end": "2003-09-26",
+      "kind": "equinox_september",
+      "return": -0.038068,
+      "decline_start": false
+    },
+    {
+      "start": "2003-12-19",
+      "end": "2003-12-25",
+      "kind": "solstice_december",
+      "return": 0.004942,
+      "decline_start": false
+    },
+    {
+      "start": "2004-03-17",
+      "end": "2004-03-23",
+      "kind": "equinox_march",
+      "return": -0.026518,
+      "decline_start": false
+    },
+    {
+      "start": "2004-06-18",
+      "end": "2004-06-24",
+      "kind": "solstice_june",
+      "return": 0.00496,
+      "decline_start": false
+    },
+    {
+      "start": "2004-09-19",
+      "end": "2004-09-25",
+      "kind": "equinox_september",
+      "return": -0.01634,
+      "decline_start": false
+    },
+    {
+      "start": "2004-12-18",
+      "end": "2004-12-24",
+      "kind": "solstice_december",
+      "return": 0.01334,
+      "decline_start": false
+    },
+    {
+      "start": "2005-03-17",
+      "end": "2005-03-23",
+      "kind": "equinox_march",
+      "return": -0.014854,
+      "decline_start": false
+    },
+    {
+      "start": "2005-06-18",
+      "end": "2005-06-24",
+      "kind": "solstice_june",
+      "return": -0.020863,
+      "decline_start": false
+    },
+    {
+      "start": "2005-09-19",
+      "end": "2005-09-25",
+      "kind": "equinox_september",
+      "return": -0.012778,
+      "decline_start": false
+    },
+    {
+      "start": "2005-12-18",
+      "end": "2005-12-24",
+      "kind": "solstice_december",
+      "return": 0.001057,
+      "decline_start": false
+    },
+    {
+      "start": "2006-03-17",
+      "end": "2006-03-23",
+      "kind": "equinox_march",
+      "return": -0.004268,
+      "decline_start": false
+    },
+    {
+      "start": "2006-06-18",
+      "end": "2006-06-24",
+      "kind": "solstice_june",
+      "return": -0.005625,
+      "decline_start": false
+    },
+    {
+      "start": "2006-09-20",
+      "end": "2006-09-26",
+      "kind": "equinox_september",
+      "return": 0.008429,
+      "decline_start": false
+    },
+    {
+      "start": "2006-12-19",
+      "end": "2006-12-25",
+      "kind": "solstice_december",
+      "return": -0.010375,
+      "decline_start": false
+    },
+    {
+      "start": "2007-03-18",
+      "end": "2007-03-24",
+      "kind": "equinox_march",
+      "return": 0.035445,
+      "decline_start": false
+    },
+    {
+      "start": "2007-06-18",
+      "end": "2007-06-24",
+      "kind": "solstice_june",
+      "return": -0.018608,
+      "decline_start": false
+    },
+    {
+      "start": "2007-09-20",
+      "end": "2007-09-26",
+      "kind": "equinox_september",
+      "return": 0.004392,
+      "decline_start": false
+    },
+    {
+      "start": "2007-12-19",
+      "end": "2007-12-25",
+      "kind": "solstice_december",
+      "return": 0.029904,
+      "decline_start": false
+    },
+    {
+      "start": "2008-03-17",
+      "end": "2008-03-23",
+      "kind": "equinox_march",
+      "return": 0.041446,
+      "decline_start": false
+    },
+    {
+      "start": "2008-06-17",
+      "end": "2008-06-23",
+      "kind": "solstice_june",
+      "return": -0.024376,
+      "decline_start": false
+    },
+    {
+      "start": "2008-09-19",
+      "end": "2008-09-25",
+      "kind": "equinox_september",
+      "return": -0.036571,
+      "decline_start": false
+    },
+    {
+      "start": "2008-12-18",
+      "end": "2008-12-24",
+      "kind": "solstice_december",
+      "return": -0.01935,
+      "decline_start": false
+    },
+    {
+      "start": "2009-03-17",
+      "end": "2009-03-23",
+      "kind": "equinox_march",
+      "return": 0.057575,
+      "decline_start": false
+    },
+    {
+      "start": "2009-06-18",
+      "end": "2009-06-24",
+      "kind": "solstice_june",
+      "return": -0.018979,
+      "decline_start": false
+    },
+    {
+      "start": "2009-09-19",
+      "end": "2009-09-25",
+      "kind": "equinox_september",
+      "return": -0.022391,
+      "decline_start": false
+    },
+    {
+      "start": "2009-12-18",
+      "end": "2009-12-24",
+      "kind": "solstice_december",
+      "return": 0.021778,
+      "decline_start": false
+    },
+    {
+      "start": "2010-03-17",
+      "end": "2010-03-23",
+      "kind": "equinox_march",
+      "return": 0.006826,
+      "decline_start": false
+    },
+    {
+      "start": "2010-06-18",
+      "end": "2010-06-24",
+      "kind": "solstice_june",
+      "return": -0.039212,
+      "decline_start": false
+    },
+    {
+      "start": "2010-09-20",
+      "end": "2010-09-26",
+      "kind": "equinox_september",
+      "return": 0.005216,
+      "decline_start": false
+    },
+    {
+      "start": "2010-12-18",
+      "end": "2010-12-24",
+      "kind": "solstice_december",
+      "return": 0.010338,
+      "decline_start": false
+    },
+    {
+      "start": "2011-03-17",
+      "end": "2011-03-23",
+      "kind": "equinox_march",
+      "return": 0.018701,
+      "decline_start": false
+    },
+    {
+      "start": "2011-06-18",
+      "end": "2011-06-24",
+      "kind": "solstice_june",
+      "return": -0.002399,
+      "decline_start": false
+    },
+    {
+      "start": "2011-09-20",
+      "end": "2011-09-26",
+      "kind": "equinox_september",
+      "return": -0.03256,
+      "decline_start": false
+    },
+    {
+      "start": "2011-12-19",
+      "end": "2011-12-25",
+      "kind": "solstice_december",
+      "return": 0.049761,
+      "decline_start": false
+    },
+    {
+      "start": "2012-03-17",
+      "end": "2012-03-23",
+      "kind": "equinox_march",
+      "return": -0.005028,
+      "decline_start": false
+    },
+    {
+      "start": "2012-06-17",
+      "end": "2012-06-23",
+      "kind": "solstice_june",
+      "return": -0.005823,
+      "decline_start": false
+    },
+    {
+      "start": "2012-09-19",
+      "end": "2012-09-25",
+      "kind": "equinox_september",
+      "return": -0.013319,
+      "decline_start": false
+    },
+    {
+      "start": "2012-12-18",
+      "end": "2012-12-24",
+      "kind": "solstice_december",
+      "return": -0.013914,
+      "decline_start": false
+    },
+    {
+      "start": "2013-03-17",
+      "end": "2013-03-23",
+      "kind": "equinox_march",
+      "return": -0.002441,
+      "decline_start": false
+    },
+    {
+      "start": "2013-06-18",
+      "end": "2013-06-24",
+      "kind": "solstice_june",
+      "return": -0.047657,
+      "decline_start": false
+    },
+    {
+      "start": "2013-09-19",
+      "end": "2013-09-25",
+      "kind": "equinox_september",
+      "return": -0.017168,
+      "decline_start": false
+    },
+    {
+      "start": "2013-12-18",
+      "end": "2013-12-24",
+      "kind": "solstice_december",
+      "return": 0.01252,
+      "decline_start": false
+    },
+    {
+      "start": "2014-03-17",
+      "end": "2014-03-23",
+      "kind": "equinox_march",
+      "return": 0.004137,
+      "decline_start": false
+    },
+    {
+      "start": "2014-06-18",
+      "end": "2014-06-24",
+      "kind": "solstice_june",
+      "return": -0.003577,
+      "decline_start": false
+    },
+    {
+      "start": "2014-09-20",
+      "end": "2014-09-26",
+      "kind": "equinox_september",
+      "return": -0.013704,
+      "decline_start": false
+    },
+    {
+      "start": "2014-12-18",
+      "end": "2014-12-24",
+      "kind": "solstice_december",
+      "return": 0.010018,
+      "decline_start": false
+    },
+    {
+      "start": "2015-03-17",
+      "end": "2015-03-23",
+      "kind": "equinox_march",
+      "return": 0.01453,
+      "decline_start": false
+    },
+    {
+      "start": "2015-06-18",
+      "end": "2015-06-24",
+      "kind": "solstice_june",
+      "return": -0.005968,
+      "decline_start": false
+    },
+    {
+      "start": "2015-09-20",
+      "end": "2015-09-26",
+      "kind": "equinox_september",
+      "return": -0.013631,
+      "decline_start": false
+    },
+    {
+      "start": "2015-12-19",
+      "end": "2015-12-25",
+      "kind": "solstice_december",
+      "return": 0.027643,
+      "decline_start": false
+    },
+    {
+      "start": "2016-03-17",
+      "end": "2016-03-23",
+      "kind": "equinox_march",
+      "return": -0.001901,
+      "decline_start": false
+    },
+    {
+      "start": "2016-06-17",
+      "end": "2016-06-23",
+      "kind": "solstice_june",
+      "return": 0.020326,
+      "decline_start": false
+    },
+    {
+      "start": "2016-09-19",
+      "end": "2016-09-25",
+      "kind": "equinox_september",
+      "return": 0.011953,
+      "decline_start": false
+    },
+    {
+      "start": "2016-12-18",
+      "end": "2016-12-24",
+      "kind": "solstice_december",
+      "return": 0.002533,
+      "decline_start": false
+    },
+    {
+      "start": "2017-03-17",
+      "end": "2017-03-23",
+      "kind": "equinox_march",
+      "return": -0.013577,
+      "decline_start": false
+    },
+    {
+      "start": "2017-06-18",
+      "end": "2017-06-24",
+      "kind": "solstice_june",
+      "return": 0.002117,
+      "decline_start": false
+    },
+    {
+      "start": "2017-09-19",
+      "end": "2017-09-25",
+      "kind": "equinox_september",
+      "return": -0.003985,
+      "decline_start": false
+    },
+    {
+      "start": "2017-12-18",
+      "end": "2017-12-24",
+      "kind": "solstice_december",
+      "return": -0.002535,
+      "decline_start": false
+    },
+    {
+      "start": "2018-03-17",
+      "end": "2018-03-23",
+      "kind": "equinox_march",
+      "return": -0.059502,
+      "decline_start": false
+    },
+    {
+      "start": "2018-06-18",
+      "end": "2018-06-24",
+      "kind": "solstice_june",
+      "return": -0.006803,
+      "decline_start": false
+    },
+    {
+      "start": "2018-09-20",
+      "end": "2018-09-26",
+      "kind": "equinox_september",
+      "return": -0.008455,
+      "decline_start": false
+    },
+    {
+      "start": "2018-12-18",
+      "end": "2018-12-24",
+      "kind": "solstice_december",
+      "return": -0.076609,
+      "decline_start": false
+    },
+    {
+      "start": "2019-03-17",
+      "end": "2019-03-23",
+      "kind": "equinox_march",
+      "return": -0.007713,
+      "decline_start": false
+    },
+    {
+      "start": "2019-06-18",
+      "end": "2019-06-24",
+      "kind": "solstice_june",
+      "return": 0.009459,
+      "decline_start": false
+    },
+    {
+      "start": "2019-09-20",
+      "end": "2019-09-26",
+      "kind": "equinox_september",
+      "return": -0.004829,
+      "decline_start": false
+    },
+    {
+      "start": "2019-12-19",
+      "end": "2019-12-25",
+      "kind": "solstice_december",
+      "return": 0.005619,
+      "decline_start": false
+    },
+    {
+      "start": "2020-03-17",
+      "end": "2020-03-23",
+      "kind": "equinox_march",
+      "return": -0.115369,
+      "decline_start": false
+    },
+    {
+      "start": "2020-06-17",
+      "end": "2020-06-23",
+      "kind": "solstice_june",
+      "return": 0.005717,
+      "decline_start": false
+    },
+    {
+      "start": "2020-09-19",
+      "end": "2020-09-25",
+      "kind": "equinox_september",
+      "return": -0.006329,
+      "decline_start": false
+    },
+    {
+      "start": "2020-12-18",
+      "end": "2020-12-24",
+      "kind": "solstice_december",
+      "return": -0.001712,
+      "decline_start": false
+    },
+    {
+      "start": "2021-03-17",
+      "end": "2021-03-23",
+      "kind": "equinox_march",
+      "return": -0.016004,
+      "decline_start": false
+    },
+    {
+      "start": "2021-06-18",
+      "end": "2021-06-24",
+      "kind": "solstice_june",
+      "return": 0.024011,
+      "decline_start": false
+    },
+    {
+      "start": "2021-09-19",
+      "end": "2021-09-25",
+      "kind": "equinox_september",
+      "return": 0.005073,
+      "decline_start": false
+    },
+    {
+      "start": "2021-12-18",
+      "end": "2021-12-24",
+      "kind": "solstice_december",
+      "return": 0.022757,
+      "decline_start": false
+    },
+    {
+      "start": "2022-03-17",
+      "end": "2022-03-23",
+      "kind": "equinox_march",
+      "return": 0.010103,
+      "decline_start": false
+    },
+    {
+      "start": "2022-06-18",
+      "end": "2022-06-24",
+      "kind": "solstice_june",
+      "return": 0.064465,
+      "decline_start": false
+    },
+    {
+      "start": "2022-09-20",
+      "end": "2022-09-26",
+      "kind": "equinox_september",
+      "return": -0.052099,
+      "decline_start": false
+    },
+    {
+      "start": "2022-12-18",
+      "end": "2022-12-24",
+      "kind": "solstice_december",
+      "return": -0.001957,
+      "decline_start": false
+    },
+    {
+      "start": "2023-03-17",
+      "end": "2023-03-23",
+      "kind": "equinox_march",
+      "return": 0.008191,
+      "decline_start": false
+    },
+    {
+      "start": "2023-06-18",
+      "end": "2023-06-24",
+      "kind": "solstice_june",
+      "return": -0.013892,
+      "decline_start": false
+    },
+    {
+      "start": "2023-09-20",
+      "end": "2023-09-26",
+      "kind": "equinox_september",
+      "return": -0.029229,
+      "decline_start": false
+    },
+    {
+      "start": "2023-12-19",
+      "end": "2023-12-25",
+      "kind": "solstice_december",
+      "return": -0.002882,
+      "decline_start": false
+    },
+    {
+      "start": "2024-03-17",
+      "end": "2024-03-23",
+      "kind": "equinox_march",
+      "return": 0.022882,
+      "decline_start": false
+    },
+    {
+      "start": "2024-06-17",
+      "end": "2024-06-23",
+      "kind": "solstice_june",
+      "return": -0.001573,
+      "decline_start": false
+    },
+    {
+      "start": "2024-09-19",
+      "end": "2024-09-25",
+      "kind": "equinox_september",
+      "return": 0.001509,
+      "decline_start": false
+    },
+    {
+      "start": "2024-12-18",
+      "end": "2024-12-24",
+      "kind": "solstice_december",
+      "return": 0.028589,
+      "decline_start": false
+    },
+    {
+      "start": "2025-03-17",
+      "end": "2025-03-23",
+      "kind": "equinox_march",
+      "return": -0.001332,
+      "decline_start": false
+    },
+    {
+      "start": "2025-06-18",
+      "end": "2025-06-24",
+      "kind": "solstice_june",
+      "return": 0.018611,
+      "decline_start": false
+    },
+    {
+      "start": "2025-09-19",
+      "end": "2025-09-25",
+      "kind": "equinox_september",
+      "return": -0.008949,
+      "decline_start": false
+    },
+    {
+      "start": "2025-12-18",
+      "end": "2025-12-24",
+      "kind": "solstice_december",
+      "return": 0.023217,
+      "decline_start": false
+    },
+    {
+      "start": "2026-03-17",
+      "end": "2026-03-23",
+      "kind": "equinox_march",
+      "return": -0.020114,
+      "decline_start": false
+    },
+    {
+      "start": "2026-06-18",
+      "end": "2026-06-24",
+      "kind": "solstice_june",
+      "return": -0.01898,
+      "decline_start": false
+    },
+    {
+      "start": "2026-09-20",
+      "end": "2026-09-26",
+      "kind": "equinox_september",
+      "return": 0.012144,
+      "decline_start": false
+    }
+  ],
+  "next_event": {
+    "date": "2026-12-21T20:50:14.148273Z"
+  },
+  "method": [
+    "Every March and September equinox and every June and December solstice in the record, using the seven calendar days from three days before to three days after the exact moment.",
+    "Returns are the S&P proxy close at the first session in a window to its close at the last session in that window.",
+    "Each event window is paired with the nearest non-overlapping window of the same calendar length, searching backward first, then forward. Control windows never overlap an event or another control.",
+    "Decline starts are peaks in the repo's /declines list of falls of 20% or more; a window counts if a peak falls inside it, inclusive of both ends.",
+    "The uncertainty check is a two-sided permutation test of the mean-return difference, 2000 shuffles with seed 20261111.",
+    "A difference is called meaningful only when p < 0.05 and the mean-return difference is at least 0.5 percentage points in absolute size.",
+    "A claim is published only when it has at least 30 non-overlapping daily windows; otherwise the page shows the count and no result.",
+    "The p-value and the sample sizes are reported exactly as computed; the same seed reproduces the same result."
+  ],
+  "limitations": [
+    "This is a descriptive comparison of a historical record, not evidence of a cause and not a forecast.",
+    "The daily S&P record starts 30 Dec 1927 (Yahoo GSPC). Before that the repo's proxy is monthly (NBER, 1871-1926), so short-window returns there would be mostly forward-filled; the headline test uses the daily record and the full-history test uses monthly returns.",
+    "The early S&P series is a chained Cowles/S&P proxy, and daily sessions before 1957 do not match the modern S&P 500 exactly.",
+    "Control windows follow a fixed rule, but seasonality, volatility clustering and overlapping macro events remain in the record.",
+    "Permutation p-values measure how unusual the mean difference is under relabelling; they do not remove those dependencies.",
+    "Decline starts are only the falls in the current /declines list, not every possible market fall."
+  ]
+}
