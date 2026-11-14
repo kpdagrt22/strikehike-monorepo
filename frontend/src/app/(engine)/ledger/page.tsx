@@ -136,18 +136,14 @@ export default async function LedgerPage() {
                       <time dateTime={entry.published_at}>{publishedDate(entry)}</time>
                     </td>
                     <td className="px-2 py-3 align-top">
-                      <a
-                        href={`#hash-${entry.seq}`}
-                        className="font-mono text-[11px] text-(--sh-text-1) underline decoration-current/30 underline-offset-2 hover:decoration-current"
-                      >
-                        {shortHash(entry.hash)}
-                      </a>
-                      <span
-                        id={`hash-${entry.seq}`}
-                        className="mt-1 block break-all font-mono text-[9px] leading-tight text-(--sh-text-3)"
-                      >
-                        {entry.hash}
-                      </span>
+                      <details id={`hash-${entry.seq}`} className="group">
+                        <summary className="cursor-pointer font-mono text-[11px] text-(--sh-text-1) underline decoration-current/30 underline-offset-2 hover:decoration-current">
+                          {shortHash(entry.hash)}
+                        </summary>
+                        <code className="mt-1 block break-all font-mono text-[10px] leading-tight text-(--sh-text-3)">
+                          {entry.hash}
+                        </code>
+                      </details>
                     </td>
                   </tr>
                 ))}

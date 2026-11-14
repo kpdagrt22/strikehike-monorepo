@@ -140,7 +140,12 @@ export default async function ClaimTestPage({ params }: Params) {
             <h2 className="text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-3)">
               The numbers
             </h2>
-            <div className="mt-3 overflow-x-auto rounded-2xl border border-(--sh-line-1)">
+            <div
+              role="region"
+              aria-label="Claim comparison table"
+              tabIndex={0}
+              className="mt-3 overflow-x-auto rounded-2xl border border-(--sh-line-1) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus)"
+            >
               <table data-claim-table="" className="w-full min-w-[40rem] border-collapse text-left text-micro">
                 <thead className="bg-(--sh-surface-float) text-(--sh-text-3)">
                   <tr>
@@ -225,7 +230,12 @@ export default async function ClaimTestPage({ params }: Params) {
               <span aria-hidden="true" className="text-base transition-transform group-open:rotate-45">+</span>
             </summary>
           <div className="border-t border-(--sh-line-1)">
-            <div className="max-h-[24rem] overflow-y-auto">
+            <div
+              role="region"
+              aria-label="Claim windows table"
+              tabIndex={0}
+              className="max-h-[24rem] overflow-y-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--sh-focus)"
+            >
               <table data-claim-windows="" className="w-full border-collapse text-left text-micro">
                 <thead className="sticky top-0 bg-(--sh-surface-float) text-(--sh-text-3)">
                   <tr>
