@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { ShareButton } from "@/components/reference/ShareButton";
-import type { Roundup, RoundupSkyItem } from "@/lib/roundup/store";
+import type {
+  Roundup,
+  RoundupDate,
+  RoundupSkyItem,
+} from "@/lib/roundup/store";
 import { weekLabel, isoWeekOf } from "@/lib/roundup/week";
 import { urlFor } from "@/lib/seo/site";
 
@@ -17,6 +21,41 @@ const DATE = new Intl.DateTimeFormat("en-GB", {
 function signed(value: number) {
   const text = Math.abs(value).toFixed(1);
   return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
+}
+
+function RoundupDateLine({
+  event,
+  className = "",
+}: {
+  event: RoundupDate;
+  className?: string;
+}) {
+  const allDay = !event.start_time;
+  return (
+    <span className={className}>
+      <LocalDateTime
+        startDate={event.start_date}
+        startTime={event.start_time}
+        startUtc={event.start_utc ?? null}
+        timezone={event.timezone ?? null}
+        allDay={allDay}
+        part="date"
+      />
+      {allDay ? null : (
+        <>
+          {" · "}
+          <LocalDateTime
+            startDate={event.start_date}
+            startTime={event.start_time}
+            startUtc={event.start_utc ?? null}
+            timezone={event.timezone ?? null}
+            allDay={false}
+            part="time"
+          />
+        </>
+      )}
+    </span>
+  );
 }
 
 function RoundupViewV1({ roundup }: { roundup: Roundup }) {
@@ -146,10 +185,10 @@ function RoundupViewV1({ roundup }: { roundup: Roundup }) {
                       >
                         {event.name}
                       </Link>
-                      <span className="ml-2 text-micro text-(--sh-text-3)">
-                        {DATE.format(new Date(`${event.start_date}T00:00:00Z`))}
-                        {event.start_time ? ` · ${event.start_time.slice(0, 5)}` : ""}
-                      </span>
+                      <RoundupDateLine
+                        event={event}
+                        className="ml-2 text-micro text-(--sh-text-3)"
+                      />
                     </li>
                   ))}
                 </ul>
@@ -176,9 +215,10 @@ function RoundupViewV1({ roundup }: { roundup: Roundup }) {
                 >
                   {event.name}
                 </Link>
-                <span className="ml-2 text-micro text-(--sh-text-3)">
-                  {DATE.format(new Date(`${event.start_date}T00:00:00Z`))}
-                </span>
+                <RoundupDateLine
+                  event={event}
+                  className="ml-2 text-micro text-(--sh-text-3)"
+                />
               </li>
             ))}
           </ul>
@@ -418,8 +458,13 @@ function RoundupViewV2({ roundup }: { roundup: Roundup }) {
             {roundup.lines?.activity}
           </p>
           <p className="mt-2 text-micro text-(--sh-text-3)">
-            Min {activity.min} · max {activity.max} · peak{" "}
-            {DATE.format(new Date(`${activity.peak_date}T00:00:00Z`))}.
+            Min {activity.min} · max {activity.max}
+            {activity.peak_date
+              ? ` · peak ${DATE.format(
+                  new Date(`${activity.peak_date}T00:00:00Z`),
+                )}`
+              : ""}
+            .
           </p>
           {activity.closest_past ? (
             <p className="mt-1 text-micro text-(--sh-text-3)">
@@ -463,10 +508,10 @@ function RoundupViewV2({ roundup }: { roundup: Roundup }) {
                       >
                         {event.name}
                       </Link>
-                      <span className="ml-2 text-micro text-(--sh-text-3)">
-                        {DATE.format(new Date(`${event.start_date}T00:00:00Z`))}
-                        {event.start_time ? ` · ${event.start_time.slice(0, 5)}` : ""}
-                      </span>
+                      <RoundupDateLine
+                        event={event}
+                        className="ml-2 text-micro text-(--sh-text-3)"
+                      />
                     </li>
                   ))}
                 </ul>
@@ -493,10 +538,10 @@ function RoundupViewV2({ roundup }: { roundup: Roundup }) {
                 >
                   {event.name}
                 </Link>
-                <span className="ml-2 text-micro text-(--sh-text-3)">
-                  {DATE.format(new Date(`${event.start_date}T00:00:00Z`))}
-                  {event.start_time ? ` · ${event.start_time.slice(0, 5)}` : ""}
-                </span>
+                <RoundupDateLine
+                  event={event}
+                  className="ml-2 text-micro text-(--sh-text-3)"
+                />
               </li>
             ))}
           </ul>

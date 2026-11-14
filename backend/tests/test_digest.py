@@ -78,6 +78,8 @@ ROUNDUP_V2 = {
                     "name": "CPI release",
                     "start_date": "2026-11-18",
                     "start_time": "13:30:00",
+                    "timezone": "America/New_York",
+                    "start_utc": "2026-11-18T13:30:00Z",
                     "path": "/events/finance~test~cpi",
                 }
             ],
@@ -106,11 +108,13 @@ ROUNDUP_V2 = {
     },
     "next_two_weeks": [
         {
-            "id": "finance:test:next",
-            "name": "Employment Situation",
-            "start_date": "2026-11-27",
-            "start_time": "13:30:00",
-            "path": "/events/finance~test~next",
+            "id": "finance:fred_release_dates:53-2026-11",
+            "name": "Gross Domestic Product (November 2026)",
+            "start_date": "2026-11-25",
+            "start_time": "08:30:00",
+            "timezone": "America/New_York",
+            "start_utc": "2026-11-25T13:30:00Z",
+            "path": "/events/finance~fred_release_dates~53-2026-11",
         }
     ],
     "from_record": {
@@ -124,7 +128,7 @@ ROUNDUP_V2 = {
         "regime": "Core Index +13.2 (Steady), +0.4 from last week.",
         "dates": "1 date in 1 theme.",
         "sky": "1 sky event this week.",
-        "activity": "Sky activity ran 40–70, peaking on 2026-11-20.",
+        "activity": "Sky activity ran 40–70, highest on Fri 20 Nov.",
         "next": "1 date in the next two weeks.",
         "record": "From the record: The new moon and the market — No meaningful difference in this record.",
     },
@@ -709,9 +713,25 @@ def test_render_v2_carries_every_section_and_the_new_subject():
     assert rendered.subject == "StrikeHike weekly · 16–22 Nov 2026 · Core Index +13.2"
     for heading in ("SKY THIS WEEK", "SKY ACTIVITY", "NEXT TWO WEEKS", "FROM THE RECORD"):
         assert heading in rendered.text
-    assert "New moon · 17 Nov 2026 · 11:47 UTC" in rendered.text
-    assert "Hubble Space Telescope launched" in rendered.text
-    assert "Employment Situation" in rendered.text
+    assert "New moon · 17 Nov 2026 · 11:47 UTC · 17:17 IST" in rendered.text
+    assert (
+        "CPI release · 18 Nov 2026 · 13:30 UTC · 19:00 IST"
+        in rendered.text
+    )
+    assert (
+        "Gross Domestic Product (November 2026) · 25 Nov 2026 · "
+        "13:30 UTC · 19:00 IST" in rendered.text
+    )
+    assert (
+        "Closest past sky: Hubble Space Telescope launched on Tue 24 Apr 1990 "
+        "(83.8% geometry match)." in rendered.text
+    )
+    assert rendered.text.count("Closest past sky") == 1
+    assert "1990-04-24" not in rendered.text
+    assert "Sky activity ran 40–70, highest on Fri 20 Nov." in rendered.text
+    assert "2026-11-20" not in rendered.text
+    assert "13:30 UTC · 19:00 IST" in rendered.html
+    assert "17:17 IST" in rendered.html
     assert "The new moon and the market" in rendered.text
     assert "No meaningful difference in this record." in rendered.text
     assert "Geometry match compares planet positions only; it predicts nothing." in rendered.text
@@ -719,3 +739,22 @@ def test_render_v2_carries_every_section_and_the_new_subject():
     assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.html
     assert "1 Test Street, Test City" in rendered.html
     assert "<img" not in rendered.html.lower()
+
+
+def test_render_v2_flat_activity_has_no_peak_day():
+    roundup = json.loads(json.dumps(ROUNDUP_V2))
+    roundup["activity"]["min"] = 99
+    roundup["activity"]["max"] = 99
+    roundup["activity"]["peak_date"] = None
+    roundup["lines"]["activity"] = "Sky activity stayed at 99 all week."
+    rendered = render_roundup(
+        roundup,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert "Sky activity stayed at 99 all week." in rendered.text
+    assert "peak" not in rendered.text.lower()
+    assert "1990-04-24" not in rendered.text
+    assert rendered.text.count("Closest past sky") == 1

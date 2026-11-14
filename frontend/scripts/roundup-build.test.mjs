@@ -7,13 +7,24 @@ import {
   weekRange,
 } from "./roundup-build.mjs";
 
-const event = (id, name, date, theme) => ({
+const event = (id, name, date, theme, extra = {}) => ({
   event_id: id,
   name,
   start_date: `${date}T00:00:00`,
   start_time: "08:30:00",
   theme,
+  ...extra,
 });
+
+function isoWeekOf(value) {
+  let target = new Date(`${value}T00:00:00Z`);
+  const day = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - day);
+  const year = target.getUTCFullYear();
+  const first = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(((target - first) / 86_400_000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
 
 test("weekRange is Monday to Sunday and rejects a malformed week", () => {
   assert.deepEqual(weekRange("2026-W46"), {
@@ -304,6 +315,142 @@ test("the v2 fixture carries every section", () => {
   assert.equal(roundup.next_two_weeks.length, 1);
   assert.equal(roundup.from_record.claim_id, "new-moon");
   assert.equal(roundup.lines.sky, "1 sky event this week.");
+  assert.equal("sky_week" in roundup, false);
+  assert.equal(roundup.sky_week_items.length, 1);
+});
+
+test("event times keep their zone and UTC instant; all-day dates keep neither", () => {
+  const upcoming = {
+    themes: {
+      Finance: {
+        events: [
+          event("finance:gdp", "GDP", "2026-11-18", "Finance", {
+            timezone: "America/New_York",
+            start_utc: "2026-11-18T13:30:00Z",
+          }),
+          event("finance:holiday", "Holiday", "2026-11-19", "Finance", {
+            start_time: null,
+          }),
+          event("finance:gdp-next", "GDP next", "2026-11-25", "Finance", {
+            timezone: "America/New_York",
+            start_utc: "2026-11-25T13:30:00Z",
+          }),
+        ],
+      },
+    },
+  };
+  const roundup = buildRoundupV2({
+    week: "2026-W47",
+    upcoming,
+    generatedAt: "2026-11-14T00:00:00.000Z",
+  });
+  const timed = roundup.themes[0].events.find((item) => item.name === "GDP");
+  assert.equal(timed.timezone, "America/New_York");
+  assert.equal(timed.start_utc, "2026-11-18T13:30:00Z");
+
+  const allDay = roundup.themes[0].events.find(
+    (item) => item.name === "Holiday",
+  );
+  assert.equal(allDay.start_time, null);
+  assert.equal("timezone" in allDay, false);
+  assert.equal("start_utc" in allDay, false);
+
+  const next = roundup.next_two_weeks.find(
+    (item) => item.name === "GDP next",
+  );
+  assert.equal(next.timezone, "America/New_York");
+  assert.equal(next.start_utc, "2026-11-25T13:30:00Z");
+});
+
+test("the weekly series has one point per ISO week, latest wins, ending at as_of", () => {
+  const atlas = {
+    meta: {
+      latest_core_index: {
+        date: "2026-11-08",
+        score: 13.18,
+        bucket: "calm_bullish",
+      },
+    },
+    timeline: [
+      { date: "2026-10-16", core_index: 16.53 },
+      { date: "2026-10-23", core_index: 15.76 },
+      { date: "2026-10-30", core_index: 14.9 },
+      { date: "2026-11-06", core_index: 13.18 },
+      { date: "2026-11-08", core_index: 13.18 },
+    ],
+  };
+  const roundup = buildRoundupV2({
+    week: "2026-W47",
+    atlas,
+    generatedAt: "2026-11-14T00:00:00.000Z",
+  });
+  const weekly = roundup.regime.weekly;
+  assert.deepEqual(
+    weekly.map((point) => point.date),
+    ["2026-10-16", "2026-10-23", "2026-10-30", "2026-11-08"],
+  );
+  assert.equal(new Set(weekly.map((point) => isoWeekOf(point.date))).size, 4);
+  assert.equal(weekly.at(-1).date, roundup.regime.as_of);
+  for (let index = 1; index < weekly.length; index += 1) {
+    const gap =
+      (new Date(`${weekly[index].date}T00:00:00Z`) -
+        new Date(`${weekly[index - 1].date}T00:00:00Z`)) /
+      86_400_000;
+    assert.ok(gap >= 7, `${weekly[index].date} is ${gap} days after the prior point`);
+  }
+});
+
+test("flat sky activity has no peak day and stays human", () => {
+  const flat = {
+    ...sky().activity,
+    min: 99,
+    max: 99,
+    peak_date: "2026-11-22",
+  };
+  const roundup = buildRoundupV2({
+    week: "2026-W47",
+    skyWeek: sky({
+      moon_phases: [
+        {
+          kind: "first_quarter",
+          body: "Moon",
+          at: "2026-11-17T11:47:47Z",
+          path: "/upcoming/science",
+        },
+      ],
+      activity: flat,
+    }),
+    generatedAt: "2026-11-14T00:00:00.000Z",
+  });
+  assert.equal(roundup.activity.peak_date, null);
+  assert.equal(flat.peak_date, "2026-11-22");
+  assert.equal(
+    roundup.lines.activity,
+    "Sky activity stayed at 99 all week.",
+  );
+  assert.equal("sky_week" in roundup, false);
+  assert.equal(roundup.sky_week_items[0].label, "First quarter");
+});
+
+test("range sky activity names its highest day in words", () => {
+  const roundup = buildRoundupV2({
+    week: "2026-W47",
+    skyWeek: sky({
+      activity: {
+        ...sky().activity,
+        min: 92,
+        max: 99,
+        peak_date: "2026-11-22",
+      },
+    }),
+    generatedAt: "2026-11-14T00:00:00.000Z",
+  });
+  assert.equal(roundup.activity.peak_date, "2026-11-22");
+  assert.equal(
+    roundup.lines.activity,
+    "Sky activity ran 92–99, highest on Sun 22 Nov.",
+  );
+  assert.equal(roundup.lines.activity.includes("2026-11-22"), false);
 });
 
 test("from the record follows the fixed priority order", () => {

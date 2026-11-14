@@ -186,4 +186,35 @@ test.describe("v2 roundup rendering", () => {
       await context.close();
     });
   }
+
+  test("W47 shows the GDP release in the visitor's zone", async ({ browser }) => {
+    const w47Path = join(
+      process.cwd(),
+      "content",
+      "roundups",
+      "2026-W47.json",
+    );
+    const original = await readFile(w47Path, "utf8");
+    try {
+      const draft = JSON.parse(original);
+      draft.approved = true;
+      await writeFile(w47Path, `${JSON.stringify(draft, null, 2)}\n`, "utf8");
+      const context = await browser.newContext({
+        timezoneId: "Asia/Kolkata",
+        viewport: { width: 1440, height: 900 },
+        colorScheme: "light",
+      });
+      const page = await context.newPage();
+      await page.goto("/this-week/2026-W47", { waitUntil: "networkidle" });
+      const gdp = page
+        .locator("[data-roundup-next] li")
+        .filter({ hasText: "Gross Domestic Product" });
+      await expect(gdp).toContainText("25 Nov");
+      await expect(gdp).toContainText("19:00 IST");
+      await expect(gdp).not.toContainText("08:30");
+      await context.close();
+    } finally {
+      await writeFile(w47Path, original, "utf8");
+    }
+  });
 });

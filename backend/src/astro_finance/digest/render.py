@@ -8,9 +8,12 @@ travels with every send.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from html import escape
 from typing import Any
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
 
 DISCLAIMER = (
     "StrikeHike is descriptive historical research with astronomical context. "
@@ -54,6 +57,11 @@ def _short(value: date) -> str:
     return f"{value.day} {MONTHS[value.month - 1]}"
 
 
+def _human_date(value: str | None) -> str:
+    parsed = _date(value)
+    return parsed.strftime("%a %d %b %Y") if parsed else str(value or "")
+
+
 def week_label(week: str) -> str:
     try:
         year, number = week.split("-W")
@@ -76,13 +84,32 @@ def _join(base_url: str, path: str | None) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
+def _time_pair(start_utc: str | None, start_time: str | None) -> str | None:
+    if start_utc:
+        try:
+            moment = datetime.fromisoformat(
+                str(start_utc).replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+        except ValueError:
+            moment = None
+        if moment is not None:
+            return (
+                f"{moment.strftime('%H:%M')} UTC · "
+                f"{moment.astimezone(IST).strftime('%H:%M')} IST"
+            )
+    if start_time:
+        return str(start_time)[:5]
+    return None
+
+
 def _event_line(event: dict[str, Any]) -> str:
     when = _date(str(event.get("start_date") or ""))
     bits = [str(event.get("name") or "Untitled date")]
     if when:
         bits.append(when.strftime("%d %b %Y"))
-    if event.get("start_time"):
-        bits.append(str(event["start_time"])[:5])
+    time = _time_pair(event.get("start_utc"), event.get("start_time"))
+    if time:
+        bits.append(time)
     return " · ".join(bits)
 
 
@@ -107,7 +134,11 @@ def _sky_event_line(event: dict[str, Any]) -> str:
         moment = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
     except ValueError:
         return label
-    return f"{label} · {moment.strftime('%d %b %Y')} · {moment.strftime('%H:%M')} UTC"
+    return (
+        f"{label} · {moment.strftime('%d %b %Y')} · "
+        f"{moment.strftime('%H:%M')} UTC · "
+        f"{moment.astimezone(IST).strftime('%H:%M')} IST"
+    )
 
 
 def _html_link(label: str, path: str | None, base_url: str) -> str:
@@ -251,13 +282,13 @@ def render_roundup(
                 f"/?d={closest.get('date')}" if closest.get("date") else None
             )
             text_parts.append(
-                f"Closest past sky: {closest.get('name')} on {closest.get('date')} "
+                f"Closest past sky: {closest.get('name')} on {_human_date(closest.get('date'))} "
                 f"({closest.get('similarity_percent')}% geometry match)."
             )
             html_parts.append(
                 '<p style="margin:0 0 8px;color:#555">Closest past sky: '
                 f"{_html_link(str(closest.get('name') or 'past date'), closest_path, base_url)} "
-                f"on {escape(str(closest.get('date') or ''))} "
+                f"on {escape(_human_date(closest.get('date')))} "
                 f"({escape(str(closest.get('similarity_percent') or ''))}% geometry match).</p>"
             )
         note = str(activity.get("note") or "").strip()

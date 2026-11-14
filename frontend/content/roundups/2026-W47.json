@@ -3,7 +3,7 @@
   "week": "2026-W47",
   "start": "2026-11-16",
   "end": "2026-11-22",
-  "generated_at": "2026-11-14T06:30:59.941Z",
+  "generated_at": "2026-11-14T08:02:13.593Z",
   "approved": false,
   "regime": {
     "as_of": "2026-11-08",
@@ -13,6 +13,10 @@
     "change": -1.7,
     "weekly": [
       {
+        "date": "2026-10-16",
+        "score": 16.53
+      },
+      {
         "date": "2026-10-23",
         "score": 15.76
       },
@@ -21,81 +25,10 @@
         "score": 14.9
       },
       {
-        "date": "2026-11-06",
-        "score": 13.18
-      },
-      {
         "date": "2026-11-08",
         "score": 13.18
       }
     ]
-  },
-  "sky_week": {
-    "start": "2026-11-16",
-    "end": "2026-11-22",
-    "source": "Swiss Ephemeris 2.10.03 · Lahiri sidereal",
-    "moon_phases": [
-      {
-        "kind": "first_quarter",
-        "body": "Moon",
-        "at": "2026-11-17T11:47:47Z",
-        "path": "/upcoming/science"
-      }
-    ],
-    "stations": [],
-    "ingresses": [
-      {
-        "kind": "ingress",
-        "body": "Sun",
-        "at": "2026-11-17T11:15:09Z",
-        "path": "/upcoming/science",
-        "rashi": 7
-      }
-    ],
-    "eclipses": [],
-    "seasons": [],
-    "conjunctions": [],
-    "activity": {
-      "daily": [
-        {
-          "date": "2026-11-16",
-          "score": 99
-        },
-        {
-          "date": "2026-11-17",
-          "score": 99
-        },
-        {
-          "date": "2026-11-18",
-          "score": 99
-        },
-        {
-          "date": "2026-11-19",
-          "score": 99
-        },
-        {
-          "date": "2026-11-20",
-          "score": 99
-        },
-        {
-          "date": "2026-11-21",
-          "score": 99
-        },
-        {
-          "date": "2026-11-22",
-          "score": 99
-        }
-      ],
-      "min": 99,
-      "max": 99,
-      "peak_date": "2026-11-22",
-      "closest_past": {
-        "date": "1970-11-12",
-        "name": "Bhola cyclone",
-        "similarity_percent": 80.4
-      },
-      "note": "Geometry match compares planet positions only; it predicts nothing."
-    }
   },
   "sky_week_items": [
     {
@@ -147,7 +80,7 @@
     ],
     "min": 99,
     "max": 99,
-    "peak_date": "2026-11-22",
+    "peak_date": null,
     "closest_past": {
       "date": "1970-11-12",
       "name": "Bhola cyclone",
@@ -162,6 +95,8 @@
       "theme": "Finance",
       "start_date": "2026-11-25",
       "start_time": "08:30:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-11-25T13:30:00Z",
       "path": "/events/finance~fred_release_dates~53-2026-11"
     },
     {
@@ -170,6 +105,8 @@
       "theme": "Finance",
       "start_date": "2026-11-25",
       "start_time": "08:30:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-11-25T13:30:00Z",
       "path": "/events/finance~fred_release_dates~54-2026-11"
     },
     {
@@ -178,13 +115,15 @@
       "theme": "Finance",
       "start_date": "2026-12-04",
       "start_time": "08:30:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-12-04T13:30:00Z",
       "path": "/events/finance~fred_release_dates~50-2026-12"
     }
   ],
   "lines": {
     "regime": "Core Index +13.2 (Steady), -1.7 from last week.",
     "sky": "2 sky events this week.",
-    "activity": "Sky activity was 99 all week (peak day 2026-11-22); the closest past sky was 1970-11-12 at 80.4% geometry match.",
+    "activity": "Sky activity stayed at 99 all week.",
     "next": "3 dates in the next two weeks."
   }
 }

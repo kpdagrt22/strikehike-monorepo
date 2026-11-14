@@ -6,6 +6,8 @@ export type RoundupDate = {
   name: string;
   start_date: string;
   start_time: string | null;
+  timezone?: string | null;
+  start_utc?: string | null;
   path: string;
 };
 export type RoundupTheme = { id: string; name: string; events: RoundupDate[] };
@@ -24,7 +26,7 @@ export type RoundupActivity = {
   daily: { date: string; score: number }[];
   min: number;
   max: number;
-  peak_date: string;
+  peak_date: string | null;
   closest_past: {
     date: string;
     name: string;

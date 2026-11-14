@@ -29,6 +29,42 @@ const PHASE_LABELS = {
   full_moon: "Full moon",
   last_quarter: "Last quarter",
 };
+const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function humanDate(value) {
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return `${WEEKDAY[date.getUTCDay()]} ${date.getUTCDate()} ${
+    MONTH[date.getUTCMonth()]
+  }`;
+}
+
+function isoWeekKey(value) {
+  const date = new Date(`${value}T00:00:00Z`);
+  const target = new Date(date);
+  const day = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - day);
+  const year = target.getUTCFullYear();
+  const first = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(
+    ((target.getTime() - first.getTime()) / DAY + 1) / 7,
+  );
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
 
 export function weekRange(value) {
   const match = /^(\d{4})-W(\d{2})$/.exec(value ?? "");
@@ -84,19 +120,54 @@ function regimeSection(atlas, { weekly = false } = {}) {
         : Number((score - previousScore).toFixed(1)),
   };
   if (weekly) {
-    result.weekly = [...timeline]
-      .filter(
+    const points = [
+      ...timeline.filter(
         (point) =>
           point?.date &&
           point.date <= latest.date &&
           Number.isFinite(Number(point.core_index)),
-      )
+      ),
+      { date: latest.date, core_index: score },
+    ];
+    const byWeek = new Map();
+    for (const point of points) {
+      const key = isoWeekKey(point.date);
+      const current = byWeek.get(key);
+      if (!current || point.date > current.date) byWeek.set(key, point);
+    }
+    const selected = [...byWeek.values()]
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-4)
       .map((point) => ({
         date: point.date,
         score: Number(point.core_index),
       }));
+    // Keep the points at least seven days apart, while the last point stays
+    // the latest reading (as_of).
+    const spaced = [];
+    for (const point of selected) {
+      if (
+        spaced.length &&
+        (new Date(`${point.date}T00:00:00Z`).getTime() -
+          new Date(`${spaced.at(-1).date}T00:00:00Z`).getTime()) /
+          DAY <
+          7
+      ) {
+        spaced[spaced.length - 1] = point;
+        while (
+          spaced.length > 1 &&
+          (new Date(`${spaced.at(-1).date}T00:00:00Z`).getTime() -
+            new Date(`${spaced.at(-2).date}T00:00:00Z`).getTime()) /
+            DAY <
+            7
+        ) {
+          spaced.splice(-2, 1);
+        }
+      } else {
+        spaced.push(point);
+      }
+    }
+    result.weekly = spaced;
   }
   return result;
 }
@@ -131,6 +202,12 @@ function dateSections(upcoming, range) {
       name: event.name,
       start_date: dateOf(event),
       start_time: event.start_time ?? null,
+      ...(event.start_time
+        ? {
+            timezone: event.timezone ?? null,
+            start_utc: event.start_utc ?? null,
+          }
+        : {}),
       path: `/events/${String(event.event_id).replaceAll(":", "~")}`,
     });
   }
@@ -210,6 +287,12 @@ function flatVisibleEvents(upcoming, start, end, limit) {
     theme: event.theme,
     start_date: dateOf(event),
     start_time: event.start_time ?? null,
+    ...(event.start_time
+      ? {
+          timezone: event.timezone ?? null,
+          start_utc: event.start_utc ?? null,
+        }
+      : {}),
     path: `/events/${String(event.event_id).replaceAll(":", "~")}`,
   }));
 }
@@ -294,7 +377,10 @@ export function buildRoundupV2({
   const regime = regimeSection(atlas, { weekly: true });
   const { themes, sky: inWeekSky, count } = dateSections(upcoming, range);
   const sky = skyItems(skyWeek);
-  const activity = skyWeek?.activity ?? null;
+  const activity = skyWeek?.activity ? { ...skyWeek.activity } : null;
+  if (activity && activity.min === activity.max) {
+    activity.peak_date = null;
+  }
   const nextStart = new Date(`${range.end}T00:00:00Z`);
   nextStart.setUTCDate(nextStart.getUTCDate() + 1);
   const nextEnd = new Date(nextStart);
@@ -324,16 +410,12 @@ export function buildRoundupV2({
     lines.sky = `${sky.length} sky ${sky.length === 1 ? "event" : "events"} this week.`;
   }
   if (activity?.daily?.length) {
-    const closest = activity.closest_past;
-    const range =
+    lines.activity =
       activity.min === activity.max
-        ? `Sky activity was ${activity.min} all week (peak day ${activity.peak_date})`
-        : `Sky activity ran ${activity.min}–${activity.max}, peaking on ${activity.peak_date}`;
-    lines.activity = `${range}${
-      closest
-        ? `; the closest past sky was ${closest.date} at ${closest.similarity_percent}% geometry match`
-        : ""
-    }.`;
+        ? `Sky activity stayed at ${activity.min} all week.`
+        : `Sky activity ran ${activity.min}–${activity.max}, highest on ${humanDate(
+            activity.peak_date,
+          )}.`;
   }
   if (next_two_weeks.length > 0) {
     lines.next = `${next_two_weeks.length} ${
@@ -352,7 +434,7 @@ export function buildRoundupV2({
     approved: false,
     ...(regime ? { regime } : {}),
     ...(themes.length ? { themes } : {}),
-    ...(sky.length ? { sky_week: skyWeek, sky_week_items: sky } : {}),
+    ...(sky.length ? { sky_week_items: sky } : {}),
     ...(activity ? { activity } : {}),
     ...(next_two_weeks.length ? { next_two_weeks } : {}),
     ...(from_record ? { from_record } : {}),

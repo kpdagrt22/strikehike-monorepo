@@ -34,6 +34,15 @@ test("New York follows EST and EDT", () => {
   assert.equal(zoneLabel(summer, "America/New_York"), "EDT");
 });
 
+test("New York crosses the DST change without shifting the UTC instant", () => {
+  const before = "2026-10-30T13:30:00Z";
+  const after = "2026-11-02T13:30:00Z";
+  assert.equal(timeLabel(before, "America/New_York"), "09:30");
+  assert.equal(zoneLabel(before, "America/New_York"), "EDT");
+  assert.equal(timeLabel(after, "America/New_York"), "08:30");
+  assert.equal(zoneLabel(after, "America/New_York"), "EST");
+});
+
 test("an all-day date is never shifted", () => {
   assert.equal(allDayLabel("2026-12-21", "Asia/Kolkata"), "Mon 21 Dec");
   assert.equal(allDayLabel("2026-12-21", "America/New_York"), "Mon 21 Dec");

@@ -28,6 +28,8 @@
           "name": "CPI release",
           "start_date": "2098-12-31",
           "start_time": "13:30:00",
+          "timezone": "America/New_York",
+          "start_utc": "2098-12-31T18:30:00Z",
           "path": "/events/finance~test~cpi"
         }
       ]
@@ -75,6 +77,8 @@
       "name": "Employment Situation",
       "start_date": "2099-01-08",
       "start_time": "13:30:00",
+      "timezone": "America/New_York",
+      "start_utc": "2099-01-08T13:30:00Z",
       "path": "/events/finance~test~next"
     }
   ],
@@ -89,7 +93,7 @@
     "regime": "Core Index +13.2 (Steady), +0.4 from last week.",
     "dates": "1 date in 1 theme.",
     "sky": "2 sky events this week.",
-    "activity": "Sky activity ran 40–70, peaking on 2099-01-01; the closest past sky was 1990-04-24 at 83.8% geometry match.",
+    "activity": "Sky activity ran 40–70, highest on Thu 01 Jan.",
     "next": "1 date in the next two weeks.",
     "record": "From the record: The new moon and the market — No meaningful difference in this record."
   }
