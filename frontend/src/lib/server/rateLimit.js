@@ -4,6 +4,13 @@
 
 export const API_LIMIT_PER_MINUTE = 240;
 export const DAILY_LIMIT_PER_MINUTE = 60;
+export const SKY_LIMIT_PER_MINUTE = 30;
+export const CHRONO_LIMIT_PER_MINUTE = 60;
+/** @type {Readonly<Record<string, number>>} */
+export const ROUTE_LIMITS = Object.freeze({
+  "/api/v1/sky/week": SKY_LIMIT_PER_MINUTE,
+  "/api/chrono/positions": CHRONO_LIMIT_PER_MINUTE,
+});
 export const IDLE_BUCKET_MS = 10 * 60_000;
 export const MAX_BUCKETS = 10_000;
 const SWEEP_INTERVAL_MS = 60_000;
@@ -38,6 +45,7 @@ function retrySeconds(bucket, perMinute) {
 export function createRateLimiter({
   apiPerMinute = API_LIMIT_PER_MINUTE,
   dailyPerMinute = DAILY_LIMIT_PER_MINUTE,
+  routeLimits = ROUTE_LIMITS,
   idleMs = IDLE_BUCKET_MS,
   maxKeys = MAX_BUCKETS,
   now = () => Date.now(),
@@ -71,6 +79,7 @@ export function createRateLimiter({
       state = {
         api: { ...bucketFor(nowMs), tokens: apiPerMinute },
         daily: { ...bucketFor(nowMs), tokens: dailyPerMinute },
+        routes: new Map(),
         lastSeen: nowMs,
       };
     }
@@ -80,30 +89,51 @@ export function createRateLimiter({
     return state;
   }
 
-  function consume(ip, daily = false) {
+  /**
+   * @param {string} ip
+   * @param {boolean} [daily]
+   * @param {string | null} [route]
+   */
+  function consume(ip, daily = false, route = null) {
     const nowMs = now();
     const state = stateFor(ip, nowMs);
     state.lastSeen = nowMs;
+
+    const routeLimit = route ? routeLimits[route] : undefined;
+    let routeState = null;
+    if (routeLimit) {
+      routeState = state.routes.get(route);
+      if (!routeState) {
+        routeState = { tokens: routeLimit, updatedAt: nowMs };
+        state.routes.set(route, routeState);
+      }
+    }
 
     refill(state.api, apiPerMinute, apiPerMinute, nowMs);
     if (daily) {
       refill(state.daily, dailyPerMinute, dailyPerMinute, nowMs);
     }
+    if (routeState && routeLimit) {
+      refill(routeState, routeLimit, routeLimit, nowMs);
+    }
 
     const apiBlocked = state.api.tokens < 1;
     const dailyBlocked = daily && state.daily.tokens < 1;
-    if (apiBlocked || dailyBlocked) {
+    const routeBlocked = Boolean(routeState && routeState.tokens < 1);
+    if (apiBlocked || dailyBlocked || routeBlocked) {
       return {
         allowed: false,
         retryAfterSeconds: Math.max(
           apiBlocked ? retrySeconds(state.api, apiPerMinute) : 0,
           dailyBlocked ? retrySeconds(state.daily, dailyPerMinute) : 0,
+          routeBlocked ? retrySeconds(routeState, routeLimit) : 0,
         ),
       };
     }
 
     state.api.tokens -= 1;
     if (daily) state.daily.tokens -= 1;
+    if (routeState) routeState.tokens -= 1;
     return { allowed: true, retryAfterSeconds: 0 };
   }
 

@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { clientIpFromHeaders, rateLimit } from "@/lib/server/rateLimit";
+import {
+  clientIpFromHeaders,
+  rateLimit,
+  ROUTE_LIMITS,
+} from "@/lib/server/rateLimit";
 
 // Public proxy routes only. The internal bundle health read in routeCache goes
 // straight to the backend, so it never passes through this limiter.
@@ -7,7 +11,9 @@ export function proxy(request: NextRequest) {
   const directIp = (request as NextRequest & { ip?: string }).ip;
   const ip = clientIpFromHeaders(request.headers, directIp);
   const daily = request.nextUrl.searchParams.get("resolution") === "daily";
-  const result = rateLimit.consume(ip, daily);
+  const pathname = request.nextUrl.pathname.replace(/\/+$/, "") || "/";
+  const route = ROUTE_LIMITS[pathname] !== undefined ? pathname : null;
+  const result = rateLimit.consume(ip, daily, route);
 
   if (!result.allowed) {
     return NextResponse.json(

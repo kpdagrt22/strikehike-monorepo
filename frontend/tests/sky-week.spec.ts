@@ -43,4 +43,22 @@ test.describe("public sky-week route", () => {
     expect(await noisy.json()).toEqual(await clean.json());
     expect(noisy.headers()["cache-control"]).toContain("max-age=86400");
   });
+
+  test("the 31st sky-week request in a minute gets 429", async ({ request }) => {
+    const headers = { "x-forwarded-for": "203.0.113.31" };
+    for (let index = 0; index < 30; index += 1) {
+      const response = await request.get(
+        "/api/v1/sky/week?start=2026-11-16",
+        { headers },
+      );
+      expect(response.status(), `request ${index + 1}`).toBe(200);
+    }
+    const blocked = await request.get(
+      "/api/v1/sky/week?start=2026-11-16",
+      { headers },
+    );
+    expect(blocked.status()).toBe(429);
+    expect(blocked.headers()["retry-after"]).toMatch(/^\d+$/);
+    expect(await blocked.json()).toEqual({ detail: "Too many requests" });
+  });
 });
