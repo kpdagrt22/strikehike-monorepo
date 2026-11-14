@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from astro_finance import sky_week as sky_week_module
 from astro_finance.sky_week import router, sky_week
 
 UTC = timezone.utc
@@ -56,11 +59,67 @@ def test_sky_activity_has_seven_days_and_a_closest_past_match():
     assert len(activity["daily"]) == 7
     assert activity["min"] <= activity["max"]
     assert activity["peak_date"] in {item["date"] for item in activity["daily"]}
-    assert activity["closest_past"]["date"] < payload["start"]
-    assert 0 <= activity["closest_past"]["similarity_percent"] <= 100
+    closest = activity["closest_past"]
+    assert closest["date"] < payload["start"]
+    assert closest["for_date"] == payload["start"]
+    assert closest["category"] == "Finance"
+    assert closest["name"] == "Black Wednesday"
+    assert closest["date"] == "1992-09-16"
+    assert closest["similarity_percent"] == 79.5
+    assert 0 <= closest["similarity_percent"] <= 100
     assert activity["note"] == (
         "Geometry match compares planet positions only; it predicts nothing."
     )
+
+
+def test_sky_activity_returns_no_closest_when_every_match_is_hidden(monkeypatch):
+    def fake(target_date, limit=1, **kwargs):
+        return {
+            "energy": {"score": 50},
+            "matches": [
+                {
+                    "date": "1970-11-12",
+                    "name": "Bhola cyclone",
+                    "category": "Natural Disasters",
+                    "similarity_percent": 80.4,
+                },
+                {
+                    "date": "2024-11-05",
+                    "name": "Trump wins US election",
+                    "category": "Politics",
+                    "similarity_percent": 78.2,
+                },
+            ],
+        }
+
+    monkeypatch.setattr(
+        sky_week_module, "find_historical_parallels", fake
+    )
+    result = sky_week_module.activity(
+        datetime(2026, 11, 16, tzinfo=UTC),
+        datetime(2026, 11, 23, tzinfo=UTC),
+    )
+    assert result["closest_past"] is None
+
+
+def test_hidden_categories_match_the_roundup_builder():
+    builder = (
+        Path(__file__).resolve().parents[2]
+        / "frontend"
+        / "scripts"
+        / "roundup-build.mjs"
+    )
+    source = builder.read_text(encoding="utf-8")
+    match = re.search(
+        r"HIDDEN_THEMES\s*=\s*new Set\(\[(.*?)\]\)", source, re.S
+    )
+    assert match, "roundup-build.mjs must declare HIDDEN_THEMES"
+    js_categories = {
+        part.strip().strip("\"'")
+        for part in match.group(1).split(",")
+        if part.strip()
+    }
+    assert js_categories == set(sky_week_module.HIDDEN_CATEGORIES)
 
 
 def test_every_sky_item_falls_inside_the_week():
@@ -84,3 +143,15 @@ def test_route_serves_a_week_and_rejects_a_bad_start():
     assert body["end"] == "2024-04-14"
     assert body["moon_phases"]
     assert client.get("/api/v1/sky/week?start=not-a-date").status_code == 422
+
+
+def test_route_serves_the_hidden_safe_closest_past():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    client = TestClient(app)
+    body = client.get("/api/v1/sky/week?start=2026-11-16").json()
+    closest = body["activity"]["closest_past"]
+    assert closest["name"] == "Black Wednesday"
+    assert closest["category"] == "Finance"
+    assert closest["for_date"] == "2026-11-16"
+    assert closest["similarity_percent"] == 79.5

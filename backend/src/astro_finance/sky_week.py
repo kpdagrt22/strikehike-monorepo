@@ -46,6 +46,10 @@ PHASES = (
 )
 SOURCE = "Swiss Ephemeris 2.10.03 · Lahiri sidereal"
 ACTIVITY_NOTE = "Geometry match compares planet positions only; it predicts nothing."
+# The roundup hides these categories from every date list. The sky-week
+# closest-past pick must follow the same rule, so a mass-casualty event or a
+# political event never becomes the "closest past sky" line.
+HIDDEN_CATEGORIES = frozenset({"Politics", "Natural Disasters"})
 
 router = APIRouter(prefix="/sky", tags=["sky"])
 
@@ -287,19 +291,27 @@ def activity(start: datetime, end: datetime) -> dict[str, Any]:
         )
         cursor += timedelta(days=1)
     peak = max(daily, key=lambda item: (item["score"], item["date"]))
-    peak_result = find_historical_parallels(peak["date"], limit=1)
-    matches = peak_result.get("matches") or []
+    low = min(item["score"] for item in daily)
+    # A flat week has no peak day: use its first day (Monday). A range uses the
+    # peak day, where the activity is highest.
+    for_date = daily[0]["date"] if peak["score"] == low else peak["date"]
+    result = find_historical_parallels(for_date, limit=2)
+    matches = result.get("matches") or []
     closest = None
-    if matches:
-        match = matches[0]
+    for match in matches:
+        if str(match.get("category") or "") in HIDDEN_CATEGORIES:
+            continue
         closest = {
             "date": match.get("date"),
             "name": match.get("name"),
+            "category": match.get("category"),
+            "for_date": for_date,
             "similarity_percent": match.get("similarity_percent"),
         }
+        break
     return {
         "daily": daily,
-        "min": min(item["score"] for item in daily),
+        "min": low,
         "max": peak["score"],
         "peak_date": peak["date"],
         "closest_past": closest,
@@ -308,6 +320,7 @@ def activity(start: datetime, end: datetime) -> dict[str, Any]:
 
 
 def sky_week(start: date) -> dict[str, Any]:
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
     begin = datetime.combine(start, time.min, tzinfo=UTC)
     end = begin + timedelta(days=7)
     return {

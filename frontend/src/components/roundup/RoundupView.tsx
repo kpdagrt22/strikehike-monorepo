@@ -17,6 +17,36 @@ const DATE = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function humanDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`);
+  return `${WEEKDAY[date.getUTCDay()]} ${date.getUTCDate()} ${
+    MONTH[date.getUTCMonth()]
+  } ${date.getUTCFullYear()}`;
+}
+
+function humanShortDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`);
+  return `${WEEKDAY[date.getUTCDay()]} ${date.getUTCDate()} ${
+    MONTH[date.getUTCMonth()]
+  }`;
+}
+
 // Signed, one decimal, with a true minus sign.
 function signed(value: number) {
   const text = Math.abs(value).toFixed(1);
@@ -467,16 +497,23 @@ function RoundupViewV2({ roundup }: { roundup: Roundup }) {
             .
           </p>
           {activity.closest_past ? (
-            <p className="mt-1 text-micro text-(--sh-text-3)">
-              Closest past sky:{" "}
+            <p
+              data-roundup-closest-past
+              className="mt-1 text-micro text-(--sh-text-3)"
+            >
+              Closest past sky to{" "}
+              {humanShortDate(
+                activity.closest_past.for_date ??
+                  activity.peak_date ??
+                  roundup.start,
+              )}:{" "}
               <Link
                 href={`/?d=${activity.closest_past.date}`}
                 className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
               >
                 {activity.closest_past.name}
-              </Link>{" "}
-              on {DATE.format(new Date(`${activity.closest_past.date}T00:00:00Z`))} ·{" "}
-              {activity.closest_past.similarity_percent}% geometry match.
+              </Link>, {humanDate(activity.closest_past.date)}{" "}
+              ({activity.closest_past.similarity_percent}% geometry match).
             </p>
           ) : null}
           <p className="mt-2 text-micro leading-relaxed text-(--sh-text-3)">

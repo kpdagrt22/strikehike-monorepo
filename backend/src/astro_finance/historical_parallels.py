@@ -121,6 +121,7 @@ def _is_hard_aspect(a: float, b: float) -> bool:
 
 def geometry_for_date(date_str: str) -> dict:
     """Compute 9-body sidereal geometry at 00:00 UTC for a calendar date."""
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
     event_date = date.fromisoformat(date_str)
     if event_date < MIN_DATE or event_date > MAX_DATE:
         raise ValueError(
@@ -146,6 +147,7 @@ def geometry_for_date(date_str: str) -> dict:
 
 def geometry_for_datetime(datetime_str: str) -> dict:
     """Compute 9-body sidereal geometry for an exact UTC minute."""
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
     try:
         target = datetime.fromisoformat(datetime_str)
     except (TypeError, ValueError) as exc:

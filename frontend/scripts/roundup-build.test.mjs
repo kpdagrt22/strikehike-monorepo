@@ -225,6 +225,8 @@ const sky = (overrides = {}) => ({
     closest_past: {
       date: "1990-04-24",
       name: "Hubble launch",
+      category: "Science",
+      for_date: "2026-11-17",
       similarity_percent: 80,
     },
     note: "Geometry match compares planet positions only; it predicts nothing.",
@@ -391,6 +393,10 @@ test("the weekly series has one point per ISO week, latest wins, ending at as_of
   );
   assert.equal(new Set(weekly.map((point) => isoWeekOf(point.date))).size, 4);
   assert.equal(weekly.at(-1).date, roundup.regime.as_of);
+  assert.equal(
+    roundup.lines.regime,
+    "Core Index +13.2 (Steady), −1.7 from the week before.",
+  );
   for (let index = 1; index < weekly.length; index += 1) {
     const gap =
       (new Date(`${weekly[index].date}T00:00:00Z`) -
@@ -451,6 +457,25 @@ test("range sky activity names its highest day in words", () => {
     "Sky activity ran 92–99, highest on Sun 22 Nov.",
   );
   assert.equal(roundup.lines.activity.includes("2026-11-22"), false);
+});
+
+test("a null closest past writes no closest line", () => {
+  const roundup = buildRoundupV2({
+    week: "2026-W47",
+    skyWeek: sky({
+      activity: {
+        ...sky().activity,
+        closest_past: null,
+      },
+    }),
+    generatedAt: "2026-11-14T00:00:00.000Z",
+  });
+  assert.equal(roundup.activity.closest_past, null);
+  assert.equal(
+    roundup.lines.activity,
+    "Sky activity ran 40–55, highest on Tue 17 Nov.",
+  );
+  assert.equal(roundup.lines.activity.includes("Closest past"), false);
 });
 
 test("from the record follows the fixed priority order", () => {

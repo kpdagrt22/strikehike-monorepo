@@ -30,6 +30,8 @@ export type RoundupActivity = {
   closest_past: {
     date: string;
     name: string;
+    category?: string;
+    for_date?: string;
     similarity_percent: number;
   } | null;
   note: string;

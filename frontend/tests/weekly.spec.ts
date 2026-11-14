@@ -154,6 +154,10 @@ test.describe("v2 roundup rendering", () => {
       await expect(page.locator("[data-roundup-activity]")).toContainText(
         "Geometry match compares planet positions only",
       );
+      await expect(page.locator("[data-roundup-closest-past]")).toContainText(
+        "Closest past sky to Thu 1 Jan: Hubble Space Telescope launched, " +
+          "Tue 24 Apr 1990 (83.8% geometry match).",
+      );
       await expect(page.locator("[data-roundup-next]")).toContainText(
         "Employment Situation",
       );
@@ -216,5 +220,21 @@ test.describe("v2 roundup rendering", () => {
     } finally {
       await writeFile(w47Path, original, "utf8");
     }
+  });
+
+  test("FOMC shows the IST date when it differs", async ({ browser }) => {
+    const context = await browser.newContext({
+      timezoneId: "Asia/Kolkata",
+      viewport: { width: 1440, height: 900 },
+    });
+    const page = await context.newPage();
+    await page.goto("/this-week/2099-W01", { waitUntil: "networkidle" });
+    const fomc = page
+      .locator("[data-roundup-next] li")
+      .filter({ hasText: "FOMC meeting" });
+    await expect(fomc).toContainText("Thu 10 Dec");
+    await expect(fomc).toContainText("00:30 IST");
+    await expect(fomc).not.toContainText("Wed 9 Dec");
+    await context.close();
   });
 });
