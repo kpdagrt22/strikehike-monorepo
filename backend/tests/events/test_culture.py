@@ -5,10 +5,9 @@ References used here:
   https://www.hko.gov.hk/en/gts/time/conversion.htm
 * Hebcal, Hebrew calendar and holiday dates:
   https://www.hebcal.com/
-* Government of India, DoPT Office Memorandum, holidays for 2027:
+* Government of India, DoPT Office Memorandum, holidays for 2027 (Holi,
+  Diwali, Id-ul-Fitr and Id-ul-Zuha):
   https://documents.doptcirculars.nic.in/D2/D02est/Holiday%20list%202027Cj0HU.PDF
-* Umm al-Qura calendar, Saudi Arabia:
-  https://www.ummulqura.org.sa/
 """
 
 from __future__ import annotations
