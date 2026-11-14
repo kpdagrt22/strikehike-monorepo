@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+from pathlib import Path
 
 import httpx
 import pytest
@@ -196,6 +197,17 @@ def token_from(text: str, purpose: str = "confirm") -> str:
 
 def unsubscribe_token(row: dict) -> str:
     return sign_token(SECRET, "unsub", int(row["id"]), str(row["token_nonce"]))
+
+
+def assert_image_tags(html: str) -> None:
+    tags = re.findall(r"<img\b[^>]*>", html, flags=re.I)
+    assert tags, "the email should carry its hosted images"
+    for tag in tags:
+        assert "alt=" in tag, tag
+        assert "width=" in tag, tag
+        assert "height=" in tag, tag
+        assert 'width="1"' not in tag, tag
+        assert 'height="1"' not in tag, tag
 
 
 @pytest.fixture
@@ -413,12 +425,39 @@ def test_dry_run_writes_one_sample_and_sends_nothing(tmp_path, digest):
     assert store.send_counts("2026-W46") == {}
 
 
+def test_preview_send_goes_to_one_address_and_is_not_recorded(digest):
+    _, store, _ = digest
+    mailer = FakeMailer()
+    result = send_week(
+        "2026-W46",
+        dry_run=False,
+        store=store,
+        mailer=mailer,
+        fetch=lambda week: ROUNDUP,
+        ledger=LEDGER_ENTRY,
+        preview_to="owner@example.com",
+    )
+    assert result.preview is True
+    assert result.sent == 1
+    assert result.recipients == 1
+    assert len(mailer.sent) == 1
+    mail = mailer.sent[0]
+    assert mail.to == "owner@example.com"
+    assert mail.subject.startswith("[Preview] ")
+    assert mail.headers["List-Unsubscribe"].startswith(
+        "<https://strikehike.com/api/digest/unsubscribe?t="
+    )
+    assert mail.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+    assert "Unsubscribe in one click" in mail.html
+    assert "1 Test Street, Test City" in mail.html
+    assert store.send_counts("2026-W46") == {}
+
+
 def test_send_is_idempotent_and_uses_unsubscribe_headers(digest):
     _, store, _ = digest
     add_active(store, "one@example.com")
     add_active(store, "two@example.com")
     mailer = FakeMailer()
-
     first = send_week(
         "2026-W46",
         dry_run=False,
@@ -730,9 +769,11 @@ def test_render_has_no_tracking_and_carries_the_footer():
     assert "You're getting this because you subscribed on strikehike.com." in rendered.text
     assert "not investment advice and not a forecast" in rendered.text
     assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.text
-    assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.html
+    assert "Ledger #1" in rendered.html
+    assert "aaaaaaaaaaaa" in rendered.html
+    assert "strikehike.com/ledger" in rendered.html
     assert "1 Test Street, Test City" in rendered.text
-    assert "<img" not in rendered.html.lower()
+    assert_image_tags(rendered.html)
     assert "https://strikehike.com/this-week/2026-W46" in rendered.text
     assert rendered.subject == "StrikeHike weekly · 9–15 Nov 2026"
 
@@ -768,15 +809,18 @@ def test_render_v2_carries_every_section_and_the_new_subject():
     assert "1990-04-24" not in rendered.text
     assert "Sky activity ran 40–70, highest on Fri 20 Nov." in rendered.text
     assert "2026-11-20" not in rendered.text
-    assert "13:30 UTC · 19:00 IST" in rendered.html
+    assert "19:00 IST" in rendered.html
+    assert "13:30 UTC" in rendered.html
     assert "17:17 IST" in rendered.html
     assert "The new moon and the market" in rendered.text
     assert "No meaningful difference in this record." in rendered.text
     assert "Geometry match compares planet positions only; it predicts nothing." in rendered.text
     assert "Unsubscribe in one click" in rendered.html
-    assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.html
+    assert "Ledger #1" in rendered.html
+    assert "aaaaaaaaaaaa" in rendered.html
+    assert "strikehike.com/ledger" in rendered.html
     assert "1 Test Street, Test City" in rendered.html
-    assert "<img" not in rendered.html.lower()
+    assert_image_tags(rendered.html)
 
 
 def test_render_v2_prints_the_ist_date_when_it_differs():
@@ -795,8 +839,10 @@ def test_render_v2_prints_the_ist_date_when_it_differs():
         "December solstice · Mon 21 Dec 2026 · 20:50 UTC · 02:20 IST "
         "(Tue 22 Dec)" in rendered.text
     )
-    assert "00:30 IST (Thu 10 Dec)" in rendered.html
-    assert "02:20 IST (Tue 22 Dec)" in rendered.html
+    assert "00:30 IST" in rendered.html
+    assert "Thu 10 Dec" in rendered.html
+    assert "02:20 IST" in rendered.html
+    assert "Tue 22 Dec" in rendered.html
 
 
 def test_render_v2_without_closest_past_omits_the_line():
@@ -830,3 +876,68 @@ def test_render_v2_flat_activity_has_no_peak_day():
     assert "peak" not in rendered.text.lower()
     assert "1990-04-24" not in rendered.text
     assert rendered.text.count("Closest past sky") == 1
+
+
+def test_render_v2_carries_calendar_actions_and_the_week_calendar():
+    rendered = render_roundup(
+        ROUNDUP_V2,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert "calendar.google.com/calendar/render?action=TEMPLATE" in rendered.html
+    assert "outlook.live.com/calendar/0/action/compose" in rendered.html
+    assert "/calendar/event/finance~test~cpi.ics" in rendered.html
+    assert "/this-week/2026-W47/calendar/new-moon" in rendered.html
+    assert "/this-week/2026-W47/calendar.ics" in rendered.html
+    assert "webcal://strikehike.com/calendar/all.ics" in rendered.html
+    assert (
+        "calendar.google.com/calendar/r?cid=webcal://strikehike.com/calendar/all.ics"
+        in rendered.html
+    )
+    assert "Add these dates:" in rendered.text
+    assert "Subscribe to every StrikeHike date: webcal://strikehike.com/calendar/all.ics" in rendered.text
+
+
+def test_render_v2_is_under_the_gmail_limit_and_links_are_absolute():
+    rendered = render_roundup(
+        ROUNDUP_V2,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert len(rendered.html.encode("utf-8")) <= 80 * 1024
+    hrefs = re.findall(r'href="([^"]+)"', rendered.html)
+    assert hrefs
+    for href in hrefs:
+        assert href.startswith("https://") or href.startswith("webcal://"), href
+
+
+def test_email_static_images_fit_the_budget():
+    root = Path(__file__).resolve().parents[2] / "frontend" / "public" / "email"
+    total = sum(path.stat().st_size for path in root.rglob("*.png"))
+    assert total <= 150 * 1024
+
+
+def test_render_v2_palette_contrast():
+    def luminance(value: str) -> float:
+        channels = [int(value[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+        linear = [
+            channel / 12.92
+            if channel <= 0.03928
+            else ((channel + 0.055) / 1.055) ** 2.4
+            for channel in channels
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    def ratio(foreground: str, background: str) -> float:
+        first, second = luminance(foreground), luminance(background)
+        lighter, darker = max(first, second), min(first, second)
+        return (lighter + 0.05) / (darker + 0.05)
+
+    assert ratio("#f2ede4", "#090910") >= 4.5
+    assert ratio("#a9a294", "#14121a") >= 4.5
+    assert ratio("#ff8b77", "#14121a") >= 4.5
+    assert ratio("#14121a", "#ff8b77") >= 4.5
