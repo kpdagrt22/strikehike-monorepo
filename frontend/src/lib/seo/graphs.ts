@@ -1,8 +1,20 @@
 // Page-level JSON-LD (plan 3.6). The root layout already declares the Person, Organization,
 // WebSite, WebApplication and SoftwareSourceCode nodes; these graphs point to them by @id and
-// never repeat them. Rules: no `license` (all rights reserved), no `distribution` (there is no
-// download), no counts in static strings, and every fact here is also visible on its page.
-import { patternsAsOf, type CaseCatalogue, type PatternsPayload, type RegimeSummary } from "./data";
+// never repeat them. Rules: no `license` on pages whose text is all rights reserved, no
+// `distribution` unless there is a real download (the ledger JSONL is the exception), no counts
+// in static strings, and every fact here is also visible on its page.
+import type { LedgerEntry } from "@/lib/ledger/store";
+import type { Roundup } from "@/lib/roundup/store";
+import { weekLabel } from "@/lib/roundup/week";
+import { ABOUT_FAQ, ABOUT_TERMS } from "./faq";
+import { lastModified } from "./lastmod";
+import {
+  patternsAsOf,
+  type CaseCatalogue,
+  type PatternsPayload,
+  type RegimeSummary,
+  type UpcomingPayload,
+} from "./data";
 import {
   APP_ID,
   CONTENT_DATES,
@@ -84,8 +96,13 @@ const DATASET_PARTIES = {
   isAccessibleForFree: true,
 };
 
-export function homeGraph(): JsonLdGraph {
-  return graph(webPage("/", undefined, { about: ref(APP_ID), mainEntity: ref(APP_ID) }));
+export function homeGraph(latestRoundupDate?: string): JsonLdGraph {
+  return graph(
+    webPage("/", latestRoundupDate?.slice(0, 10), {
+      about: ref(APP_ID),
+      mainEntity: ref(APP_ID),
+    }),
+  );
 }
 
 export function regimeGraph(summary: RegimeSummary | null): JsonLdGraph {
@@ -163,12 +180,271 @@ export function patternsGraph(payload: PatternsPayload | null): JsonLdGraph {
   return graph(webPage("/patterns", patternsAsOf(payload)), breadcrumb("/patterns"));
 }
 
+const thisWeekUrl = () => urlFor("/this-week");
+const weekUrl = (week: string) => urlFor(`/this-week/${week}`);
+
+export function thisWeekGraph(roundups: Roundup[]): JsonLdGraph {
+  const url = thisWeekUrl();
+  const latest = roundups[0];
+  const latestDate = latest?.generated_at?.slice(0, 10);
+  const page = {
+    "@type": "CollectionPage",
+    "@id": `${url}#webpage`,
+    url,
+    name: "This week: macro + sky",
+    description:
+      "The latest approved StrikeHike weekly roundup, and every approved week in the archive.",
+    inLanguage: "en",
+    isPartOf: ref(WEBSITE_ID),
+    publisher: ref(ORG_ID),
+    author: ref(PERSON_ID),
+    ...(latestDate ? { dateModified: latestDate } : {}),
+    breadcrumb: ref(`${url}#breadcrumb`),
+    mainEntity: ref(`${url}#archive`),
+  };
+  return graph(
+    page,
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${url}#breadcrumb`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: PAGES["/"].crumb, item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "This week", item: url },
+      ],
+    },
+    {
+      "@type": "ItemList",
+      "@id": `${url}#archive`,
+      name: "Approved weekly roundups",
+      numberOfItems: roundups.length,
+      itemListElement: roundups.map((round, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: `Week of ${weekLabel(round.week)}`,
+        url: weekUrl(round.week),
+      })),
+    },
+  );
+}
+
+export function weekGraph(
+  roundup: Roundup,
+  ledger: LedgerEntry | null,
+  image?: string,
+): JsonLdGraph {
+  const url = weekUrl(roundup.week);
+  const label = weekLabel(roundup.week);
+  const title = `Week of ${label}`;
+  const published = (
+    ledger?.published_at ?? roundup.generated_at
+  )?.slice(0, 10);
+  const description = `The approved StrikeHike roundup for the week of ${label}: the Regime reading, the dates ahead and the sky events.`;
+  const articleId = `${url}#article`;
+  const skyDatasetId = `${url}#sky-dataset`;
+  return graph(
+    {
+      "@type": "WebPage",
+      "@id": `${url}#webpage`,
+      url,
+      name: title,
+      description,
+      inLanguage: "en",
+      isPartOf: ref(WEBSITE_ID),
+      publisher: ref(ORG_ID),
+      author: ref(PERSON_ID),
+      ...(published ? { dateModified: published } : {}),
+      breadcrumb: ref(`${url}#breadcrumb`),
+      mainEntity: ref(articleId),
+      about: ref(datasetId("/regime")),
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${url}#breadcrumb`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: PAGES["/"].crumb, item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "This week", item: thisWeekUrl() },
+        { "@type": "ListItem", position: 3, name: title, item: url },
+      ],
+    },
+    {
+      "@type": "Article",
+      "@id": articleId,
+      headline: title,
+      description,
+      url,
+      ...(published ? { datePublished: published, dateModified: published } : {}),
+      inLanguage: "en",
+      author: ref(PERSON_ID),
+      publisher: ref(ORG_ID),
+      ...(image ? { image } : {}),
+      isPartOf: ref(WEBSITE_ID),
+      mainEntityOfPage: ref(url),
+      isBasedOn: [ref(datasetId("/regime")), ref(skyDatasetId)],
+    },
+    {
+      "@type": "Dataset",
+      "@id": skyDatasetId,
+      name: `Sky week ${roundup.week}`,
+      description:
+        "Planetary positions and sky events for the week, Swiss Ephemeris 2.10.03, Lahiri sidereal.",
+      url,
+      creator: ref(PERSON_ID),
+      publisher: ref(ORG_ID),
+      isAccessibleForFree: true,
+    },
+  );
+}
+
+export function ledgerGraph(entries: LedgerEntry[]): JsonLdGraph {
+  const url = urlFor("/ledger");
+  const first = entries[0];
+  const latest = entries.at(-1);
+  const published = latest?.published_at?.slice(0, 10);
+  const start = first?.reading?.as_of;
+  const end = latest?.reading?.as_of;
+  const datasetIdValue = `${url}#dataset`;
+  return graph(
+    {
+      "@type": "WebPage",
+      "@id": `${url}#webpage`,
+      url,
+      name: "Published ledger",
+      description:
+        "A public, append-only record of the weekly StrikeHike roundups: the week, the reading, the publication time and a hash chain.",
+      inLanguage: "en",
+      isPartOf: ref(WEBSITE_ID),
+      publisher: ref(ORG_ID),
+      author: ref(PERSON_ID),
+      ...(published ? { dateModified: published } : {}),
+      breadcrumb: ref(`${url}#breadcrumb`),
+      mainEntity: ref(datasetIdValue),
+      about: ref(datasetIdValue),
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${url}#breadcrumb`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: PAGES["/"].crumb, item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: PAGES["/ledger"].crumb, item: url },
+      ],
+    },
+    {
+      "@type": "Dataset",
+      "@id": datasetIdValue,
+      name: "StrikeHike roundup ledger",
+      description:
+        "An append-only JSONL record of approved weekly roundups. Each line carries the week, the Core Index reading, the publication time, the SHA-256 of the LF-normalised roundup bytes and the previous line's hash.",
+      url,
+      creator: ref(PERSON_ID),
+      publisher: ref(ORG_ID),
+      isAccessibleForFree: true,
+      license: "https://creativecommons.org/licenses/by/4.0/",
+      variableMeasured: [
+        "Week",
+        "Core Index reading",
+        "Reading label",
+        "Publication time",
+        "Roundup SHA-256",
+        "Previous line hash",
+      ],
+      ...(start && end ? { temporalCoverage: `${start}/${end}` } : {}),
+      ...(published ? { dateModified: published } : {}),
+      distribution: {
+        "@type": "DataDownload",
+        name: "StrikeHike ledger JSONL",
+        description: "One JSON object per line, oldest first.",
+        contentUrl: urlFor("/ledger.jsonl"),
+        encodingFormat: "application/jsonl",
+      },
+    },
+  );
+}
+
+export function upcomingGraph(
+  payload: UpcomingPayload | null,
+  themes: { name: string; slug: string; count: number }[],
+): JsonLdGraph {
+  const url = urlFor("/upcoming");
+  const dateModified = lastModified(
+    CONTENT_DATES["/upcoming"],
+    payload?.as_of,
+  );
+  const listId = `${url}#themes`;
+  return graph(
+    {
+      "@type": "WebPage",
+      "@id": `${url}#webpage`,
+      url,
+      name: "Upcoming dates",
+      description: PAGES["/upcoming"].description,
+      inLanguage: "en",
+      isPartOf: ref(WEBSITE_ID),
+      publisher: ref(ORG_ID),
+      author: ref(PERSON_ID),
+      dateModified,
+      breadcrumb: ref(`${url}#breadcrumb`),
+      mainEntity: ref(listId),
+      about: ref(listId),
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${url}#breadcrumb`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: PAGES["/"].crumb, item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: PAGES["/upcoming"].crumb, item: url },
+      ],
+    },
+    {
+      "@type": "ItemList",
+      "@id": listId,
+      name: "Upcoming themes",
+      numberOfItems: themes.length,
+      itemListElement: themes.map((theme, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: theme.name,
+        url: urlFor(`/upcoming/${theme.slug}`),
+      })),
+    },
+  );
+}
+
 export function disclaimerGraph(): JsonLdGraph {
   return graph(webPage("/disclaimer"), breadcrumb("/disclaimer"));
 }
 
 export function aboutGraph(): JsonLdGraph {
-  return graph(webPage("/about"), breadcrumb("/about"));
+  const url = absoluteUrl("/about");
+  const faqId = `${url}#faq`;
+  const termsId = `${url}#terms`;
+  return graph(
+    webPage("/about", undefined, {
+      mainEntity: ref(faqId),
+      about: ref(termsId),
+    }),
+    breadcrumb("/about"),
+    {
+      "@type": "FAQPage",
+      "@id": faqId,
+      url,
+      mainEntity: ABOUT_FAQ.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer },
+      })),
+    },
+    {
+      "@type": "DefinedTermSet",
+      "@id": termsId,
+      name: "StrikeHike terms",
+      hasDefinedTerm: ABOUT_TERMS.map((term) => ({
+        "@type": "DefinedTerm",
+        name: term.name,
+        description: term.description,
+        inDefinedTermSet: ref(termsId),
+      })),
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -179,7 +455,14 @@ export function aboutGraph(): JsonLdGraph {
 
 export type Crumb = { name: string; path: string };
 
-const generatedWebPage = (path: string, name: string, description: string, dateModified: string, crumbs: Crumb[]) => {
+const generatedWebPage = (
+  path: string,
+  name: string,
+  description: string,
+  dateModified: string,
+  crumbs: Crumb[],
+  extra: JsonLdNode = {},
+) => {
   const url = urlFor(path);
   return graph(
     {
@@ -194,6 +477,7 @@ const generatedWebPage = (path: string, name: string, description: string, dateM
       author: ref(PERSON_ID),
       dateModified,
       breadcrumb: ref(`${url}#breadcrumb`),
+      ...extra,
     },
     {
       "@type": "BreadcrumbList",
@@ -208,18 +492,59 @@ const generatedWebPage = (path: string, name: string, description: string, dateM
   );
 };
 
-/** An event page: Home > Upcoming dates > the event. */
+export type EventNodeInput = {
+  startDate: string;
+  description?: string;
+  status?: string;
+};
+
+/** An event page: Home > Upcoming dates > the event. A dated event also carries
+ *  an online Event node; no offers, no attendance location. */
 export function eventPageGraph(
   path: string,
   name: string,
   description: string,
   dateModified: string,
+  event?: EventNodeInput,
 ): JsonLdGraph {
-  return generatedWebPage(path, name, description, dateModified, [
-    { name: PAGES["/"].crumb, path: "/" },
-    { name: PAGES["/upcoming"].crumb, path: "/upcoming" },
-    { name, path },
-  ]);
+  const url = urlFor(path);
+  const page = generatedWebPage(
+    path,
+    name,
+    description,
+    dateModified,
+    [
+      { name: PAGES["/"].crumb, path: "/" },
+      { name: PAGES["/upcoming"].crumb, path: "/upcoming" },
+      { name, path },
+    ],
+    event ? { mainEntity: ref(`${url}#event`) } : {},
+  );
+  if (!event) return page;
+  return {
+    ...page,
+    "@graph": [
+      ...page["@graph"],
+      {
+        "@type": "Event",
+        "@id": `${url}#event`,
+        name,
+        description: event.description ?? description,
+        startDate: event.startDate,
+        eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
+        eventStatus:
+          event.status === "cancelled"
+            ? "https://schema.org/EventCancelled"
+            : event.status === "rescheduled"
+              ? "https://schema.org/EventRescheduled"
+              : "https://schema.org/EventScheduled",
+        isAccessibleForFree: true,
+        url,
+        organizer: ref(ORG_ID),
+        publisher: ref(ORG_ID),
+      },
+    ],
+  };
 }
 
 /** A theme page: Home > Upcoming dates > the theme. */
@@ -340,6 +665,8 @@ export function referenceDetailGraph({
   name,
   description,
   dateModified,
+  datePublished,
+  image,
   start,
   end,
   crumbs,
@@ -348,6 +675,8 @@ export function referenceDetailGraph({
   name: string;
   description: string;
   dateModified: string;
+  datePublished?: string;
+  image?: string;
   start?: string;
   end?: string;
   crumbs: Crumb[];
@@ -368,6 +697,8 @@ export function referenceDetailGraph({
       description,
       url,
       dateModified,
+      ...(datePublished ? { datePublished } : {}),
+      ...(image ? { image } : {}),
       inLanguage: "en",
       author: ref(PERSON_ID),
       publisher: ref(ORG_ID),

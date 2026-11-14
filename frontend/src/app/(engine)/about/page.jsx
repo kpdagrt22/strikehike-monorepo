@@ -4,8 +4,32 @@ import { PageShell } from "@/components/PageShell";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { CONTACT_URL } from "@/lib/contact";
+import { ABOUT_FAQ, ABOUT_TERMS } from "@/lib/seo/faq";
 import { aboutGraph } from "@/lib/seo/graphs";
 import { PERSON_URL } from "@/lib/seo/site";
+
+export const metadata = {
+  title: { absolute: "About StrikeHike" },
+  description:
+    "What StrikeHike is and is not: descriptive historical research, not advice and not a forecast. How it works, where the data come from, who builds it, and how visits are counted.",
+  alternates: { canonical: "/about" },
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    alternateLocale: ["en_US"],
+    siteName: "StrikeHike",
+    url: "https://strikehike.com/about",
+    title: "About StrikeHike",
+    description:
+      "What StrikeHike is and is not: descriptive historical research, not advice and not a forecast. How it works, where the data come from, who builds it, and how visits are counted.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About StrikeHike",
+    description:
+      "What StrikeHike is and is not: descriptive historical research, not advice and not a forecast.",
+  },
+};
 
 // A plain, server-rendered account of the site: what it is and is not, how the
 // numbers are made, where the data come from, who builds it and how visits are
@@ -89,6 +113,33 @@ export default function AboutPage() {
           closest to a chosen date. Both describe the sky, not markets, and
           neither says anything about what will happen.
         </p>
+      </section>
+
+      <section id="faq" className={SECTION} aria-labelledby="about-faq-heading">
+        <h2 id="about-faq-heading" className={HEADING}>
+          Questions and definitions
+        </h2>
+        <dl className="space-y-4">
+          {ABOUT_FAQ.map((item) => (
+            <div key={item.question}>
+              <dt className="font-medium text-black/80 dark:text-white/80">
+                {item.question}
+              </dt>
+              <dd className="mt-1">{item.answer}</dd>
+            </div>
+          ))}
+        </dl>
+        <h3 className={`${HEADING} mt-6 text-meta`}>Terms</h3>
+        <dl className="space-y-2">
+          {ABOUT_TERMS.map((term) => (
+            <div key={term.name}>
+              <dt className="font-medium text-black/80 dark:text-white/80">
+                {term.name}
+              </dt>
+              <dd className="mt-0.5">{term.description}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <section className={SECTION} aria-labelledby="about-data-heading">

@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
   const { crash, facts } = loaded;
   const path = recessionPath(crash.id);
-  const title = `${crash.name} · NBER recession · ${SITE_NAME}`;
+  const title = `${crash.name} · NBER recession — ${SITE_NAME}`;
   const description = `${crash.name}, ${formatDate(crash.start)} to ${formatDate(
     crash.end,
   )} (${facts.length} days)${
@@ -109,6 +109,8 @@ export default async function RecessionPage({ params }: Params) {
           name: crash.name,
           description: `${crash.name}, ${crash.start} to ${crash.end}.`,
           dateModified: asOf,
+          datePublished: asOf,
+          image: `${urlFor(path)}/card.png`,
           start: crash.start,
           end: crash.end,
           crumbs: [

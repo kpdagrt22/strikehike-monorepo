@@ -42,7 +42,7 @@ export async function generateMetadata({
   const { year, list: slug } = await params;
   const list = findYearList(year, slug);
   if (!list) return { title: "Not found", robots: { index: false, follow: true } };
-  const title = `${list.title} · ${SITE_NAME}`;
+  const title = `${list.title} — ${SITE_NAME}`;
   const path = yearListPath(list);
   return {
     title: { absolute: title },

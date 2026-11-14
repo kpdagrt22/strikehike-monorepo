@@ -6,6 +6,7 @@ import { motion, useAnimationControls } from "framer-motion";
 import { viewOpened } from "@/lib/analytics/events";
 import { CONTACT_URL } from "@/lib/contact";
 import { INTENT, reveal } from "@/lib/motion";
+import { SiteColophon } from "@/components/seo/SiteColophon";
 
 // The panel covers the alignment panel, so a hover preview waits a touch
 // longer than the nav's intent delay.
@@ -17,6 +18,26 @@ const VIEWS = [
   { href: "/convergence", label: "Convergence" },
   { href: "/patterns", label: "Study of Patterns" },
   { href: "/disclaimer", label: "Disclaimer" },
+];
+
+// Three short research doors from the home page, so the server HTML links
+// every key area even before the orrery's JavaScript arrives.
+const RESEARCH = [
+  {
+    href: "/tested",
+    label: "Tested",
+    what: "Seven popular claims, measured against the daily S&P 500 record.",
+  },
+  {
+    href: "/recessions",
+    label: "Recessions",
+    what: "Every NBER recession since 1854, on one timeline.",
+  },
+  {
+    href: "/declines",
+    label: "20% falls",
+    what: "Market declines since 1871, compared side by side.",
+  },
 ];
 
 const LINK =
@@ -217,7 +238,7 @@ export function InfoModule() {
         variants={reveal}
         initial="initial"
         animate={controls}
-        className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-right overflow-hidden rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4]"
+        className="mt-3 w-[min(22rem,calc(100vw-1.5rem))] origin-top-right overflow-y-auto rounded-2xl border border-black/10 bg-(--sh-surface-overlay) p-5 text-[#14121a] shadow-(--sh-shadow-overlay) backdrop-blur-xl dark:border-white/10 dark:text-[#f2ede4] max-h-[calc(100dvh-6rem)]"
       >
         <div className="flex items-start justify-between gap-4">
           <p className="text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
@@ -272,6 +293,23 @@ export function InfoModule() {
             </Link>
           ))}
         </nav>
+        <p className="mt-4 text-micro font-medium uppercase tracking-[0.14em] text-black/60 dark:text-white/60">
+          Research
+        </p>
+        <ul className="mt-1 space-y-2">
+          {RESEARCH.map((item) => (
+            <li
+              key={item.href}
+              className="text-micro leading-snug text-black/60 dark:text-white/60"
+            >
+              <Link href={item.href} prefetch={false} className={LINK}>
+                {item.label}
+              </Link>
+              {" — "}
+              {item.what}
+            </li>
+          ))}
+        </ul>
         <p className="mt-1 flex flex-wrap items-center gap-x-1 text-micro text-black/60 dark:text-white/60">
           <span>Built and run by</span>
           <a href="https://thisiskp.in" rel="author" className={LINK}>
@@ -311,6 +349,9 @@ export function InfoModule() {
           >
             Opens the enquiry form on thisiskp.in
           </p>
+        </div>
+        <div data-home-colophon className="mt-4">
+          <SiteColophon current="/" compact />
         </div>
       </motion.section>
     </div>

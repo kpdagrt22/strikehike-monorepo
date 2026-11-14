@@ -110,7 +110,7 @@ test.describe("event pages", () => {
     });
     expect(types).toContain("BreadcrumbList");
     expect(types).toContain("WebPage");
-    expect(types).not.toContain("Event");
+    expect(types).toContain("Event");
 
     // The three things a reader comes for.
     await expect(page.getByRole("link", { name: /See the sky on this date/ })).toBeVisible();

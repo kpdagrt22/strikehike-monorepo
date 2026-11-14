@@ -14,7 +14,7 @@ const DESCRIPTION =
   "Seven popular sky claims tested against the daily S&P 500 record since 1928: Mercury and Mars retrograde, the full and new moon, eclipses, solstices and equinoxes, and Mars-Saturn conjunctions. Method, windows and results shown, including no difference.";
 
 export const metadata: Metadata = {
-  title: { absolute: `${TITLE} · ${SITE_NAME}` },
+  title: { absolute: `${TITLE} — ${SITE_NAME}` },
   description: DESCRIPTION,
   alternates: { canonical: PATH },
   openGraph: {
@@ -23,10 +23,10 @@ export const metadata: Metadata = {
     alternateLocale: ["en_US"],
     siteName: SITE_NAME,
     url: urlFor(PATH),
-    title: `${TITLE} · ${SITE_NAME}`,
+    title: `${TITLE} — ${SITE_NAME}`,
     description: DESCRIPTION,
   },
-  twitter: { card: "summary_large_image", title: `${TITLE} · ${SITE_NAME}`, description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: `${TITLE} — ${SITE_NAME}`, description: DESCRIPTION },
 };
 
 export default async function TestedIndexPage() {

@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
   const { fall, facts } = loaded;
   const path = declinePath(fall.id);
-  const title = `${fall.name} · S&P fall · ${SITE_NAME}`;
+  const title = `${fall.name} · S&P fall — ${SITE_NAME}`;
   const description = `${fall.name}: the S&P 500 fell ${formatPercent(
     -facts.drawdown,
     0,
@@ -112,6 +112,8 @@ export default async function DeclinePage({ params }: Params) {
           name: fall.name,
           description: `${fall.name}: S&P 500 fall from ${fall.peak} to ${fall.low}.`,
           dateModified: asOf,
+          datePublished: asOf,
+          image: `${urlFor(path)}/card.png`,
           start: fall.peak,
           end: fall.low,
           crumbs: [

@@ -505,6 +505,7 @@ jobs:
           DIGEST_ENABLED: ${{ vars.DIGEST_ENABLED }}
           DIGEST_POSTAL_ADDRESS: ${{ vars.DIGEST_POSTAL_ADDRESS }}
           DIGEST_REPLY_TO: ${{ vars.DIGEST_REPLY_TO }}
+          INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -515,13 +516,14 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO,INDEXNOW_KEY
           script: |
             set -euo pipefail
 
             APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
             cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
             echo "Deploying from $(pwd)"
+            PREV_HEAD="$(git rev-parse HEAD)"
 
             git fetch origin main
             git checkout main
@@ -538,6 +540,7 @@ jobs:
             if [ "$MIGRATE_STATUS" -ne 0 ]; then
               exit 1
             fi
+            NEW_HEAD="$(git rev-parse HEAD)"
 
             MARKER="NBER recession windows from FRED"
             BASE_URL="https://strikehike.com"
@@ -590,6 +593,13 @@ jobs:
 
             # Build the new stack while the existing site is still serving.
             export BUILD_SHA="$(git rev-parse --short=7 HEAD)"
+            if [ -n "${INDEXNOW_KEY:-}" ]; then
+              # The key file must be served at /<key>.txt. It is generated on
+              # the host so the key never lives in the repository.
+              find frontend/public -maxdepth 1 -type f -name '*.txt' \
+                ! -name 'llms.txt' ! -name 'robots.txt' -delete
+              printf '%s' "$INDEXNOW_KEY" > "frontend/public/${INDEXNOW_KEY}.txt"
+            fi
             docker compose -p strikehike-chrono build
 
             OLD_IDS="$(docker ps -aq --filter 'label=com.docker.compose.project=strikehike' || true)"
@@ -888,6 +898,48 @@ jobs:
             fi
 
             prune_after_success
+            if [ -z "${INDEXNOW_KEY:-}" ]; then
+              echo "IndexNow: INDEXNOW_KEY is not set; skipped."
+            else
+              CHANGED="$(git diff --name-only "$PREV_HEAD" "$NEW_HEAD" -- frontend/content/roundups frontend/content/ledger/ledger.jsonl || true)"
+              WEEK=""
+              if [ -n "$CHANGED" ]; then
+                WEEK="$(printf '%s\n' "$CHANGED" | while IFS= read -r file; do
+                  case "$file" in
+                    frontend/content/roundups/*.json)
+                      if grep -q '"approved": true' "$file" 2>/dev/null; then
+                        basename "$file" .json
+                      fi
+                      ;;
+                  esac
+                done | sort | tail -n 1)"
+              fi
+              LEDGER_CHANGED=0
+              if printf '%s\n' "$CHANGED" | grep -qx 'frontend/content/ledger/ledger.jsonl'; then
+                LEDGER_CHANGED=1
+              fi
+              if [ -n "$WEEK" ] || [ "$LEDGER_CHANGED" -eq 1 ]; then
+                PAYLOAD="$(INDEXNOW_KEY="$INDEXNOW_KEY" WEEK="$WEEK" BASE_URL="$BASE_URL" python3 - <<'PY'
+            import json, os
+            base = os.environ["BASE_URL"].rstrip("/")
+            urls = [f"{base}/this-week", f"{base}/ledger", f"{base}/sitemap.xml"]
+            week = os.environ.get("WEEK", "").strip()
+            if week:
+                urls.append(f"{base}/this-week/{week}")
+            print(json.dumps({
+                "host": "strikehike.com",
+                "key": os.environ["INDEXNOW_KEY"],
+                "keyLocation": f"https://strikehike.com/{os.environ['INDEXNOW_KEY']}.txt",
+                "urlList": urls,
+            }))
+            PY
+                )"
+                CODE="$(printf '%s' "$PAYLOAD" | curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 -H 'Content-Type: application/json; charset=utf-8' --data-binary @- https://api.indexnow.org/indexnow || true)"
+                echo "IndexNow answered ${CODE:-no response}"
+              else
+                echo "IndexNow: no approved roundup or ledger change; skipped."
+              fi
+            fi
             df -h /
             docker compose -p strikehike-chrono exec -T backend \
               du -sh /app/data/runtime/analytics 2>/dev/null || true

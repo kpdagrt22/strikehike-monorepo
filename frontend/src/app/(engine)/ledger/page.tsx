@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { LedgerVerify } from "@/components/ledger/LedgerVerify";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import {
   readLedger,
@@ -9,6 +10,7 @@ import {
   signedReading,
   type LedgerEntry,
 } from "@/lib/ledger/store";
+import { ledgerGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,7 @@ const DESCRIPTION =
   "A public, append-only record of the weekly StrikeHike roundups: the week, the reading, the publication time and a hash chain.";
 
 export const metadata: Metadata = {
-  title: { absolute: `${TITLE} · ${SITE_NAME}` },
+  title: { absolute: `${TITLE} — ${SITE_NAME}` },
   description: DESCRIPTION,
   alternates: { canonical: "/ledger" },
   openGraph: {
@@ -27,10 +29,10 @@ export const metadata: Metadata = {
     alternateLocale: ["en_US"],
     siteName: SITE_NAME,
     url: urlFor("/ledger"),
-    title: `${TITLE} · ${SITE_NAME}`,
+    title: `${TITLE} — ${SITE_NAME}`,
     description: DESCRIPTION,
   },
-  twitter: { card: "summary_large_image", title: `${TITLE} · ${SITE_NAME}`, description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: `${TITLE} — ${SITE_NAME}`, description: DESCRIPTION },
 };
 
 const DATE = new Intl.DateTimeFormat("en-GB", {
@@ -69,6 +71,7 @@ export default async function LedgerPage() {
 
   return (
     <PageShell>
+      <JsonLd data={ledgerGraph(entries ?? [])} />
       <header className="max-w-[820px]">
         <p className="text-micro uppercase tracking-[0.2em] text-(--sh-signal-ink)">
           Published record
@@ -112,9 +115,12 @@ export default async function LedgerPage() {
                 {entries.map((entry) => (
                   <tr key={entry.seq} id={String(entry.seq)} className="align-top">
                     <td className="px-2 py-3 align-top">
-                      <span className="block font-medium text-(--sh-text-1)">
+                      <Link
+                        href={`/this-week/${entry.week}`}
+                        className="block font-medium text-(--sh-text-1) underline decoration-current/30 underline-offset-2 hover:decoration-current"
+                      >
                         {entry.week}
-                      </span>
+                      </Link>
                       {entry.kind === "correction" ? (
                         <span className="mt-1 block text-[10px] leading-tight text-(--sh-text-3)">
                           Correction of #{entry.corrects_seq}

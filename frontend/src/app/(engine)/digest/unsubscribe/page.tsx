@@ -6,7 +6,7 @@ import { UnsubscribeButton } from "@/components/digest/UnsubscribeButton";
 import { SITE_NAME } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  title: { absolute: `Unsubscribe · ${SITE_NAME}` },
+  title: { absolute: `Unsubscribe — ${SITE_NAME}` },
   robots: { index: false, follow: false },
 };
 

@@ -66,7 +66,7 @@ export async function generateMetadata({
   const description = `${INTRO[theme]} ${
     count > 0 ? `${count} dates ahead.` : "Dates ahead."
   } Times are shown in your time zone; subscribe in your calendar.`;
-  const title = `${TITLE[theme]} · ${SITE_NAME}`;
+  const title = `${TITLE[theme]} — ${SITE_NAME}`;
   const path = `/upcoming/${theme}`;
   return {
     title: { absolute: title },

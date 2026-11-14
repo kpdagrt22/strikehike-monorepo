@@ -88,9 +88,11 @@ export const absoluteUrl = (path: SitePath) => (path === "/" ? SITE_URL : `${SIT
 /** An absolute URL for a generated path ("/events/finance~…"), which is not a SitePath. */
 export const urlFor = (path: string) => (path.startsWith("/") ? `${SITE_URL}${path}` : path);
 
-/** The `<title>` exactly as rendered: home stands alone, the rest carry " | StrikeHike". */
+/** The `<title>` exactly as rendered: home and About stand alone, the rest carry " — StrikeHike". */
 export const fullTitle = (path: SitePath) =>
-  path === "/" ? PAGES[path].title : `${PAGES[path].title} | ${SITE_NAME}`;
+  path === "/" || path === "/about"
+    ? PAGES[path].title
+    : `${PAGES[path].title} — ${SITE_NAME}`;
 
 /** Title, description, canonical, Open Graph and Twitter for one page. Images come from the
  *  opengraph-image files (3.8), which take priority over this object. */
@@ -98,7 +100,7 @@ export function pageMetadata(path: SitePath): Metadata {
   const page = PAGES[path];
   const full = fullTitle(path);
   return {
-    title: path === "/" ? { absolute: page.title } : page.title, // root template adds " | StrikeHike"
+    title: path === "/" ? { absolute: page.title } : page.title, // root template adds " — StrikeHike"
     description: page.description,
     alternates: { canonical: path },
     openGraph: {
