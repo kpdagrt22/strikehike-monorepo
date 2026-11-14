@@ -57,9 +57,17 @@ def _short(value: date) -> str:
     return f"{value.day} {MONTHS[value.month - 1]}"
 
 
+def _human_day(value: date) -> str:
+    return f"{value.strftime('%a')} {value.day} {value.strftime('%b %Y')}"
+
+
+def _human_short(value: date) -> str:
+    return f"{value.strftime('%a')} {value.day} {value.strftime('%b')}"
+
+
 def _human_date(value: str | None) -> str:
     parsed = _date(value)
-    return parsed.strftime("%a %d %b %Y") if parsed else str(value or "")
+    return _human_day(parsed) if parsed else str(value or "")
 
 
 def week_label(week: str) -> str:
@@ -84,7 +92,22 @@ def _join(base_url: str, path: str | None) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
-def _time_pair(start_utc: str | None, start_time: str | None) -> str | None:
+def _time_pair_from_moment(
+    moment: datetime, printed_date: date | None = None
+) -> str:
+    moment = moment.astimezone(timezone.utc)
+    ist = moment.astimezone(IST)
+    pair = f"{moment.strftime('%H:%M')} UTC · {ist.strftime('%H:%M')} IST"
+    if printed_date and ist.date() != printed_date:
+        pair += f" ({_human_short(ist.date())})"
+    return pair
+
+
+def _time_pair(
+    start_utc: str | None,
+    start_time: str | None,
+    printed_date: date | None = None,
+) -> str | None:
     if start_utc:
         try:
             moment = datetime.fromisoformat(
@@ -93,10 +116,7 @@ def _time_pair(start_utc: str | None, start_time: str | None) -> str | None:
         except ValueError:
             moment = None
         if moment is not None:
-            return (
-                f"{moment.strftime('%H:%M')} UTC · "
-                f"{moment.astimezone(IST).strftime('%H:%M')} IST"
-            )
+            return _time_pair_from_moment(moment, printed_date)
     if start_time:
         return str(start_time)[:5]
     return None
@@ -106,8 +126,8 @@ def _event_line(event: dict[str, Any]) -> str:
     when = _date(str(event.get("start_date") or ""))
     bits = [str(event.get("name") or "Untitled date")]
     if when:
-        bits.append(when.strftime("%d %b %Y"))
-    time = _time_pair(event.get("start_utc"), event.get("start_time"))
+        bits.append(_human_day(when))
+    time = _time_pair(event.get("start_utc"), event.get("start_time"), when)
     if time:
         bits.append(time)
     return " · ".join(bits)
@@ -131,13 +151,14 @@ def _sky_event_line(event: dict[str, Any]) -> str:
     if not at:
         return label
     try:
-        moment = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+        moment = datetime.fromisoformat(
+            str(at).replace("Z", "+00:00")
+        ).astimezone(timezone.utc)
     except ValueError:
         return label
     return (
-        f"{label} · {moment.strftime('%d %b %Y')} · "
-        f"{moment.strftime('%H:%M')} UTC · "
-        f"{moment.astimezone(IST).strftime('%H:%M')} IST"
+        f"{label} · {_human_day(moment.date())} · "
+        f"{_time_pair_from_moment(moment, moment.date())}"
     )
 
 
@@ -192,7 +213,7 @@ def render_roundup(
         reading = _date(str(regime.get("as_of") or ""))
         text_parts.extend(["REGIME", line or "The latest Regime reading."])
         if reading:
-            text_parts.append(f"Latest reading: week of {reading.strftime('%d %b %Y')}.")
+            text_parts.append(f"Latest reading: {_human_day(reading)}.")
         text_parts.append("")
         html_parts.append(
             '<h2 style="font-size:18px;margin:22px 0 6px">Regime</h2>'
@@ -201,8 +222,8 @@ def render_roundup(
             html_parts.append(f"<p style=\"margin:0 0 6px\">{escape(line)}</p>")
         if reading:
             html_parts.append(
-                f'<p style="margin:0;color:#555">Latest reading: week of '
-                f"{escape(reading.strftime('%d %b %Y'))}.</p>"
+                f'<p style="margin:0;color:#555">Latest reading: '
+                f"{escape(_human_day(reading))}.</p>"
             )
 
     if themes:
@@ -281,14 +302,25 @@ def render_roundup(
             closest_path = (
                 f"/?d={closest.get('date')}" if closest.get("date") else None
             )
+            for_date = _date(
+                str(
+                    closest.get("for_date")
+                    or activity.get("peak_date")
+                    or roundup.get("start")
+                    or ""
+                )
+            )
+            for_label = _human_short(for_date) if for_date else ""
             text_parts.append(
-                f"Closest past sky: {closest.get('name')} on {_human_date(closest.get('date'))} "
+                f"Closest past sky to {for_label}: {closest.get('name')}, "
+                f"{_human_date(closest.get('date'))} "
                 f"({closest.get('similarity_percent')}% geometry match)."
             )
             html_parts.append(
-                '<p style="margin:0 0 8px;color:#555">Closest past sky: '
-                f"{_html_link(str(closest.get('name') or 'past date'), closest_path, base_url)} "
-                f"on {escape(_human_date(closest.get('date')))} "
+                '<p style="margin:0 0 8px;color:#555">Closest past sky to '
+                f"{escape(for_label)}: "
+                f"{_html_link(str(closest.get('name') or 'past date'), closest_path, base_url)}, "
+                f"{escape(_human_date(closest.get('date')))} "
                 f"({escape(str(closest.get('similarity_percent') or ''))}% geometry match).</p>"
             )
         note = str(activity.get("note") or "").strip()

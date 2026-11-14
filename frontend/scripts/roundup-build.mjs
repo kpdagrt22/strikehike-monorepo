@@ -53,6 +53,11 @@ function humanDate(value) {
   }`;
 }
 
+function signed(value) {
+  const text = Math.abs(value).toFixed(1);
+  return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
+}
+
 function isoWeekKey(value) {
   const date = new Date(`${value}T00:00:00Z`);
   const target = new Date(date);
@@ -394,10 +399,10 @@ export function buildRoundupV2({
   const from_record = claimForWeek(skyWeek, claims);
   const lines = {};
   if (regime) {
-    lines.regime = `Core Index ${regime.score >= 0 ? "+" : ""}${regime.score.toFixed(1)} (${regime.label})${
+    lines.regime = `Core Index ${signed(regime.score)} (${regime.label})${
       regime.change == null
         ? ""
-        : `, ${regime.change >= 0 ? "+" : ""}${regime.change.toFixed(1)} from last week`
+        : `, ${signed(regime.change)} from the week before`
     }.`;
   }
   if (themes.length > 0) {

@@ -67,6 +67,8 @@
     "closest_past": {
       "date": "1990-04-24",
       "name": "Hubble Space Telescope launched",
+      "category": "Science",
+      "for_date": "2099-01-01",
       "similarity_percent": 83.8
     },
     "note": "Geometry match compares planet positions only; it predicts nothing."
@@ -80,6 +82,15 @@
       "timezone": "America/New_York",
       "start_utc": "2099-01-08T13:30:00Z",
       "path": "/events/finance~test~next"
+    },
+    {
+      "id": "finance:test:fomc",
+      "name": "FOMC meeting",
+      "start_date": "2026-12-09",
+      "start_time": "14:00:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-12-09T19:00:00Z",
+      "path": "/events/finance~test~fomc"
     }
   ],
   "from_record": {
@@ -90,11 +101,11 @@
     "path": "/tested/new-moon"
   },
   "lines": {
-    "regime": "Core Index +13.2 (Steady), +0.4 from last week.",
+    "regime": "Core Index +13.2 (Steady), +0.4 from the week before.",
     "dates": "1 date in 1 theme.",
     "sky": "2 sky events this week.",
     "activity": "Sky activity ran 40–70, highest on Thu 01 Jan.",
-    "next": "1 date in the next two weeks.",
+    "next": "2 dates in the next two weeks.",
     "record": "From the record: The new moon and the market — No meaningful difference in this record."
   }
 }

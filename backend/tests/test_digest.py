@@ -56,16 +56,16 @@ ROUNDUP_V2 = {
     "start": "2026-11-16",
     "end": "2026-11-22",
     "regime": {
-        "as_of": "2026-11-13",
+        "as_of": "2026-11-08",
         "score": 13.2,
         "label": "Steady",
-        "previous_score": 12.8,
-        "change": 0.4,
+        "previous_score": 14.9,
+        "change": -1.7,
         "weekly": [
-            {"date": "2026-10-23", "score": 11.1},
-            {"date": "2026-10-30", "score": 11.8},
-            {"date": "2026-11-06", "score": 12.4},
-            {"date": "2026-11-13", "score": 13.2},
+            {"date": "2026-10-16", "score": 16.53},
+            {"date": "2026-10-23", "score": 15.76},
+            {"date": "2026-10-30", "score": 14.9},
+            {"date": "2026-11-08", "score": 13.18},
         ],
     },
     "themes": [
@@ -102,6 +102,8 @@ ROUNDUP_V2 = {
         "closest_past": {
             "date": "1990-04-24",
             "name": "Hubble Space Telescope launched",
+            "category": "Science",
+            "for_date": "2026-11-20",
             "similarity_percent": 83.8,
         },
         "note": "Geometry match compares planet positions only; it predicts nothing.",
@@ -125,12 +127,45 @@ ROUNDUP_V2 = {
         "path": "/tested/new-moon",
     },
     "lines": {
-        "regime": "Core Index +13.2 (Steady), +0.4 from last week.",
+        "regime": "Core Index +13.2 (Steady), −1.7 from the week before.",
         "dates": "1 date in 1 theme.",
         "sky": "1 sky event this week.",
         "activity": "Sky activity ran 40–70, highest on Fri 20 Nov.",
         "next": "1 date in the next two weeks.",
         "record": "From the record: The new moon and the market — No meaningful difference in this record.",
+    },
+}
+
+
+ROUNDUP_CROSS_DATE = {
+    **ROUNDUP_V2,
+    "week": "2026-W48",
+    "start": "2026-11-23",
+    "end": "2026-11-29",
+    "sky_week_items": [
+        {
+            "kind": "season",
+            "body": "Sun",
+            "at": "2026-12-21T20:50:15Z",
+            "path": "/upcoming/science",
+            "label": "December solstice",
+        }
+    ],
+    "next_two_weeks": [
+        {
+            "id": "finance:fomc:2026-12",
+            "name": "FOMC meeting",
+            "start_date": "2026-12-09",
+            "start_time": "14:00:00",
+            "timezone": "America/New_York",
+            "start_utc": "2026-12-09T19:00:00Z",
+            "path": "/events/finance~fomc~2026-12",
+        }
+    ],
+    "lines": {
+        **ROUNDUP_V2["lines"],
+        "sky": "1 sky event this week.",
+        "next": "1 date in the next two weeks.",
     },
 }
 
@@ -713,18 +748,21 @@ def test_render_v2_carries_every_section_and_the_new_subject():
     assert rendered.subject == "StrikeHike weekly · 16–22 Nov 2026 · Core Index +13.2"
     for heading in ("SKY THIS WEEK", "SKY ACTIVITY", "NEXT TWO WEEKS", "FROM THE RECORD"):
         assert heading in rendered.text
-    assert "New moon · 17 Nov 2026 · 11:47 UTC · 17:17 IST" in rendered.text
+    assert "Core Index +13.2 (Steady), −1.7 from the week before." in rendered.text
+    assert "Latest reading: Sun 8 Nov 2026." in rendered.text
+    assert "week of 08 Nov" not in rendered.text
+    assert "New moon · Tue 17 Nov 2026 · 11:47 UTC · 17:17 IST" in rendered.text
     assert (
-        "CPI release · 18 Nov 2026 · 13:30 UTC · 19:00 IST"
+        "CPI release · Wed 18 Nov 2026 · 13:30 UTC · 19:00 IST"
         in rendered.text
     )
     assert (
-        "Gross Domestic Product (November 2026) · 25 Nov 2026 · "
+        "Gross Domestic Product (November 2026) · Wed 25 Nov 2026 · "
         "13:30 UTC · 19:00 IST" in rendered.text
     )
     assert (
-        "Closest past sky: Hubble Space Telescope launched on Tue 24 Apr 1990 "
-        "(83.8% geometry match)." in rendered.text
+        "Closest past sky to Fri 20 Nov: Hubble Space Telescope launched, "
+        "Tue 24 Apr 1990 (83.8% geometry match)." in rendered.text
     )
     assert rendered.text.count("Closest past sky") == 1
     assert "1990-04-24" not in rendered.text
@@ -739,6 +777,40 @@ def test_render_v2_carries_every_section_and_the_new_subject():
     assert "Ledger #1 · aaaaaaaaaaaa — strikehike.com/ledger" in rendered.html
     assert "1 Test Street, Test City" in rendered.html
     assert "<img" not in rendered.html.lower()
+
+
+def test_render_v2_prints_the_ist_date_when_it_differs():
+    rendered = render_roundup(
+        ROUNDUP_CROSS_DATE,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert (
+        "FOMC meeting · Wed 9 Dec 2026 · 19:00 UTC · 00:30 IST "
+        "(Thu 10 Dec)" in rendered.text
+    )
+    assert (
+        "December solstice · Mon 21 Dec 2026 · 20:50 UTC · 02:20 IST "
+        "(Tue 22 Dec)" in rendered.text
+    )
+    assert "00:30 IST (Thu 10 Dec)" in rendered.html
+    assert "02:20 IST (Tue 22 Dec)" in rendered.html
+
+
+def test_render_v2_without_closest_past_omits_the_line():
+    roundup = json.loads(json.dumps(ROUNDUP_V2))
+    roundup["activity"]["closest_past"] = None
+    rendered = render_roundup(
+        roundup,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    )
+    assert "Closest past sky" not in rendered.text
+    assert "Closest past sky" not in rendered.html
 
 
 def test_render_v2_flat_activity_has_no_peak_day():

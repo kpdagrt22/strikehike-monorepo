@@ -3,7 +3,7 @@
   "week": "2026-W47",
   "start": "2026-11-16",
   "end": "2026-11-22",
-  "generated_at": "2026-11-14T08:02:13.593Z",
+  "generated_at": "2026-11-14T10:27:39.163Z",
   "approved": false,
   "regime": {
     "as_of": "2026-11-08",
@@ -34,7 +34,7 @@
     {
       "kind": "ingress",
       "body": "Sun",
-      "at": "2026-11-17T11:15:09Z",
+      "at": "2026-11-16T14:13:13Z",
       "path": "/upcoming/science",
       "rashi": 7,
       "label": "Sun enters Vrishchika"
@@ -82,9 +82,11 @@
     "max": 99,
     "peak_date": null,
     "closest_past": {
-      "date": "1970-11-12",
-      "name": "Bhola cyclone",
-      "similarity_percent": 80.4
+      "date": "1992-09-16",
+      "name": "Black Wednesday",
+      "category": "Finance",
+      "for_date": "2026-11-16",
+      "similarity_percent": 79.5
     },
     "note": "Geometry match compares planet positions only; it predicts nothing."
   },
@@ -121,7 +123,7 @@
     }
   ],
   "lines": {
-    "regime": "Core Index +13.2 (Steady), -1.7 from last week.",
+    "regime": "Core Index +13.2 (Steady), −1.7 from the week before.",
     "sky": "2 sky events this week.",
     "activity": "Sky activity stayed at 99 all week.",
     "next": "3 dates in the next two weeks."
