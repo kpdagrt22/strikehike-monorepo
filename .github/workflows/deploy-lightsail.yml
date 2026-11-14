@@ -71,6 +71,7 @@ jobs:
             tests/test_digest.py \
             tests/test_ledger.py \
             tests/test_claim_tests.py \
+            tests/test_approval.py \
             tests/test_sky_week.py \
             tests/test_caddy_snippet.py \
             -q
