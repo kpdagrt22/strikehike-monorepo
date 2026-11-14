@@ -1,6 +1,9 @@
 name: Send weekly digest
 
 on:
+  schedule:
+    # Monday 01:30 UTC = 07:00 IST. The runner uses the current ISO week.
+    - cron: "30 1 * * 1"
   workflow_dispatch:
     inputs:
       week:
@@ -22,11 +25,42 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
+      - name: Resolve the week and mode
+        id: resolve
+        env:
+          INPUT_WEEK: ${{ inputs.week }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          AUTOSEND: ${{ vars.DIGEST_AUTOSEND }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            week="$INPUT_WEEK"
+            dry_run="$INPUT_DRY_RUN"
+          else
+            if [ "$AUTOSEND" != "1" ]; then
+              echo "::notice::DIGEST_AUTOSEND is not 1; scheduled send skipped."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            week="$(TZ=Asia/Kolkata date +%G-W%V)"
+            dry_run="false"
+          fi
+          if ! printf '%s' "$week" | grep -Eq '^[0-9]{4}-W[0-9]{2}$'; then
+            echo "::error::week must look like 2026-W47"
+            exit 1
+          fi
+          echo "week=$week" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Digest week $week, dry_run=$dry_run"
+
       - name: Run the digest command on the server
+        if: steps.resolve.outputs.skip != 'true'
         uses: appleboy/ssh-action@v1.2.0
         env:
-          DIGEST_WEEK: ${{ inputs.week }}
-          DIGEST_DRY_RUN: ${{ inputs.dry_run }}
+          DIGEST_WEEK: ${{ steps.resolve.outputs.week }}
+          DIGEST_DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           DIGEST_TOKEN_SECRET: ${{ secrets.DIGEST_TOKEN_SECRET }}
           DIGEST_ENABLED: ${{ vars.DIGEST_ENABLED }}
@@ -51,6 +85,27 @@ jobs:
             APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
             cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
             echo "Digest week $DIGEST_WEEK, dry_run=$DIGEST_DRY_RUN"
+
+            if [ "$DIGEST_DRY_RUN" = "false" ]; then
+              # Refuse before sending if the week is not approved. The sender
+              # fetches the same public route again; this check only gives the
+              # owner the exact red message.
+              docker compose -p strikehike-chrono exec -T \
+                backend python - "$DIGEST_WEEK" <<'PY'
+            import sys
+            from astro_finance.digest.content import RoundupNotFound, fetch_roundup
+
+            week = sys.argv[1]
+            try:
+                fetch_roundup(week)
+            except RoundupNotFound:
+                print(f"::error::{week} is not approved yet")
+                raise SystemExit(1)
+            except Exception as exc:
+                print(f"::error::roundup source failed for {week}: {exc}")
+                raise SystemExit(1)
+            PY
+            fi
 
             FLAG="--dry-run"
             if [ "$DIGEST_DRY_RUN" = "false" ]; then
