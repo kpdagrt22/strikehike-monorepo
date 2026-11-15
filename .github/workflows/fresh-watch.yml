@@ -1,0 +1,37 @@
+name: fresh-watch
+
+# Daily public freshness check. A crossed threshold fails the job so GitHub
+# emails the owner; a network error is retried three times by the script.
+
+on:
+  schedule:
+    # Daily at 02:30 UTC.
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fresh-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: "22"
+
+      - name: Check freshness
+        run: |
+          node scripts/fresh-watch.mjs \
+            --base-url=https://strikehike.com \
+            --summary=fresh-watch.md
+          cat fresh-watch.md >> "$GITHUB_STEP_SUMMARY"
