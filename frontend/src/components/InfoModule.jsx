@@ -310,7 +310,7 @@ export function InfoModule({ snapshot = null }) {
                     {item.allDay
                       ? " (all day)"
                       : item.time
-                        ? ` (${item.time.slice(0, 5)})`
+                        ? ` (${item.time})`
                         : null}
                   </li>
                 ))}

@@ -92,6 +92,60 @@ test.describe("S3: server data, thin pages and distributions", () => {
     );
   });
 
+  test("the home page is ISR and its server HTML uses the public bucket words", async ({
+    request,
+  }) => {
+    const response = await request.get("/");
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("data-home-snapshot");
+    // The raw Core Index keys never reach the public page.
+    expect(html.toLowerCase()).not.toContain("bullish");
+    expect(html.toLowerCase()).not.toContain("bearish");
+    // ISR, not a per-request render.
+    const cache = response.headers()["cache-control"] ?? "";
+    expect(cache).toContain("s-maxage=");
+    expect(cache).not.toContain("no-store");
+  });
+
+  test("the window list is cacheable and unknown claims are 404", async ({
+    request,
+  }) => {
+    const known = await request.get("/tested/full-moon/windows.json");
+    expect(known.status()).toBe(200);
+    expect(known.headers()["cache-control"]).toBe(
+      "public, max-age=3600, stale-while-revalidate=86400",
+    );
+    const unknown = await request.get("/tested/not-a-claim/windows.json");
+    expect(unknown.status()).toBe(404);
+  });
+
+  test("/upcoming defaults to a rolling window, not the first calendar month", async ({
+    page,
+    request,
+  }) => {
+    const payload = (await (
+      await request.get("/api/v1/events/upcoming?limit_per_theme=100&horizon_days=365")
+    ).json()) as {
+      themes: Record<string, { events: unknown[] }>;
+    };
+    const total = Object.entries(payload.themes)
+      .filter(([name]) => name !== "Politics" && name !== "Natural Disasters")
+      .reduce((sum, [, theme]) => sum + theme.events.length, 0);
+
+    await page.goto("/upcoming", { waitUntil: "domcontentloaded" });
+    const rows = await page.locator("[data-upcoming-row]").count();
+    // The next 30 days, or the first ten dates when the window is thin: never
+    // one or two dates because the calendar month is about to turn.
+    expect(rows).toBeGreaterThanOrEqual(Math.min(10, total));
+    expect(rows).toBeLessThanOrEqual(total);
+    if (total > rows) {
+      await expect(
+        page.getByRole("link", { name: /Show all \d+ dates/ }),
+      ).toBeVisible();
+    }
+  });
+
   test("approved week pages are cacheable and answer a conditional GET", async ({
     request,
   }) => {

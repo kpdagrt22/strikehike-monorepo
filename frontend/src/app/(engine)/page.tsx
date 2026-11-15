@@ -3,6 +3,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { flatEvents } from "@/components/upcoming/upcomingGrouping";
 import { latestApprovedRoundup } from "@/lib/roundup/store";
 import { weekLabel } from "@/lib/roundup/week";
+import { bucketLabel } from "@/lib/regime/buckets";
 import { getRegimeSummary, getUpcoming } from "@/lib/seo/data";
 import { homeGraph } from "@/lib/seo/graphs";
 import { pageMetadata } from "@/lib/seo/site";
@@ -10,11 +11,11 @@ import { orderedThemes } from "@/lib/events/upcoming";
 import HomeClient from "./HomeClient";
 
 // The orrery is a client view; this server wrapper adds the home page's own
-// metadata, its JSON-LD, and the "At a glance" snapshot. The snapshot is read
-// per request so the server HTML carries the latest week, the next three dates
-// and the current Core Index even when the client HUD is still loading.
+// metadata, its JSON-LD, and the "At a glance" snapshot. The page is ISR: the
+// snapshot is still in the server HTML, but a bot hit never triggers two
+// backend calls. The data reads keep their own 60-second cache.
 export const metadata: Metadata = pageMetadata("/");
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function Page() {
   const [latest, summary, upcoming] = await Promise.all([
@@ -27,6 +28,8 @@ export default async function Page() {
       name: string;
       start_date: string;
       start_time: string | null;
+      start_utc: string | null;
+      timezone: string | null;
       all_day: boolean;
     };
     theme: { name: string };
@@ -40,14 +43,19 @@ export default async function Page() {
       reading && reading.score != null
         ? {
             score: reading.score,
-            bucket: reading.bucket?.replaceAll("_", " ") ?? null,
+            bucket: bucketLabel(reading.bucket),
             date: reading.date,
           }
         : null,
     next: next.map(({ event, theme }) => ({
       name: event.name,
       date: event.start_date,
-      time: event.start_time,
+      // The snapshot prints UTC; the reader's zone is the client HUD's job.
+      time: event.start_utc
+        ? `${event.start_utc.slice(11, 16)} UTC`
+        : event.start_time
+          ? `${event.start_time.slice(0, 5)} ${event.timezone ?? "local"}`
+          : null,
       allDay: event.all_day,
       theme: theme.name,
     })),

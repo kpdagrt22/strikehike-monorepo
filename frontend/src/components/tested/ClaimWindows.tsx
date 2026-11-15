@@ -24,8 +24,10 @@ export function ClaimWindows({
   const [rows, setRows] = useState<WindowRow[] | null>(null);
   const [failed, setFailed] = useState(false);
 
-  async function load() {
-    if (rows || failed) return;
+  async function load(force = false) {
+    if (rows) return;
+    if (failed && !force) return;
+    if (force) setFailed(false);
     try {
       const response = await fetch(`/tested/${claimId}/windows.json`);
       if (!response.ok) throw new Error("windows");
@@ -42,7 +44,9 @@ export function ClaimWindows({
       onToggle={(event) => {
         const next = event.currentTarget.open;
         setOpen(next);
-        if (next) void load();
+        // Reopening after a failed fetch tries again instead of staying broken
+        // until a reload.
+        if (next) void load(failed);
       }}
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-micro font-medium uppercase tracking-[0.14em] text-(--sh-text-2)">

@@ -58,7 +58,23 @@ export default async function UpcomingPage({
   const unavailable = !payload || Boolean(payload.message);
   const items = flatEvents(themes);
   const groups = monthGroups(items);
-  const shownGroups = expanded ? groups : groups.slice(0, 1);
+  // A rolling window, not "the first calendar month": late in a month that
+  // could be one or two dates. The next 30 days from the payload's own as_of,
+  // or the next 10 dates when the window is thin.
+  const asOf = payload?.as_of ? Date.parse(`${payload.as_of}T00:00:00Z`) : NaN;
+  const cutoff = Number.isFinite(asOf)
+    ? new Date(asOf + 30 * 86_400_000).toISOString().slice(0, 10)
+    : null;
+  const inWindow = cutoff
+    ? items.filter(
+        ({ event }: { event: { start_date: string } }) =>
+          event.start_date <= cutoff,
+      )
+    : [];
+  const defaultItems = inWindow.length >= 10 ? inWindow : items.slice(0, 10);
+  const shownItems = expanded ? items : defaultItems;
+  const shownGroups = monthGroups(shownItems);
+  const hasMore = items.length > defaultItems.length;
   const total = themes.reduce((sum, theme) => sum + theme.available, 0);
   const next = nextItem(items);
   const listedCount = items.length;
@@ -126,7 +142,7 @@ export default async function UpcomingPage({
           ) : (
             <>
               <UpcomingGroups groups={shownGroups} />
-              {groups.length > shownGroups.length ? (
+              {hasMore && !expanded ? (
                 <p className="mt-6">
                   <Link
                     href="/upcoming?all=1"
@@ -135,7 +151,7 @@ export default async function UpcomingPage({
                     Show all {items.length} dates
                   </Link>
                 </p>
-              ) : expanded && groups.length > 1 ? (
+              ) : expanded && hasMore ? (
                 <p className="mt-6">
                   <Link
                     href="/upcoming"

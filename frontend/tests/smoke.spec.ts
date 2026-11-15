@@ -256,7 +256,10 @@ test.describe("upcoming calendar", () => {
     await waitForUpcoming(request);
     const data = await fetchUpcoming(request);
     await page.goto("/upcoming", { waitUntil: "networkidle" });
-    await expect(page.locator("[data-upcoming-group]")).toHaveCount(1);
+    // The default is a rolling window (the next 30 days, or ten dates), so it
+    // can span one or two month groups.
+    await expect(page.locator("[data-upcoming-group]")).not.toHaveCount(0);
+    await expect(page.locator("[data-upcoming-row]")).not.toHaveCount(0);
     await expect(page.getByRole("link", { name: /Show all \d+ dates/ })).toBeVisible();
     await page.goto("/upcoming?all=1", { waitUntil: "networkidle" });
 

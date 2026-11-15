@@ -102,3 +102,11 @@ export async function readClaimTests(): Promise<ClaimTest[]> {
   const found = await Promise.all(CLAIM_IDS.map((id) => readClaimTest(id)));
   return found.filter((claim): claim is ClaimTest => claim !== null);
 }
+
+/** The public window list for one claim, or null when the claim is unpublished. */
+export function windowsForClaim(
+  claim: Pick<ClaimTest, "published" | "windows"> | null,
+): { windows: ClaimTest["windows"] } | null {
+  if (!claim || !claim.published) return null;
+  return { windows: claim.windows };
+}
