@@ -10,12 +10,13 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AlignedPathsChart } from "@/components/regime/AlignedPathsChart";
 import { AstroLens } from "@/components/regime/AstroLens";
-import { CasePicker, CaseTriggerPlaceholder } from "@/components/regime/CasePicker";
+import { CaseTriggerPlaceholder } from "@/components/regime/CaseTriggerPlaceholder";
 import { ASSET_TARGETS } from "@/components/regime/assetTargets";
 import { coreIndexTone } from "@/components/regime/regimeUtils";
-import { OnboardingModal } from "@/components/ui/OnboardingModal";
+
 import { caseOpened, methodOpened } from "@/lib/analytics/events";
 import { getRegimeToneColor, getRegimeToneLabel } from "@/lib/regimeTone";
 import {
@@ -42,6 +43,18 @@ import {
   seriesAvailability,
   spanEnd,
 } from "@/lib/regime/caseCompare";
+
+// The picker carries framer-motion; it loads as its own chunk and shows the
+// same-size trigger box until it arrives, so the compare bar does not move.
+const CasePicker = dynamic(
+  () => import("@/components/regime/CasePicker").then((mod) => mod.CasePicker),
+  { ssr: false, loading: () => <CaseTriggerPlaceholder /> },
+);
+const OnboardingModal = dynamic(
+  () =>
+    import("@/components/ui/OnboardingModal").then((mod) => mod.OnboardingModal),
+  { ssr: false },
+);
 
 // --------------------------------------------------------------- caches
 // JSON kept for the session and read through useSyncExternalStore. Paths are

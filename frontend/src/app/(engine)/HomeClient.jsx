@@ -16,6 +16,7 @@ import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
 import { MotionRoot } from "@/components/MotionRoot";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { OrreryPoster } from "@/components/OrreryPoster";
 import { RegimeOverlaySync } from "@/components/RegimeOverlaySync";
 import { RightPanel } from "@/components/RightPanel";
 import { SponsorModule } from "@/components/SponsorModule";
@@ -227,11 +228,20 @@ export default function Home({ snapshot }) {
   // mismatched attributes during hydration).
   const isDark = mounted ? resolvedTheme !== "light" : true;
   const regimeTone = useChronoStore((state) => state.regimeTone);
+  // NEXT_PUBLIC_ORRERY_PHONE=poster shows a still orrery on phones until the
+  // reader taps; the default "live" keeps today's behaviour.
+  const posterMode = process.env.NEXT_PUBLIC_ORRERY_PHONE === "poster";
+  const [started, setStarted] = useState(false);
+  const showPoster = posterMode && phone && !started;
+  const showCanvas = !posterMode || (phone ? started : mounted);
 
   return (
     <MotionRoot>
       <main className="relative h-full w-full overflow-hidden border-0 p-0">
-      <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} stage={stage} />
+      {showPoster ? <OrreryPoster onStart={() => setStarted(true)} /> : null}
+      {showCanvas ? (
+        <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} stage={stage} />
+      ) : null}
 
       <HomeIntro compact={compactIntro} />
       <RegimeOverlaySync />

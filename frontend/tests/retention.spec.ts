@@ -296,14 +296,18 @@ test.describe("recently viewed", () => {
         "/declines",
         'a[href^="/declines/"]',
       );
+      // A live event from the current bundle: the old hard-coded id rotated
+      // out and now answers 308 to its theme page.
+      const event = await firstHref(
+        page,
+        "/upcoming",
+        'a[href^="/events/"]',
+      );
+      await page.goto(event, { waitUntil: "networkidle" });
+      const eventTitle = (await page.locator("h1").first().textContent())?.trim();
       const date = "/dates/2027/fomc-meetings";
 
-      for (const path of [
-        "/events/finance~fred_release_dates~50-2026-12",
-        recession,
-        decline,
-        date,
-      ]) {
+      for (const path of [event, recession, decline, date]) {
         await page.goto(path, { waitUntil: "networkidle" });
       }
       await page.goto("/upcoming", { waitUntil: "networkidle" });
@@ -312,7 +316,7 @@ test.describe("recently viewed", () => {
         .allTextContents();
       expect(titles.length).toBe(4);
       expect(titles[0]).toContain("FOMC");
-      expect(titles[3]).toContain("Employment Situation");
+      expect(titles[3]).toBe(eventTitle);
 
       await page.evaluate(() => {
         localStorage.setItem(
@@ -327,7 +331,7 @@ test.describe("recently viewed", () => {
           ),
         );
       });
-      await page.reload({ waitUntil: "networkidle" });
+      await page.reload({ waitUntil: "load" });
       await expect(page.locator("[data-recently-viewed] li")).toHaveCount(8);
       await page.locator("[data-clear-recent]").click();
       await expect(page.locator("[data-recently-viewed]")).toHaveCount(0);

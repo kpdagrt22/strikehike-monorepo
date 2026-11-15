@@ -8,6 +8,13 @@ const CSP_HEADER =
   CSP_MODE === "enforce"
     ? "Content-Security-Policy"
     : "Content-Security-Policy-Report-Only";
+// The Reporting API needs an absolute endpoint. Production is the default; a
+// local verification build sets CSP_REPORT_ORIGIN=http://127.0.0.1:3000 so its
+// reports stay local. The legacy report-uri uses the same absolute URL.
+const CSP_REPORT_ORIGIN = (
+  process.env.CSP_REPORT_ORIGIN ?? "https://strikehike.com"
+).replace(/\/+$/, "");
+const CSP_REPORT_URL = `${CSP_REPORT_ORIGIN}/api/v1/csp-report`;
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -56,8 +63,23 @@ const nextConfig: NextConfig = {
           // that directive (and log an error) in a report-only policy.
           {
             key: CSP_HEADER,
-            value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri ${CSP_REPORT_URL}; report-to csp-endpoint`,
+          },
+          {
+            // The Reporting API group. Chrome ignores a relative endpoint and
+            // then sends nothing at all, so this one is absolute.
+            key: "Reporting-Endpoints",
+            value: `csp-endpoint="${CSP_REPORT_URL}"`,
+          },
+          {
+            // The older Reporting API header, kept for browsers that still
+            // read it; both point at the same endpoint.
+            key: "Report-To",
+            value: JSON.stringify({
+              group: "csp-endpoint",
+              max_age: 10886400,
+              endpoints: [{ url: CSP_REPORT_URL }],
+            }),
           },
         ],
       },

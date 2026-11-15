@@ -221,6 +221,31 @@ def _vitals(events: list[dict[str, Any]]) -> dict[str, Any]:
     return out
 
 
+def _csp(store: AnalyticsStore, start: date, end: date) -> dict[str, Any]:
+    """Top CSP directives and blocked origins for the week (aggregates only)."""
+    rows = store.connection.execute(
+        "SELECT directive, blocked_origin FROM csp_reports "
+        "WHERE day_ist BETWEEN ? AND ?",
+        (start.isoformat(), end.isoformat()),
+    ).fetchall()
+    directives: dict[str, int] = defaultdict(int)
+    origins: dict[str, int] = defaultdict(int)
+    for row in rows:
+        directives[str(row["directive"])] += 1
+        origins[str(row["blocked_origin"])] += 1
+    return {
+        "total": len(rows),
+        "directives": [
+            {"name": name, "count": count}
+            for name, count in sorted(directives.items(), key=lambda item: (-item[1], item[0]))[:5]
+        ],
+        "origins": [
+            {"name": name, "count": count}
+            for name, count in sorted(origins.items(), key=lambda item: (-item[1], item[0]))[:5]
+        ],
+    }
+
+
 def _experiment_split(events: list[dict[str, Any]]) -> dict[str, Any]:
     """Engaged sessions per variant, for each experiment that reported exposures.
 
@@ -537,6 +562,7 @@ def build_weekly_export(
             "referrers": _referrers(events),
             "vitals": _vitals(events),
         },
+        "csp": _csp(store, start, end),
         "server": _server(log_dir, week),
         "feedback": feedback,
         "data_quality": {

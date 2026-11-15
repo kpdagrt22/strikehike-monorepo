@@ -1,4 +1,4 @@
-import { EARTH_RADIUS, PLANETS } from "@/components/PlanetarySystem";
+import { EARTH_RADIUS, PLANETS } from "@/lib/orreryData";
 
 // A static, server-safe orrery for browsers without WebGL. It uses the same
 // positions already in the store: the Sun, every planet and Earth's orbit.

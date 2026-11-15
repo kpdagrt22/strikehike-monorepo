@@ -1,0 +1,172 @@
+name: deps-watch
+
+# Advisory weekly check: reports runtime dependency advisories into the job
+# summary. It opens no issue and never fails the run; a broken audit is itself
+# reported in the summary. Actions are pinned by SHA like the other workflows.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deps-watch
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: npm audit (runtime dependencies)
+        working-directory: frontend
+        run: |
+          set +e
+          npm audit --omit=dev --json > "$RUNNER_TEMP/npm-audit.json" 2> "$RUNNER_TEMP/npm-audit.err"
+          echo "npm_audit_exit=$?" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: pip-audit (backend runtime requirements)
+        run: |
+          set +e
+          python -m pip install --quiet --disable-pip-version-check pip-audit==2.10.1
+          echo "pip_audit_install_exit=$?" >> "$GITHUB_ENV"
+          python -m pip_audit -r backend/requirements-minimal.txt \
+            --format=json --output "$RUNNER_TEMP/pip-audit.json" 2> "$RUNNER_TEMP/pip-audit.err"
+          echo "pip_audit_exit=$?" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Write the summary
+        env:
+          NPM_AUDIT: ${{ runner.temp }}/npm-audit.json
+          PIP_AUDIT: ${{ runner.temp }}/pip-audit.json
+          NPM_AUDIT_ERR: ${{ runner.temp }}/npm-audit.err
+          PIP_AUDIT_ERR: ${{ runner.temp }}/pip-audit.err
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          out = []
+          out.append("## deps-watch")
+          out.append("")
+          out.append("Advisory only. No issue is opened and this run never fails on a finding.")
+          out.append("")
+
+          # npm audit
+          npm_path = Path(os.environ["NPM_AUDIT"])
+          npm_exit = os.environ.get("npm_audit_exit", "?")
+          out.append("### Frontend: `npm audit --omit=dev`")
+          out.append("")
+          try:
+              data = json.loads(npm_path.read_text(encoding="utf-8"))
+          except Exception:
+              err = Path(os.environ["NPM_AUDIT_ERR"]).read_text(encoding="utf-8", errors="replace").strip()
+              out.append(f"Audit did not produce JSON (exit {npm_exit}).")
+              if err:
+                  out.append("")
+                  out.append("```")
+                  out.append(err.splitlines()[-1][:300])
+                  out.append("```")
+          else:
+              meta = data.get("metadata", {}).get("vulnerabilities", {})
+              counts = {k: int(meta.get(k, 0) or 0) for k in ("info", "low", "moderate", "high", "critical")}
+              total = sum(counts.values())
+              out.append(f"Runtime advisories: **{total}** "
+                         f"(critical {counts['critical']}, high {counts['high']}, "
+                         f"moderate {counts['moderate']}, low {counts['low']}, info {counts['info']}).")
+              advisories = data.get("vulnerabilities", {})
+              shown = 0
+              if advisories:
+                  out.append("")
+                  out.append("| Package | Severity | Via | Direct | Fix available |")
+                  out.append("|---|---|---|---|---|")
+                  for name, item in sorted(
+                      advisories.items(),
+                      key=lambda kv: {"critical": 0, "high": 1, "moderate": 2, "low": 3, "info": 4}.get(
+                          str(kv[1].get("severity")), 9
+                      ),
+                  ):
+                      if shown >= 15:
+                          out.append(f"| ... | | {len(advisories) - shown} more packages | | |")
+                          break
+                      via = item.get("via", [])
+                      titles = [v.get("title", "") for v in via if isinstance(v, dict)]
+                      out.append(
+                          f"| `{name}` | {item.get('severity', '?')} | "
+                          f"{(titles[0] if titles else 'advisory')[:90]} | "
+                          f"{'yes' if item.get('isDirect') else 'no'} | "
+                          f"{'yes' if item.get('fixAvailable') else 'no'} |"
+                      )
+                      shown += 1
+          out.append("")
+
+          # pip-audit
+          pip_path = Path(os.environ["PIP_AUDIT"])
+          pip_exit = os.environ.get("pip_audit_exit", "?")
+          install_exit = os.environ.get("pip_audit_install_exit", "?")
+          out.append("### Backend: `pip-audit -r requirements-minimal.txt`")
+          out.append("")
+          try:
+              data = json.loads(pip_path.read_text(encoding="utf-8"))
+          except Exception:
+              err = Path(os.environ["PIP_AUDIT_ERR"]).read_text(encoding="utf-8", errors="replace").strip()
+              out.append(
+                  f"Audit did not produce JSON (install exit {install_exit}, audit exit {pip_exit})."
+              )
+              if err:
+                  out.append("")
+                  out.append("```")
+                  out.append(err.splitlines()[-1][:300])
+                  out.append("```")
+          else:
+              rows = []
+              for package in data.get("dependencies", []):
+                  for vuln in package.get("vulns", []) or []:
+                      rows.append((package.get("name", "?"), package.get("version", "?"),
+                                   vuln.get("id", "?"), (vuln.get("fix_versions") or [])))
+              raw_deps = data.get("dependencies", [])
+              raw_total = len(raw_deps)
+              # requirements-minimal.txt is the runtime set. The audit output
+              # includes every pinned line it could resolve.
+              runtime_total = sum(
+                  1 for d in raw_deps
+                  if d.get("name", "").lower() not in {"pip", "setuptools", "wheel"}
+              )
+              out.append(f"Runtime requirements checked: **{runtime_total}** "
+                         f"({raw_total} resolved lines). Advisories: **{len(rows)}**.")
+              if rows:
+                  out.append("")
+                  out.append("| Package | Version | Advisory | Fix versions |")
+                  out.append("|---|---|---|---|")
+                  for name, version, vid, fixes in rows[:15]:
+                      out.append(f"| `{name}` | {version} | {vid} | {', '.join(fixes) if fixes else 'none'} |")
+                  if len(rows) > 15:
+                      out.append(f"| ... | | {len(rows) - 15} more | |")
+          out.append("")
+          out.append("Run: `" + os.environ.get("GITHUB_RUN_ID", "manual") + "`.")
+
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          with summary.open("a", encoding="utf-8") as handle:
+              handle.write("\n".join(out) + "\n")
+          PY

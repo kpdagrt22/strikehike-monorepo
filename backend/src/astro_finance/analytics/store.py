@@ -21,6 +21,10 @@ GLOBAL_DAILY_CAP = 50_000
 # visitors behind one /48, so this is an abuse ceiling, not a per-person cap.
 NET_REQUESTS_PER_MINUTE = 600
 RETENTION_DAYS = 395
+# CSP reports per IST day, all networks together. A broken policy repeats the
+# same few rows on every page view, so a few thousand is a full sample; the cap
+# keeps a report flood from growing the database.
+CSP_DAILY_CAP = 2_000
 
 
 def _day(value: datetime) -> str:
@@ -274,6 +278,17 @@ class AnalyticsStore:
                   stripped_props INTEGER NOT NULL DEFAULT 0,
                   global_cap_hit INTEGER NOT NULL DEFAULT 0
                 );
+                CREATE TABLE IF NOT EXISTS csp_reports (
+                  id INTEGER PRIMARY KEY,
+                  received_at INTEGER NOT NULL,
+                  day_ist TEXT NOT NULL,
+                  week_ist TEXT NOT NULL,
+                  directive TEXT NOT NULL,
+                  blocked_origin TEXT NOT NULL,
+                  page_path TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_csp_week ON csp_reports(week_ist);
+                CREATE INDEX IF NOT EXISTS idx_csp_day ON csp_reports(day_ist);
                 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS feedback (
                   id INTEGER PRIMARY KEY,
@@ -331,6 +346,7 @@ class AnalyticsStore:
         cutoff = now_ms - RETENTION_DAYS * 86_400_000
         self.connection.execute("DELETE FROM events WHERE received_at < ?", (cutoff,))
         self.connection.execute("DELETE FROM feedback WHERE received_at < ?", (cutoff,))
+        self.connection.execute("DELETE FROM csp_reports WHERE received_at < ?", (cutoff,))
         self.connection.execute(
             "INSERT INTO meta(key, value) VALUES('last_purge_day', ?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -459,6 +475,49 @@ class AnalyticsStore:
             )
             self.connection.commit()
         return {"accepted": len(kept), "dropped_global_cap": dropped_cap}
+
+    def add_csp_report(
+        self,
+        directive: str,
+        blocked_origin: str,
+        page_path: str,
+        net_key: str,
+        now_ms: int | None = None,
+    ) -> bool:
+        """Store one CSP violation: directive, blocked origin, page path, date.
+
+        No IP, user agent, cookie or Authorization header is accepted; there is
+        no column for them. The rate limit is the store's per-network bucket.
+        """
+        now_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+        if not self.net_limit.take(net_key or "unknown", 1, now_ms / 1000):
+            return False
+        moment = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
+        day = _day(moment)
+        # The connection is shared across request threads: every write holds
+        # the store lock, like ingest() and add_feedback().
+        with self.lock, self.connection:
+            self._purge(day, now_ms)
+            stored = self.connection.execute(
+                "SELECT COUNT(*) AS n FROM csp_reports WHERE day_ist=?", (day,)
+            ).fetchone()
+            if int(stored["n"]) >= CSP_DAILY_CAP:
+                # The day's sample is full: accept and drop, so the browser
+                # does not retry.
+                return True
+            self.connection.execute(
+                "INSERT INTO csp_reports(received_at, day_ist, week_ist, directive, "
+                "blocked_origin, page_path) VALUES(?,?,?,?,?,?)",
+                (
+                    now_ms,
+                    day,
+                    _week(moment),
+                    directive[:120],
+                    blocked_origin[:160],
+                    page_path[:160],
+                ),
+            )
+        return True
 
     def add_feedback(
         self,
