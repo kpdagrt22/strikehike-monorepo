@@ -64,7 +64,7 @@ export function UpcomingEventRow({
               <>
                 <Link
                   href={`/upcoming/${themeSlug}`}
-                  className="inline-flex items-center rounded-full border border-(--sh-line-1) px-1.5 py-0.5 font-medium text-(--sh-text-2) transition-colors hover:border-(--sh-line-2) hover:text-(--sh-text-1) focus-visible:border-(--sh-line-2) focus-visible:text-(--sh-text-1)"
+                  className="sh-row-theme"
                 >
                   {themeName}
                 </Link>

@@ -237,11 +237,13 @@ test.describe("upcoming calendar", () => {
 
   test("Show all opens and a subscribe link points at the feed", async ({ page, request }) => {
     await waitForUpcoming(request);
-    await page.goto("/upcoming?all=1", { waitUntil: "domcontentloaded" });
-    const details = page.locator("details").filter({ hasText: "Show all" }).first();
-    await expect(details).toBeVisible();
-    await details.locator("summary").click();
-    await expect(details).toHaveJSProperty("open", true);
+    await page.goto("/upcoming", { waitUntil: "domcontentloaded" });
+    const before = await page.locator("[data-upcoming-row]").count();
+    const showAll = page.getByRole("link", { name: /Show all \d+ dates/ });
+    await expect(showAll).toBeVisible();
+    await showAll.click();
+    await page.waitForURL("**/upcoming?all=1");
+    await expect(page.locator("[data-upcoming-row]")).not.toHaveCount(before);
 
     await page.getByRole("button", { name: "Subscribe to all" }).click();
     const download = page.getByRole("link", { name: "Download .ics" });

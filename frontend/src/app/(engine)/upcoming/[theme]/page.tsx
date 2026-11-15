@@ -119,6 +119,7 @@ export default async function ThemePage({
   const items = flatEvents([themeEntry]);
   const groups = themeGroup(themeEntry, items);
   const total = themes.reduce((sum, item) => sum + item.available, 0);
+  const next = nextItem(items);
 
   return (
     <PageShell>
@@ -159,10 +160,21 @@ export default async function ThemePage({
             </nav>
           }
           subscribeScope={theme}
-          themes={themes}
+          themes={themes.map(({ name, slug, available }) => ({
+            name,
+            slug,
+            available,
+          }))}
           current={theme}
           total={total}
-          next={nextItem(items)}
+          next={
+            next
+              ? {
+                  event: next.event,
+                  theme: { name: next.theme.name, slug: next.theme.slug },
+                }
+              : null
+          }
           showFilterSubscribes={false}
           share={
             <>

@@ -57,7 +57,6 @@ export function LocalDateTime(props: Props) {
     "data-sd": startDate,
     "data-su": startUtc ?? undefined,
     "data-st": startTime ?? undefined,
-    "data-tz": props.timezone ?? undefined,
     "data-ad": allDay ? "" : undefined,
     "data-lg": long ? "" : undefined,
   };

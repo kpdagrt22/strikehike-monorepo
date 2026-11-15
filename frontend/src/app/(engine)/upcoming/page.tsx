@@ -59,8 +59,8 @@ export default async function UpcomingPage({
   const items = flatEvents(themes);
   const groups = monthGroups(items);
   // A rolling window, not "the first calendar month": late in a month that
-  // could be one or two dates. The next 30 days from the payload's own as_of,
-  // or the next 10 dates when the window is thin.
+  // could be one or two dates. The first ten dates are the next 30 days in
+  // practice, and "Show all" carries the rest.
   const asOf = payload?.as_of ? Date.parse(`${payload.as_of}T00:00:00Z`) : NaN;
   const cutoff = Number.isFinite(asOf)
     ? new Date(asOf + 30 * 86_400_000).toISOString().slice(0, 10)
@@ -71,7 +71,8 @@ export default async function UpcomingPage({
           event.start_date <= cutoff,
       )
     : [];
-  const defaultItems = inWindow.length >= 10 ? inWindow : items.slice(0, 10);
+  const defaultItems =
+    inWindow.length >= 10 ? inWindow.slice(0, 10) : items.slice(0, 10);
   const shownItems = expanded ? items : defaultItems;
   const shownGroups = monthGroups(shownItems);
   const hasMore = items.length > defaultItems.length;
@@ -115,7 +116,14 @@ export default async function UpcomingPage({
           }))}
           current="all"
           total={total}
-          next={next}
+          next={
+            next
+              ? {
+                  event: next.event,
+                  theme: { name: next.theme.name, slug: next.theme.slug },
+                }
+              : null
+          }
           changeNote={<ChangeNote where="upcoming" />}
           footer={<RecentlyViewed />}
         />

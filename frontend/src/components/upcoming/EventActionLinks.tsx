@@ -7,8 +7,7 @@ import { eventCalendarPath, eventPath, skyDate, skyHref } from "@/lib/events/eve
 //
 // This is a server component: the rows on /upcoming, /this-week and the date
 // pages are plain HTML. One EventActionTracker on the page records the clicks.
-const ACTION =
-  "inline-flex min-h-11 items-center rounded-full border border-(--sh-line-1) px-2.5 text-micro font-medium text-(--sh-text-2) transition-colors hover:bg-(--sh-hover) hover:text-(--sh-text-1) focus-visible:bg-(--sh-hover) focus-visible:text-(--sh-text-1) sm:min-h-8";
+const ACTION = "sh-row-action";
 const REVEAL =
   "pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:duration-(--sh-dur-reveal) pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 motion-reduce:transition-none";
 

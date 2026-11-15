@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { PageShell } from "@/components/PageShell";
@@ -113,7 +113,7 @@ export default async function EventPage({
     // 404; a genuinely unknown id still 404s.
     const theme = themeName(id.split(":")[0]);
     if (theme && !hasNoThemePage(theme) && (await roundupListsEvent(id))) {
-      redirect(`/upcoming/${themeSlug(theme)}`);
+      permanentRedirect(`/upcoming/${themeSlug(theme)}`);
     }
     notFound();
   }
