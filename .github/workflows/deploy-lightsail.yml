@@ -967,3 +967,22 @@ jobs:
             df -h /
             docker compose -p strikehike-chrono exec -T backend \
               du -sh /app/data/runtime/analytics 2>/dev/null || true
+
+      - name: Check out for live verification
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node for live verification
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: "22"
+
+      - name: Verify the live build
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          node scripts/verify-live.mjs \
+            --base-url=https://strikehike.com \
+            --expect-sha="${BUILD_SHA::7}" \
+            --timeout=120
