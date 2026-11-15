@@ -33,6 +33,7 @@ from astro_finance.historical_parallels import (  # noqa: E402
     forecast_ladder,
     list_events_by_category,
 )
+from astro_finance.analytics.csp import router as csp_router  # noqa: E402
 from astro_finance.analytics.router import (  # noqa: E402
     feedback_router as analytics_feedback_router,
     router as analytics_router,
@@ -53,6 +54,7 @@ app.include_router(roundups_router, prefix="/api/v1")
 app.include_router(sky_week_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(analytics_feedback_router, prefix="/api/v1")
+app.include_router(csp_router, prefix="/api/v1")
 app.include_router(digest_router, prefix="/api")
 
 CORS_ORIGINS = [
