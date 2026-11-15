@@ -4,9 +4,11 @@ import { PageShell } from "@/components/PageShell";
 import { DataUnavailable } from "@/components/states/DataUnavailable";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
-import { ChangeNote } from "@/components/retention/ChangeNote";
-import { RecentlyViewed } from "@/components/retention/RecentlyViewed";
-import { YourThemes } from "@/components/retention/YourThemes";
+import {
+  ChangeNoteLazy,
+  RecentlyViewedLazy,
+  YourThemesLazy,
+} from "@/components/retention/RetentionLazy";
 import { UpcomingGroups } from "@/components/upcoming/UpcomingGroups";
 import { UpcomingPageTracker } from "@/components/upcoming/UpcomingPageTracker";
 import { UpcomingRail } from "@/components/upcoming/UpcomingRail";
@@ -124,13 +126,13 @@ export default async function UpcomingPage({
                 }
               : null
           }
-          changeNote={<ChangeNote where="upcoming" />}
-          footer={<RecentlyViewed />}
+          changeNote={<ChangeNoteLazy where="upcoming" />}
+          footer={<RecentlyViewedLazy />}
         />
 
         <div className="mt-8 min-w-0 lg:mt-0">
           <div data-your-themes-slot="" className="mb-6">
-            <YourThemes themes={yourThemes} />
+            <YourThemesLazy themes={yourThemes} />
           </div>
           {unavailable ? (
             <DataUnavailable
