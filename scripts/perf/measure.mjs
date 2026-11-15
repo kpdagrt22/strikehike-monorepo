@@ -72,16 +72,20 @@ function runLighthouse(url, index) {
     `--form-factor=${formFactor}`,
     "--throttling-method=simulate",
     formFactor === "mobile"
-      ? "--screenEmulation.mobile --screenEmulation.width=390 --screenEmulation.height=844 --screenEmulation.deviceScaleFactor=3"
+      ? "--screenEmulation.mobile=true --screenEmulation.width=390 --screenEmulation.height=844 --screenEmulation.deviceScaleFactor=3"
       : "--screenEmulation.mobile=false --screenEmulation.width=1350 --screenEmulation.height=940 --screenEmulation.deviceScaleFactor=1",
     '--chrome-flags="--headless=new --no-sandbox --disable-gpu"',
     "--quiet",
   ].join(" ");
-  const result = spawnSync(flags, {
-    shell: true,
-    encoding: "utf8",
-    timeout: 240_000,
-  });
+  let result;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    result = spawnSync(flags, {
+      shell: true,
+      encoding: "utf8",
+      timeout: 240_000,
+    });
+    if (result.status === 0) break;
+  }
   if (result.status !== 0) {
     throw new Error(
       `lighthouse failed for ${url} (exit ${result.status}): ${(result.stderr || result.stdout || "").slice(-800)}`,
