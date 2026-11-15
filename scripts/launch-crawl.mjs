@@ -12,7 +12,7 @@
 import { writeFileSync } from "node:fs";
 
 const UA = "StrikeHike-launch-crawl/1.0 (+https://strikehike.com/about)";
-const RATE_MS = 500;
+const RATE_MS = Math.max(200, Number(arg("rate-ms", "500")) || 500);
 
 function arg(name, fallback) {
   const prefix = `--${name}=`;
@@ -329,9 +329,10 @@ console.log(markdown);
 if (
   summary.issues.non_200.length ||
   summary.issues.canonical_mismatch.length ||
-  summary.issues.jsonld_invalid.length ||
-  summary.issues.internal_404.length ||
-  summary.issues.mixed_content.length
+  summary.issues.missing_title.length ||
+  summary.issues.missing_description.length ||
+  summary.issues.og_image_bad.length ||
+  summary.issues.internal_404.length
 ) {
   process.exitCode = 1;
 }
