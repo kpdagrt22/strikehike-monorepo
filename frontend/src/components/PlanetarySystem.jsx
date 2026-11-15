@@ -9,9 +9,8 @@ import { getRegimeToneColor } from "@/lib/regimeTone";
 import { useChronoStore } from "@/store/chronoStore";
 import { viewOpened } from "@/lib/analytics/events";
 import { useEntityStore } from "@/store/entityStore";
+import { EARTH_RADIUS, EARTH_SIZE, PLANETS } from "@/lib/orreryData";
 
-export const EARTH_RADIUS = 1.66;
-export const EARTH_SIZE = 0.09;
 const MOON_SIZE = EARTH_SIZE * 0.42;
 const MOON_ORBIT_RADIUS = EARTH_SIZE * 2.8;
 const SATURN_TILT = Math.PI / 2 + 0.47;
@@ -42,109 +41,7 @@ const TEXTURE_PATHS = [
   "/textures/saturn-ring.webp",
 ];
 
-/**
- * Visual orbit radii, inner to outer. The values are deliberately compressed:
- * the scene is a legible orrery, not a scale model of the solar system. The
- * Sun is the central anchor; the rest are perceptual relative sizes.
- */
-export const PLANETS = [
-  {
-    name: "Sun",
-    symbol: "☉",
-    radius: 0,
-    size: 0.27,
-    color: "#f6c76a",
-    roughness: 0.5,
-    metalness: 0.0,
-    clearcoat: 0.1,
-    bumpScale: 0.014,
-    gas: false,
-  },
-  {
-    name: "Mercury",
-    symbol: "☿",
-    radius: 1.22,
-    size: 0.038,
-    color: "#b9b3a8",
-    roughness: 0.72,
-    metalness: 0.28,
-    clearcoat: 0.05,
-    bumpScale: 0.032,
-    gas: false,
-  },
-  {
-    name: "Venus",
-    symbol: "♀",
-    radius: 1.5,
-    size: 0.09,
-    color: "#e8c9a0",
-    roughness: 0.52,
-    metalness: 0.12,
-    clearcoat: 0.22,
-    bumpScale: 0.018,
-    gas: false,
-  },
-  {
-    name: "Mars",
-    symbol: "♂",
-    radius: 1.82,
-    size: 0.058,
-    color: "#d97a5a",
-    roughness: 0.74,
-    metalness: 0.16,
-    clearcoat: 0.06,
-    bumpScale: 0.03,
-    gas: false,
-  },
-  {
-    name: "Jupiter",
-    symbol: "♃",
-    radius: 2.28,
-    size: 0.175,
-    color: "#d8b47a",
-    roughness: 0.7,
-    metalness: 0.1,
-    clearcoat: 0.12,
-    bumpScale: 0.012,
-    gas: true,
-  },
-  {
-    name: "Saturn",
-    symbol: "♄",
-    radius: 2.72,
-    size: 0.148,
-    color: "#e0cf9a",
-    roughness: 0.54,
-    metalness: 0.04,
-    clearcoat: 0.2,
-    bumpScale: 0.014,
-    gas: true,
-  },
-  {
-    name: "Rahu",
-    symbol: "☊",
-    radius: 3.12,
-    size: 0.035,
-    color: "#8b7cff",
-    roughness: 0.36,
-    metalness: 0.42,
-    clearcoat: 0.4,
-    bumpScale: 0.02,
-    gas: false,
-  },
-  {
-    name: "Ketu",
-    symbol: "☋",
-    radius: 3.42,
-    size: 0.035,
-    color: "#7c9bb5",
-    roughness: 0.36,
-    metalness: 0.42,
-    clearcoat: 0.4,
-    bumpScale: 0.02,
-    gas: false,
-  },
-];
+
 
 function seededRandom(seed) {
   let state = seed >>> 0;
