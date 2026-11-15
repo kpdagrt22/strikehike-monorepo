@@ -7,7 +7,11 @@
 # SQLite files are copied with the sqlite3 backup API. The events runtime
 # (bundles + current pointer) is copied as a directory. Caddy data and logs are
 # never touched. The newest 14 stamps are kept.
+#
+# digest.sqlite holds subscriber emails, so every copy is owner-only (umask 077,
+# backup root 0700).
 set -euo pipefail
+umask 077
 
 RUNTIME_DIR=""
 DEST_ROOT="${HOME}/strikehike-backups"
@@ -116,7 +120,11 @@ PY
   docker compose -p "$PROJECT" exec -T backend rm -rf "$INNER" || true
 fi
 
-# --- a copy must have bytes, and every sqlite file must open ---
+# docker cp keeps the container's file modes; make the whole copy owner-only.
+chmod 700 "$DEST_ROOT" "$DEST"
+chmod -R go-rwx "$DEST"
+
+# --- a copy must have bytes, and every sqlite file must pass quick_check ---
 if find "$DEST" -type f -size 0 | grep -q .; then
   echo "empty file in backup: $(find "$DEST" -type f -size 0 | head -n 1)" >&2
   exit 1
@@ -127,7 +135,9 @@ for db in "$DEST"/*.sqlite "$DEST"/*.db; do
 import sqlite3
 import sys
 with sqlite3.connect(sys.argv[1]) as con:
-    con.execute("SELECT 1").fetchone()
+    result = con.execute("PRAGMA quick_check").fetchone()[0]
+    if result != "ok":
+        sys.exit(f"sqlite quick_check failed for {sys.argv[1]}: {result}")
 PY
 done
 

@@ -56,5 +56,10 @@ COUNT="$(find "$HOME_DIR/strikehike-backups" -mindepth 1 -maxdepth 1 -type d | w
 [ ! -d "$HOME_DIR/strikehike-backups/2026-11-15T00:00:01Z" ] \
   || { echo "oldest stamp was not pruned" >&2; exit 1; }
 [ ! -e "$RUNTIME/backups" ] || { echo "backup leaked into the runtime dir" >&2; exit 1; }
+# Copies hold subscriber emails: owner-only on Linux (NTFS has no POSIX modes).
+if [ "$(uname -s)" = "Linux" ]; then
+  [ "$(stat -c %a "$LATEST")" = "700" ] || { echo "backup stamp is not 0700" >&2; exit 1; }
+  [ "$(stat -c %a "$LATEST/digest.sqlite")" = "600" ] || { echo "digest copy is not 0600" >&2; exit 1; }
+fi
 
 echo "backup runtime: sqlite copies valid, events kept, 14 stamps retained"

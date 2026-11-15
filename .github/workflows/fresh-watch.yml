@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
@@ -31,7 +33,11 @@ jobs:
 
       - name: Check freshness
         run: |
+          # Keep the summary when a threshold fails: that is when it matters.
+          set +e
           node scripts/fresh-watch.mjs \
             --base-url=https://strikehike.com \
             --summary=fresh-watch.md
-          cat fresh-watch.md >> "$GITHUB_STEP_SUMMARY"
+          rc=$?
+          [ -f fresh-watch.md ] && cat fresh-watch.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
