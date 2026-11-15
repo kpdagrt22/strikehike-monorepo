@@ -61,7 +61,7 @@ services:
         NEXT_PUBLIC_BUILD_SHA: ${BUILD_SHA:-dev}
         CSP_MODE: ${CSP_MODE:-report-only}
         CSP_REPORT_ORIGIN: ${CSP_REPORT_ORIGIN:-https://strikehike.com}
-        NEXT_PUBLIC_ORRERY_PHONE: ${NEXT_PUBLIC_ORRERY_PHONE:-live}
+        NEXT_PUBLIC_ORRERY_PHONE: ${NEXT_PUBLIC_ORRERY_PHONE:-poster}
     environment:
       CHRONO_API_URL: http://backend:8010
       NEXT_TELEMETRY_DISABLED: "1"

@@ -107,6 +107,10 @@ jobs:
         working-directory: .
         run: bash tests/deploy/test_caddy_migration.sh
 
+      - name: Runtime backup copies sqlite and keeps 14 stamps
+        working-directory: .
+        run: bash tests/deploy/test_backup_runtime.sh
+
   test-frontend:
     name: Frontend lint and build
     runs-on: ubuntu-24.04
@@ -603,6 +607,12 @@ jobs:
             # Build the new stack while the existing site is still serving.
             export BUILD_SHA="$(git rev-parse --short=7 HEAD)"
             export CSP_MODE="${CSP_MODE:-report-only}"
+
+            # BACKUP-1: a pre-deploy runtime copy. A failed backup warns and
+            # never stops the deploy; Caddy data is not touched.
+            if ! bash scripts/backup_runtime.sh; then
+              echo "::warning::pre-deploy runtime backup failed; continuing without a backup"
+            fi
             if [ -n "${INDEXNOW_KEY:-}" ]; then
               # The key file must be served at /<key>.txt. It is generated on
               # the host so the key never lives in the repository.

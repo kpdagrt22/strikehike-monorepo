@@ -18,6 +18,9 @@ const CSP_REPORT_URL = `${CSP_REPORT_ORIGIN}/api/v1/csp-report`;
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The poster-mode Playwright build uses its own directory so it does not
+  // replace the live build the main suite is serving.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // No X-Powered-By header.
   poweredByHeader: false,
   // Pin the workspace root to this project (multiple lockfiles exist on disk).

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { mockHomeData } from "./fixtures/homeData";
+import { ORRERY_OVERLAYS } from "./orreryOverlays";
 
 const H1 = "The market record beside the sky, tested in public.";
 const PRIMARY = "See 170 years of markets beside the sky";
@@ -733,20 +734,6 @@ type OrreryScreen = {
   viewport: { width: number; height: number };
 };
 
-const ORRERY_OVERLAYS: Array<[string, string]> = [
-  ["intro", "[data-home-intro]"],
-  ["change note", "[data-home-change-note]"],
-  ["gauge", '[data-hud="gauge"]'],
-  ["aura", ".sh-aura"],
-  ["captions", "[data-gauge-captions]"],
-  ["hint", "[data-home-hint]"],
-  ["left column", "[data-home-left-column]"],
-  ["right panel", "#chrono-alignment-sheet"],
-  ["time controls", '[data-hud="timeline"]'],
-  ["dock", '[data-hud="dock"]'],
-  ["feedback", "[data-home-feedback]"],
-  ["sponsor", "[data-home-sponsor]"],
-];
 
 function rectIntersects(
   a: Box,

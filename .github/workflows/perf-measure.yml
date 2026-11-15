@@ -1,0 +1,68 @@
+name: perf-measure
+
+# Advisory Lighthouse measurement on a quiet GitHub runner. Slow numbers do not
+# fail the job; only a Lighthouse run that cannot complete does.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to measure
+        required: false
+        default: https://strikehike.com
+      runs:
+        description: Runs per route
+        required: false
+        default: "5"
+      form_factor:
+        description: Lighthouse form factor
+        required: true
+        type: choice
+        options:
+          - mobile
+          - desktop
+        default: mobile
+  schedule:
+    # Tuesdays 03:30 UTC.
+    - cron: "30 3 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-measure-${{ inputs.base_url || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: "22"
+
+      - name: Measure
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://strikehike.com' }}
+          RUNS: ${{ inputs.runs || '5' }}
+          FORM_FACTOR: ${{ inputs.form_factor || 'mobile' }}
+        run: |
+          node scripts/perf/measure.mjs \
+            --base-url="$BASE_URL" \
+            --runs="$RUNS" \
+            --form-factor="$FORM_FACTOR" \
+            --out=perf-measure.json \
+            --markdown=perf-measure.md
+          cat perf-measure.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the JSON
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: perf-measure-${{ github.run_id }}
+          path: perf-measure.json
+          retention-days: 30
