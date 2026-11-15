@@ -56,6 +56,8 @@ CARD = "#14121a"
 LINE = "#2a2730"
 GOLD = "#ff8b77"
 GOLD_DEEP = "#f05d49"
+# Accent text on the light plates: 5.66:1 on #ffffff, 5.29:1 on #faf7f2.
+ACCENT_LIGHT = "#b3412e"
 LIGHT_BG = "#faf7f2"
 LIGHT_CARD = "#ffffff"
 LIGHT_INK = "#14121a"
@@ -353,11 +355,11 @@ def _actions(item: dict[str, Any], week: str, base_url: str) -> str:
     )
     return (
         f'<p style="margin:2px 0 0;{SANS}font-size:14px;">'
-        f'<a href="{_attr(links["google"])}" style="{style}">＋ Google</a>'
+        f'<a class="sh-accent" href="{_attr(links["google"])}" style="{style}">＋ Google</a>'
         f'<span class="sh-muted" style="color:{MUTED};"> · </span>'
-        f'<a href="{_attr(links["outlook"])}" style="{style}">Outlook</a>'
+        f'<a class="sh-accent" href="{_attr(links["outlook"])}" style="{style}">Outlook</a>'
         f'<span class="sh-muted" style="color:{MUTED};"> · </span>'
-        f'<a href="{_attr(links["ics"])}" style="{style}">Apple / .ics</a>'
+        f'<a class="sh-accent" href="{_attr(links["ics"])}" style="{style}">Apple / .ics</a>'
         "</p>"
     )
 
@@ -427,7 +429,7 @@ def _timeline(
     parts: list[str] = []
     for label, rows in grouped.items():
         parts.append(
-            f'<p style="margin:18px 0 0;{SANS}font-size:14px;font-weight:700;'
+            f'<p class="sh-accent" style="margin:18px 0 0;{SANS}font-size:14px;font-weight:700;'
             f'letter-spacing:2px;color:{GOLD};">{escape(label)}</p>'
         )
         for item, theme in rows:
@@ -498,7 +500,7 @@ def _header(roundup: dict[str, Any], base_url: str) -> str:
 def _hero(roundup: dict[str, Any]) -> str:
     label = week_label(str(roundup.get("week") or ""))
     return (
-        f'<p style="margin:0 0 6px;{SANS}font-size:14px;font-weight:700;'
+        f'<p class="sh-accent" style="margin:0 0 6px;{SANS}font-size:14px;font-weight:700;'
         f'letter-spacing:2px;text-transform:uppercase;color:{GOLD};">'
         "This week: macro + sky</p>"
         f'<h1 class="sh-ink" style="margin:0 0 10px;{SANS}font-size:40px;'
@@ -542,14 +544,14 @@ def _regime_card(roundup: dict[str, Any], base_url: str) -> str:
     footer = (
         f'<p class="sh-muted" style="margin:8px 0 0;{SANS}font-size:14px;'
         f'color:{MUTED};">Latest reading: {escape(_human_day(reading))} · '
-        f'<a href="{_attr(base_url.rstrip("/") + "/regime")}" '
+        f'<a class="sh-accent" href="{_attr(base_url.rstrip("/") + "/regime")}" '
         f'style="color:{GOLD};text-decoration:underline;">Open the Regime chart →</a>'
         "</p>"
         if reading
         else ""
     )
     content = (
-        f'<p style="margin:0 0 8px;{SANS}font-size:14px;font-weight:700;'
+        f'<p class="sh-accent" style="margin:0 0 8px;{SANS}font-size:14px;font-weight:700;'
         f'letter-spacing:2px;text-transform:uppercase;color:{GOLD};">'
         "Regime · Core Index</p>"
         f'<p style="margin:0;{SANS};font-variant-numeric:tabular-nums;">'
@@ -617,7 +619,7 @@ def _activity_card(roundup: dict[str, Any], base_url: str) -> str:
         else ""
     )
     content = (
-        f'<p style="margin:0 0 4px;{SANS}font-size:14px;font-weight:700;'
+        f'<p class="sh-accent" style="margin:0 0 4px;{SANS}font-size:14px;font-weight:700;'
         f'letter-spacing:2px;text-transform:uppercase;color:{GOLD};">'
         "Sky activity</p>"
         f"{chart}"
@@ -648,7 +650,7 @@ def _calendar_block(roundup: dict[str, Any], base_url: str) -> str:
         f"{_button('Add all these dates to your calendar', week_calendar_url(week, base_url))}"
         "</p>"
         f'<p style="margin:0 0 6px;{SANS}font-size:14px;">'
-        f'<a href="{_attr(subscribe_url(base_url))}" style="color:{GOLD};'
+        f'<a class="sh-accent" href="{_attr(subscribe_url(base_url))}" style="color:{GOLD};'
         f'text-decoration:underline;">Subscribe to every StrikeHike date</a></p>'
         f'<p style="margin:0;{SANS}font-size:14px;">'
         f'<a href="{_attr(google_subscribe_url(base_url))}" class="sh-muted" style="color:{MUTED};'
@@ -664,7 +666,7 @@ def _record_card(roundup: dict[str, Any], base_url: str) -> str:
         return ""
     href = _join(base_url, str(record.get("path") or ""))
     content = (
-        f'<p style="margin:0 0 4px;{SANS}font-size:14px;font-weight:700;'
+        f'<p class="sh-accent" style="margin:0 0 4px;{SANS}font-size:14px;font-weight:700;'
         f'letter-spacing:2px;text-transform:uppercase;color:{GOLD};">'
         "From the record</p>"
         f'<p style="margin:0 0 4px;{SANS}font-size:17px;font-weight:600;">'
@@ -672,7 +674,7 @@ def _record_card(roundup: dict[str, Any], base_url: str) -> str:
         f"{escape(str(record.get('title') or 'Claim test'))}</a></p>"
         f"{_muted(escape(str(record.get('result') or '')))}"
         f'<p style="margin:0;{SANS}font-size:14px;">'
-        f'<a href="{_attr(href)}" style="color:{GOLD};text-decoration:underline;">'
+        f'<a class="sh-accent" href="{_attr(href)}" style="color:{GOLD};text-decoration:underline;">'
         "See the test →</a></p>"
     )
     return _card(content)
@@ -734,7 +736,8 @@ def _style_block() -> str:
         f".sh-card{{background-color:{LIGHT_CARD}!important;border-color:{LIGHT_LINE}!important;}}"
         f".sh-ink{{color:{LIGHT_INK}!important;}}"
         f".sh-muted{{color:{LIGHT_MUTED}!important;}}"
-        f".sh-chip{{background-color:{GOLD_DEEP}!important;color:#ffffff!important;}}"
+        f".sh-accent{{color:{ACCENT_LIGHT}!important;}}"
+        f".sh-chip{{background-color:{GOLD_DEEP}!important;color:{LIGHT_INK}!important;}}"
         f".sh-chip-bg{{background-color:#f1ebe2!important;border-color:{LIGHT_LINE}!important;}}"
         "}"
         "@media (max-width:480px){"

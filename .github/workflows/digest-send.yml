@@ -15,6 +15,11 @@ on:
         required: true
         default: true
         type: boolean
+      preview:
+        description: "Send one [Preview] to the address in the DIGEST_PREVIEW_TO secret"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -30,13 +35,16 @@ jobs:
         env:
           INPUT_WEEK: ${{ inputs.week }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_PREVIEW: ${{ inputs.preview }}
           AUTOSEND: ${{ vars.DIGEST_AUTOSEND }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+          preview="false"
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             week="$INPUT_WEEK"
             dry_run="$INPUT_DRY_RUN"
+            preview="${INPUT_PREVIEW:-false}"
           else
             if [ "$AUTOSEND" != "1" ]; then
               echo "::notice::DIGEST_AUTOSEND is not 1; scheduled send skipped."
@@ -50,10 +58,16 @@ jobs:
             echo "::error::week must look like 2026-W47"
             exit 1
           fi
+          if [ "$preview" = "true" ]; then
+            # A preview is a real send to one address, never a dry run, and it
+            # never depends on the DIGEST_AUTOSEND gate.
+            dry_run="false"
+          fi
           echo "week=$week" >> "$GITHUB_OUTPUT"
           echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "preview=$preview" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
-          echo "Digest week $week, dry_run=$dry_run"
+          echo "Digest week $week, dry_run=$dry_run, preview=$preview"
 
       - name: Run the digest command on the server
         if: steps.resolve.outputs.skip != 'true'
@@ -66,6 +80,9 @@ jobs:
           DIGEST_ENABLED: ${{ vars.DIGEST_ENABLED }}
           DIGEST_POSTAL_ADDRESS: ${{ vars.DIGEST_POSTAL_ADDRESS }}
           DIGEST_REPLY_TO: ${{ vars.DIGEST_REPLY_TO }}
+          DIGEST_PREVIEW: ${{ steps.resolve.outputs.preview }}
+          DIGEST_PREVIEW_TO: ${{ secrets.DIGEST_PREVIEW_TO }}
+          DIGEST_PREVIEW_NONCE: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -73,7 +90,7 @@ jobs:
           port: 22
           # No script_stop: the script's own set -euo pipefail handles failures.
           command_timeout: 30m
-          envs: DIGEST_WEEK,DIGEST_DRY_RUN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO
+          envs: DIGEST_WEEK,DIGEST_DRY_RUN,DIGEST_PREVIEW,DIGEST_PREVIEW_TO,DIGEST_PREVIEW_NONCE,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO
           script: |
             set -euo pipefail
 
@@ -84,7 +101,7 @@ jobs:
 
             APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
             cd "$APP_DIR" 2>/dev/null || cd "$HOME/$APP_DIR"
-            echo "Digest week $DIGEST_WEEK, dry_run=$DIGEST_DRY_RUN"
+            echo "Digest week $DIGEST_WEEK, dry_run=$DIGEST_DRY_RUN, preview=$DIGEST_PREVIEW"
 
             if [ "$DIGEST_DRY_RUN" = "false" ]; then
               # Refuse before sending if the week is not approved. The sender
@@ -105,6 +122,25 @@ jobs:
                 print(f"::error::roundup source failed for {week}: {exc}")
                 raise SystemExit(1)
             PY
+            fi
+
+            if [ "$DIGEST_PREVIEW" = "true" ]; then
+              # The address comes from the repository secret and is never echoed.
+              if [ -z "${DIGEST_PREVIEW_TO:-}" ]; then
+                echo "::error::DIGEST_PREVIEW_TO is not set; no preview sent."
+                exit 1
+              fi
+              docker compose -p strikehike-chrono exec -T \
+                -e RESEND_API_KEY \
+                -e DIGEST_TOKEN_SECRET \
+                -e DIGEST_ENABLED \
+                -e DIGEST_POSTAL_ADDRESS \
+                -e DIGEST_REPLY_TO \
+                backend python -m astro_finance.digest send \
+                  --week "$DIGEST_WEEK" \
+                  --to "$DIGEST_PREVIEW_TO" \
+                  --preview-nonce "${DIGEST_PREVIEW_NONCE:-manual}"
+              exit 0
             fi
 
             FLAG="--dry-run"
