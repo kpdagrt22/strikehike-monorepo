@@ -508,6 +508,7 @@ jobs:
           DIGEST_POSTAL_ADDRESS: ${{ vars.DIGEST_POSTAL_ADDRESS }}
           DIGEST_REPLY_TO: ${{ vars.DIGEST_REPLY_TO }}
           INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
+          CSP_MODE: ${{ vars.CSP_MODE }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -518,7 +519,7 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO,INDEXNOW_KEY
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO,INDEXNOW_KEY,CSP_MODE
           script: |
             set -euo pipefail
 
@@ -601,6 +602,7 @@ jobs:
 
             # Build the new stack while the existing site is still serving.
             export BUILD_SHA="$(git rev-parse --short=7 HEAD)"
+            export CSP_MODE="${CSP_MODE:-report-only}"
             if [ -n "${INDEXNOW_KEY:-}" ]; then
               # The key file must be served at /<key>.txt. It is generated on
               # the host so the key never lives in the repository.
