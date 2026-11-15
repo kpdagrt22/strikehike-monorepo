@@ -1,0 +1,43 @@
+name: pipeline-health
+
+# Checks every scheduled workflow's newest completed scheduled run. The summary
+# is written whether the check passes or fails.
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: pipeline-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: "22"
+
+      - name: Check health
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set +e
+          node scripts/pipeline-health.mjs --summary=pipeline-health.md
+          code=$?
+          cat pipeline-health.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit "$code"
