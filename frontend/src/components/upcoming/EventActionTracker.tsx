@@ -5,6 +5,8 @@ import {
   calendarSubscribed,
   dateTravelled,
   eventSourceClicked,
+  supportLinkClicked,
+  supportOpened,
 } from "@/lib/analytics/events";
 import { useChronoStore } from "@/store/chronoStore";
 
@@ -15,7 +17,9 @@ export function EventActionTracker() {
     const onClick = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      const link = target.closest<HTMLElement>("[data-event-action]");
+      const link = target.closest<HTMLElement>(
+        "[data-event-action],[data-support-link]",
+      );
       if (!link) return;
       if (link.dataset.eventAction === "sky" && link.dataset.eventDate) {
         dateTravelled("archive_event", link.dataset.eventDate);
@@ -48,6 +52,10 @@ export function EventActionTracker() {
             link.dataset.eventSource,
           );
         }
+      }
+      if (link.dataset.supportLink === "footer") {
+        supportOpened("footer_link", "footer");
+        supportLinkClicked("paypal", "footer");
       }
     };
     document.addEventListener("click", onClick, { capture: true });
