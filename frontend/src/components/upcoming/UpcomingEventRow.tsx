@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EventSourceLink } from "@/components/upcoming/EventSourceLink";
-import { EventActions } from "@/components/upcoming/EventActions";
+import { EventActionLinks } from "@/components/upcoming/EventActionLinks";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { eventPath } from "@/lib/events/eventId";
 import { statusLabel } from "@/lib/events/upcoming";
@@ -28,7 +28,7 @@ export function UpcomingEventRow({
   const title = linkTitle ? (
     <Link
       href={eventPath(event.event_id)}
-      className="underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
+      className="inline-flex min-h-6 items-center underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
     >
       {event.name}
     </Link>
@@ -96,7 +96,7 @@ export function UpcomingEventRow({
             />
           </div>
           {actions ? (
-            <EventActions
+            <EventActionLinks
               event={{
                 event_id: event.event_id,
                 start_date: event.start_date,

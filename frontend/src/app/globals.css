@@ -271,13 +271,26 @@
 }
 
 /* Nakshatra halo (header Easter egg): drawn over the brand mark; it fades in
-   and out with the views (framer-motion, opacity only) and never moves. */
+   with the views (CSS only, opacity) and never moves. */
 .sh-halo {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+@keyframes sh-halo-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sh-halo-in {
+  animation: sh-halo-in var(--sh-dur-reveal) var(--sh-ease-out) both;
 }
 
 /* Timeline scrubber: a hairline track with a small pearl/obsidian thumb. */

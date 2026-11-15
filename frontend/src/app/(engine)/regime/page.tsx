@@ -2,6 +2,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { NberTable } from "@/components/seo/NberTable";
 import { MethodDetails } from "@/components/regime/MethodDetails";
 import { MethodDetailsBody } from "@/components/regime/MethodDetailsBody";
+import { MotionRoot } from "@/components/MotionRoot";
 import { readOrNull } from "@/components/seo/readOrNull";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { getCaseCatalogue, getRegimeSummary, type RegimeSummary } from "@/lib/seo/data";
@@ -49,7 +50,7 @@ export default async function Page() {
     readOrNull(getCaseCatalogue),
   ]);
   return (
-    <>
+    <MotionRoot>
       <RegimeClient
         initialSummary={initialSummary(summary)}
         header={<RegimeHeader />}
@@ -65,6 +66,6 @@ export default async function Page() {
         colophon={<SiteColophon current="/regime" />}
       />
       <JsonLd data={regimeGraph(summary)} />
-    </>
+    </MotionRoot>
   );
 }

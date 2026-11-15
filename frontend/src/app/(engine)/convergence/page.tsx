@@ -1,5 +1,6 @@
 import { CatalogueTable } from "@/components/seo/CatalogueTable";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { MotionRoot } from "@/components/MotionRoot";
 import { readOrNull } from "@/components/seo/readOrNull";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { getCaseCatalogue } from "@/lib/seo/data";
@@ -13,13 +14,13 @@ export const revalidate = 60;
 export default async function Page() {
   const catalogue = await readOrNull(getCaseCatalogue);
   return (
-    <>
+    <MotionRoot>
       <ConvergenceClient
         initialCatalogue={catalogue}
         after={<CatalogueTable catalogue={catalogue} />}
         colophon={<SiteColophon current="/convergence" />}
       />
       <JsonLd data={convergenceGraph(catalogue)} />
-    </>
+    </MotionRoot>
   );
 }

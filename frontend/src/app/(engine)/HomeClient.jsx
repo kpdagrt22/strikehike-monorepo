@@ -14,6 +14,7 @@ import { FutureLadder } from "@/components/FutureLadder";
 import { HomeIntro } from "@/components/HomeIntro";
 import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
+import { MotionRoot } from "@/components/MotionRoot";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { RegimeOverlaySync } from "@/components/RegimeOverlaySync";
 import { RightPanel } from "@/components/RightPanel";
@@ -228,7 +229,8 @@ export default function Home({ snapshot }) {
   const regimeTone = useChronoStore((state) => state.regimeTone);
 
   return (
-    <main className="relative h-full w-full overflow-hidden border-0 p-0">
+    <MotionRoot>
+      <main className="relative h-full w-full overflow-hidden border-0 p-0">
       <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} stage={stage} />
 
       <HomeIntro compact={compactIntro} />
@@ -257,6 +259,7 @@ export default function Home({ snapshot }) {
       <SponsorModule />
       <OnboardingOverlay />
       <DateChangeAnnouncer />
-    </main>
+      </main>
+    </MotionRoot>
   );
 }

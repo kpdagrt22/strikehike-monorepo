@@ -1,16 +1,16 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import {
   allDayLabel,
   allDayLongLabel,
   dateLabel,
-  eventInstant,
   longDateLabel,
   timeLabel,
-  zoneLabel,
 } from "@/lib/events/localTime";
 
+// A dated row's date or time. This is a server component: it renders the UTC
+// value, which is also the no-JavaScript value, and tags the node so the one
+// LocalTimeSync on the page can rewrite it to the reader's zone after mount.
+// Rendering it as one client component per row made /upcoming hydrate dozens of
+// islands for the same text.
 type Props = {
   startDate: string;
   startTime: string | null;
@@ -45,26 +45,6 @@ function serverTime({
 
 export function LocalDateTime(props: Props) {
   const { startDate, startTime, startUtc, allDay, part, long = false } = props;
-  const [value, setValue] = useState(() =>
-    part === "date" ? serverDate(props) : serverTime(props),
-  );
-
-  useEffect(() => {
-    if (allDay) return undefined;
-    // After mount only: the first client render must equal the server HTML.
-    const queued = window.setTimeout(() => {
-      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      const instant = eventInstant(startDate, startTime, startUtc);
-      setValue(
-        part === "date"
-          ? long
-            ? longDateLabel(instant, zone)
-            : dateLabel(instant, zone)
-          : `${timeLabel(instant, zone)} ${zoneLabel(instant, zone)}`,
-      );
-    }, 0);
-    return () => window.clearTimeout(queued);
-  }, [allDay, long, part, startDate, startTime, startUtc]);
 
   const title = allDay
     ? startDate
@@ -72,12 +52,26 @@ export function LocalDateTime(props: Props) {
       ? `${startUtc.slice(0, 16).replace("T", " ")} UTC`
       : `${startDate} ${startTime?.slice(0, 5) ?? ""} ${props.timezone ?? "UTC"}`;
 
+  const data = {
+    "data-ld": part,
+    "data-sd": startDate,
+    "data-su": startUtc ?? undefined,
+    "data-st": startTime ?? undefined,
+    "data-tz": props.timezone ?? undefined,
+    "data-ad": allDay ? "" : undefined,
+    "data-lg": long ? "" : undefined,
+  };
+
   if (part === "date") {
     return (
-      <time dateTime={startUtc ?? startDate} title={title}>
-        {value}
+      <time dateTime={startUtc ?? startDate} title={title} {...data}>
+        {serverDate(props)}
       </time>
     );
   }
-  return <span title={title}>{value}</span>;
+  return (
+    <span title={title} {...data}>
+      {serverTime(props)}
+    </span>
+  );
 }
