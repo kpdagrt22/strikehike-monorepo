@@ -35,7 +35,15 @@ def event(name: str, when: datetime, pv: str, path: str = "/", **props):
     return payload
 
 
-def put(store: AnalyticsStore, aid: str, sid: str, events: list[dict], when: datetime, new: int = 1):
+def put(
+    store: AnalyticsStore,
+    aid: str,
+    sid: str,
+    events: list[dict],
+    when: datetime,
+    new: int = 1,
+    vis: list[dict] | None = None,
+):
     envelope = {
         "v": 1,
         "aid": aid,
@@ -46,6 +54,8 @@ def put(store: AnalyticsStore, aid: str, sid: str, events: list[dict], when: dat
         "exp": [],
         "ev": events,
     }
+    if vis is not None:
+        envelope["vis"] = vis
     parsed, valid, stripped, vis, _invalid = validate_batch(envelope)
     store.ingest(
         parsed,
@@ -489,3 +499,45 @@ def test_v2_engagement_device_region_and_funnels(tmp_path):
     for index in range(11):
         assert letters[index] * 16 not in text
         assert letters[index] * 22 not in text
+
+def test_weekly_referrers_include_ai_assistants_and_sampled_vitals(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    try:
+        for index in range(5):
+            aid = (str(index) * 22)[:22]
+            sid = (str(index) * 16)[:16]
+            pv = f"{index:012x}"
+            put(
+                store,
+                aid,
+                sid,
+                [event("page_viewed", NOW, pv, referrer_host="chatgpt.com")],
+                NOW,
+                vis=[
+                    {
+                        "pv": pv,
+                        "ms": 1200,
+                        "lcp": 1000 + index * 100,
+                        "inp": 40 + index,
+                        "cls": 10 + index,
+                    }
+                ],
+            )
+        payload = build_weekly_export(store, WEEK, logs)
+    finally:
+        store.close()
+
+    referrers = payload["product"]["referrers"]
+    assert referrers["ai_assistant"]["label"] == "AI assistants"
+    assert referrers["ai_assistant"]["sessions"] == 5
+    # Five visitors is the first cell the report may show.
+    assert referrers["ai_assistant"]["visitors"]["value"] == 5
+    assert referrers["direct"]["sessions"] == 0
+
+    vitals = payload["product"]["vitals"]["/"]
+    assert vitals["samples"] == 5
+    assert vitals["lcp_p75_ms"] == 1300
+    assert vitals["inp_p75_ms"] == 43
+    assert vitals["cls_p75"] == 0.013

@@ -28,6 +28,18 @@ let lastKey = "";
 let lastAt = 0;
 // Web Vitals describe the hard load only: they ride on the first page view.
 let rumPv = "";
+// One in ten sessions reports vitals. The hash of the existing session id makes
+// the choice stable for the whole session, so a sampled session is not split
+// across flushes and no new identifier is needed.
+const RUM_SAMPLE = 10;
+export function rumSampled(sid: string): boolean {
+  if (!sid) return false;
+  let hash = 0;
+  for (let index = 0; index < sid.length; index += 1) {
+    hash = (hash * 31 + sid.charCodeAt(index)) >>> 0;
+  }
+  return hash % RUM_SAMPLE === 0;
+}
 // Visibility-only beacons: at most one a minute, and only when time moved.
 let sentMs = 0;
 let sentAt = 0;
@@ -240,7 +252,7 @@ export function flushAnalytics(final?: unknown) {
   const now = Date.now();
   tick(now);
   const ms = Math.round(visible);
-  const rum = pv === rumPv;
+  const rum = pv === rumPv && rumSampled(memory?.sid ?? "");
   const vis: Vis | null =
     pv && ms - sentMs >= 1000 && (final === true || now - sentAt >= 60_000)
       ? {
