@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { PageShell } from "@/components/PageShell";
@@ -11,8 +11,9 @@ import { RecentTracker } from "@/components/retention/RecentTracker";
 import { eventCalendarPath, eventIdFromSlug, eventSlug, skyHref } from "@/lib/events/eventId";
 import { googleCalendarUrl } from "@/lib/events/googleCalendar";
 import { isIndexableEvent } from "@/lib/events/indexing";
-import { hasNoThemePage, themeSlug } from "@/lib/events/upcoming";
+import { hasNoThemePage, themeName, themeSlug } from "@/lib/events/upcoming";
 import { getEvent, getUpcomingAll } from "@/lib/seo/data";
+import { roundupListsEvent } from "@/lib/roundup/store";
 import { eventPageGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 
@@ -106,7 +107,16 @@ export default async function EventPage({
     getEvent(id).catch(() => null),
     getUpcomingAll().catch(() => null),
   ]);
-  if (!event) notFound();
+  if (!event) {
+    // An approved roundup keeps its links after the active events bundle rotates
+    // an old release out. Send that reader to the theme's calendar rather than a
+    // 404; a genuinely unknown id still 404s.
+    const theme = themeName(id.split(":")[0]);
+    if (theme && !hasNoThemePage(theme) && (await roundupListsEvent(id))) {
+      permanentRedirect(`/upcoming/${themeSlug(theme)}`);
+    }
+    notFound();
+  }
 
   const path = `/events/${eventSlug(event.event_id)}`;
   const day = dateOf(event.start_date);
@@ -213,6 +223,23 @@ export default async function EventPage({
               {event.description}
             </p>
           ) : null}
+          <p
+            data-event-factual
+            className="mt-3 max-w-[760px] text-meta leading-relaxed text-(--sh-text-2)"
+          >
+            {event.description
+              ? `${event.name} is listed for ${day}.`
+              : `${event.name} is a ${event.theme.toLowerCase()} date on ${day}.`}{" "}
+            <a
+              href={authority ?? event.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
+            >
+              {sourceLabel}: {event.source_id?.replaceAll("_", " ") ?? "official calendar"}
+            </a>
+            .
+          </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-(--sh-line-1) pt-4 text-meta text-(--sh-text-3)">
             <a

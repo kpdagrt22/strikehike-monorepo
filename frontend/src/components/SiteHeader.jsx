@@ -4,12 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { viewOpened } from "@/lib/analytics/events";
 import { ModeSwitch, viewForPath } from "@/components/ModeSwitch";
 import { SoundToggle } from "@/components/SoundToggle";
 import { useDismissable } from "@/hooks/useDismissable";
-import { DUR, EASE } from "@/lib/motion";
 import { useChronoStore } from "@/store/chronoStore";
 
 const NAKSHATRA_SPAN = 360 / 27;
@@ -35,22 +33,13 @@ function NakshatraHalo() {
       : -1;
 
   return (
-    <motion.svg
+    <svg
       aria-hidden="true"
       data-egg="nakshatra-halo"
       viewBox="0 0 96 96"
       stroke="currentColor"
       strokeWidth="1.5"
-      className="sh-halo text-(--sh-text-4)"
-      initial={{ opacity: 0 }}
-      animate={{
-        opacity: 1,
-        transition: { duration: DUR.reveal, ease: EASE.out },
-      }}
-      exit={{
-        opacity: 0,
-        transition: { duration: DUR.revealOut, ease: EASE.exit },
-      }}
+      className="sh-halo sh-halo-in text-(--sh-text-4)"
     >
       {HALO_TICKS.map((d, index) =>
         index === lit ? (
@@ -65,7 +54,7 @@ function NakshatraHalo() {
           <path key={d} d={d} />
         ),
       )}
-    </motion.svg>
+    </svg>
   );
 }
 
@@ -91,9 +80,7 @@ function Brand({ halo }) {
           draggable={false}
           className="h-8 w-8 rounded-full object-cover ring-1 ring-black/10 shadow-[0_0_16px_rgba(216,180,122,0.28)] dark:ring-white/10"
         />
-        <AnimatePresence>
-          {halo ? <NakshatraHalo key="halo" /> : null}
-        </AnimatePresence>
+        {halo ? <NakshatraHalo /> : null}
       </span>
       <span className="ml-0.5 inline-flex items-baseline">
         <span className="text-strong font-semibold tracking-[-0.03em] max-[360px]:text-body">

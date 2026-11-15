@@ -108,3 +108,18 @@ export async function approvedRoundup(week: string) {
 export async function latestApprovedRoundup() {
   return (await readAll())[0] ?? null;
 }
+
+/** True when an approved roundup still lists this event id. The active bundle
+ * rotates old releases out, so the roundup's link needs a landing page. */
+export async function roundupListsEvent(id: string) {
+  for (const round of await readAll()) {
+    for (const theme of round.themes ?? []) {
+      if (theme.events.some((event) => event.id === id)) return true;
+    }
+    if ((round.next_two_weeks ?? []).some((event) => event.id === id)) {
+      return true;
+    }
+    if ((round.sky ?? []).some((event) => event.id === id)) return true;
+  }
+  return false;
+}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
+import { LocalTime } from "@/components/upcoming/LocalTime";
 import { eventInstant } from "@/lib/events/localTime";
 import { eventPath } from "@/lib/events/eventId";
 
@@ -65,7 +65,7 @@ export function NextUpCard({ item }) {
         {event.name}
       </Link>
       <p className="mt-1.5 text-meta leading-relaxed text-(--sh-text-2)">
-        <LocalDateTime
+        <LocalTime
           startDate={event.start_date}
           startTime={event.start_time}
           startUtc={event.start_utc}
@@ -77,7 +77,7 @@ export function NextUpCard({ item }) {
         {event.all_day ? null : (
           <>
             {" · "}
-            <LocalDateTime
+            <LocalTime
               startDate={event.start_date}
               startTime={event.start_time}
               startUtc={event.start_utc}

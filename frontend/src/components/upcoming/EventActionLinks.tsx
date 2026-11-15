@@ -1,0 +1,73 @@
+import Link from "next/link";
+import { eventCalendarPath, eventPath, skyDate, skyHref } from "@/lib/events/eventId";
+
+// The three quiet actions beside a dated row. Desktop reveals them on row hover
+// or focus-within (the row carries `group`); on touch they are always visible.
+// Every target is at least 44 px tall on touch and keeps the site's focus ring.
+//
+// This is a server component: the rows on /upcoming, /this-week and the date
+// pages are plain HTML. One EventActionTracker on the page records the clicks.
+const ACTION = "sh-row-action";
+const REVEAL =
+  "pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:duration-(--sh-dur-reveal) pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 motion-reduce:transition-none";
+
+const SCOPES: Record<string, "all" | "science" | "finance" | "culture-religion"> = {
+  all: "all",
+  science: "science",
+  finance: "finance",
+  "culture-religion": "culture-religion",
+};
+
+type ActionEvent = {
+  event_id: string;
+  start_date: string;
+  start_utc?: string | null;
+  all_day?: boolean;
+  status?: string;
+};
+
+export function EventActionLinks({
+  event,
+  themeSlug,
+  className = "",
+}: {
+  event: ActionEvent;
+  themeSlug: string;
+  className?: string;
+}) {
+  const sky = skyHref(event);
+  const date = skyDate(event);
+  const scope = SCOPES[themeSlug] ?? null;
+  const past = event.status === "completed" || event.status === "cancelled";
+
+  return (
+    <div
+      data-event-actions
+      className={`flex flex-wrap items-center gap-1.5 ${REVEAL} ${className}`}
+    >
+      {sky ? (
+        <Link
+          href={sky}
+          className={ACTION}
+          data-event-action="sky"
+          data-event-date={date}
+        >
+          See the sky
+        </Link>
+      ) : null}
+      <Link href={eventPath(event.event_id)} className={ACTION}>
+        Event page
+      </Link>
+      {scope && !past ? (
+        <a
+          href={eventCalendarPath(event.event_id)}
+          className={ACTION}
+          data-event-action="calendar"
+          data-calendar-scope={scope}
+        >
+          Add to calendar
+        </a>
+      ) : null}
+    </div>
+  );
+}

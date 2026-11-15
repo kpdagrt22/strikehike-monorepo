@@ -252,3 +252,17 @@ test("visible time alone is sent at most once a minute", async () => {
     Date.now = original;
   }
 });
+
+test("RUM sampling is stable per session and about one in ten", async () => {
+  install();
+  const track = await import("./track.ts?rum-sample");
+  assert.equal(track.rumSampled(""), false);
+  assert.equal(track.rumSampled("A".repeat(16)), track.rumSampled("A".repeat(16)));
+  let sampled = 0;
+  const total = 2000;
+  for (let index = 0; index < total; index += 1) {
+    const sid = index.toString(36).padStart(16, "0").slice(-16);
+    if (track.rumSampled(sid)) sampled += 1;
+  }
+  assert.ok(sampled > total * 0.05 && sampled < total * 0.15, `sampled ${sampled}`);
+});

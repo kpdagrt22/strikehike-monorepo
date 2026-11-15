@@ -110,14 +110,19 @@ test.describe("weekly roundup spotlight", () => {
 });
 
 test.describe("v2 roundup rendering", () => {
-  const fixturePath = join(process.cwd(), "content", "roundups", "2099-W01.json");
+  // Its own week: retention.spec.ts writes a different 2099-W01, and week pages
+  // are ISR-cached, so sharing the id would serve whichever rendered first.
+  const FIXTURE_WEEK = "2099-W07";
+  const fixturePath = join(process.cwd(), "content", "roundups", `${FIXTURE_WEEK}.json`);
 
   test.beforeAll(async () => {
     const fixture = await readFile(
       join(process.cwd(), "tests", "fixtures", "roundup-v2.json"),
       "utf8",
     );
-    await writeFile(fixturePath, fixture, "utf8");
+    const parsed = JSON.parse(fixture);
+    parsed.week = FIXTURE_WEEK;
+    await writeFile(fixturePath, JSON.stringify(parsed, null, 2), "utf8");
   });
 
   test.afterAll(async () => {
@@ -147,7 +152,7 @@ test.describe("v2 roundup rendering", () => {
       });
       const page = await context.newPage();
       const errors = watchErrors(page);
-      await page.goto("/this-week/2099-W01", { waitUntil: "networkidle" });
+      await page.goto(`/this-week/${FIXTURE_WEEK}`, { waitUntil: "networkidle" });
       await expect(page.locator("[data-roundup-schema='2']")).toBeVisible();
       await expect(page.locator("[data-roundup-sparkline]")).toBeVisible();
       await expect(page.locator("[data-roundup-sky]")).toContainText("New moon");
@@ -228,7 +233,7 @@ test.describe("v2 roundup rendering", () => {
       viewport: { width: 1440, height: 900 },
     });
     const page = await context.newPage();
-    await page.goto("/this-week/2099-W01", { waitUntil: "networkidle" });
+    await page.goto(`/this-week/${FIXTURE_WEEK}`, { waitUntil: "networkidle" });
     const fomc = page
       .locator("[data-roundup-next] li")
       .filter({ hasText: "FOMC meeting" });

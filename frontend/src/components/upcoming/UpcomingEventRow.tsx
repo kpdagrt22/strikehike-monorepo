@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EventSourceLink } from "@/components/upcoming/EventSourceLink";
-import { EventActions } from "@/components/upcoming/EventActions";
+import { EventActionLinks } from "@/components/upcoming/EventActionLinks";
 import { LocalDateTime } from "@/components/upcoming/LocalDateTime";
 import { eventPath } from "@/lib/events/eventId";
 import { statusLabel } from "@/lib/events/upcoming";
@@ -28,7 +28,7 @@ export function UpcomingEventRow({
   const title = linkTitle ? (
     <Link
       href={eventPath(event.event_id)}
-      className="underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
+      className="inline-flex min-h-6 items-center underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:decoration-current"
     >
       {event.name}
     </Link>
@@ -64,7 +64,7 @@ export function UpcomingEventRow({
               <>
                 <Link
                   href={`/upcoming/${themeSlug}`}
-                  className="inline-flex items-center rounded-full border border-(--sh-line-1) px-1.5 py-0.5 font-medium text-(--sh-text-2) transition-colors hover:border-(--sh-line-2) hover:text-(--sh-text-1) focus-visible:border-(--sh-line-2) focus-visible:text-(--sh-text-1)"
+                  className="sh-row-theme"
                 >
                   {themeName}
                 </Link>
@@ -96,8 +96,14 @@ export function UpcomingEventRow({
             />
           </div>
           {actions ? (
-            <EventActions
-              event={event}
+            <EventActionLinks
+              event={{
+                event_id: event.event_id,
+                start_date: event.start_date,
+                start_utc: event.start_utc,
+                all_day: event.all_day,
+                status: event.status,
+              }}
               themeSlug={themeSlug}
               className="mt-1.5 pointer-fine:absolute pointer-fine:right-2 pointer-fine:top-1/2 pointer-fine:z-10 pointer-fine:mt-0 pointer-fine:-translate-y-1/2 pointer-fine:rounded-full pointer-fine:bg-(--sh-surface-overlay) pointer-fine:px-1 pointer-fine:shadow-(--sh-shadow-float) pointer-fine:backdrop-blur-xl"
             />

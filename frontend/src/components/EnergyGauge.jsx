@@ -177,7 +177,7 @@ export function EnergyGauge({
         horizontal ? "flex-row items-center gap-3" : "flex-col items-center"
       } ${
         homeIntro
-          ? "top-[17.5rem] sm:top-[27rem] lg:top-[8.5rem]"
+          ? "top-[calc(var(--sh-header-clear)+14.3125rem)] sm:top-[calc(var(--sh-header-clear)+17.6875rem)] lg:top-[8.5rem]"
           : "top-[4.5rem] sm:top-(--sh-header-clear)"
       } ${
         mobileSheet ? "max-lg:opacity-0" : ""

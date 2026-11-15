@@ -6,12 +6,20 @@ import { RoundupView } from "@/components/roundup/RoundupView";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SiteColophon } from "@/components/seo/SiteColophon";
 import { ledgerForWeek } from "@/lib/ledger/store";
-import { approvedRoundup } from "@/lib/roundup/store";
+import { approvedRoundup, approvedRoundups } from "@/lib/roundup/store";
 import { isIsoWeek, weekLabel } from "@/lib/roundup/week";
 import { weekGraph } from "@/lib/seo/graphs";
 import { SITE_NAME, urlFor } from "@/lib/seo/site";
 
-export const dynamic = "force-dynamic";
+// An approved week never changes, so it is generated once and cached. Unknown
+// or unapproved weeks still render on demand and 404.
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  const rounds = await approvedRoundups();
+  return rounds.map((round) => ({ week: round.week }));
+}
 
 type Params = { params: Promise<{ week: string }> };
 

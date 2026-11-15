@@ -1,11 +1,9 @@
-"use client";
-
-import { supportLinkClicked, supportOpened } from "@/lib/analytics/events";
 import { PAYPAL_URL } from "@/lib/support/copy";
 
 // The footer's only support affordance is this link, so it reports the same
 // pair the home panel does: the support action and the link click, both with
-// surface "footer".
+// surface "footer". The link is a server component; the one EventActionTracker
+// on the page records the click by delegation.
 export function FooterSupportLink({
   className,
   children,
@@ -19,10 +17,7 @@ export function FooterSupportLink({
       target="_blank"
       rel="noopener noreferrer"
       data-support-link="footer"
-      onClick={() => {
-        supportOpened("footer_link", "footer");
-        supportLinkClicked("paypal", "footer");
-      }}
+      data-support-action="paypal"
       className={className}
     >
       {children}

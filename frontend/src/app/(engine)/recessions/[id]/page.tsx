@@ -165,6 +165,24 @@ export default async function RecessionPage({ params }: Params) {
         </div>
       </header>
 
+      <p
+        data-recession-facts
+        className="mt-3 max-w-[760px] text-meta leading-relaxed text-(--sh-text-2)"
+      >
+        NBER peak {crash.start_month ?? crash.start} to trough{" "}
+        {crash.end_month ?? crash.end}
+        {facts.length == null ? null : `; ${formatNumber(facts.length)} days`}.{" "}
+        <a
+          href="https://fred.stlouisfed.org/series/USREC"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-current/30 underline-offset-2 hover:decoration-current"
+        >
+          Source: NBER business cycle dates (USREC)
+        </a>
+        .
+      </p>
+
       <div className="mt-6 grid max-w-[760px] gap-3 sm:grid-cols-2">
         <Card
           label="S&P fall in the window"

@@ -66,7 +66,8 @@ def _meaningful(name: str, props: dict[str, Any]) -> bool:
 def _week_events(store: AnalyticsStore, week: str) -> list[dict[str, Any]]:
     rows = store.connection.execute(
         "SELECT id, received_at, session_id, anon_id, name, path, props, "
-        "day_ist, ephemeral, device_class, geo_bucket "
+        "day_ist, ephemeral, device_class, geo_bucket, referrer_class, "
+        "rum_lcp_ms, rum_inp_ms, rum_cls_x1000 "
         "FROM events WHERE week_ist=? ORDER BY received_at, id",
         (week,),
     ).fetchall()
@@ -137,6 +138,87 @@ def _retention(
 
 def _server(log_dir: str | Path, week: str) -> dict[str, Any]:
     return aggregate_server_logs(log_dir, week)
+
+
+REFERRER_CLASSES = (
+    "search",
+    "ai_assistant",
+    "community",
+    "social",
+    "direct",
+    "referral",
+    "share",
+    "calendar",
+    "feed",
+    "email",
+    "other",
+)
+
+
+def _referrers(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Landing sessions by referrer class. The AI group is named for the report."""
+    groups = {value: {"sessions": 0, "ids": set()} for value in REFERRER_CLASSES}
+    for row in events:
+        if row["name"] != "page_viewed":
+            continue
+        cls = row["referrer_class"]
+        if not cls:
+            continue
+        bucket = cls if cls in groups else "other"
+        groups[bucket]["sessions"] += 1
+        groups[bucket]["ids"].add(row["anon_id"])
+    return {
+        value: {
+            "label": "AI assistants" if value == "ai_assistant" else value,
+            "sessions": group["sessions"],
+            "visitors": people_cell(len(group["ids"])),
+        }
+        for value, group in groups.items()
+    }
+
+
+def _p75(values: list[int]) -> int | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = max(0, (3 * len(ordered) + 3) // 4 - 1)
+    return ordered[min(index, len(ordered) - 1)]
+
+
+def _vitals(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """p75 LCP/INP/CLS per route template, from the sampled page views."""
+    per: dict[str, dict[str, list[int]]] = defaultdict(
+        lambda: {"lcp": [], "inp": [], "cls": []}
+    )
+    for row in events:
+        if row["name"] != "page_viewed":
+            continue
+        lcp = row["rum_lcp_ms"]
+        inp = row["rum_inp_ms"]
+        cls = row["rum_cls_x1000"]
+        if lcp is None and inp is None and cls is None:
+            continue
+        bucket = per[page_template(row["path"])]
+        if lcp is not None:
+            bucket["lcp"].append(int(lcp))
+        if inp is not None:
+            bucket["inp"].append(int(inp))
+        if cls is not None:
+            bucket["cls"].append(int(cls))
+    out: dict[str, Any] = {}
+    for template, values in per.items():
+        samples = max(len(values["lcp"]), len(values["inp"]), len(values["cls"]))
+        if samples < 5:
+            out[template] = {"samples": samples, "reason": "insufficient data (n<5)"}
+            continue
+        cls_p75 = _p75(values["cls"])
+        out[template] = {
+            "samples": samples,
+            "lcp_p75_ms": _p75(values["lcp"]),
+            "inp_p75_ms": _p75(values["inp"]),
+            "cls_p75": round(cls_p75 / 1000, 3) if cls_p75 is not None else None,
+        }
+    return out
 
 
 def _experiment_split(events: list[dict[str, Any]]) -> dict[str, Any]:
@@ -451,6 +533,9 @@ def build_weekly_export(
             "by_device": _breakdown(week_sessions, "device", (*DEVICES, "unknown")),
             "by_region": _breakdown(week_sessions, "region", REGIONS),
             "funnels": _funnels(week_sessions),
+            # v3: landing referrers (the AI assistants group) and sampled RUM.
+            "referrers": _referrers(events),
+            "vitals": _vitals(events),
         },
         "server": _server(log_dir, week),
         "feedback": feedback,

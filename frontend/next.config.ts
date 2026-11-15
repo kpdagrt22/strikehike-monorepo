@@ -1,5 +1,14 @@
 import type { NextConfig } from "next";
 
+// CSP_MODE=enforce switches the policy from report-only to enforcing. It is a
+// build-time setting because next.config headers() runs at build; the default
+// stays report-only so a deploy cannot enforce by accident.
+const CSP_MODE = process.env.CSP_MODE === "enforce" ? "enforce" : "report-only";
+const CSP_HEADER =
+  CSP_MODE === "enforce"
+    ? "Content-Security-Policy"
+    : "Content-Security-Policy-Report-Only";
+
 const nextConfig: NextConfig = {
   output: "standalone",
   // No X-Powered-By header.
@@ -42,11 +51,11 @@ const nextConfig: NextConfig = {
               "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
           },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-          // Report-only until live pages show no violations. Add
-          // upgrade-insecure-requests when it is enforced: browsers ignore
+          // Report-only by default; set CSP_MODE=enforce at build to enforce.
+          // Add upgrade-insecure-requests when it is enforced: browsers ignore
           // that directive (and log an error) in a report-only policy.
           {
-            key: "Content-Security-Policy-Report-Only",
+            key: CSP_HEADER,
             value:
               "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
           },

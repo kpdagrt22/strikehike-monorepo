@@ -292,6 +292,26 @@ export function weekGraph(
       creator: ref(PERSON_ID),
       publisher: ref(ORG_ID),
       isAccessibleForFree: true,
+      distribution: [
+        {
+          "@type": "DataDownload",
+          name: "Approved roundup JSON",
+          contentUrl: `${url}/roundup.json`,
+          encodingFormat: "application/json",
+        },
+        {
+          "@type": "DataDownload",
+          name: "Roundup data",
+          contentUrl: `${url}/data.json`,
+          encodingFormat: "application/json",
+        },
+        {
+          "@type": "DataDownload",
+          name: "Week calendar",
+          contentUrl: `${url}/calendar.ics`,
+          encodingFormat: "text/calendar",
+        },
+      ],
     },
   );
 }
@@ -371,6 +391,7 @@ export function upcomingGraph(
     payload?.as_of,
   );
   const listId = `${url}#themes`;
+  const calendarId = `${url}#calendar-dataset`;
   return graph(
     {
       "@type": "WebPage",
@@ -406,6 +427,43 @@ export function upcomingGraph(
         name: theme.name,
         url: urlFor(`/upcoming/${theme.slug}`),
       })),
+    },
+    {
+      "@type": "Dataset",
+      "@id": calendarId,
+      name: "StrikeHike calendar feeds",
+      description:
+        "All dates, finance dates, science dates and culture dates as RFC 5545 calendars.",
+      url,
+      creator: ref(PERSON_ID),
+      publisher: ref(ORG_ID),
+      isAccessibleForFree: true,
+      distribution: [
+        {
+          "@type": "DataDownload",
+          name: "All dates",
+          contentUrl: urlFor("/calendar/all.ics"),
+          encodingFormat: "text/calendar",
+        },
+        {
+          "@type": "DataDownload",
+          name: "Finance dates",
+          contentUrl: urlFor("/calendar/finance.ics"),
+          encodingFormat: "text/calendar",
+        },
+        {
+          "@type": "DataDownload",
+          name: "Science dates",
+          contentUrl: urlFor("/calendar/science.ics"),
+          encodingFormat: "text/calendar",
+        },
+        {
+          "@type": "DataDownload",
+          name: "Culture and religion dates",
+          contentUrl: urlFor("/calendar/culture-religion.ics"),
+          encodingFormat: "text/calendar",
+        },
+      ],
     },
   );
 }

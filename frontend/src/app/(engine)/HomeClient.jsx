@@ -14,6 +14,7 @@ import { FutureLadder } from "@/components/FutureLadder";
 import { HomeIntro } from "@/components/HomeIntro";
 import { InfoModule } from "@/components/InfoModule";
 import { MobileDock } from "@/components/MobileDock";
+import { MotionRoot } from "@/components/MotionRoot";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { RegimeOverlaySync } from "@/components/RegimeOverlaySync";
 import { RightPanel } from "@/components/RightPanel";
@@ -187,7 +188,7 @@ function getIntroSeen() {
 
 const getIntroSeenServer = () => false;
 
-export default function Home() {
+export default function Home({ snapshot }) {
   const { resolvedTheme } = useTheme();
   const stage = useOrreryStage();
 
@@ -228,7 +229,8 @@ export default function Home() {
   const regimeTone = useChronoStore((state) => state.regimeTone);
 
   return (
-    <main className="relative h-full w-full overflow-hidden border-0 p-0">
+    <MotionRoot>
+      <main className="relative h-full w-full overflow-hidden border-0 p-0">
       <Canvas3D isDark={isDark} mounted={mounted} regimeTone={regimeTone} stage={stage} />
 
       <HomeIntro compact={compactIntro} />
@@ -252,11 +254,12 @@ export default function Home() {
       </div>
       <RightPanel />
       <ViewControls />
-      <InfoModule />
+      <InfoModule snapshot={snapshot} />
       <FeedbackModule />
       <SponsorModule />
       <OnboardingOverlay />
       <DateChangeAnnouncer />
-    </main>
+      </main>
+    </MotionRoot>
   );
 }
