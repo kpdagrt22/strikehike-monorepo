@@ -85,6 +85,23 @@ python -m astro_finance.digest send --week 2026-W48 --to owner@example.com
 The preview still carries the RFC 8058 unsubscribe headers and a sample
 unsubscribe link. It uses `DIGEST_POSTAL_ADDRESS` when set.
 
+### Preview from GitHub Actions, without a public address
+
+The repository is public, so dispatch inputs and logs are public. Set the
+repository secret `DIGEST_PREVIEW_TO` to the address once, then dispatch
+**Send weekly digest** with `week`, `dry_run` (ignored for a preview) and
+`preview: true`. The workflow runs:
+
+```bash
+python -m astro_finance.digest send --week <week> --to "$DIGEST_PREVIEW_TO" \
+  --preview-nonce "<run id>-<run attempt>"
+```
+
+It never echoes the address, fails clearly when the secret is missing, and
+skips the `DIGEST_AUTOSEND` gate. The nonce is added to the preview
+idempotency key only, so a second preview the same day still arrives; a real
+send keeps its `digest-<week>-<subscriber>` key.
+
 ## Corrections
 
 Never edit an existing line. Append a correction that points at the line it

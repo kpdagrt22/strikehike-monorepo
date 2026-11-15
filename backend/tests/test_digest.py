@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -450,6 +451,35 @@ def test_preview_send_goes_to_one_address_and_is_not_recorded(digest):
     assert mail.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
     assert "Unsubscribe in one click" in mail.html
     assert "1 Test Street, Test City" in mail.html
+    assert store.send_counts("2026-W46") == {}
+
+
+def test_preview_nonce_changes_only_the_preview_key(digest):
+    _, store, _ = digest
+    mailer = FakeMailer()
+
+    def preview(nonce):
+        send_week(
+            "2026-W46",
+            dry_run=False,
+            store=store,
+            mailer=mailer,
+            fetch=lambda week: ROUNDUP,
+            ledger=LEDGER_ENTRY,
+            preview_to="owner@example.com",
+            preview_nonce=nonce,
+        )
+        return mailer.sent[-1].idempotency_key
+
+    first = preview("run-1")
+    second = preview("run-2")
+    assert first != second
+    assert first.startswith("preview-2026-W46-")
+    assert first.endswith("-run-1")
+    assert second.endswith("-run-2")
+    # No nonce: the old key shape, so an existing preview stays idempotent.
+    plain = preview(None)
+    assert plain == f"preview-2026-W46-{hashlib.sha1(b'owner@example.com').hexdigest()[:12]}"
     assert store.send_counts("2026-W46") == {}
 
 
@@ -922,6 +952,8 @@ def test_email_static_images_fit_the_budget():
 
 
 def test_render_v2_palette_contrast():
+    from astro_finance.digest import render
+
     def luminance(value: str) -> float:
         channels = [int(value[index : index + 2], 16) / 255 for index in (1, 3, 5)]
         linear = [
@@ -937,7 +969,36 @@ def test_render_v2_palette_contrast():
         lighter, darker = max(first, second), min(first, second)
         return (lighter + 0.05) / (darker + 0.05)
 
-    assert ratio("#f2ede4", "#090910") >= 4.5
-    assert ratio("#a9a294", "#14121a") >= 4.5
-    assert ratio("#ff8b77", "#14121a") >= 4.5
-    assert ratio("#14121a", "#ff8b77") >= 4.5
+    # Dark plates.
+    assert ratio(render.INK, render.BG) >= 4.5
+    assert ratio(render.MUTED, render.CARD) >= 4.5
+    assert ratio(render.GOLD, render.CARD) >= 4.5
+    assert ratio(render.LIGHT_INK, render.GOLD) >= 4.5
+
+    # Light plates: every text/background pair the light override can produce.
+    assert ratio(render.LIGHT_INK, render.LIGHT_BG) >= 4.5
+    assert ratio(render.LIGHT_INK, render.LIGHT_CARD) >= 4.5
+    assert ratio(render.LIGHT_MUTED, render.LIGHT_CARD) >= 4.5
+    assert ratio(render.ACCENT_LIGHT, render.LIGHT_CARD) >= 4.5
+    assert ratio(render.ACCENT_LIGHT, render.LIGHT_BG) >= 4.5
+    # The light chip and the primary button.
+    assert ratio(render.LIGHT_INK, render.GOLD_DEEP) >= 4.5
+    assert ratio(render.LIGHT_INK, render.GOLD) >= 4.5
+
+
+def test_render_v2_light_override_carries_the_accent_class():
+    from astro_finance.digest import render
+
+    html = render.render_roundup(
+        ROUNDUP_V2,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    ).html
+    assert 'class="sh-accent"' in html
+    assert f".sh-accent{{color:{render.ACCENT_LIGHT}!important;}}" in html
+    assert (
+        f".sh-chip{{background-color:{render.GOLD_DEEP}!important;"
+        f"color:{render.LIGHT_INK}!important;}}" in html
+    )

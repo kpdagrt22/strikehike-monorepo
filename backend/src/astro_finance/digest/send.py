@@ -74,6 +74,7 @@ def send_week(
     sample_dir: str | Path | None = None,
     ledger: dict[str, Any] | None = None,
     preview_to: str | None = None,
+    preview_nonce: str | None = None,
 ) -> SendResult:
     if limit is not None and limit < 1:
         raise SendError("--limit must be at least 1")
@@ -109,6 +110,10 @@ def send_week(
                 settings.reply_to(),
             )
         digest = hashlib.sha1(address.encode("utf-8")).hexdigest()[:12]
+        # Resend keeps an idempotency key for 24 hours. A per-run nonce keeps a
+        # second preview the same day deliverable; real sends are unchanged.
+        nonce = (preview_nonce or "").strip()
+        key_suffix = f"-{nonce}" if nonce else ""
         mail = Mail(
             to=address,
             subject=f"[Preview] {rendered.subject}",
@@ -120,7 +125,7 @@ def send_week(
             },
             from_address=settings.from_address(),
             reply_to=settings.reply_to(),
-            idempotency_key=f"preview-{week}-{digest}",
+            idempotency_key=f"preview-{week}-{digest}{key_suffix}",
         )
         mailer.send(mail)
         logger.info(
@@ -322,6 +327,12 @@ def _parser() -> argparse.ArgumentParser:
         help="send one [Preview] to this address; not recorded in the sends table",
     )
     send.add_argument(
+        "--preview-nonce",
+        default=None,
+        metavar="NONCE",
+        help="add this run's nonce to the preview idempotency key only",
+    )
+    send.add_argument(
         "--sample-dir",
         default=None,
         help="where the dry-run HTML and text samples are written",
@@ -340,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
             limit=args.limit,
             sample_dir=args.sample_dir,
             preview_to=args.to,
+            preview_nonce=args.preview_nonce,
         )
     except (RoundupError, SendError, ValueError) as exc:
         print(f"digest send failed: {exc}", file=sys.stderr)
