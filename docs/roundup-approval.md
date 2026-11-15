@@ -65,6 +65,26 @@ approved. Manual dispatch still defaults to a dry run. This repository never set
 the variable; set it in GitHub repository settings when you want the Monday
 send. The sender's per-subscriber send rows make a rerun a no-op.
 
+## Preview the email
+
+Render a local sample without sending:
+
+```bash
+cd backend
+python -m astro_finance.digest send --week 2026-W48 --dry-run
+```
+
+Send one preview to a single address. The subject is prefixed `[Preview]` and
+the send is **not** recorded in the sends table:
+
+```bash
+cd backend
+python -m astro_finance.digest send --week 2026-W48 --to owner@example.com
+```
+
+The preview still carries the RFC 8058 unsubscribe headers and a sample
+unsubscribe link. It uses `DIGEST_POSTAL_ADDRESS` when set.
+
 ## Corrections
 
 Never edit an existing line. Append a correction that points at the line it

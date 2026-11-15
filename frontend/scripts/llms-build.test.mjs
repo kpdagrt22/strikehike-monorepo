@@ -27,6 +27,9 @@ test("llms.txt carries definitions, data sources and the correct declines wordin
 
 test("the committed llms.txt matches the generator", async () => {
   const text = await buildLlms();
-  const file = await readFile("public/llms.txt", "utf8");
+  const file = (await readFile("public/llms.txt", "utf8")).replace(
+    /\r\n/g,
+    "\n",
+  );
   assert.equal(file, text);
 });

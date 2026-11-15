@@ -7,6 +7,7 @@ Resend. A real send requires ``--send`` and ``DIGEST_POSTAL_ADDRESS``.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import os
 import sys
@@ -43,6 +44,7 @@ class SendResult:
     failed: int = 0
     skipped: int = 0
     stuck: int = 0
+    preview: bool = False
     sample_email: str | None = None
     sample_html: str | None = None
     sample_text: str | None = None
@@ -71,15 +73,12 @@ def send_week(
     now_ms: int | None = None,
     sample_dir: str | Path | None = None,
     ledger: dict[str, Any] | None = None,
+    preview_to: str | None = None,
 ) -> SendResult:
     if limit is not None and limit < 1:
         raise SendError("--limit must be at least 1")
     store = store or get_store()
     fetch = fetch or fetch_roundup
-    secret = settings.token_secret()
-    if not secret:
-        raise SendError("DIGEST_TOKEN_SECRET is not configured")
-
     roundup = fetch(week)
     if ledger is None:
         ledger = fetch_ledger_entry(week)
@@ -87,6 +86,61 @@ def send_week(
         raise SendError(
             f"no ledger entry for {week}; append it before sending"
         )
+
+    if preview_to is not None:
+        address = preview_to.strip()
+        if not address or "@" not in address:
+            raise SendError("--to needs one email address")
+        postal = settings.postal_address() or "Postal address not set (preview)"
+        unsubscribe_url = (
+            f"{settings.base_url()}/api/digest/unsubscribe?t=preview-token"
+        )
+        rendered = render_roundup(
+            roundup,
+            unsubscribe_url=unsubscribe_url,
+            postal_address=postal,
+            base_url=settings.base_url(),
+            ledger=ledger,
+        )
+        if mailer is None:
+            mailer = ResendMailer(
+                settings.resend_api_key(),
+                settings.from_address(),
+                settings.reply_to(),
+            )
+        digest = hashlib.sha1(address.encode("utf-8")).hexdigest()[:12]
+        mail = Mail(
+            to=address,
+            subject=f"[Preview] {rendered.subject}",
+            html=rendered.html,
+            text=rendered.text,
+            headers={
+                "List-Unsubscribe": f"<{unsubscribe_url}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+            from_address=settings.from_address(),
+            reply_to=settings.reply_to(),
+            idempotency_key=f"preview-{week}-{digest}",
+        )
+        mailer.send(mail)
+        logger.info(
+            "digest preview week=%s masked=%s",
+            week,
+            mask_email(address),
+        )
+        return SendResult(
+            week=week,
+            dry_run=False,
+            recipients=1,
+            eligible=1,
+            sent=1,
+            preview=True,
+        )
+
+    secret = settings.token_secret()
+    if not secret:
+        raise SendError("DIGEST_TOKEN_SECRET is not configured")
+
     subscribers = store.active_subscribers()
     eligible = []
     already_sent = 0
@@ -262,6 +316,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     send.add_argument("--limit", type=int, default=None, help="send to at most N people")
     send.add_argument(
+        "--to",
+        default=None,
+        metavar="ADDRESS",
+        help="send one [Preview] to this address; not recorded in the sends table",
+    )
+    send.add_argument(
         "--sample-dir",
         default=None,
         help="where the dry-run HTML and text samples are written",
@@ -276,9 +336,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = send_week(
             args.week,
-            dry_run=args.dry_run,
+            dry_run=False if args.to else args.dry_run,
             limit=args.limit,
             sample_dir=args.sample_dir,
+            preview_to=args.to,
         )
     except (RoundupError, SendError, ValueError) as exc:
         print(f"digest send failed: {exc}", file=sys.stderr)

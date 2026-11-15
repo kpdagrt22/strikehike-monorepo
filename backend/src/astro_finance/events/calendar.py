@@ -83,10 +83,14 @@ def _calendar_name(themes: list[Theme]) -> str:
 def _event_lines(event: Mapping[str, Any], stamp: str, sequence: int) -> list[str]:
     source = str(event["source_url"])
     method = "Method" if event.get("verification") == "computed" else "Source"
-    description = (
-        f"{event['theme']} · {method}: {source}\n"
-        "Listed by StrikeHike. Dates only: StrikeHike does not say what will happen on them."
+    description = str(
+        event.get("calendar_description")
+        or (
+            f"{event['theme']} · {method}: {source}\n"
+            "Listed by StrikeHike. Dates only: StrikeHike does not say what will happen on them."
+        )
     )
+    url = str(event.get("calendar_url") or source)
     lines = ["BEGIN:VEVENT", f"UID:{event['event_id']}@strikehike.com"]
     lines.append(f"DTSTAMP:{stamp}")
     lines.append(f"LAST-MODIFIED:{stamp}")
@@ -105,11 +109,12 @@ def _event_lines(event: Mapping[str, Any], stamp: str, sequence: int) -> list[st
         if instant is None:
             raise ValueError(f"timed event has no usable start: {event['event_id']}")
         lines.append(f"DTSTART:{_format_utc(instant)}")
-        lines.append(f"DTEND:{_format_utc(instant + timedelta(minutes=30))}")
+        minutes = int(event.get("duration_minutes") or 30)
+        lines.append(f"DTEND:{_format_utc(instant + timedelta(minutes=minutes))}")
 
     lines.append(f"SUMMARY:{escape_text(str(event['name']))}")
     lines.append(f"DESCRIPTION:{escape_text(description)}")
-    lines.append(f"URL:{source}")
+    lines.append(f"URL:{url}")
     lines.append(f"STATUS:{STATUS_MAP.get(str(event['status']), 'CONFIRMED')}")
     lines.append("TRANSP:TRANSPARENT")
     lines.append("END:VEVENT")
@@ -182,4 +187,40 @@ def build_event_calendar(
         *_event_lines(event, stamp, sequence),
         "END:VCALENDAR",
     ]
+    return _lines(lines)
+
+
+def build_roundup_calendar(
+    events: Iterable[Mapping[str, Any]],
+    *,
+    created_at: str | None,
+    calendar_name: str,
+) -> bytes:
+    """One VCALENDAR for every dated item in an approved week.
+
+    The VEVENT block is the feed's own, so folding, CRLF, escaping and the UID
+    shape stay identical to the public calendar feeds.
+    """
+
+    stamp, sequence = _stamp_and_sequence(created_at)
+    ordered = sorted(
+        events,
+        key=lambda event: (
+            str(event["start_date"]),
+            str(event.get("start_time") or "00:00:00"),
+            str(event["event_id"]),
+        ),
+    )
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        f"PRODID:{PRODID}",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{escape_text(calendar_name)}",
+        "X-WR-TIMEZONE:UTC",
+    ]
+    for event in ordered:
+        lines.extend(_event_lines(event, stamp, sequence))
+    lines.append("END:VCALENDAR")
     return _lines(lines)
