@@ -1,0 +1,53 @@
+name: launch-crawl
+
+# Weekly read-only production crawl. It fails red on a broken canonical, a
+# missing title/description, an OG image that is not 200, an internal 404 or a
+# non-200 crawl URL. The JSON artifact is kept for 30 days.
+
+on:
+  schedule:
+    # Thursdays 03:30 UTC.
+    - cron: "30 3 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: launch-crawl
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: "22"
+
+      - name: Crawl production
+        run: |
+          set +e
+          node scripts/launch-crawl.mjs \
+            --base-url=https://strikehike.com \
+            --rate-ms=1000 \
+            --out=launch-crawl.json \
+            --markdown=launch-crawl.md
+          code=$?
+          cat launch-crawl.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit "$code"
+
+      - name: Keep the crawl JSON
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: launch-crawl-${{ github.run_id }}
+          path: launch-crawl.json
+          retention-days: 30
