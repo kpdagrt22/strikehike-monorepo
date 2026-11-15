@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out
@@ -48,7 +48,7 @@ jobs:
       - name: pip-audit (backend runtime requirements)
         run: |
           set +e
-          python -m pip install --quiet --disable-pip-version-check pip-audit
+          python -m pip install --quiet --disable-pip-version-check pip-audit==2.10.1
           echo "pip_audit_install_exit=$?" >> "$GITHUB_ENV"
           python -m pip_audit -r backend/requirements-minimal.txt \
             --format=json --output "$RUNNER_TEMP/pip-audit.json" 2> "$RUNNER_TEMP/pip-audit.err"

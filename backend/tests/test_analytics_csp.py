@@ -213,3 +213,29 @@ def test_weekly_export_tops_the_directives_and_origins(tmp_path):
     assert csp["origins"][0] == {"name": "https://cdn.example.com", "count": 3}
     # Only names and counts, never a URL or an id.
     assert set(csp["origins"][0]) == {"name", "count"}
+
+
+def test_the_daily_cap_drops_quietly_after_the_sample_is_full(client, monkeypatch):
+    api, store = client
+    monkeypatch.setattr("astro_finance.analytics.store.CSP_DAILY_CAP", 3)
+    for _ in range(5):
+        assert post(api, report_uri()).status_code == 204
+    count = store.connection.execute("SELECT COUNT(*) AS n FROM csp_reports").fetchone()["n"]
+    assert count == 3
+
+
+def test_old_csp_rows_are_purged_with_the_other_tables(tmp_path):
+    from astro_finance.analytics import store as store_module
+
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        now_ms = int(NOW.timestamp() * 1000)
+        old_ms = now_ms - (store_module.RETENTION_DAYS + 2) * 86_400_000
+        assert store.add_csp_report("img-src", "https://a.example", "/", "net", now_ms=old_ms)
+        assert store.add_csp_report("img-src", "https://b.example", "/", "net", now_ms=now_ms)
+        rows = store.connection.execute(
+            "SELECT blocked_origin FROM csp_reports ORDER BY id"
+        ).fetchall()
+        assert [row["blocked_origin"] for row in rows] == ["https://b.example"]
+    finally:
+        store.close()
