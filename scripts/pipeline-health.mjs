@@ -21,11 +21,19 @@ function arg(name, fallback) {
   return found ? found.slice(prefix.length) : fallback;
 }
 
-export function evaluate(runs, now, intervalHours, graceHours) {
+// `workflowCreatedAt` (the workflow's registration time) separates a workflow
+// that is too new to have run from one whose schedule never fires.
+export function evaluate(runs, now, intervalHours, graceHours, workflowCreatedAt = null) {
   const completed = runs
     .filter((run) => run.conclusion)
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   if (completed.length === 0) {
+    const addedHours = workflowCreatedAt
+      ? (now.getTime() - Date.parse(workflowCreatedAt)) / 3_600_000
+      : null;
+    if (addedHours !== null && Number.isFinite(addedHours) && addedHours <= intervalHours + graceHours) {
+      return { ok: true, detail: `not due yet (added ${addedHours.toFixed(1)} h ago)`, ageHours: null };
+    }
     return { ok: false, detail: "no completed scheduled run", ageHours: null };
   }
   const newest = completed[0];
@@ -68,11 +76,24 @@ async function main() {
       continue;
     }
     const data = await response.json();
+    let createdAt = null;
+    if (!(data.workflow_runs ?? []).some((run) => run.conclusion)) {
+      const meta = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${workflow.file}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "User-Agent": "StrikeHike-pipeline-health/1.0",
+        },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (meta.ok) createdAt = (await meta.json()).created_at ?? null;
+    }
     const result = evaluate(
       data.workflow_runs ?? [],
       now,
       workflow.intervalHours,
       workflow.graceHours,
+      createdAt,
     );
     rows.push({ name: workflow.name, ...result });
   }

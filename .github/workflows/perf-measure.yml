@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
@@ -52,13 +54,17 @@ jobs:
           RUNS: ${{ inputs.runs || '5' }}
           FORM_FACTOR: ${{ inputs.form_factor || 'mobile' }}
         run: |
+          # Keep whatever summary exists when a run fails.
+          set +e
           node scripts/perf/measure.mjs \
             --base-url="$BASE_URL" \
             --runs="$RUNS" \
             --form-factor="$FORM_FACTOR" \
             --out=perf-measure.json \
             --markdown=perf-measure.md
-          cat perf-measure.md >> "$GITHUB_STEP_SUMMARY"
+          code=$?
+          cat perf-measure.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit "$code"
 
       - name: Keep the JSON
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

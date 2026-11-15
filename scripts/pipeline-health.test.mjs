@@ -33,6 +33,18 @@ test("no completed run fails", () => {
   );
 });
 
+test("a workflow too new to have run is not due yet", () => {
+  const added = new Date(NOW.getTime() - 20 * 3_600_000).toISOString();
+  const result = evaluate([], NOW, 168, 24, added);
+  assert.equal(result.ok, true);
+  assert.match(result.detail, /not due yet/);
+});
+
+test("a workflow older than its window with no scheduled run fails", () => {
+  const added = new Date(NOW.getTime() - 200 * 3_600_000).toISOString();
+  assert.equal(evaluate([], NOW, 168, 24, added).ok, false);
+});
+
 test("the window includes its grace edge", () => {
   assert.equal(evaluate([run(30)], NOW, 24, 6).ok, true);
   assert.equal(evaluate([run(30.1)], NOW, 24, 6).ok, false);

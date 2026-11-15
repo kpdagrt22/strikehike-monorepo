@@ -332,7 +332,14 @@ if (
   summary.issues.missing_title.length ||
   summary.issues.missing_description.length ||
   summary.issues.og_image_bad.length ||
-  summary.issues.internal_404.length
+  summary.issues.internal_404.length ||
+  // Kept from the B4 crawl's exit rule: invalid JSON-LD, mixed content and
+  // missing security headers stay failures (all zero on 15 Nov).
+  summary.issues.jsonld_invalid.length ||
+  summary.issues.mixed_content.length ||
+  summary.issues.missing_hsts.length ||
+  summary.issues.missing_nosniff.length ||
+  summary.issues.missing_referrer.length
 ) {
   process.exitCode = 1;
 }
