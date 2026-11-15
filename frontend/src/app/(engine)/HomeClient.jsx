@@ -189,7 +189,7 @@ function getIntroSeen() {
 
 const getIntroSeenServer = () => false;
 
-export default function Home({ snapshot }) {
+export default function Home({ snapshotContent }) {
   const { resolvedTheme } = useTheme();
   const stage = useOrreryStage();
 
@@ -264,7 +264,7 @@ export default function Home({ snapshot }) {
       </div>
       <RightPanel />
       <ViewControls />
-      <InfoModule snapshot={snapshot} />
+      <InfoModule snapshotContent={snapshotContent} />
       <FeedbackModule />
       <SponsorModule />
       <OnboardingOverlay />

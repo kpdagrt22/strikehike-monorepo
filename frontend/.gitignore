@@ -19,6 +19,7 @@
 # next.js
 /.next/
 /.next-poster/
+/.next-profile/
 /out/
 
 # production

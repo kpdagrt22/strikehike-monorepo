@@ -9,6 +9,7 @@ import { homeGraph } from "@/lib/seo/graphs";
 import { pageMetadata } from "@/lib/seo/site";
 import { orderedThemes } from "@/lib/events/upcoming";
 import HomeClient from "./HomeClient";
+import { HomeSnapshot } from "@/components/home/HomeSnapshot";
 
 // The orrery is a client view; this server wrapper adds the home page's own
 // metadata, its JSON-LD, and the "At a glance" snapshot. The page is ISR: the
@@ -63,7 +64,7 @@ export default async function Page() {
 
   return (
     <>
-      <HomeClient snapshot={snapshot} />
+      <HomeClient snapshotContent={<HomeSnapshot snapshot={snapshot} />} />
       <JsonLd data={homeGraph(latest?.generated_at)} />
     </>
   );
