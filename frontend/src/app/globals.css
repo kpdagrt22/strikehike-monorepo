@@ -284,6 +284,61 @@
   @apply inline-flex items-center rounded-full border border-(--sh-line-1) px-1.5 py-0.5 font-medium text-(--sh-text-2) transition-colors hover:border-(--sh-line-2) hover:text-(--sh-text-1) focus-visible:border-(--sh-line-2) focus-visible:text-(--sh-text-1);
 }
 
+/* Server-rendered classes that repeat on every row or footer link. Each is
+   exactly the utility list the element carried before (S3.2): one class name
+   in the HTML, and in the RSC payload that repeats it, instead of 100-530
+   bytes of utilities per element. In the components layer, so a utility added
+   beside one still wins, as it did when both were utilities. */
+@layer components {
+  /* The quiet footer and body link (components/seo/styles.ts LINK). */
+  .sh-link {
+    @apply text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77];
+  }
+
+  /* One dated row (UpcomingEventRow). `group` stays a literal class on the
+     row: the actions' group-hover reveal keys on it. */
+  .sh-row {
+    @apply relative border-b border-(--sh-line-1) last:border-b-0;
+  }
+
+  .sh-row-body {
+    @apply flex min-h-16 items-start gap-3 py-2;
+  }
+
+  .sh-row-date {
+    @apply w-24 shrink-0 whitespace-nowrap pt-0.5 text-micro uppercase tracking-[0.08em] text-(--sh-text-3);
+  }
+
+  .sh-row-title {
+    @apply truncate text-body font-medium leading-snug text-(--sh-text-1);
+  }
+
+  .sh-row-meta {
+    @apply mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-(--sh-text-3);
+  }
+
+  /* The row's three actions (EventActionLinks): revealed on row hover or
+     focus on pointer devices, always visible on touch. */
+  .sh-row-actions {
+    @apply flex flex-wrap items-center gap-1.5 pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:duration-(--sh-dur-reveal) pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 motion-reduce:transition-none;
+  }
+
+  /* ...floated over the row's right edge on pointer devices. */
+  .sh-row-actions-float {
+    @apply mt-1.5 pointer-fine:absolute pointer-fine:right-2 pointer-fine:top-1/2 pointer-fine:z-10 pointer-fine:mt-0 pointer-fine:-translate-y-1/2 pointer-fine:rounded-full pointer-fine:bg-(--sh-surface-overlay) pointer-fine:px-1 pointer-fine:shadow-(--sh-shadow-float) pointer-fine:backdrop-blur-xl;
+  }
+
+  /* The 404 page. Its tree rides in every page's RSC payload (twice, as the
+     root and engine not-found boundaries), so its long lists cost every page. */
+  .sh-404 {
+    @apply relative grid h-[100dvh] w-screen place-items-center overflow-hidden bg-[radial-gradient(ellipse_at_50%_28%,#ffffff_0%,#faf7f2_30%,#f1ebe2_62%,#e3dbcf_100%)] px-4 dark:bg-[radial-gradient(ellipse_at_50%_28%,#232330_0%,#141420_30%,#090910_62%,#020204_100%)];
+  }
+
+  .sh-404-view {
+    @apply inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-white/45 px-4 text-micro font-medium uppercase tracking-[0.14em] text-black/70 transition-colors duration-(--sh-dur-micro) hover:bg-white/75 hover:text-black/90 focus-visible:bg-white/75 focus-visible:text-black/90 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:bg-white/[0.08] dark:hover:text-white/90 dark:focus-visible:bg-white/[0.08] dark:focus-visible:text-white/90;
+  }
+}
+
 /* Nakshatra halo (header Easter egg): drawn over the brand mark; it fades in
    with the views (CSS only, opacity) and never moves. */
 .sh-halo {

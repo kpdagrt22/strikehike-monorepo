@@ -139,6 +139,23 @@ PYTHONPATH=src:. python -m pytest \
 
 In PowerShell, set `$env:PYTHONPATH = "src;."` and pass the same file list. For the frontend, CI runs `npm run lint` and `npm run build` in `frontend/`; there are no frontend unit tests.
 
+**The Playwright deploy gate, locally.** The smoke and `@deploy` sets read whatever events bundle the backend serves, so
+build the bundle CI builds (offline FRED fixtures plus the committed computed and curated sources, for today) and point
+the backend at it:
+
+```bash
+cd backend
+PYTHONPATH=src:. python -m scripts.smoke_events_bundle --out /tmp/smoke-events-build --runtime /tmp/smoke-events
+PYTHONPATH=src:. EVENTS_RUNTIME_DIR=/tmp/smoke-events LOAD_ML_MODELS=0 ANALYTICS_INGEST_ENABLED=1 \
+  ANALYTICS_DB=/tmp/smoke-analytics.sqlite uvicorn api_server:app --host 127.0.0.1 --port 8010
+```
+
+Then build and start the frontend with `CHRONO_API_URL=http://127.0.0.1:8010` and run
+`npx playwright test tests/smoke.spec.ts` and `npx playwright test --grep "@deploy"`. Rebuild the bundle after any change
+under `backend/data/events/`: a runtime left on an older bundle fails tests that CI passes (the P17 Culture/Religion
+gap). To serve production's own dates instead, `python -m astro_finance.events activate --version <bundle_version>
+--runtime-dir /tmp/prod-events` installs a published release after checking its checksums.
+
 ## Deployment
 
 Every push to `main` runs [`.github/workflows/deploy-lightsail.yml`](.github/workflows/deploy-lightsail.yml). Only one run executes at a time (concurrency group `lightsail-production`, `cancel-in-progress: false`), so a newer push never cancels a deploy that is already running.

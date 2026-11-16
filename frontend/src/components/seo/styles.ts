@@ -1,9 +1,10 @@
 // Classes the server-rendered SEO blocks share with the views around them, copied from each
 // page's own Method & limits and footer links, so the new rows read as part of the page.
 
-/** The engine pages' quiet footer link (/regime, /patterns), 44 px tall on touch. */
-export const LINK =
-  "text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-[#14121a] focus-visible:text-[#14121a] hover:decoration-[#f05d49] focus-visible:decoration-[#f05d49] pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center dark:text-white/60 dark:decoration-white/20 dark:hover:text-[#f2ede4] dark:focus-visible:text-[#f2ede4] dark:hover:decoration-[#ff8b77] dark:focus-visible:decoration-[#ff8b77]";
+/** The engine pages' quiet footer link (/regime, /patterns), 44 px tall on touch. The
+ *  utilities live in globals.css (.sh-link): the footer repeats this link about 15 times on
+ *  every page, and each copy is in both the HTML and the RSC payload (S3.2). */
+export const LINK = "sh-link";
 
 /** The "+" that turns 45° while its closed row is open. */
 export const PLUS =

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -10,6 +12,25 @@ const CLAIMS = [
   "mars-retrograde",
   "mars-saturn-conjunction",
 ] as const;
+
+/** Names of the curated Culture/Religion festivals dated from today through
+ *  the next 365 days (the /upcoming horizon). */
+function curatedCultureDates(today: string): string[] {
+  const toml = readFileSync(
+    join(process.cwd(), "..", "backend", "data", "events", "curated", "culture_religion.toml"),
+    "utf8",
+  );
+  const horizon = new Date(Date.parse(`${today}T00:00:00Z`) + 365 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const names: string[] = [];
+  for (const block of toml.split(/^\[\[events\]\]\s*$/m).slice(1)) {
+    const name = /^name\s*=\s*"([^"]+)"/m.exec(block)?.[1];
+    const date = /^date\s*=\s*"(\d{4}-\d{2}-\d{2})"/m.exec(block)?.[1];
+    if (name && date && date >= today && date <= horizon) names.push(name);
+  }
+  return names;
+}
 
 async function seedTheme(page: Page, theme: "light" | "dark") {
   await page.addInitScript((value) => {
@@ -73,15 +94,42 @@ test.describe("P17: more claim tests and culture dates", () => {
     "Culture/Religion shows the new computed and curated dates",
     { tag: "@deploy" },
     async ({ page }) => {
+      // The served bundle is built for today, in CI and on a local stack alike
+      // (backend/scripts/smoke_events_bundle.py), so the expected names follow
+      // today's date rather than fixed years: "Christmas 2026" leaves the
+      // 12-month window on 26 Dec 2026 and "Holi 2027" on 24 Mar 2027. The
+      // check is as strict as before: the next Christmas and the next Chinese
+      // New Year (computed), and every curated festival dated in the next 12
+      // months (Holi 2027 among them until 23 Mar 2027).
       const response = await page.goto("/upcoming/culture-religion", {
         waitUntil: "networkidle",
       });
       expect(response?.status()).toBe(200);
       await expect(page.locator("h1")).toContainText("Culture and religion");
       expect(await page.locator("[data-upcoming-row]").count()).toBeGreaterThan(0);
-      await expect(page.locator("body")).toContainText("Christmas 2026");
-      await expect(page.locator("body")).toContainText("Chinese New Year 2027");
-      await expect(page.locator("body")).toContainText("Holi 2027");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const year = Number(today.slice(0, 4));
+      const body = page.locator("body");
+      await expect(body).toContainText(
+        `Christmas ${today <= `${year}-12-25` ? year : year + 1}`,
+      );
+      // Chinese New Year falls between 21 Jan and 20 Feb.
+      const newYears =
+        today < `${year}-01-21`
+          ? [year]
+          : today > `${year}-02-20`
+            ? [year + 1]
+            : [year, year + 1];
+      await expect(body).toContainText(
+        new RegExp(`Chinese New Year (${newYears.join("|")})`),
+      );
+      const curated = curatedCultureDates(today);
+      expect(
+        curated.length,
+        "verified Culture/Religion dates in the next 12 months (backend/data/events/curated/culture_religion.toml)",
+      ).toBeGreaterThan(0);
+      for (const name of curated) await expect(body).toContainText(name);
     },
   );
 });
