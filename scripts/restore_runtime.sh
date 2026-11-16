@@ -6,7 +6,10 @@
 # Copies the sqlite files and the events directory, runs PRAGMA integrity_check
 # on every database and writes a row count per table. The destination must not
 # be the live runtime directory. Caddy data is never touched.
+#
+# The restored digest.sqlite holds subscriber emails: owner-only, like the backup.
 set -euo pipefail
+umask 077
 
 FROM=""
 TO=""
