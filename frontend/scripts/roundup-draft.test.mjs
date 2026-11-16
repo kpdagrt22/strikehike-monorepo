@@ -36,7 +36,16 @@ before(async () => {
     let body = null;
     if (url.pathname === "/api/v1/regime/macro-history") body = atlas();
     if (url.pathname === "/api/v1/events/upcoming") body = { themes: {} };
-    if (url.pathname === "/api/v1/sky/week") body = { moon_phases: [] };
+    // A valid sky week: the draft now refuses a response without activity.daily (DATA-guards).
+    if (url.pathname === "/api/v1/sky/week") {
+      const start = url.searchParams.get("start") ?? "2026-11-23";
+      const first = Date.parse(`${start}T00:00:00Z`);
+      const daily = Array.from({ length: 7 }, (_, i) => ({
+        date: new Date(first + i * 86_400_000).toISOString().slice(0, 10),
+        score: 40,
+      }));
+      body = { moon_phases: [], activity: { min: 40, max: 40, peak_date: null, daily } };
+    }
     response.writeHead(body ? 200 : 404, { "Content-Type": "application/json" });
     response.end(JSON.stringify(body ?? { detail: "not found" }));
   });
