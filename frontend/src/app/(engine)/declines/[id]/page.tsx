@@ -29,14 +29,17 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
+// null means no such decline (a 404). A backend that does not answer throws
+// instead: the proxy has already answered 503 for that case (pageGate.ts), so
+// a slow backend never turns a real decline page into a 404.
 async function load(id: string) {
-  const atlas = await getRegimeAtlas().catch(() => null);
-  if (!declinesComplete(atlas?.meta)) return null;
-  const fall = findDecline(atlas?.meta, id);
+  const atlas = await getRegimeAtlas();
+  if (!declinesComplete(atlas.meta)) return null;
+  const fall = findDecline(atlas.meta, id);
   if (!fall) return null;
   return {
-    atlas: atlas!,
-    record: trendRecord(atlas?.meta)!,
+    atlas,
+    record: trendRecord(atlas.meta)!,
     fall,
     facts: declineFacts(atlas, fall),
   };

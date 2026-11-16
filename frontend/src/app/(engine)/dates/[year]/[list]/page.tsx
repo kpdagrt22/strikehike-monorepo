@@ -27,6 +27,8 @@ export function generateStaticParams() {
   return [];
 }
 
+// null means no such list, or one not yet complete (a 404). A backend that does
+// not answer throws instead: the proxy answers 503 first (pageGate.ts).
 async function loadList(year: string, slug: string): Promise<YearList | null> {
   const list = findYearList(year, slug);
   if (!list) return null;

@@ -64,7 +64,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id: slug } = await params;
   const id = eventIdFromSlug(slug);
-  const event = id ? await getEvent(id).catch(() => null) : null;
+  const event = id ? await getEvent(id) : null;
   if (!event) {
     return { title: "Event not found", robots: { index: false, follow: true } };
   }
@@ -103,8 +103,11 @@ export default async function EventPage({
   const { id: slug } = await params;
   const id = eventIdFromSlug(slug);
   if (!id) notFound();
+  // getEvent returns null only for an id the bundle does not have. A backend
+  // that does not answer throws: the proxy answers 503 before this renders
+  // (pageGate.ts), and an ISR regeneration that throws keeps the last good page.
   const [event, upcoming] = await Promise.all([
-    getEvent(id).catch(() => null),
+    getEvent(id),
     getUpcomingAll().catch(() => null),
   ]);
   if (!event) {

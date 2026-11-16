@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   TEXT_SPACING,
   findClippedText,
+  findCoveredByLayer,
   findOverlappingText,
   measureOverflow,
   settle,
@@ -45,5 +46,45 @@ for (const route of ROUTES) {
       await findOverlappingText(page),
       `${route} overlapping text`,
     ).toEqual([]);
+  });
+}
+
+// The home page's first-visit hint floats over the page, so the overlap check
+// above (which compares a fixed layer only with itself) cannot see it. On a
+// short or narrow phone, and with text spacing, it must still cover no text and
+// no control, and it must still close with its button or Esc.
+for (const [width, height, spacing, closeWith] of [
+  [320, 568, true, "button"],
+  [320, 568, false, "Escape"],
+  [320, 800, true, "Escape"],
+  [360, 640, true, "button"],
+  [390, 844, true, "Escape"],
+] as const) {
+  test(`first-visit hint covers nothing at ${width}x${height}${spacing ? " with text spacing" : ""}`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height });
+    await page.goto("/", { waitUntil: "load" });
+    const hint = page.locator("[data-home-hint]");
+    await expect(hint).toBeVisible();
+    if (spacing) await page.addStyleTag({ content: TEXT_SPACING });
+    await settle(page);
+
+    expect(
+      await findCoveredByLayer(page, "[data-home-hint]"),
+      `hint at ${width}x${height} (${await hint.getAttribute("data-hint-place")})`,
+    ).toEqual([]);
+    const box = await hint.boundingBox();
+    expect(box!.y + box!.height, "hint inside the viewport").toBeLessThanOrEqual(height);
+    expect(await findOverlappingText(page), "overlapping text").toEqual([]);
+
+    if (closeWith === "Escape") {
+      await page.keyboard.press("Escape");
+    } else {
+      // Its one button: the 44 px x, or the whole one-line pill.
+      await hint.getByRole("button", { name: /Dismiss hint/ }).click();
+    }
+    await expect(hint).toHaveCount(0);
   });
 }
