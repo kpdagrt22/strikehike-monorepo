@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex" }],
       },
+      // The weekly email's hosted images and web font. A mail client loads
+      // the @font-face file cross-origin, as a browser would, so it needs CORS.
+      {
+        source: "/email/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
       // Transport and content-type hygiene. HSTS covers the apex only: no includeSubDomains, no preload.
       {
         source: "/:path*",
