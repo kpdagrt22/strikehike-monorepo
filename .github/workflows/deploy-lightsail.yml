@@ -111,6 +111,10 @@ jobs:
         working-directory: .
         run: bash tests/deploy/test_backup_runtime.sh
 
+      - name: Restore drill keeps counts and refuses production
+        working-directory: .
+        run: bash tests/deploy/test_restore_runtime.sh
+
   test-frontend:
     name: Frontend lint and build
     runs-on: ubuntu-24.04
