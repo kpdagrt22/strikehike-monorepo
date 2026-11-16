@@ -337,12 +337,17 @@ class AnalyticsStore:
         with self.lock, self.connection:
             self._stat(day, **{f"dropped_{kind}": count})
 
-    def _purge(self, day: str, now_ms: int) -> None:
+    def _purge(self, day: str, now_ms: int) -> bool:
+        """Drop rows older than RETENTION_DAYS, once per IST day.
+
+        The caller holds the store lock inside one transaction. Returns False
+        when today's purge has already run (meta.last_purge_day).
+        """
         row = self.connection.execute(
             "SELECT value FROM meta WHERE key='last_purge_day'"
         ).fetchone()
         if row and row["value"] == day:
-            return
+            return False
         cutoff = now_ms - RETENTION_DAYS * 86_400_000
         self.connection.execute("DELETE FROM events WHERE received_at < ?", (cutoff,))
         self.connection.execute("DELETE FROM feedback WHERE received_at < ?", (cutoff,))
@@ -352,6 +357,19 @@ class AnalyticsStore:
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (day,),
         )
+        return True
+
+    def purge_expired(self, now_ms: int | None = None) -> bool:
+        """The retention purge on a clock (analytics/retention.py).
+
+        The same purge the first write of an IST day runs, for a day with no
+        write: inside the store lock and one transaction, at most once per IST
+        day, so it is idempotent and never races a write. True when it ran.
+        """
+        now_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+        day = _day(datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc))
+        with self.lock, self.connection:
+            return self._purge(day, now_ms)
 
     def ingest(
         self,

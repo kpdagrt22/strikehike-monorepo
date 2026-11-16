@@ -33,6 +33,7 @@ from astro_finance.historical_parallels import (  # noqa: E402
     forecast_ladder,
     list_events_by_category,
 )
+from astro_finance.analytics import retention as analytics_retention  # noqa: E402
 from astro_finance.analytics.csp import router as csp_router  # noqa: E402
 from astro_finance.analytics.router import (  # noqa: E402
     feedback_router as analytics_feedback_router,
@@ -56,6 +57,10 @@ app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(analytics_feedback_router, prefix="/api/v1")
 app.include_router(csp_router, prefix="/api/v1")
 app.include_router(digest_router, prefix="/api")
+
+# The analytics 395-day purge also runs at startup and is checked hourly, so a
+# day without traffic does not skip it (analytics/retention.py).
+analytics_retention.install(app)
 
 CORS_ORIGINS = [
     origin.strip()
