@@ -1,6 +1,7 @@
 // Server reads for the server-rendered text, the JSON-LD and the sitemap. Server-only by use:
 // import it from Server Components, metadata files and route handlers, never from a client module.
 import { cache } from "react";
+import { readEvent, readRegimeAtlas } from "@/lib/server/pageData";
 
 // Set only at runtime (docker-compose `environment`). Unset in the Docker build stage and in CI,
 // so those builds prerender without data and ISR fills the data in on the server.
@@ -182,6 +183,7 @@ export interface PatternsPayload {
 // ---------------------------------------------------------------------------------------------
 // Reads. Each returns null when CHRONO_API_URL is unset (build and CI) and throws on a bad
 // response at runtime. Callers that must never fail (sitemap, JSON-LD) add `.catch(() => null)`.
+// The atlas and single-event reads differ: see getRegimeAtlas and getEvent.
 // ---------------------------------------------------------------------------------------------
 
 // Monthly points from 2025 keep this small (≈30 KB); `crashes` and `meta` are always complete.
@@ -192,16 +194,11 @@ export const getRegimeSummary = cache(async (): Promise<RegimeSummary | null> =>
   return p as unknown as RegimeSummary;
 });
 
-// The weekly atlas: the same crashes and meta, plus every weekly point the
-// reference pages draw. ≈2.6 MB; the 60-second cache is shared by the pages.
-export const getRegimeAtlas = cache(async (): Promise<RegimeAtlas | null> => {
-  const p = await getJson("/api/v1/regime/macro-history?resolution=weekly&view=atlas");
-  if (!p) return null;
-  if (!Array.isArray(p.timeline) || !Array.isArray(p.crashes) || !p.meta) {
-    throw new Error("regime atlas shape");
-  }
-  return p as unknown as RegimeAtlas;
-});
+// The weekly atlas: the same crashes and meta, plus every weekly point the reference pages draw
+// (~12 MB, over Next's 2 MB data-cache limit). It goes through the shared last-good memo in
+// lib/server/pageData.ts, which is its only cache. It never returns null: it throws
+// BackendUnavailableError when the backend cannot answer and no earlier copy exists.
+export const getRegimeAtlas = cache((): Promise<RegimeAtlas> => readRegimeAtlas());
 
 export const getCaseCatalogue = cache(async (): Promise<CaseCatalogue | null> => {
   const p = await getJson("/api/v1/regime/cases");
@@ -319,19 +316,8 @@ export function archiveCount(health: EventsHealthPayload | null, theme: string):
 
 /**
  * One event by id, or null when the bundle has no such event (404) or the id is malformed (422).
- * Throws when there is no backend or it fails, so an ISR regeneration keeps the last good page.
+ * Read through the shared last-good memo (lib/server/pageData.ts). Throws BackendUnavailableError
+ * when the backend cannot answer and no earlier copy exists, so a page answers 503 (or an ISR
+ * regeneration keeps the last good page) instead of a 404.
  */
-export const getEvent = cache(async (id: string): Promise<EventDetailPayload | null> => {
-  if (!BACKEND) throw new Error("CHRONO_API_URL is not set");
-  const response = await fetch(`${BACKEND}/api/v1/events/${encodeURIComponent(id)}`, {
-    next: { revalidate: 60 },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (response.status === 404 || response.status === 422) return null;
-  if (!response.ok) throw new Error(`event ${id} returned ${response.status}`);
-  const data: unknown = await response.json();
-  if (!data || typeof data !== "object" || !("event_id" in data)) {
-    throw new Error("event shape");
-  }
-  return data as EventDetailPayload;
-});
+export const getEvent = cache((id: string): Promise<EventDetailPayload | null> => readEvent(id));

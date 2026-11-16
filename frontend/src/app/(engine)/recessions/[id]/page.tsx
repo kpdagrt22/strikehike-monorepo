@@ -28,12 +28,15 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
+// null means no such recession (a 404). A backend that does not answer throws
+// instead: the proxy has already answered 503 for that case (pageGate.ts), so
+// a slow backend never turns a real recession page into a 404.
 async function load(id: string) {
-  const atlas = await getRegimeAtlas().catch(() => null);
+  const atlas = await getRegimeAtlas();
   if (!recessionsComplete(atlas)) return null;
   const crash = findRecession(atlas, id);
   if (!crash) return null;
-  return { atlas: atlas!, crash, facts: recessionFacts(atlas!, crash) };
+  return { atlas, crash, facts: recessionFacts(atlas, crash) };
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
