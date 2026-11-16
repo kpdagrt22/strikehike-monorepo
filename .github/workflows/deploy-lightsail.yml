@@ -69,6 +69,8 @@ jobs:
             tests/test_analytics_serverlogs.py \
             tests/test_analytics_weekly.py \
             tests/test_digest.py \
+            tests/test_digest_send_safety.py \
+            tests/test_digest_workflow.py \
             tests/test_digest_calendar.py \
             tests/test_roundup_calendar.py \
             tests/test_ledger.py \

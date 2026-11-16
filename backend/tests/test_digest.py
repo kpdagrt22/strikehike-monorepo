@@ -972,6 +972,7 @@ def test_render_v2_palette_contrast():
     # Dark plates.
     assert ratio(render.INK, render.BG) >= 4.5
     assert ratio(render.MUTED, render.CARD) >= 4.5
+    assert ratio(render.MUTED, render.BG) >= 4.5  # the footer sits on the page
     assert ratio(render.GOLD, render.CARD) >= 4.5
     assert ratio(render.LIGHT_INK, render.GOLD) >= 4.5
 
@@ -979,6 +980,7 @@ def test_render_v2_palette_contrast():
     assert ratio(render.LIGHT_INK, render.LIGHT_BG) >= 4.5
     assert ratio(render.LIGHT_INK, render.LIGHT_CARD) >= 4.5
     assert ratio(render.LIGHT_MUTED, render.LIGHT_CARD) >= 4.5
+    assert ratio(render.LIGHT_MUTED, render.LIGHT_BG) >= 4.5  # the footer
     assert ratio(render.ACCENT_LIGHT, render.LIGHT_CARD) >= 4.5
     assert ratio(render.ACCENT_LIGHT, render.LIGHT_BG) >= 4.5
     # The light chip and the primary button.
@@ -1002,3 +1004,37 @@ def test_render_v2_light_override_carries_the_accent_class():
         f".sh-chip{{background-color:{render.GOLD_DEEP}!important;"
         f"color:{render.LIGHT_INK}!important;}}" in html
     )
+
+
+def test_render_v2_every_dark_text_colour_has_a_light_override():
+    """An inline dark-palette colour without a light class stays light-on-light.
+
+    The footer's unsubscribe and ledger links and the closest-past link once
+    kept #a9a294 on #faf7f2 (2.4:1) in light mode, because an inline colour on
+    the link beats the class on its paragraph.
+    """
+
+    from astro_finance.digest import render
+
+    html = render.render_roundup(
+        ROUNDUP_V2,
+        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
+        postal_address="1 Test Street, Test City",
+        base_url=BASE,
+        ledger={"seq": 1, "hash": "a" * 64},
+    ).html
+    dark_only = {
+        render.INK.lower(): "sh-ink",
+        render.MUTED.lower(): "sh-muted",
+        render.GOLD.lower(): "sh-accent",
+    }
+    checked = 0
+    for tag in re.findall(r"<[a-z][a-z0-9]*\b[^>]*\bstyle=\"[^\"]*\"[^>]*>", html):
+        style = re.search(r'style="([^"]*)"', tag).group(1)
+        colour = re.search(r"(?:^|;)\s*color:\s*(#[0-9a-fA-F]{6})", style)
+        if not colour or colour.group(1).lower() not in dark_only:
+            continue
+        checked += 1
+        classes = (re.search(r'class="([^"]*)"', tag) or [None, ""])[1].split()
+        assert dark_only[colour.group(1).lower()] in classes, tag
+    assert checked > 20
