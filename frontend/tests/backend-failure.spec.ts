@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, rmSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { join } from "node:path";
@@ -11,9 +12,19 @@ import { YEAR_LISTS } from "../src/lib/events/yearLists";
 // against a stub backend it controls, so the main server and its backend are untouched:
 // - a missing id is a 404 while the backend answers;
 // - a cold page whose backend fails or times out is a 503 with Retry-After;
-// - once a page has loaded, a failing backend still serves it (200).
+// - once a page has loaded, a failing backend still serves it (200);
+// - after a restart (empty memo) with the backend down, an ISR page Next still
+//   holds on disk answers with that copy (200).
 
-const STANDALONE = join(process.cwd(), ".next", "standalone", "server.js");
+const STANDALONE_DIR = join(process.cwd(), ".next", "standalone");
+const STANDALONE = join(STANDALONE_DIR, "server.js");
+// Next's on-disk ISR copies: server/route-cache/APP_PAGE/<sha256(page)>/$<path>.html.
+function isrDir(page: string) {
+  const owner = createHash("sha256").update(page).digest("hex");
+  return join(STANDALONE_DIR, ".next", "server", "route-cache", "APP_PAGE", owner);
+}
+const EVENT_ISR = isrDir("/(engine)/events/[id]/page");
+const DATES_ISR = isrDir("/(engine)/dates/[year]/[list]/page");
 const RECESSION = "nber-1929-08";
 const FALL = { name: "1929 crash", peak: "1929-09-16", low: "1932-06-01" };
 const DECLINE = `${FALL.peak}-1929-crash`;
@@ -23,7 +34,10 @@ const MISSING_EVENT_PATH = "/events/finance~stub_source~missing-2026-12";
 const YEAR_LIST = YEAR_LISTS.find((list) => list.year === "2027" && list.slug === "fomc-meetings")!;
 const YEAR_PATH = `/dates/${YEAR_LIST.year}/${YEAR_LIST.slug}`;
 
-type Mode = "ok" | "fail" | "hang";
+// down: no backend at all (the connection closes unanswered); busy: every call
+// answers 503 with the backend's own Retry-After.
+type Mode = "ok" | "fail" | "hang" | "down" | "busy";
+const BUSY_RETRY_AFTER = "120";
 let mode: Mode = "ok";
 const hits = { atlas: 0 };
 let stub: Server | null = null;
@@ -102,6 +116,15 @@ function send(response: ServerResponse, status: number, body: unknown) {
 }
 
 function handle(request: IncomingMessage, response: ServerResponse) {
+  if (mode === "down") {
+    request.socket.destroy();
+    return;
+  }
+  if (mode === "busy") {
+    response.writeHead(503, { "Content-Type": "application/json", "Retry-After": BUSY_RETRY_AFTER });
+    response.end(JSON.stringify({ detail: "stub busy" }));
+    return;
+  }
   const url = new URL(request.url ?? "/", "http://stub");
   const isAtlas = url.pathname === "/api/v1/regime/macro-history" && url.searchParams.get("view") === "atlas";
   const eventMatch = url.pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
@@ -150,6 +173,37 @@ async function waitForSite() {
   throw new Error(`the stubbed site did not answer on ${base}`);
 }
 
+let stubPort = 0;
+
+async function startSite() {
+  const sitePort = await freePort();
+  base = `http://127.0.0.1:${sitePort}`;
+  site = spawn(process.execPath, [STANDALONE], {
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      PORT: String(sitePort),
+      HOSTNAME: "127.0.0.1",
+      CHRONO_API_URL: `http://127.0.0.1:${stubPort}`,
+    },
+    stdio: "ignore",
+  });
+  await waitForSite();
+}
+
+async function stopSite() {
+  const child = site;
+  site = null;
+  if (!child?.pid) return;
+  const exited = new Promise((resolve) => child.once("exit", resolve));
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    child.kill("SIGTERM");
+  }
+  await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 10_000))]);
+}
+
 async function expectUnavailable(request: APIRequestContext, path: string) {
   const response = await request.get(`${base}${path}`, { maxRedirects: 0, timeout: 30_000 });
   expect(response.status(), `${path} status`).toBe(503);
@@ -166,33 +220,18 @@ test.describe("backend failure never reads as a missing page", () => {
 
   test.beforeAll(async () => {
     test.setTimeout(120_000);
-    const stubPort = await freePort();
+    // These routes render on demand only (no build-time copies): clear the
+    // stub pages a previous run left on disk, so the cold-page tests are cold.
+    rmSync(EVENT_ISR, { recursive: true, force: true });
+    rmSync(DATES_ISR, { recursive: true, force: true });
+    stubPort = await freePort();
     stub = createServer(handle);
     await new Promise<void>((resolve) => stub!.listen(stubPort, "127.0.0.1", resolve));
-    const sitePort = await freePort();
-    base = `http://127.0.0.1:${sitePort}`;
-    site = spawn(process.execPath, [STANDALONE], {
-      env: {
-        ...process.env,
-        NODE_ENV: "production",
-        PORT: String(sitePort),
-        HOSTNAME: "127.0.0.1",
-        CHRONO_API_URL: `http://127.0.0.1:${stubPort}`,
-      },
-      stdio: "ignore",
-    });
-    await waitForSite();
+    await startSite();
   });
 
   test.afterAll(async () => {
-    if (site?.pid) {
-      if (process.platform === "win32") {
-        spawnSync("taskkill", ["/PID", String(site.pid), "/T", "/F"], { stdio: "ignore" });
-      } else {
-        site.kill("SIGTERM");
-      }
-    }
-    site = null;
+    await stopSite();
     // Drop the hanging stub connections, then the stub.
     stub?.closeAllConnections();
     await new Promise((resolve) => stub?.close(resolve) ?? resolve(null));
@@ -277,5 +316,122 @@ test.describe("backend failure never reads as a missing page", () => {
       const missing = await request.get(`${base}/recessions/nber-1800-01`, { maxRedirects: 0 });
       expect(missing.status(), `${next} missing id`).toBe(404);
     }
+  });
+
+  // OPS-hardening: every 503 the proxy routes answer names Retry-After and is
+  // never cached. None of these routes was read earlier in this server, so no
+  // stored copy can answer for them.
+  const EVENT_SLUG = EVENT_ID.replaceAll(":", "~");
+  const API_GETS = [
+    "/api/v1/events/upcoming",
+    "/api/v1/events/health",
+    `/api/v1/events/${EVENT_SLUG}`,
+    "/api/v1/regime/macro-history?resolution=weekly",
+    "/api/v1/regime/cases",
+    "/api/v1/regime/cases/today/path",
+    "/api/v1/regime/crypto-milestones",
+    "/api/v1/regime/forecast",
+    "/api/v1/regime/runs",
+    "/api/v1/patterns",
+    "/api/v1/sky/week?start=2026-11-16",
+    "/api/events",
+    "/api/forecast-ladder",
+    "/api/digest/status",
+    "/api/v1/usage/weekly?week=2026-W46",
+    "/calendar/all.ics",
+    `/calendar/event/${EVENT_SLUG}.ics`,
+    "/this-week/2026-W46/calendar.ics",
+  ];
+  const API_POSTS: Array<[string, string]> = [
+    ["/api/digest/subscribe", JSON.stringify({ email: "reader@example.org" })],
+    ["/api/digest/unsubscribe?t=stub", "List-Unsubscribe=One-Click"],
+    ["/api/v1/feedback", JSON.stringify({ message: "stub", path: "/" })],
+  ];
+
+  async function expectRetryAfter(
+    response: Awaited<ReturnType<APIRequestContext["get"]>>,
+    label: string,
+    retryAfter: string,
+  ) {
+    expect(response.status(), `${label} status`).toBe(503);
+    expect(response.headers()["retry-after"], `${label} Retry-After`).toBe(retryAfter);
+    expect(response.headers()["cache-control"], `${label} Cache-Control`).toBe("no-store");
+  }
+
+  function post(request: APIRequestContext, path: string, data: string) {
+    return request.post(`${base}${path}`, {
+      data,
+      headers: { Origin: base, "Content-Type": "text/plain" },
+      maxRedirects: 0,
+      timeout: 30_000,
+    });
+  }
+
+  test("with the backend down, every proxy 503 names Retry-After: 60 and no-store", async ({ request }) => {
+    mode = "down";
+    for (const path of API_GETS) {
+      await expectRetryAfter(await request.get(`${base}${path}`, { maxRedirects: 0, timeout: 30_000 }), path, "60");
+    }
+    for (const [path, data] of API_POSTS) {
+      await expectRetryAfter(await post(request, path, data), `POST ${path}`, "60");
+    }
+  });
+
+  test("a backend 503 keeps its own Retry-After where the route passes it through", async ({ request }) => {
+    mode = "busy";
+    for (const path of [
+      "/api/digest/status",
+      "/api/v1/usage/weekly?week=2026-W46",
+      "/api/v1/regime/forecast",
+      "/api/v1/regime/runs",
+    ]) {
+      await expectRetryAfter(await request.get(`${base}${path}`, { maxRedirects: 0 }), path, BUSY_RETRY_AFTER);
+    }
+    for (const [path, data] of API_POSTS) {
+      await expectRetryAfter(await post(request, path, data), `POST ${path}`, BUSY_RETRY_AFTER);
+    }
+    // The cached proxy routes answer their own 503 body: the default applies.
+    for (const path of ["/api/v1/patterns", "/api/v1/events/upcoming", "/calendar/all.ics"]) {
+      await expectRetryAfter(await request.get(`${base}${path}`, { maxRedirects: 0 }), path, "60");
+    }
+  });
+
+  test("after a restart with the backend down, a page Next holds on disk still answers 200", async ({ request }) => {
+    test.setTimeout(120_000);
+    // The event, the year list and the missing id rendered above, so Next has
+    // written them to its on-disk ISR cache.
+    const copies = [
+      join(EVENT_ISR, "$", "events", `${EVENT_SLUG}.html`),
+      join(EVENT_ISR, "$", "events", `${MISSING_EVENT_PATH.split("/")[2]}.html`),
+      join(DATES_ISR, "$", "dates", YEAR_LIST.year, `${YEAR_LIST.slug}.html`),
+    ];
+    await expect.poll(() => copies.filter((file) => !existsSync(file)), { timeout: 15_000 }).toEqual([]);
+
+    // A restart empties the memo; the backend is gone.
+    mode = "down";
+    await stopSite();
+    await startSite();
+
+    for (const path of [EVENT_PATH, YEAR_PATH]) {
+      const response = await request.get(`${base}${path}`, { maxRedirects: 0, timeout: 30_000 });
+      expect(response.status(), path).toBe(200);
+      expect(await response.text(), path).not.toContain("This page could not load its data.");
+    }
+    const event = await request.get(`${base}${EVENT_PATH}`, { maxRedirects: 0 });
+    expect(await event.text()).toContain("Stub probe release");
+    // A stored "no such event" is still a 404.
+    expect((await request.get(`${base}${MISSING_EVENT_PATH}`, { maxRedirects: 0 })).status()).toBe(404);
+
+    // A hanging backend: the gate's read times out (8 s), then Next answers from disk.
+    mode = "hang";
+    const hung = await request.get(`${base}${EVENT_PATH}`, { maxRedirects: 0, timeout: 30_000 });
+    expect(hung.status()).toBe(200);
+
+    // No copy on disk or in the memo: still a 503 with Retry-After, never a 404.
+    mode = "down";
+    await expectUnavailable(request, "/events/finance~stub_source~never-rendered-2026-12");
+    // Recession and decline pages are dynamic (no ISR copy): after a restart
+    // with the backend down they answer 503 until the backend returns.
+    await expectUnavailable(request, `/recessions/${RECESSION}`);
   });
 });

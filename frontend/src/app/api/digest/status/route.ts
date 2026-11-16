@@ -1,4 +1,5 @@
-import { DIGEST_BACKEND } from "@/lib/server/digestProxy";
+import { DIGEST_BACKEND, passThrough } from "@/lib/server/digestProxy";
+import { unavailableHeaders } from "@/lib/server/unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +19,8 @@ export async function GET() {
         { headers: { "Cache-Control": "no-store" } },
       );
     }
-    return new Response(body || null, {
-      status: response.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-      },
-    });
+    return passThrough(response.status, body, response.headers.get("retry-after"));
   } catch {
-    return new Response(null, { status: 503 });
+    return new Response(null, { status: 503, headers: unavailableHeaders(503) });
   }
 }

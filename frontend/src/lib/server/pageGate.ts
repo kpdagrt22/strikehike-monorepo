@@ -6,12 +6,19 @@
 // - the read succeeds, or the last-good memo has a copy: the page renders from
 //   that copy, and a missing id still reaches the page's notFound(), a real 404;
 // - the backend fails or times out with no copy: the proxy answers 503 with
-//   Retry-After and a small "temporarily unavailable" page, never a 404.
+//   Retry-After and a small "temporarily unavailable" page, never a 404;
+// - except for an ISR page (event, year list) that Next still holds on disk:
+//   the memo starts empty after a restart, but Next serves that copy and keeps
+//   it when a background regeneration fails, so the proxy lets it answer.
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { eventIdFromSlug } from "@/lib/events/eventId";
 import { findYearList } from "@/lib/events/yearLists";
-import { isBackendUnavailable, RETRY_AFTER_SECONDS } from "./lastGood";
+import { isBackendUnavailable } from "./lastGood";
 import { readEvent, readRegimeAtlas } from "./pageData";
+import { unavailableHeaders } from "./unavailable.js";
 
 /** The backend read a gated path needs before it renders, or null for none. */
 export function pageDataRead(pathname: string): (() => Promise<unknown>) | null {
@@ -30,6 +37,45 @@ export function pageDataRead(pathname: string): (() => Promise<unknown>) | null 
     return list ? () => Promise.all(list.entries.map((entry) => readEvent(entry.id))) : null;
   }
   return null;
+}
+
+// The gated pages that are ISR pages, by their app-router page: Next keys its
+// on-disk copies by that page (next/dist/server/lib/route-cache-key.js).
+// Recession and decline pages are dynamic and have no such copy.
+const ISR_PAGES: Record<string, string> = {
+  events: "/(engine)/events/[id]/page",
+  dates: "/(engine)/dates/[year]/[list]/page",
+};
+
+/**
+ * True when Next has a rendered copy of `pathname` on disk: Next 16's
+ * `<distDir>/server/route-cache/APP_PAGE/<sha256(page)>/$<path>.html`, or the
+ * older `<distDir>/server/app/<path>.html`. Only called for a path whose id or
+ * list pageDataRead already accepted; a layout Next no longer uses finds
+ * nothing, which keeps the 503.
+ */
+export function hasIsrCopy(
+  pathname: string,
+  // A runtime lookup, not a build input: turbopackIgnore keeps Turbopack's
+  // file tracing from copying the whole project into the standalone output.
+  distDir = join(/* turbopackIgnore: true */ process.cwd(), process.env.NEXT_DIST_DIR || ".next"),
+): boolean {
+  const page = ISR_PAGES[pathname.split("/")[1] ?? ""];
+  if (!page) return false;
+  const server = resolve(distDir, "server");
+  const owner = createHash("sha256").update(page).digest("hex");
+  const candidates = [
+    resolve(server, "route-cache", "APP_PAGE", owner, `$${pathname}.html`),
+    resolve(server, "app", `.${pathname}.html`),
+  ];
+  return candidates.some((file) => {
+    if (!file.startsWith(server + sep)) return false;
+    try {
+      return existsSync(file);
+    } catch {
+      return false;
+    }
+  });
 }
 
 function escapeHtml(value: string) {
@@ -81,13 +127,12 @@ export async function gatePage(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     // Anything other than "the backend did not answer" is left to the page.
     if (!isBackendUnavailable(error)) return NextResponse.next();
+    // Next still holds this page on disk (a restart emptied the memo): it
+    // serves that copy, fresh or stale, and keeps it if regeneration fails.
+    if (hasIsrCopy(request.nextUrl.pathname)) return NextResponse.next();
     return new NextResponse(unavailablePage(request.nextUrl.pathname), {
       status: 503,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Retry-After": String(RETRY_AFTER_SECONDS),
-      },
+      headers: unavailableHeaders(503, { "Content-Type": "text/html; charset=utf-8" }),
     });
   }
 }

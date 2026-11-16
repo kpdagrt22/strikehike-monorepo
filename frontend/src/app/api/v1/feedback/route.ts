@@ -1,4 +1,5 @@
 import { networkHash } from "@/lib/server/netHash";
+import { unavailableHeaders } from "@/lib/server/unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,10 @@ function sameOrigin(request: Request) {
 function json(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: unavailableHeaders(status, {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    }),
   });
 }
 
@@ -59,10 +63,14 @@ export async function POST(request: Request) {
     const text = await response.text();
     return new Response(text, {
       status: response.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-      },
+      headers: unavailableHeaders(
+        response.status,
+        {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+        response.headers.get("retry-after"),
+      ),
     });
   } catch {
     return json(503, { detail: "Feedback unavailable" });

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from astro_finance.analytics import retention
 from astro_finance.analytics import store as store_module
 from astro_finance.analytics.schema import validate_batch
 from astro_finance.analytics.store import AnalyticsStore, DailyCounter, TokenBucket
@@ -334,3 +338,195 @@ def test_limit_maps_stay_bounded():
     for index in range(1_000):
         counter.take(f"key-{index}", 1, "2026-11-05")
     assert len(counter.counts) <= 100
+
+
+# --- the retention purge on a clock (analytics/retention.py) ------------------
+
+DAY_MS = 86_400_000
+NOW_MS = 1_700_000_000_000  # 2023-11-15 03:43 IST
+
+
+def _seed_old_and_recent(store, now):
+    """One row per table just past the window and one inside it, all written
+    before `now`'s IST day, so no write on that day runs the purge."""
+    old = now - (store_module.RETENTION_DAYS + 1) * DAY_MS
+    recent = now - 10 * DAY_MS
+    put(store, batch(aid="O" * 22), net="old", now_ms=old)
+    put(store, batch(aid="R" * 22), net="recent", now_ms=recent)
+    assert store.add_feedback("old note", "/", "abc1234", "fb-old", now_ms=old)
+    assert store.add_feedback("recent note", "/", "abc1234", "fb-recent", now_ms=recent)
+    assert store.add_csp_report("script-src", "https://x.example", "/", "csp-old", now_ms=old)
+    assert store.add_csp_report("script-src", "https://x.example", "/", "csp-recent", now_ms=recent)
+    for table in ("events", "feedback", "csp_reports"):
+        assert _count(store, table) == 2
+    return old, recent
+
+
+def _received(store, table):
+    return [row[0] for row in store.connection.execute(f"SELECT received_at FROM {table} ORDER BY received_at")]
+
+
+def test_the_scheduled_purge_runs_on_a_day_without_writes(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        _old, recent = _seed_old_and_recent(store, NOW_MS)
+        assert store.purge_expired(now_ms=NOW_MS) is True
+        for table in ("events", "feedback", "csp_reports"):
+            assert _received(store, table) == [recent], table
+        recorded = store.connection.execute(
+            "SELECT value FROM meta WHERE key='last_purge_day'"
+        ).fetchone()[0]
+        assert recorded == store_module._day(datetime.fromtimestamp(NOW_MS / 1000, tz=timezone.utc))
+    finally:
+        store.close()
+
+
+def test_the_scheduled_purge_is_idempotent_and_once_per_ist_day(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        _seed_old_and_recent(store, NOW_MS)
+        assert store.purge_expired(now_ms=NOW_MS) is True
+        # Again the same day: nothing to do, nothing changes.
+        assert store.purge_expired(now_ms=NOW_MS + 3_600_000) is False
+        assert _count(store) == 1
+        # A row that is already old but arrives later that day (a restored
+        # copy) waits for the next IST day's purge, as with the write path.
+        store.connection.execute(
+            "INSERT INTO feedback(received_at, day_ist, path, message, app_version) "
+            "VALUES(?, '2022-01-01', '/', 'restored', 'abc1234')",
+            (NOW_MS - 500 * DAY_MS,),
+        )
+        store.connection.commit()
+        assert store.purge_expired(now_ms=NOW_MS + 2 * 3_600_000) is False
+        assert _count(store, "feedback") == 2
+        # A write later the same day finds the purge done.
+        put(store, batch(aid="W" * 22), net="later", now_ms=NOW_MS + 3 * 3_600_000)
+        assert _count(store, "feedback") == 2
+        assert store.purge_expired(now_ms=NOW_MS + DAY_MS) is True
+        assert _count(store, "feedback") == 1
+    finally:
+        store.close()
+
+
+def test_the_scheduled_purge_waits_for_the_store_lock(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        _seed_old_and_recent(store, NOW_MS)
+        result: dict[str, bool] = {}
+        with store.lock:
+            worker = threading.Thread(
+                target=lambda: result.setdefault("ran", store.purge_expired(now_ms=NOW_MS))
+            )
+            worker.start()
+            worker.join(timeout=0.3)
+            assert worker.is_alive(), "the purge ran while a write held the store lock"
+            assert _count(store) == 2
+        worker.join(timeout=10)
+        assert result == {"ran": True}
+        assert _count(store) == 1
+    finally:
+        store.close()
+
+
+def test_the_scheduled_purge_keeps_todays_csp_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(store_module, "CSP_DAILY_CAP", 2)
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    try:
+        for index in range(2):
+            assert store.add_csp_report("img-src", "https://y.example", "/", f"n{index}", now_ms=NOW_MS)
+        # Make today's purge due again, so the scheduled one really runs.
+        store.connection.execute("UPDATE meta SET value='2000-01-01' WHERE key='last_purge_day'")
+        store.connection.commit()
+        assert store.purge_expired(now_ms=NOW_MS + 60_000) is True
+        # The purge leaves today's sample alone: the day's cap is still full.
+        assert store.add_csp_report("img-src", "https://y.example", "/", "n3", now_ms=NOW_MS + 120_000)
+        assert _count(store, "csp_reports") == 2
+        assert store_module.RETENTION_DAYS == 395
+    finally:
+        store.close()
+
+
+def test_purge_if_due_never_creates_a_database(tmp_path, monkeypatch):
+    path = tmp_path / "absent" / "analytics.sqlite"
+    monkeypatch.setenv("ANALYTICS_DB", str(path))
+    monkeypatch.setattr(store_module, "_store", None)
+    assert retention.purge_if_due(now_ms=NOW_MS) is None
+    assert not path.parent.exists()
+    assert store_module._store is None
+
+
+def test_purge_if_due_purges_the_shared_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANALYTICS_DB", str(tmp_path / "analytics.sqlite"))
+    monkeypatch.setattr(store_module, "_store", None)
+    shared = store_module.get_store()
+    try:
+        _seed_old_and_recent(shared, NOW_MS)
+        assert retention.purge_if_due(now_ms=NOW_MS) is True
+        # The same instance (and lock) the ingest, CSP and feedback routes use.
+        assert store_module.get_store() is shared
+        assert _count(shared) == 1
+        assert retention.purge_if_due(now_ms=NOW_MS) is False
+    finally:
+        shared.close()
+
+
+def test_the_timer_purges_at_startup_then_on_each_interval(monkeypatch):
+    calls: list[float] = []
+
+    def fake_purge(now_ms=None):
+        calls.append(time.monotonic())
+        if len(calls) == 2:
+            raise sqlite3.OperationalError("database is locked")
+        return True
+
+    monkeypatch.setattr(retention, "purge_if_due", fake_purge)
+    app = FastAPI()
+    retention.install(app, interval=0.02)
+    with TestClient(app):
+        deadline = time.monotonic() + 10
+        while len(calls) < 4 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        # Startup, a failed check that did not stop the timer, and more after it.
+        assert len(calls) >= 4
+    stopped = len(calls)
+    time.sleep(0.2)
+    assert len(calls) == stopped, "shutdown did not stop the timer"
+
+
+def test_startup_purges_a_store_with_no_write_today(tmp_path, monkeypatch):
+    path = tmp_path / "analytics.sqlite"
+    now = int(time.time() * 1000)
+    seed = AnalyticsStore(path)
+    try:
+        _old, recent = _seed_old_and_recent(seed, now)
+    finally:
+        seed.close()
+    monkeypatch.setenv("ANALYTICS_DB", str(path))
+    monkeypatch.setattr(store_module, "_store", None)
+    app = FastAPI()
+    retention.install(app)
+    try:
+        with TestClient(app):
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                con = sqlite3.connect(path)
+                try:
+                    rows = [r[0] for r in con.execute("SELECT received_at FROM events")]
+                finally:
+                    con.close()
+                if rows == [recent]:
+                    break
+                time.sleep(0.05)
+            assert rows == [recent]
+    finally:
+        if store_module._store is not None:
+            store_module._store.close()
+
+
+def test_the_api_server_starts_and_stops_the_retention_timer():
+    from api_server import app as api_app
+
+    startup = [handler.__name__ for handler in api_app.router.on_startup]
+    shutdown = [handler.__name__ for handler in api_app.router.on_shutdown]
+    assert "start_analytics_retention" in startup
+    assert "stop_analytics_retention" in shutdown

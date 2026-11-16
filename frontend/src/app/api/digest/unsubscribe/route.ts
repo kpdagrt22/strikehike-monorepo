@@ -64,7 +64,11 @@ export async function POST(request: Request) {
         },
       },
     );
-    return passThrough(response.status, await response.text());
+    return passThrough(
+      response.status,
+      await response.text(),
+      response.headers.get("retry-after"),
+    );
   } catch {
     return json(503, { detail: "Digest unavailable" });
   }

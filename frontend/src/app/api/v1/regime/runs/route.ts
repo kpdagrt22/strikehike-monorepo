@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unavailableHeaders } from "@/lib/server/unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,10 @@ export async function GET(request: Request) {
     if (!response.ok) {
       return NextResponse.json(
         payload ?? { error: "Regime runs service is unavailable." },
-        { status: response.status },
+        {
+          status: response.status,
+          headers: unavailableHeaders(response.status, {}, response.headers.get("retry-after")),
+        },
       );
     }
 
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json(
       { error: "Regime runs service is unavailable." },
-      { status: 503 },
+      { status: 503, headers: unavailableHeaders(503) },
     );
   } finally {
     clearTimeout(timer);
