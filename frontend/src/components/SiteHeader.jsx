@@ -61,14 +61,20 @@ function NakshatraHalo() {
 const GLASS =
   "border-black/10 bg-white/45 shadow-(--sh-shadow-float) backdrop-blur-2xl dark:border-white/10 dark:bg-black/40";
 
-function Brand({ halo }) {
+// On the home page the info button takes the top-right corner, so on phones
+// the sound and menu buttons start further left and the brand pill stops
+// where they start; when a reader's wider text spacing (WCAG 1.4.12) needs
+// more room, ".com" wraps under the name instead of sliding beneath the
+// buttons. At normal spacing the pill is narrower than the cap and nothing
+// changes.
+function Brand({ halo, home }) {
   return (
     <Link
       href="/"
       prefetch={false}
       aria-label="strikehike.com - home"
       data-shell="brand"
-      className={`pointer-events-auto absolute left-3 top-3 inline-flex h-12 items-center rounded-full border pr-4 max-[360px]:pr-3 text-[#14121a] transition-[background-color,border-color,scale] duration-(--sh-dur-micro) hover:border-[#f05d49]/35 hover:bg-white/65 focus-visible:border-[#f05d49]/35 focus-visible:bg-white/65 active:scale-[0.97] sm:left-5 sm:top-5 dark:text-[#f2ede4] dark:hover:border-[#ff8b77]/30 dark:hover:bg-black/55 dark:focus-visible:border-[#ff8b77]/30 dark:focus-visible:bg-black/55 ${GLASS}`}
+      className={`pointer-events-auto absolute left-3 top-3 inline-flex h-12 items-center rounded-full border pr-4 max-[360px]:pr-3 ${home ? "max-sm:max-w-[calc(100vw-10.5rem)]" : ""} text-[#14121a] transition-[background-color,border-color,scale] duration-(--sh-dur-micro) hover:border-[#f05d49]/35 hover:bg-white/65 focus-visible:border-[#f05d49]/35 focus-visible:bg-white/65 active:scale-[0.97] sm:left-5 sm:top-5 dark:text-[#f2ede4] dark:hover:border-[#ff8b77]/30 dark:hover:bg-black/55 dark:focus-visible:border-[#ff8b77]/30 dark:focus-visible:bg-black/55 ${GLASS}`}
     >
       <span className="relative grid h-[46px] w-[46px] shrink-0 place-items-center">
         <Image
@@ -82,7 +88,7 @@ function Brand({ halo }) {
         />
         {halo ? <NakshatraHalo /> : null}
       </span>
-      <span className="ml-0.5 inline-flex items-baseline">
+      <span className="ml-0.5 inline-flex flex-wrap items-baseline">
         <span className="text-strong font-semibold tracking-[-0.03em] max-[360px]:text-body">
           strikehike
         </span>
@@ -157,7 +163,7 @@ export function SiteHeader() {
         />
       ) : null}
 
-      <Brand halo={open} />
+      <Brand halo={open} home={view.href === "/"} />
 
       {/* Desktop: the five views, always present, centred in the space
           between the brand and the menu. */}

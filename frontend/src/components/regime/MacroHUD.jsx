@@ -150,9 +150,12 @@ export function MacroHUD({
             <div className="flex items-end gap-1.5 sm:gap-2">
               {/* A fixed five-character box (a signed score with one decimal,
                   "+22.4"), always filled (shorter scores are padded): digits
-                  change in place and "/ +50" never moves while scrubbing. */}
+                  change in place and "/ +50" never moves while scrubbing.
+                  A minimum width, not a fixed one: with a reader's wider
+                  letter spacing (WCAG 1.4.12) the box grows instead of the
+                  score running into "/ +50". */}
               <span
-                className="inline-block w-[calc(5ch-0.375em)] text-right font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] tabular-nums sm:text-[3.5rem]"
+                className="inline-block min-w-[calc(5ch-0.375em)] shrink-0 text-right font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] tabular-nums sm:text-[3.5rem]"
                 style={{ color: tone.color }}
               >
                 {padReadout(formatSigned(point?.core_index), 5)}
