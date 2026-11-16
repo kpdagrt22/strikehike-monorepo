@@ -18,7 +18,7 @@ export function RegimeBoot({ summary }: { summary: RegimeSummary | null }) {
         </p>
         <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
           <div className="flex items-end gap-1.5 sm:gap-2">
-            <span className="inline-block w-[calc(5ch-0.375em)] text-right font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] tabular-nums text-(--sh-text-1) sm:text-[3.5rem]">
+            <span className="inline-block min-w-[calc(5ch-0.375em)] shrink-0 text-right font-mono text-[2.9rem] font-medium leading-[0.78] tracking-[-0.075em] tabular-nums text-(--sh-text-1) sm:text-[3.5rem]">
               {padReadout(formatSigned(latest?.score), 5)}
             </span>
             <span className="pb-1 font-mono text-micro text-black/60 dark:text-white/60">
