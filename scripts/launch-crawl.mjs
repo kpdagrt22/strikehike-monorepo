@@ -314,7 +314,7 @@ const summary = {
 const markdown = [
   `## LAUNCH-crawl · ${baseUrl} · ${summary.crawled_at}`,
   "",
-  `Sitemap ${summary.sitemap_status}; ${summary.pages} URLs crawled (${summary.html_pages} HTML); seeded from sitemap and internal links at 2 req/s.`,
+  `Sitemap ${summary.sitemap_status}; ${summary.pages} URLs crawled (${summary.html_pages} HTML); seeded from sitemap and internal links at ${(1000 / RATE_MS).toFixed(0)} req/s.`,
   "",
   "| Check | Count |",
   "|---|---:|",
