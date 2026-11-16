@@ -605,7 +605,7 @@ def _activity_card(roundup: dict[str, Any], base_url: str) -> str:
         closest_html = (
             f'<p class="sh-muted" style="margin:0 0 6px;{SANS}font-size:14px;'
             f'color:{MUTED};">Closest past sky to {escape(for_label)}: '
-            f'<a href="{_attr(_join(base_url, closest_path))}" '
+            f'<a href="{_attr(_join(base_url, closest_path))}" class="sh-muted" '
             f'style="color:{MUTED};">{escape(str(closest.get("name") or "past date"))}</a>, '
             f'{escape(_human_date(closest.get("date")))} '
             f'({escape(str(closest.get("similarity_percent") or ""))}% geometry match).'
@@ -701,7 +701,7 @@ def _footer(
         ledger_url = f"{base_url.rstrip('/')}/ledger"
         ledger_html = (
             f'<p class="sh-muted" style="margin:0 0 4px;{SANS}font-size:14px;'
-            f'color:{MUTED};"><a href="{_attr(ledger_url)}" style="color:{MUTED};'
+            f'color:{MUTED};"><a href="{_attr(ledger_url)}" class="sh-muted" style="color:{MUTED};'
             f'text-decoration:underline;">Ledger #{escape(str(ledger["seq"]))} · '
             f'{escape(str(ledger["hash"])[:12])}</a></p>'
             f'<p class="sh-muted" style="margin:0 0 10px;{SANS}font-size:14px;'
@@ -722,7 +722,7 @@ def _footer(
         f'color:{MUTED};">{escape(WHY)}</p>'
         f"{ledger_html}"
         f'<p style="margin:0 0 8px;{SANS}font-size:14px;">'
-        f'<a href="{_attr(unsubscribe_url)}" style="color:{MUTED};'
+        f'<a href="{_attr(unsubscribe_url)}" class="sh-muted" style="color:{MUTED};'
         f'text-decoration:underline;">Unsubscribe in one click</a></p>'
         f"{postal}</div>"
     )
