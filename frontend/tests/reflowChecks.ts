@@ -266,6 +266,65 @@ export async function findOverlappingText(page: Page) {
   });
 }
 
+// A floating layer (the home page's first-visit hint) must not sit over any
+// text or control outside itself. findOverlappingText compares a fixed layer
+// only with its own text, by design, so a layer that floats over the page is
+// checked here on its own: every visible text line and every visible control
+// whose box it overlaps by more than 1 px both ways is reported. Screen-reader
+// only text and boxes that fill most of the viewport (the sky canvas) are not
+// counted.
+export async function findCoveredByLayer(page: Page, selector: string) {
+  return page.evaluate((layerSelector) => {
+    const layer = document.querySelector(layerSelector);
+    if (!layer) return [`no element matches ${layerSelector}`];
+    const box = layer.getBoundingClientRect();
+    const covers = (rect: DOMRect) =>
+      Math.min(rect.right, box.right) - Math.max(rect.left, box.left) > 1 &&
+      Math.min(rect.bottom, box.bottom) - Math.max(rect.top, box.top) > 1;
+    const shown = (element: Element) => {
+      if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) {
+        return false;
+      }
+      if (element.closest('[aria-hidden="true"], .sr-only')) return false;
+      const rect = element.getBoundingClientRect();
+      return rect.width > 1 && rect.height > 1;
+    };
+    const label = (element: Element) =>
+      `${element.tagName.toLowerCase()} "${(
+        element.getAttribute("aria-label") ??
+        element.textContent ??
+        ""
+      )
+        .trim()
+        .slice(0, 28)}"`;
+
+    const found: string[] = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = (node.textContent ?? "").trim();
+      const owner = node.parentElement;
+      if (!text || !owner || layer.contains(owner)) continue;
+      if (owner.closest("svg, script, style, noscript, template")) continue;
+      if (!shown(owner)) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      if ([...range.getClientRects()].some((rect) => rect.width >= 2 && rect.height >= 2 && covers(rect))) {
+        found.push(`text in ${label(owner)}: "${text.slice(0, 28)}"`);
+      }
+    }
+    const area = window.innerWidth * window.innerHeight;
+    for (const control of document.querySelectorAll(
+      'a[href], button, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])',
+    )) {
+      if (layer.contains(control) || control.contains(layer) || !shown(control)) continue;
+      const rect = control.getBoundingClientRect();
+      if (rect.width * rect.height > area / 2) continue;
+      if (covers(rect)) found.push(`control ${label(control)}`);
+    }
+    return found.slice(0, 8);
+  }, selector);
+}
+
 // Lets layout settle after a style change: two frames, then any finite
 // running animations (capped at 2 s), then a short pause for scripts that
 // re-measure on resize.
