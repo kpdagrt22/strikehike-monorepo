@@ -13,7 +13,13 @@ import { createLastGoodStore, type LastGoodStore } from "./lastGood";
 
 const BACKEND = process.env.CHRONO_API_URL?.replace(/\/+$/, "");
 const TIMEOUT_MS = 8_000;
-const FRESH_MS = 60_000;
+// An event is small and quick: refreshed after a minute, as before. The atlas is
+// a weekly dataset that takes the backend seconds of CPU to validate and
+// serialise, and other requests wait meanwhile (a 3 s /api/digest/status probe
+// timed out behind a background refresh in a local @deploy run): it is
+// refreshed every 30 minutes.
+const EVENT_FRESH_MS = 60_000;
+const ATLAS_FRESH_MS = 30 * 60_000;
 const GLOBAL_KEY = "__strikehikePageData";
 
 type Stores = { atlas: LastGoodStore; events: LastGoodStore };
@@ -77,10 +83,10 @@ async function fetchEvent(id: string): Promise<EventDetailPayload | null> {
 
 /** The weekly atlas (`view=atlas`); throws BackendUnavailableError, never returns null. */
 export function readRegimeAtlas(): Promise<RegimeAtlas> {
-  return stores().atlas.read("atlas", FRESH_MS, fetchAtlas, "The regime atlas");
+  return stores().atlas.read("atlas", ATLAS_FRESH_MS, fetchAtlas, "The regime atlas");
 }
 
 /** One event, or null when the bundle has no such event; throws BackendUnavailableError. */
 export function readEvent(id: string): Promise<EventDetailPayload | null> {
-  return stores().events.read(id, FRESH_MS, () => fetchEvent(id), `Event ${id}`);
+  return stores().events.read(id, EVENT_FRESH_MS, () => fetchEvent(id), `Event ${id}`);
 }
