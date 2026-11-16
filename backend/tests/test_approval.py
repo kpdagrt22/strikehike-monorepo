@@ -68,7 +68,7 @@ def _setup(
     ledger = root / "frontend" / "content" / "ledger" / "ledger.jsonl"
     ledger.parent.mkdir(parents=True)
     shutil.copyfile(REAL_LEDGER, ledger)
-    roundup = _write_roundup(root, "2026-W48", approved=approved)
+    roundup = _write_roundup(root, "2099-W01", approved=approved)
     _git(root, "init")
     _git(root, "config", "user.email", "test@example.com")
     _git(root, "config", "user.name", "Test")
@@ -82,7 +82,7 @@ def test_approve_flips_one_range_appends_and_verifies(tmp_path):
     original = roundup.read_bytes()
     before = read_entries(ledger)
 
-    result = approve_roundup("2026-W48", repo_root=root)
+    result = approve_roundup("2099-W01", repo_root=root)
     approved = roundup.read_bytes()
     assert approved == original.replace(
         b'"approved": false', b'"approved": true', 1
@@ -93,12 +93,12 @@ def test_approve_flips_one_range_appends_and_verifies(tmp_path):
     entries = read_entries(ledger)
     assert len(entries) == len(before) + 1
     entry = entries[-1]
-    assert entry["week"] == "2026-W48"
+    assert entry["week"] == "2099-W01"
     assert entry["roundup_sha256"] == result["sha256"]
     assert verify_file(ledger) == entries
 
     with pytest.raises(LedgerError, match="already approved"):
-        approve_roundup("2026-W48", repo_root=root)
+        approve_roundup("2099-W01", repo_root=root)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -111,23 +111,23 @@ def test_approve_regenerates_llms_with_the_new_week(tmp_path):
     script.write_text(
         "import { readFile, writeFile } from 'node:fs/promises';\n"
         "const data = JSON.parse(await readFile("
-        "'content/roundups/2026-W48.json', 'utf8'));\n"
+        "'content/roundups/2099-W01.json', 'utf8'));\n"
         "await writeFile('public/llms.txt', "
         "`Latest: ${data.week} approved=${data.approved}\\n`);\n",
         encoding="utf-8",
     )
 
-    approve_roundup("2026-W48", repo_root=root)
+    approve_roundup("2099-W01", repo_root=root)
 
     text = (frontend / "public" / "llms.txt").read_text(encoding="utf-8")
-    assert "2026-W48" in text
+    assert "2099-W01" in text
     assert "approved=true" in text
 
 
 def test_approve_refuses_an_already_approved_week(tmp_path):
     root, _, _ = _setup(tmp_path, approved=True)
     with pytest.raises(LedgerError, match="already approved"):
-        approve_roundup("2026-W48", repo_root=root)
+        approve_roundup("2099-W01", repo_root=root)
 
 
 def test_approve_refuses_other_roundup_changes(tmp_path):
@@ -136,7 +136,7 @@ def test_approve_refuses_other_roundup_changes(tmp_path):
         roundup.read_bytes().replace(b'"schema": 2', b'"schema": 3', 1)
     )
     with pytest.raises(LedgerError, match="roundup has uncommitted changes"):
-        approve_roundup("2026-W48", repo_root=root)
+        approve_roundup("2099-W01", repo_root=root)
 
 
 def test_approve_refuses_an_uncommitted_ledger(tmp_path):
@@ -145,7 +145,7 @@ def test_approve_refuses_an_uncommitted_ledger(tmp_path):
     with pytest.raises(
         LedgerError, match="ledger.jsonl has uncommitted changes"
     ):
-        approve_roundup("2026-W48", repo_root=root)
+        approve_roundup("2099-W01", repo_root=root)
 
 
 def test_approve_refuses_a_week_that_already_has_a_ledger_line(tmp_path):
@@ -157,19 +157,19 @@ def test_approve_refuses_a_week_that_already_has_a_ledger_line(tmp_path):
         raw = json.dumps(data, indent=2).encode("utf-8") + b"\n"
         return data, normalise_newlines(raw)
 
-    append_entry("2026-W48", path=ledger, fetch=fake)
+    append_entry("2099-W01", path=ledger, fetch=fake)
     _git(root, "add", ".")
     _git(root, "commit", "-m", "existing line")
 
     with pytest.raises(LedgerError, match="already has a ledger line"):
-        approve_roundup("2026-W48", repo_root=root)
+        approve_roundup("2099-W01", repo_root=root)
 
 
 def test_approve_refuses_an_uncommitted_new_roundup(tmp_path):
     root, _, _ = _setup(tmp_path)
-    _write_roundup(root, "2026-W49", approved=False)
+    _write_roundup(root, "2099-W02", approved=False)
     with pytest.raises(LedgerError, match="roundup is not committed"):
-        approve_roundup("2026-W49", repo_root=root)
+        approve_roundup("2099-W02", repo_root=root)
 
 
 def test_approve_refuses_a_missing_week(tmp_path):

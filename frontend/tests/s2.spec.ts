@@ -1,4 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+// The newest approved week in the repository: the hub's "latest" link must
+// follow each approval, so the test reads it rather than naming a week.
+function latestApprovedWeek(): string {
+  const dir = join(process.cwd(), "content", "roundups");
+  const weeks = readdirSync(dir)
+    .filter((name) => /^\d{4}-W\d{2}\.json$/.test(name))
+    .filter((name) => JSON.parse(readFileSync(join(dir, name), "utf8")).approved === true)
+    .map((name) => name.replace(/\.json$/, ""))
+    .sort();
+  return weeks[weeks.length - 1];
+}
 
 // S2: the server HTML carries one JSON-LD graph per page type, the hub and
 // archive link every approved week, and the ledger and week pages have their
@@ -70,7 +84,7 @@ test.describe("S2: JSON-LD and crawlable links", () => {
     await expect(archive.locator('a[href="/this-week/2026-W47"]')).toBeVisible();
     await expect(page.locator("[data-latest-roundup] a").first()).toHaveAttribute(
       "href",
-      "/this-week/2026-W47",
+      `/this-week/${latestApprovedWeek()}`,
     );
   });
 

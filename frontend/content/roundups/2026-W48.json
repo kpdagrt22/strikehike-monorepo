@@ -1,0 +1,158 @@
+{
+  "schema": 2,
+  "week": "2026-W48",
+  "start": "2026-11-23",
+  "end": "2026-11-29",
+  "generated_at": "2026-11-16T17:35:08.949Z",
+  "approved": true,
+  "regime": {
+    "as_of": "2026-11-15",
+    "score": 12.78,
+    "label": "Steady",
+    "previous_score": 13.18,
+    "change": -0.4,
+    "weekly": [
+      {
+        "date": "2026-10-23",
+        "score": 15.76
+      },
+      {
+        "date": "2026-10-30",
+        "score": 14.9
+      },
+      {
+        "date": "2026-11-06",
+        "score": 13.18
+      },
+      {
+        "date": "2026-11-15",
+        "score": 12.78
+      }
+    ]
+  },
+  "themes": [
+    {
+      "id": "finance",
+      "name": "Finance",
+      "events": [
+        {
+          "id": "finance:fred_release_dates:53-2026-11",
+          "name": "Gross Domestic Product (November 2026)",
+          "start_date": "2026-11-25",
+          "start_time": "08:30:00",
+          "timezone": "America/New_York",
+          "start_utc": "2026-11-25T13:30:00Z",
+          "path": "/events/finance~fred_release_dates~53-2026-11"
+        },
+        {
+          "id": "finance:fred_release_dates:54-2026-11",
+          "name": "Personal Income and Outlays (November 2026)",
+          "start_date": "2026-11-25",
+          "start_time": "08:30:00",
+          "timezone": "America/New_York",
+          "start_utc": "2026-11-25T13:30:00Z",
+          "path": "/events/finance~fred_release_dates~54-2026-11"
+        }
+      ]
+    }
+  ],
+  "sky_week_items": [
+    {
+      "kind": "full_moon",
+      "body": "Moon",
+      "at": "2026-11-24T14:53:36Z",
+      "path": "/upcoming/science",
+      "label": "Full moon"
+    }
+  ],
+  "activity": {
+    "daily": [
+      {
+        "date": "2026-11-23",
+        "score": 98
+      },
+      {
+        "date": "2026-11-24",
+        "score": 96
+      },
+      {
+        "date": "2026-11-25",
+        "score": 96
+      },
+      {
+        "date": "2026-11-26",
+        "score": 96
+      },
+      {
+        "date": "2026-11-27",
+        "score": 96
+      },
+      {
+        "date": "2026-11-28",
+        "score": 20
+      },
+      {
+        "date": "2026-11-29",
+        "score": 14
+      }
+    ],
+    "min": 14,
+    "max": 98,
+    "peak_date": "2026-11-23",
+    "closest_past": {
+      "date": "1992-09-16",
+      "name": "Black Wednesday",
+      "category": "Finance",
+      "for_date": "2026-11-23",
+      "similarity_percent": 78.8
+    },
+    "note": "Geometry match compares planet positions only; it predicts nothing."
+  },
+  "next_two_weeks": [
+    {
+      "id": "finance:fred_release_dates:50-2026-12",
+      "name": "Employment Situation (December 2026)",
+      "theme": "Finance",
+      "start_date": "2026-12-04",
+      "start_time": "08:30:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-12-04T13:30:00Z",
+      "path": "/events/finance~fred_release_dates~50-2026-12"
+    },
+    {
+      "id": "finance:curated_upcoming:fomc-2026-12",
+      "name": "Federal Reserve FOMC policy decision",
+      "theme": "Finance",
+      "start_date": "2026-12-09",
+      "start_time": "14:00:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-12-09T19:00:00Z",
+      "path": "/events/finance~curated_upcoming~fomc-2026-12"
+    },
+    {
+      "id": "finance:fred_release_dates:10-2026-12",
+      "name": "Consumer Price Index (December 2026)",
+      "theme": "Finance",
+      "start_date": "2026-12-10",
+      "start_time": "08:30:00",
+      "timezone": "America/New_York",
+      "start_utc": "2026-12-10T13:30:00Z",
+      "path": "/events/finance~fred_release_dates~10-2026-12"
+    }
+  ],
+  "from_record": {
+    "claim_id": "full-moon",
+    "title": "The full moon and the market",
+    "result": "No meaningful difference in this record.",
+    "result_code": "no_meaningful_difference",
+    "path": "/tested/full-moon"
+  },
+  "lines": {
+    "regime": "Core Index +12.8 (Steady), −0.4 from the week before.",
+    "dates": "2 dates in 1 theme.",
+    "sky": "1 sky event this week.",
+    "activity": "Sky activity ran 14–98, highest on Mon 23 Nov.",
+    "next": "3 dates in the next two weeks.",
+    "record": "From the record: The full moon and the market — No meaningful difference in this record."
+  }
+}

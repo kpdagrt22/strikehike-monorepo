@@ -40,14 +40,14 @@ Every number on StrikeHike describes the past. Each page shows the date its data
 
 ## This week
 
-- Latest: [Week of 16 Nov 2026 – 22 Nov 2026](https://strikehike.com/this-week/2026-W47).
+- Latest: [Week of 23 Nov 2026 – 29 Nov 2026](https://strikehike.com/this-week/2026-W48).
 - [Archive](https://strikehike.com/this-week) of every approved week.
 - [RSS](https://strikehike.com/this-week/rss.xml).
 
 ## Ledger
 
 - [Published ledger](https://strikehike.com/ledger) and [ledger.jsonl](https://strikehike.com/ledger.jsonl).
-- Latest line: 2026-W47, published 2026-11-14T13:12:14Z, reading 13.2 (Steady).
+- Latest line: 2026-W48, published 2026-11-16T17:35:10Z, reading 12.8 (Steady).
 - Each line carries the SHA-256 of the LF-normalised roundup bytes and the hash of the line before it, so a silent edit is detectable. The ledger records what was published, not performance.
 - The ledger JSONL is published under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
 

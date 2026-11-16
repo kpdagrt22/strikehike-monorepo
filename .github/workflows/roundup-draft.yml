@@ -50,7 +50,11 @@ jobs:
           echo "week=$week" >> "$GITHUB_OUTPUT"
           echo "Drafting $week"
 
-      - name: Refuse to overwrite an approved week
+      # An approved week is never redrafted. When the owner approved a week early (W48 was drafted
+      # and approved on 16 Nov), the scheduled run has nothing to do: it says so and stays green, so
+      # pipeline-health and GitHub's failure email do not cry wolf. The summary still shows the week.
+      - name: Skip a week that is already approved
+        id: approved
         working-directory: frontend
         env:
           WEEK: ${{ steps.week.outputs.week }}
@@ -58,11 +62,14 @@ jobs:
           set -euo pipefail
           file="content/roundups/$WEEK.json"
           if [ -f "$file" ] && grep -q '"approved": true' "$file"; then
-            echo "::error::$WEEK is already approved; refusing to draft over it."
-            exit 1
+            echo "::notice::$WEEK is already approved; nothing to draft."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Draft against production
+        if: steps.approved.outputs.skip != 'true'
         working-directory: frontend
         env:
           ROUNDUP_API_URL: https://strikehike.com
@@ -84,6 +91,7 @@ jobs:
             "frontend/content/roundups/$WEEK.json" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the draft
+        if: steps.approved.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: roundup-${{ steps.week.outputs.week }}
