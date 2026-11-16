@@ -17,6 +17,7 @@
  *
  * State is per server process and starts empty after a restart or deploy.
  */
+import { unavailableHeaders } from "./unavailable.js";
 
 export type RouteLoadResult = {
   status: number;
@@ -233,7 +234,8 @@ const defaultCache = createRouteCache();
 
 export const cachedRoute = defaultCache.cachedRoute;
 
-/** JSON text response; Cache-Control is sent on 200 responses only. */
+/** JSON text response; Cache-Control is sent on 200 responses only, and a
+ *  503 carries Retry-After and no-store (unavailable.js). */
 export function jsonTextResponse(
   result: RouteLoadResult,
   cacheControl: string,
@@ -242,11 +244,14 @@ export function jsonTextResponse(
     "Content-Type": "application/json",
   };
   if (result.status === 200) headers["Cache-Control"] = cacheControl;
-  return new Response(result.body, { status: result.status, headers });
+  return new Response(result.body, {
+    status: result.status,
+    headers: unavailableHeaders(result.status, headers, result.headers?.["Retry-After"]),
+  });
 }
 
 /** Text response that keeps the upstream Content-Type, Cache-Control, ETag and
- *  Content-Disposition. */
+ *  Content-Disposition; a 503 carries Retry-After and no-store. */
 export function textResponse(
   result: RouteLoadResult,
   fallbackContentType: string,
@@ -261,7 +266,10 @@ export function textResponse(
   if (result.headers?.["Content-Disposition"]) {
     headers["Content-Disposition"] = result.headers["Content-Disposition"];
   }
-  return new Response(result.body, { status: result.status, headers });
+  return new Response(result.body, {
+    status: result.status,
+    headers: unavailableHeaders(result.status, headers, result.headers?.["Retry-After"]),
+  });
 }
 
 /** True when an If-None-Match header names this ETag (or is `*`). */

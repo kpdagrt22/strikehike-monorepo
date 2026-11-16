@@ -14,8 +14,10 @@
  * State is per server process and starts empty after a restart or deploy.
  */
 
-/** Seconds a client should wait before asking again after a 503. */
-export const RETRY_AFTER_SECONDS = 60;
+import { RETRY_AFTER_SECONDS, unavailableHeaders } from "./unavailable.js";
+
+/** Seconds a client should wait before asking again after a 503 (unavailable.js). */
+export { RETRY_AFTER_SECONDS };
 
 /** The backend could not answer and there is no earlier copy to serve. */
 export class BackendUnavailableError extends Error {
@@ -39,11 +41,7 @@ export function isBackendUnavailable(error: unknown): error is BackendUnavailabl
 export function serviceUnavailableResponse(body = "Temporarily unavailable\n"): Response {
   return new Response(body, {
     status: 503,
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-store",
-      "Retry-After": String(RETRY_AFTER_SECONDS),
-    },
+    headers: unavailableHeaders(503, { "Content-Type": "text/plain; charset=utf-8" }),
   });
 }
 

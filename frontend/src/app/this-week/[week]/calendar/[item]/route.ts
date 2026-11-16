@@ -4,6 +4,7 @@ import {
   textResponse,
   type RouteLoadResult,
 } from "@/lib/server/routeCache";
+import { unavailableHeaders } from "@/lib/server/unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -71,9 +72,10 @@ export async function GET(
     return new Response(null, { status: 304, headers });
   }
   if (result.status !== 200) {
+    const status = result.status === 422 ? 404 : result.status;
     return new Response(result.body, {
-      status: result.status === 422 ? 404 : result.status,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      status,
+      headers: unavailableHeaders(status, { "Content-Type": "text/plain; charset=utf-8" }),
     });
   }
   return textResponse(result, CONTENT_TYPE);

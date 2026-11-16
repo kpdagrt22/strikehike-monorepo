@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unavailableHeaders } from "@/lib/server/unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,9 @@ function failure(status: number, detail: string) {
     { detail },
     {
       status,
-      headers: {
+      headers: unavailableHeaders(status, {
         "Cache-Control": "no-store",
-      },
+      }),
     },
   );
 }
@@ -42,10 +43,14 @@ export async function GET(request: Request) {
     const body = await response.text();
     return new Response(body || null, {
       status: response.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-      },
+      headers: unavailableHeaders(
+        response.status,
+        {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+        response.headers.get("retry-after"),
+      ),
     });
   } catch {
     return failure(503, "Usage export is unavailable.");

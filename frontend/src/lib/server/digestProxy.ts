@@ -1,4 +1,5 @@
 import { networkHash } from "@/lib/server/netHash";
+import { unavailableHeaders } from "@/lib/server/unavailable";
 
 export const DIGEST_BACKEND = (
   process.env.CHRONO_API_URL ?? "http://127.0.0.1:8000"
@@ -24,16 +25,24 @@ export function proxyHeaders(request: Request) {
 export function json(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: unavailableHeaders(status, {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    }),
   });
 }
 
-export function passThrough(status: number, body: string) {
+/** The backend's status and body; a 503 keeps the backend's Retry-After, else 60 s. */
+export function passThrough(status: number, body: string, retryAfter: string | null = null) {
   return new Response(body || null, {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store",
-    },
+    headers: unavailableHeaders(
+      status,
+      {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      },
+      retryAfter,
+    ),
   });
 }

@@ -10,8 +10,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { eventIdFromSlug } from "@/lib/events/eventId";
 import { findYearList } from "@/lib/events/yearLists";
-import { isBackendUnavailable, RETRY_AFTER_SECONDS } from "./lastGood";
+import { isBackendUnavailable } from "./lastGood";
 import { readEvent, readRegimeAtlas } from "./pageData";
+import { unavailableHeaders } from "./unavailable.js";
 
 /** The backend read a gated path needs before it renders, or null for none. */
 export function pageDataRead(pathname: string): (() => Promise<unknown>) | null {
@@ -83,11 +84,7 @@ export async function gatePage(request: NextRequest): Promise<NextResponse> {
     if (!isBackendUnavailable(error)) return NextResponse.next();
     return new NextResponse(unavailablePage(request.nextUrl.pathname), {
       status: 503,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Retry-After": String(RETRY_AFTER_SECONDS),
-      },
+      headers: unavailableHeaders(503, { "Content-Type": "text/html; charset=utf-8" }),
     });
   }
 }

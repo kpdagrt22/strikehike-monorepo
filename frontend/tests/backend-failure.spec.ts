@@ -23,7 +23,10 @@ const MISSING_EVENT_PATH = "/events/finance~stub_source~missing-2026-12";
 const YEAR_LIST = YEAR_LISTS.find((list) => list.year === "2027" && list.slug === "fomc-meetings")!;
 const YEAR_PATH = `/dates/${YEAR_LIST.year}/${YEAR_LIST.slug}`;
 
-type Mode = "ok" | "fail" | "hang";
+// down: no backend at all (the connection closes unanswered); busy: every call
+// answers 503 with the backend's own Retry-After.
+type Mode = "ok" | "fail" | "hang" | "down" | "busy";
+const BUSY_RETRY_AFTER = "120";
 let mode: Mode = "ok";
 const hits = { atlas: 0 };
 let stub: Server | null = null;
@@ -102,6 +105,15 @@ function send(response: ServerResponse, status: number, body: unknown) {
 }
 
 function handle(request: IncomingMessage, response: ServerResponse) {
+  if (mode === "down") {
+    request.socket.destroy();
+    return;
+  }
+  if (mode === "busy") {
+    response.writeHead(503, { "Content-Type": "application/json", "Retry-After": BUSY_RETRY_AFTER });
+    response.end(JSON.stringify({ detail: "stub busy" }));
+    return;
+  }
   const url = new URL(request.url ?? "/", "http://stub");
   const isAtlas = url.pathname === "/api/v1/regime/macro-history" && url.searchParams.get("view") === "atlas";
   const eventMatch = url.pathname.match(/^\/api\/v1\/events\/([^/]+)$/);
@@ -276,6 +288,84 @@ test.describe("backend failure never reads as a missing page", () => {
       // A stored atlas still answers a missing id with a real 404.
       const missing = await request.get(`${base}/recessions/nber-1800-01`, { maxRedirects: 0 });
       expect(missing.status(), `${next} missing id`).toBe(404);
+    }
+  });
+
+  // OPS-hardening: every 503 the proxy routes answer names Retry-After and is
+  // never cached. None of these routes was read earlier in this server, so no
+  // stored copy can answer for them.
+  const EVENT_SLUG = EVENT_ID.replaceAll(":", "~");
+  const API_GETS = [
+    "/api/v1/events/upcoming",
+    "/api/v1/events/health",
+    `/api/v1/events/${EVENT_SLUG}`,
+    "/api/v1/regime/macro-history?resolution=weekly",
+    "/api/v1/regime/cases",
+    "/api/v1/regime/cases/today/path",
+    "/api/v1/regime/crypto-milestones",
+    "/api/v1/regime/forecast",
+    "/api/v1/regime/runs",
+    "/api/v1/patterns",
+    "/api/v1/sky/week?start=2026-11-16",
+    "/api/events",
+    "/api/forecast-ladder",
+    "/api/digest/status",
+    "/api/v1/usage/weekly?week=2026-W46",
+    "/calendar/all.ics",
+    `/calendar/event/${EVENT_SLUG}.ics`,
+    "/this-week/2026-W46/calendar.ics",
+  ];
+  const API_POSTS: Array<[string, string]> = [
+    ["/api/digest/subscribe", JSON.stringify({ email: "reader@example.org" })],
+    ["/api/digest/unsubscribe?t=stub", "List-Unsubscribe=One-Click"],
+    ["/api/v1/feedback", JSON.stringify({ message: "stub", path: "/" })],
+  ];
+
+  async function expectRetryAfter(
+    response: Awaited<ReturnType<APIRequestContext["get"]>>,
+    label: string,
+    retryAfter: string,
+  ) {
+    expect(response.status(), `${label} status`).toBe(503);
+    expect(response.headers()["retry-after"], `${label} Retry-After`).toBe(retryAfter);
+    expect(response.headers()["cache-control"], `${label} Cache-Control`).toBe("no-store");
+  }
+
+  function post(request: APIRequestContext, path: string, data: string) {
+    return request.post(`${base}${path}`, {
+      data,
+      headers: { Origin: base, "Content-Type": "text/plain" },
+      maxRedirects: 0,
+      timeout: 30_000,
+    });
+  }
+
+  test("with the backend down, every proxy 503 names Retry-After: 60 and no-store", async ({ request }) => {
+    mode = "down";
+    for (const path of API_GETS) {
+      await expectRetryAfter(await request.get(`${base}${path}`, { maxRedirects: 0, timeout: 30_000 }), path, "60");
+    }
+    for (const [path, data] of API_POSTS) {
+      await expectRetryAfter(await post(request, path, data), `POST ${path}`, "60");
+    }
+  });
+
+  test("a backend 503 keeps its own Retry-After where the route passes it through", async ({ request }) => {
+    mode = "busy";
+    for (const path of [
+      "/api/digest/status",
+      "/api/v1/usage/weekly?week=2026-W46",
+      "/api/v1/regime/forecast",
+      "/api/v1/regime/runs",
+    ]) {
+      await expectRetryAfter(await request.get(`${base}${path}`, { maxRedirects: 0 }), path, BUSY_RETRY_AFTER);
+    }
+    for (const [path, data] of API_POSTS) {
+      await expectRetryAfter(await post(request, path, data), `POST ${path}`, BUSY_RETRY_AFTER);
+    }
+    // The cached proxy routes answer their own 503 body: the default applies.
+    for (const path of ["/api/v1/patterns", "/api/v1/events/upcoming", "/calendar/all.ics"]) {
+      await expectRetryAfter(await request.get(`${base}${path}`, { maxRedirects: 0 }), path, "60");
     }
   });
 });
