@@ -304,6 +304,12 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       bundle_dir: ${{ steps.version.outputs.bundle_dir }}
     steps:
+      - name: Check out the publish script
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+
       - name: Download the gated bundle artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -326,6 +332,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "bundle_dir=$(dirname "$manifest")" >> "$GITHUB_OUTPUT"
 
+      # Idempotent: a complete release for the same version is skipped (the
+      # same week built twice has the same content-hash version); a draft or a
+      # release missing an asset fails red instead of being skipped. Tested by
+      # backend/tests/events/test_publish_release.py.
       - name: Create the release idempotently
         shell: bash
         env:
@@ -333,24 +343,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.version.outputs.version }}
           BUNDLE_DIR: ${{ steps.version.outputs.bundle_dir }}
-        run: |
-          set -euo pipefail
-          tag="events-bundle-$VERSION"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; skipping."
-            exit 0
-          fi
-          tarball="$RUNNER_TEMP/events-bundle-$VERSION.tar.gz"
-          tar -czf "$tarball" -C "$BUNDLE_DIR" .
-          cp "$BUNDLE_DIR/manifest.json" "$RUNNER_TEMP/manifest.json"
-          cd "$RUNNER_TEMP"
-          sha256sum "events-bundle-$VERSION.tar.gz" manifest.json > SHA256SUMS
-          gh release create "$tag" \
-            "events-bundle-$VERSION.tar.gz" \
-            manifest.json \
-            SHA256SUMS \
-            --title "Events bundle $VERSION" \
-            --notes "Weekly events bundle $VERSION. Manifest publishable=true."
+          WORK_DIR: ${{ runner.temp }}
+        run: bash scripts/publish_events_release.sh
 
   activate:
     name: Activate events bundle

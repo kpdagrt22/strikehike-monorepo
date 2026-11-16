@@ -9,6 +9,7 @@ from astro_finance.events.gates import (
     gate_dates,
     gate_distribution,
     gate_duplicates,
+    gate_empty_result,
     gate_final_schema,
     gate_freshness,
     gate_historical,
@@ -16,7 +17,7 @@ from astro_finance.events.gates import (
     gate_safety,
     run_gates,
 )
-from astro_finance.events.models import EventStatus, Theme
+from astro_finance.events.models import EventKind, EventStatus, SourceKind, Theme
 from conftest import NOW, TODAY, build_event, build_run, build_source
 
 
@@ -268,5 +269,73 @@ def test_run_gates_returns_every_gate():
         "duplicate_integrity",
         "source_freshness",
         "distribution_shift",
+        "empty_result",
         "safety",
     }
+
+
+def test_empty_result_gate_passes_a_bundle_with_upcoming_events(tmp_path):
+    result = gate_empty_result(_ctx(tmp_path, [build_event()]))
+    assert result.status == "pass", result.reason
+
+
+def test_empty_result_gate_fails_without_any_active_upcoming_event(tmp_path):
+    # No previous bundle: distribution_shift passes trivially here, so this
+    # gate is the only one that stops an empty first build.
+    historical = build_event(
+        event_id="science:test:seed-2000",
+        kind=EventKind.HISTORICAL,
+    )
+    cancelled = build_event(
+        event_id="science:test:cancelled-2027",
+        status=EventStatus.CANCELLED,
+    )
+    ctx = _ctx(tmp_path, [historical, cancelled])
+    assert gate_distribution(ctx).status == "pass"
+    result = gate_empty_result(ctx)
+    assert result.status == "fail"
+    assert "no active upcoming events" in result.reason
+
+
+def test_empty_result_gate_fails_when_a_computed_source_returns_nothing(tmp_path):
+    # The astronomy and Culture/Religion computations always have dates in
+    # the next 365 days; none means a broken adapter.
+    computed = build_source(source_id="test_source", kind=SourceKind.COMPUTED)
+    ctx = _ctx(
+        tmp_path,
+        [build_event()],
+        source_specs={"test_source": computed},
+        source_runs={"test_source": build_run(records=0)},
+    )
+    result = gate_empty_result(ctx)
+    assert result.status == "fail"
+    assert "test_source: the computed source returned 0 records" in result.reason
+
+
+def test_empty_result_gate_only_warns_when_an_api_calendar_lists_nothing(tmp_path):
+    # FRED lists only the next one or two dates per release; an empty list
+    # keeps the previous dates (lifecycle) and is reported, not fatal.
+    ctx = _ctx(
+        tmp_path,
+        [build_event()],
+        source_runs={"test_source": build_run(records=0)},
+    )
+    result = gate_empty_result(ctx)
+    assert result.status == "pass"
+    assert "test_source: the api source listed 0 dates (warning only" in result.reason
+
+
+def test_empty_result_gate_ignores_a_failed_fetch_and_an_empty_curated_file(tmp_path):
+    # A failed fetch is source_freshness's job (the previous events are kept);
+    # an empty curated file is a legitimate "nothing verified yet".
+    curated = build_source(source_id="curated_source", kind=SourceKind.CURATED)
+    ctx = _ctx(
+        tmp_path,
+        [build_event()],
+        source_specs={"test_source": build_source(), "curated_source": curated},
+        source_runs={
+            "test_source": build_run(fetched=False, records=0, error="HTTP 504"),
+            "curated_source": build_run("curated_source", records=0),
+        },
+    )
+    assert gate_empty_result(ctx).status == "pass"

@@ -52,7 +52,7 @@ def _events(count: int = 3):
 
 
 def _make_release(
-    tmp_path: Path, version: str, events, *, publishable: bool = True
+    tmp_path: Path, version: str, events, *, publishable: bool = True, counted=None
 ) -> Path:
     source = tmp_path / f"source-{version}"
     write_dataset(source, events, today=TODAY)
@@ -61,7 +61,7 @@ def _make_release(
         "schema_version": 1,
         "created_at": NOW.isoformat().replace("+00:00", "Z"),
         "as_of": TODAY.isoformat(),
-        "counts": count_matrix(events),
+        "counts": count_matrix(events if counted is None else counted),
         "files": {
             "events.json": _sha256(source / "events.json"),
             "events.sqlite": _sha256(source / "events.sqlite"),
@@ -150,6 +150,47 @@ def test_second_activation_records_previous_and_rollback_swaps(tmp_path):
     assert (runtime / "current").read_text("utf-8") == f"bundles/{VERSION_A}\n"
     assert (runtime / "previous").read_text("utf-8") == f"bundles/{VERSION_B}\n"
     assert current_bundle_dir(runtime) == runtime / "bundles" / VERSION_A
+
+
+def test_reactivating_the_active_version_keeps_the_rollback_target(tmp_path):
+    # A second publish of the same week activates the version that is already
+    # live. It must not overwrite "previous" with itself, or a rollback after
+    # the duplicate run would have nowhere to go.
+    runtime = _runtime(tmp_path)
+    release_a = _make_release(tmp_path, VERSION_A, _events())
+    release_b = _make_release(tmp_path, VERSION_B, _events(4))
+    activate_bundle(version=VERSION_A, runtime_dir=runtime, release_dir=release_a)
+    activate_bundle(version=VERSION_B, runtime_dir=runtime, release_dir=release_b)
+    live = runtime / "bundles" / VERSION_B / "events.sqlite"
+    live_mtime = live.stat().st_mtime_ns
+
+    again = activate_bundle(
+        version=VERSION_B, runtime_dir=runtime, release_dir=release_b
+    )
+    assert again.version == VERSION_B
+    assert again.pruned == ()
+    assert (runtime / "current").read_text("utf-8") == f"bundles/{VERSION_B}\n"
+    assert (runtime / "previous").read_text("utf-8") == f"bundles/{VERSION_A}\n"
+    # Nothing was re-extracted over the live bundle.
+    assert live.stat().st_mtime_ns == live_mtime
+    assert rollback_bundle(runtime).to_version == VERSION_A
+
+
+def test_an_unsafe_version_or_a_count_mismatch_never_goes_live(tmp_path):
+    runtime = _runtime(tmp_path)
+    release_a = _make_release(tmp_path, VERSION_A, _events())
+    activate_bundle(version=VERSION_A, runtime_dir=runtime, release_dir=release_a)
+
+    with pytest.raises(ActivationError, match="invalid bundle version"):
+        activate_bundle(version="../escape", runtime_dir=runtime, release_dir=release_a)
+
+    # A manifest that counts 4 events over an events file with 2 (a truncated
+    # or emptied bundle) is refused before the pointer moves.
+    short = _make_release(tmp_path, VERSION_B, _events(2), counted=_events(4))
+    with pytest.raises(ActivationError, match="events.json has 2 events, manifest counts say 4"):
+        activate_bundle(version=VERSION_B, runtime_dir=runtime, release_dir=short)
+    assert (runtime / "current").read_text("utf-8") == f"bundles/{VERSION_A}\n"
+    assert not (runtime / "bundles" / VERSION_B).exists()
 
 
 def test_rollback_without_a_previous_bundle_fails(tmp_path):

@@ -1062,6 +1062,28 @@ def test_run_pipeline_refuses_to_write_without_daily_sp500(tmp_path):
     assert not (output / "macro_regime_history.meta.json").exists()
 
 
+def test_a_failed_parquet_write_keeps_the_previous_artifact(tmp_path, monkeypatch):
+    # The artifact is written to <name>.tmp and renamed: a write that dies
+    # part-way (a full disk) leaves the previous parquet readable and whole.
+    path = tmp_path / "macro_regime_history.parquet"
+    previous = pd.DataFrame(
+        {"core_index": [1.0, 2.0]},
+        index=pd.DatetimeIndex(["2026-11-01", "2026-11-08"], tz="UTC", name="date"),
+    )
+    macro_ingestion._write_parquet(previous, path)
+    before = path.read_bytes()
+
+    def half_write(self, target, *args, **kwargs):
+        Path(target).write_bytes(b"PAR1 half a file")
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(pd.DataFrame, "to_parquet", half_write)
+    with pytest.raises(OSError, match="No space left"):
+        macro_ingestion._write_parquet(previous.assign(core_index=[3.0, 4.0]), path)
+    assert path.read_bytes() == before
+    assert pd.read_parquet(path)["core_index"].tolist() == [1.0, 2.0]
+
+
 def test_run_pipeline_reports_stale_yahoo_and_uses_fred_tail(tmp_path, monkeypatch):
     import os
     from datetime import datetime, timezone
