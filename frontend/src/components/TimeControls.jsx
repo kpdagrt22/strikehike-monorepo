@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import crashMarkers from "@/data/astro/crash_markers.json";
-import { DateTimePicker } from "@/components/DateTimePicker";
 import { useMounted } from "@/hooks/useMounted";
 import { dateTravelled, viewOpened } from "@/lib/analytics/events";
 import { categoryTone } from "@/lib/categoryTone";
@@ -14,6 +14,14 @@ import {
   currentUtcDate,
   useChronoStore,
 } from "@/store/chronoStore";
+
+// The precise date and time picker is a dialog behind a click: its code (the
+// dialog, its calendar and focus trap) loads on the first open, not with the
+// page (TBT-4). ssr: false because it only ever renders after that click.
+const DateTimePicker = dynamic(
+  () => import("@/components/DateTimePicker").then((mod) => mod.DateTimePicker),
+  { ssr: false, loading: () => null },
+);
 
 const DAY_MS = 86_400_000;
 const MIN_MS = Date.parse(`${TIMELINE_MIN}T00:00:00Z`);
@@ -229,6 +237,9 @@ export function TimeControls() {
   const [expanded, setExpanded] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Set on the first open: from then on the picker stays mounted, so its exit
+  // animation plays and a second open needs no load.
+  const [pickerUsed, setPickerUsed] = useState(false);
   const mounted = useMounted();
   const selectedDateTime = `${focusedDate}T${focusedTime}`;
 
@@ -593,6 +604,7 @@ export function TimeControls() {
                       event.detail === 0 ? "keyboard" : "click",
                     );
                     setExpanded(true);
+                    setPickerUsed(true);
                     setPickerOpen(true);
                   }}
                   aria-haspopup="dialog"
@@ -683,15 +695,17 @@ export function TimeControls() {
       </AnimatePresence>
       </motion.div>
 
-      <DateTimePicker
-        open={pickerOpen}
-        initialDate={focusedDate}
-        initialTime={focusedTime}
-        minDate={TIMELINE_MIN}
-        maxDate={TIMELINE_MAX}
-        onApply={applyPicker}
-        onClose={closePicker}
-      />
+      {pickerUsed ? (
+        <DateTimePicker
+          open={pickerOpen}
+          initialDate={focusedDate}
+          initialTime={focusedTime}
+          minDate={TIMELINE_MIN}
+          maxDate={TIMELINE_MAX}
+          onApply={applyPicker}
+          onClose={closePicker}
+        />
+      ) : null}
     </>
   );
 }

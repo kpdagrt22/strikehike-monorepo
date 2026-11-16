@@ -556,6 +556,26 @@ test.describe("navigation is one action", () => {
   }
 });
 
+// TBT-4: the picker's code is not in the page's first scripts; it loads on the
+// first open. The dialog must still open, close with Escape and open again.
+test("the precise date picker opens on first use, closes and reopens", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.addInitScript(() => localStorage.setItem("hasSeenIntro", "1"));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await home(page);
+  const timeline = page.locator('[data-hud="timeline"]');
+  const dialog = page.getByRole("dialog", { name: "Choose date and time (UTC)" });
+  await expect(dialog).toHaveCount(0);
+  for (let round = 0; round < 2; round += 1) {
+    await timeline.hover();
+    await page.getByRole("button", { name: /Edit precise UTC date and time/ }).click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+
 test("the hint dismisses with Escape and stays dismissed", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await home(page);

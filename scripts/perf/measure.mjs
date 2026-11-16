@@ -37,6 +37,12 @@ const runs = Math.max(1, Number(arg("runs", "5")) || 5);
 const formFactor = arg("form-factor", "mobile") === "desktop" ? "desktop" : "mobile";
 const outPath = arg("out", "perf-measure.json");
 const markdownPath = arg("markdown", "perf-measure.md");
+// --only=/,/regime measures just those routes (no live event lookup): one run
+// per build in turn makes an interleaved A/B, with the medians taken after.
+const onlyRoutes = arg("only", "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const extraRoutes = arg("routes", "")
   .split(",")
   .map((value) => value.trim())
@@ -146,8 +152,8 @@ function table(data) {
   return `${lines.join("\n")}\n`;
 }
 
-const event = await liveEventRoute();
-const routes = [...DEFAULT_ROUTES, event, ...extraRoutes];
+const event = onlyRoutes.length ? null : await liveEventRoute();
+const routes = onlyRoutes.length ? onlyRoutes : [...DEFAULT_ROUTES, event, ...extraRoutes];
 const collected = [];
 for (const [index, route] of routes.entries()) {
   const url = `${baseUrl}${route}`;
