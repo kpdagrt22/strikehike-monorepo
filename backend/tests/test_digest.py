@@ -817,8 +817,9 @@ def test_render_v2_carries_every_section_and_the_new_subject():
         ledger={"seq": 1, "hash": "a" * 64},
     )
     assert rendered.subject == "StrikeHike weekly · 16–22 Nov 2026 · Core Index +13.2"
-    for heading in ("SKY THIS WEEK", "SKY ACTIVITY", "NEXT TWO WEEKS", "FROM THE RECORD"):
-        assert heading in rendered.text
+    # v3 merges the week's dates and sky events into one THIS WEEK timeline.
+    for heading in ("THIS WEEK", "SKY ACTIVITY", "NEXT TWO WEEKS", "FROM THE RECORD"):
+        assert f"\n{heading}\n" in rendered.text
     assert "Core Index +13.2 (Steady), −1.7 from the week before." in rendered.text
     assert "Latest reading: Sun 8 Nov 2026." in rendered.text
     assert "week of 08 Nov" not in rendered.text
@@ -951,9 +952,7 @@ def test_email_static_images_fit_the_budget():
     assert total <= 150 * 1024
 
 
-def test_render_v2_palette_contrast():
-    from astro_finance.digest import render
-
+def _ratio(foreground: str, background: str) -> float:
     def luminance(value: str) -> float:
         channels = [int(value[index : index + 2], 16) / 255 for index in (1, 3, 5)]
         linear = [
@@ -964,77 +963,246 @@ def test_render_v2_palette_contrast():
         ]
         return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
 
-    def ratio(foreground: str, background: str) -> float:
-        first, second = luminance(foreground), luminance(background)
-        lighter, darker = max(first, second), min(first, second)
-        return (lighter + 0.05) / (darker + 0.05)
-
-    # Dark plates.
-    assert ratio(render.INK, render.BG) >= 4.5
-    assert ratio(render.MUTED, render.CARD) >= 4.5
-    assert ratio(render.MUTED, render.BG) >= 4.5  # the footer sits on the page
-    assert ratio(render.GOLD, render.CARD) >= 4.5
-    assert ratio(render.LIGHT_INK, render.GOLD) >= 4.5
-
-    # Light plates: every text/background pair the light override can produce.
-    assert ratio(render.LIGHT_INK, render.LIGHT_BG) >= 4.5
-    assert ratio(render.LIGHT_INK, render.LIGHT_CARD) >= 4.5
-    assert ratio(render.LIGHT_MUTED, render.LIGHT_CARD) >= 4.5
-    assert ratio(render.LIGHT_MUTED, render.LIGHT_BG) >= 4.5  # the footer
-    assert ratio(render.ACCENT_LIGHT, render.LIGHT_CARD) >= 4.5
-    assert ratio(render.ACCENT_LIGHT, render.LIGHT_BG) >= 4.5
-    # The light chip and the primary button.
-    assert ratio(render.LIGHT_INK, render.GOLD_DEEP) >= 4.5
-    assert ratio(render.LIGHT_INK, render.GOLD) >= 4.5
+    first, second = luminance(foreground), luminance(background)
+    lighter, darker = max(first, second), min(first, second)
+    return (lighter + 0.05) / (darker + 0.05)
 
 
-def test_render_v2_light_override_carries_the_accent_class():
-    from astro_finance.digest import render
-
-    html = render.render_roundup(
-        ROUNDUP_V2,
+def _render_v2(roundup: dict | None = None):
+    return render_roundup(
+        roundup or ROUNDUP_V2,
         unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
         postal_address="1 Test Street, Test City",
         base_url=BASE,
         ledger={"seq": 1, "hash": "a" * 64},
-    ).html
-    assert 'class="sh-accent"' in html
-    assert f".sh-accent{{color:{render.ACCENT_LIGHT}!important;}}" in html
-    assert (
-        f".sh-chip{{background-color:{render.GOLD_DEEP}!important;"
-        f"color:{render.LIGHT_INK}!important;}}" in html
     )
 
 
-def test_render_v2_every_dark_text_colour_has_a_light_override():
-    """An inline dark-palette colour without a light class stays light-on-light.
+def _without_outlook_blocks(html: str) -> str:
+    """Drop the <!--[if mso]> blocks: Outlook on Windows has no dark rules."""
 
-    The footer's unsubscribe and ledger links and the closest-past link once
-    kept #a9a294 on #faf7f2 (2.4:1) in light mode, because an inline colour on
-    the link beats the class on its paragraph.
+    return re.sub(r"<!--\[if mso\]>.*?<!\[endif\]-->", "", html, flags=re.S)
+
+
+def test_render_v2_palette_contrast():
+    """Every text colour keeps 4.5:1 on every plate it can sit on, both modes."""
+
+    from astro_finance.digest import render
+
+    for palette in (render.LIGHT, render.DARK):
+        for text in ("text1", "text2", "text3", "accent", "signal"):
+            # page: header, hero, glance, ledger, footer; card: every card;
+            # soft: the calendar card and the week chip.
+            for plate in ("page", "card", "soft"):
+                assert _ratio(palette[text], palette[plate]) >= 4.5, (text, plate, palette)
+        # The two buttons.
+        assert _ratio(palette["won"], palette["wfill"]) >= 4.5
+        assert _ratio(palette["ion"], palette["ifill"]) >= 4.5
+        # Non-text marks that carry meaning (WCAG 1.4.11): the latest Core
+        # Index bar and the busiest-day bar against the card.
+        assert _ratio(palette["barstrong"], palette["card"]) >= 3
+        assert _ratio(palette["actpeak"], palette["card"]) >= 3
+    # Both modes name the same roles.
+    assert render.LIGHT.keys() == render.DARK.keys()
+
+
+def test_render_v3_dark_rules_reach_every_class():
+    from astro_finance.digest import render
+
+    html = _render_v2().html
+    styles = re.findall(r"<style>(.*?)</style>", html, flags=re.S)
+    # Gmail drops a whole block it can't parse, so the phone rules and the
+    # dark rules live in separate blocks.
+    phone = next(block for block in styles if "max-width:480px" in block)
+    dark = next(block for block in styles if "prefers-color-scheme:dark" in block)
+    assert phone != dark
+    assert "prefers-color-scheme" not in phone
+    for role, cls in render.TEXT_CLASSES.items():
+        assert f"color:{render.DARK[role]}!important" in dark.split(f".{cls}{{", 1)[1].split("}", 1)[0]
+        # Outlook.com recolours with data-ogsc; it gets the same night palette.
+        assert f"[data-ogsc] .{cls}{{color:{render.DARK[role]}!important;}}" in dark
+    for cls, role in (("sb", "page"), ("sc", "card"), ("sw", "soft"), ("bw", "wfill"), ("bi", "ifill")):
+        assert f".{cls}{{background-color:{render.DARK[role]}!important" in dark
+        assert f"[data-ogsb] .{cls}{{background-color:{render.DARK[role]}!important" in dark
+    assert '<meta name="color-scheme" content="light dark" />' in html
+    for cls in ("sb", "sc", "sw", "t1", "t2", "t3", "ta", "ts", "bw", "bi", "bs", "bn", "ba"):
+        assert re.search(rf'class="[^"]*\b{cls}\b', html), cls
+
+
+def test_render_v2_every_dark_text_colour_has_a_light_override():
+    """Every inline text colour carries the class the dark rules target.
+
+    An inline colour beats a class on its parent, so an element without its
+    own class keeps the light colour in dark mode (this once left three
+    footer links at 2.4:1 in light mode, the mirror case).
     """
 
     from astro_finance.digest import render
 
-    html = render.render_roundup(
-        ROUNDUP_V2,
-        unsubscribe_url="https://strikehike.com/api/digest/unsubscribe?t=x",
-        postal_address="1 Test Street, Test City",
-        base_url=BASE,
-        ledger={"seq": 1, "hash": "a" * 64},
-    ).html
-    dark_only = {
-        render.INK.lower(): "sh-ink",
-        render.MUTED.lower(): "sh-muted",
-        render.GOLD.lower(): "sh-accent",
-    }
+    html = _without_outlook_blocks(_render_v2().html)
+    by_colour = {render.LIGHT[role].lower(): cls for role, cls in render.TEXT_CLASSES.items()}
     checked = 0
     for tag in re.findall(r"<[a-z][a-z0-9]*\b[^>]*\bstyle=\"[^\"]*\"[^>]*>", html):
         style = re.search(r'style="([^"]*)"', tag).group(1)
         colour = re.search(r"(?:^|;)\s*color:\s*(#[0-9a-fA-F]{6})", style)
-        if not colour or colour.group(1).lower() not in dark_only:
+        if not colour or colour.group(1).lower() not in by_colour:
             continue
         checked += 1
         classes = (re.search(r'class="([^"]*)"', tag) or [None, ""])[1].split()
-        assert dark_only[colour.group(1).lower()] in classes, tag
-    assert checked > 20
+        assert by_colour[colour.group(1).lower()] in classes, tag
+    assert checked > 60
+
+
+ALL_SKY_KINDS = [
+    {"kind": kind, "body": body, "at": f"2026-11-{17 + index:02d}T10:00:00Z",
+     "path": "/upcoming/science", "label": label}
+    for index, (kind, body, label) in enumerate(
+        [
+            ("new_moon", "Moon", "New moon"),
+            ("first_quarter", "Moon", "First quarter"),
+            ("full_moon", "Moon", "Full moon"),
+            ("last_quarter", "Moon", "Last quarter"),
+            ("ingress", "Sun", "Sun enters Vrishchika"),
+            ("station_retrograde", "Mercury", "Mercury stations retrograde"),
+            ("station_direct", "Mercury", "Mercury stations direct"),
+            ("solar_eclipse", "Sun", "Solar eclipse"),
+            ("lunar_eclipse", "Moon", "Lunar eclipse"),
+            ("season", "Sun", "December solstice"),
+            ("mars_saturn_conjunction", "Mars", "Mars–Saturn conjunction"),
+        ]
+    )
+]
+
+
+def test_render_v3_every_hosted_file_exists_in_public():
+    """Each image and the web font point at a file the next deploy serves.
+
+    v2 asked for moon-full-moon.png for a full moon, which never existed.
+    """
+
+    public = Path(__file__).resolve().parents[2] / "frontend" / "public"
+    roundup = {**ROUNDUP_V2, "sky_week_items": ALL_SKY_KINDS}
+    html = _render_v2(roundup).html
+    urls = re.findall(r'<img src="([^"]+)"', html)
+    urls += re.findall(r"src:url\(([^)]+)\)", html)
+    assert len(set(urls)) >= 14
+    for url in set(urls):
+        assert url.startswith(f"{BASE}/email/"), url
+        assert (public / url[len(BASE) + 1 :]).is_file(), url
+    for name in ("moon-new", "moon-first-quarter", "moon-full", "moon-last-quarter",
+                 "ingress", "station", "eclipse", "season", "orbit", "finance"):
+        assert f"/email/v3/icons/{name}.png" in html, name
+
+
+def test_render_v3_is_email_safe_markup():
+    html = _render_v2().html
+    assert '<html lang="en"' in html
+    assert 'role="article"' in html and 'lang="en"' in html
+    tables = re.findall(r"<table\b[^>]*>", html)
+    assert tables
+    for tag in tables:
+        assert 'role="presentation"' in tag, tag
+    lowered = html.lower()
+    for banned in ("<svg", "display:flex", "display:grid", "<script", "position:absolute"):
+        assert banned not in lowered, banned
+    # The bulletproof buttons: VML for Outlook on Windows, a link elsewhere.
+    assert html.count("<v:roundrect") == 2
+    # A hidden preheader carries the week's facts.
+    assert re.search(r'<div style="display:none;[^"]*">Core Index \+13\.2 Steady', html)
+
+
+def test_render_v3_text_part_reads_in_order():
+    text = _render_v2().text
+    order = [
+        "STRIKEHIKE WEEKLY ROUNDUP · 2026-W47",
+        "AT A GLANCE",
+        "REGIME · CORE INDEX",
+        "Last 4 weekly readings: +16.5 (16 Oct), +15.8 (23 Oct), +14.9 (30 Oct), +13.2 (8 Nov)",
+        "\nTHIS WEEK\n",
+        "\nSKY ACTIVITY\n",
+        "\nNEXT TWO WEEKS\n",
+        "\nSAVE THE DATES\n",
+        "\nFROM THE RECORD\n",
+        "Read this week's roundup: https://strikehike.com/this-week/2026-W47",
+        "Ledger #1 · aaaaaaaaaaaa",
+        "Unsubscribe: https://strikehike.com/api/digest/unsubscribe?t=x",
+        "Postal address: 1 Test Street, Test City",
+    ]
+    positions = [text.index(part) for part in order]
+    assert positions == sorted(positions)
+    assert "<" not in text and "&amp;" not in text
+
+
+def _busy_week(in_week: int, sky: int, upcoming: int) -> dict:
+    base = ROUNDUP_V2["themes"][0]["events"][0]
+    nxt = ROUNDUP_V2["next_two_weeks"][0]
+    return {
+        **ROUNDUP_V2,
+        "themes": [
+            {
+                "id": "finance",
+                "name": "Finance",
+                "events": [
+                    {**base, "id": f"{base['id']}-{i}", "name": f"Release {i}",
+                     "path": f"{base['path']}-{i}"}
+                    for i in range(in_week)
+                ],
+            }
+        ],
+        "sky_week_items": [
+            {**ALL_SKY_KINDS[i % len(ALL_SKY_KINDS)]} for i in range(sky)
+        ],
+        "next_two_weeks": [
+            {**nxt, "id": f"{nxt['id']}-{i}", "path": f"{nxt['path']}-{i}"}
+            for i in range(upcoming)
+        ],
+    }
+
+
+def test_render_v3_busy_weeks_stay_clear_of_the_gmail_clip():
+    """Gmail clips at 102 KB and would hide the footer's unsubscribe link."""
+
+    from astro_finance.digest import render
+
+    normal = _render_v2().html
+    assert "+ Outlook" in normal and "Add to calendar (.ics)" not in normal
+    # A plausible busy week keeps all three calendar actions per date.
+    busy = _render_v2(_busy_week(6, 3, 6)).html
+    assert len(busy.encode("utf-8")) <= render.HTML_BUDGET
+    assert busy.count("+ Outlook") == 15
+    # Past the budget, each date falls back to one .ics action; the week file
+    # still carries every date, and the footer stays in.
+    for shape in ((10, 4, 6), (24, 8, 6)):
+        heavy = _render_v2(_busy_week(*shape)).html
+        assert len(heavy.encode("utf-8")) < 100 * 1024, shape
+        assert "+ Outlook" not in heavy
+        assert heavy.count("Add to calendar (.ics)") == sum(shape)
+        assert "Unsubscribe in one click" in heavy
+        assert "/this-week/2026-W47/calendar.ics" in heavy
+
+
+BANNED_COPY = (
+    # frontend/scripts/check-copy.mjs, plus the email's own no-advice terms.
+    "smart money", "accumulation", "contrarian", "expected to", "is likely to",
+    "we expect", "next week will", "this week will", "will rise", "will fall",
+    "will outperform", "will underperform", "guaranteed", "sure thing",
+    "we predict", "predicts the market", "proves that", "accuracy", "accurate",
+    "signal", "buy", "sell", "recommend", "should invest", "target price",
+)
+
+
+def test_render_v3_copy_is_descriptive_only():
+    from astro_finance.digest import render
+
+    rendered = _render_v2(_busy_week(2, 3, 2))
+    visible = re.sub(r"<!--.*?-->", " ", rendered.html, flags=re.S)
+    visible = re.sub(r"<style>.*?</style>|<title>.*?</title>", " ", visible, flags=re.S)
+    visible = re.sub(r"<[^>]+>", " ", visible)
+    allowed = (render.DISCLAIMER, ROUNDUP_V2["activity"]["note"])
+    for body in (visible.replace("&#x27;", "'"), rendered.text):
+        for sentence in allowed:
+            body = body.replace(sentence, " ")
+        lowered = body.lower()
+        for term in BANNED_COPY:
+            assert not re.search(rf"\b{re.escape(term)}", lowered), term
+    assert render.DISCLAIMER in rendered.text
