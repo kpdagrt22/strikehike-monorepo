@@ -18,8 +18,8 @@ import {
 // Production URLs map to their paths on the server under test. A11Y_ALL_CRAWL
 // points at the crawl JSON; the default is the planning copy the CSP sweep
 // also reads. A URL that redirects elsewhere on the local build (an event
-// whose date has passed in the local bundle) is skipped: its target is in the
-// crawl too.
+// missing from the local bundle that a roundup still links goes to its theme
+// calendar) is skipped: its target is in the crawl too.
 //
 //   A11Y_ALL=1 A11Y_ALL_CRAWL=crawl.json npx playwright test tests/a11y-all.spec.ts
 const ENABLED = process.env.A11Y_ALL === "1";
