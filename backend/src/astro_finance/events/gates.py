@@ -12,6 +12,7 @@ from .models import (
     Event,
     EventKind,
     EventStatus,
+    SourceKind,
     SourceRun,
     Theme,
     canonical_json,
@@ -305,6 +306,57 @@ def gate_distribution(ctx: GateContext) -> GateResult:
     return GateResult("distribution_shift", "pass", reason)
 
 
+# A local computation that returns nothing is a broken adapter: the
+# astronomy source always has moon phases and the Culture/Religion source
+# always has a Christmas within 365 days. An API calendar may legitimately list
+# nothing for a while (FRED lists only the next one or two dates per release,
+# and a government shutdown can clear them): its previous dates are kept and
+# become unverified after two empty runs, so an empty API fetch only warns. A
+# renamed response key is caught in the adapter as a schema error instead.
+# A curated file may be empty (Politics).
+FAIL_WHEN_EMPTY = (SourceKind.COMPUTED,)
+WARN_WHEN_EMPTY = (SourceKind.API,)
+
+
+def gate_empty_result(ctx: GateContext) -> GateResult:
+    """Fail on an empty result, with or without a previous bundle.
+
+    distribution_shift only compares against a previous bundle, so a first
+    build (or one whose previous-release download failed) could otherwise
+    publish an empty upcoming list.
+    """
+
+    failures = []
+    warnings = []
+    active = sum(
+        1
+        for event in ctx.events
+        if event.kind is EventKind.UPCOMING
+        and event.status in (EventStatus.SCHEDULED, EventStatus.TENTATIVE)
+    )
+    if active == 0:
+        failures.append("the bundle has no active upcoming events")
+    for source_id, spec in ctx.source_specs.items():
+        run = ctx.source_runs.get(source_id)
+        if run is None or not run.fetched_this_run or run.record_count:
+            continue
+        if spec.kind in FAIL_WHEN_EMPTY:
+            failures.append(
+                f"{source_id}: the {spec.kind.value} source returned 0 records"
+            )
+        elif spec.kind in WARN_WHEN_EMPTY:
+            warnings.append(
+                f"{source_id}: the {spec.kind.value} source listed 0 dates "
+                "(warning only; its previous dates are kept)"
+            )
+    if failures:
+        return GateResult("empty_result", "fail", "; ".join(failures + warnings))
+    reason = f"{active} active upcoming events; every computed source returned records"
+    if warnings:
+        reason += "; " + "; ".join(warnings)
+    return GateResult("empty_result", "pass", reason)
+
+
 def gate_safety(ctx: GateContext) -> GateResult:
     bad_urls = [
         event.event_id
@@ -342,5 +394,6 @@ def run_gates(ctx: GateContext) -> list[GateResult]:
         gate_duplicates(ctx),
         gate_freshness(ctx),
         gate_distribution(ctx),
+        gate_empty_result(ctx),
         gate_safety(ctx),
     ]

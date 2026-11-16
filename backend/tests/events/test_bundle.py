@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from astro_finance.events.bundle import (
     CRYPTO_MILESTONES_FILENAME,
@@ -20,7 +21,7 @@ from astro_finance.events.bundle import (
     validate_bundle_files,
     write_dataset,
 )
-from astro_finance.events.pipeline import PipelineOptions, run_pipeline
+from astro_finance.events.pipeline import PipelineError, PipelineOptions, run_pipeline
 from astro_finance.events.reporting import quality_report_payload
 from astro_finance.events.sqlite_writer import EVENT_COLUMNS
 from conftest import FIXTURES, NOW, TODAY, build_event
@@ -275,6 +276,63 @@ def test_build_is_idempotent_apart_from_created_at(tmp_path):
     second_manifest = json.loads((second.bundle_dir / "manifest.json").read_text("utf-8"))
     assert first_manifest.pop("created_at") != second_manifest.pop("created_at")
     assert first_manifest == second_manifest
+
+
+def test_rebuilding_the_same_week_against_its_own_bundle_keeps_the_version(tmp_path):
+    # The second publish of one week (a late cron after a manual dispatch, as
+    # on 16 Nov 2026) builds with the first run's bundle as --previous. The
+    # release tag is events-bundle-<bundle_version>, so an unchanged version is
+    # what makes the publish step skip instead of creating a second release.
+    first = _build(tmp_path / "first", created_at=NOW)
+    second = run_pipeline(
+        PipelineOptions(
+            out_dir=tmp_path / "second",
+            previous_dir=first.bundle_dir,
+            today=TODAY,
+            now=NOW,
+            offline_dir=FIXTURES / "offline",
+            created_at=NOW + timedelta(hours=4),
+        )
+    )
+    assert second.bundle_version == first.bundle_version
+    for name in ("events.json", "events.sqlite"):
+        assert (first.bundle_dir / name).read_bytes() == (
+            second.bundle_dir / name
+        ).read_bytes(), name
+    assert second.quality_report["summary"]["events_updated"] == 0
+    first_manifest = json.loads((first.bundle_dir / "manifest.json").read_text("utf-8"))
+    second_manifest = json.loads((second.bundle_dir / "manifest.json").read_text("utf-8"))
+    assert first_manifest["files"]["events.json"] == second_manifest["files"]["events.json"]
+    assert first_manifest["counts"] == second_manifest["counts"]
+
+
+def test_a_failed_bundle_swap_keeps_the_previous_bundle(tmp_path, monkeypatch):
+    # The bundle is built in a staging directory and swapped in with one
+    # rename; when that rename fails, the previous bundle is put back whole.
+    first = _build(tmp_path / "out", created_at=NOW)
+    before = (first.bundle_dir / "manifest.json").read_bytes()
+
+    import astro_finance.events.bundle as bundle_module
+
+    real_replace = bundle_module.os.replace
+
+    def failing_replace(source, target):
+        name = Path(source).name
+        # Fail only the staging -> bundle swap, not the restore of the backup.
+        if (
+            name.startswith(".bundle-")
+            and not name.startswith(".bundle-previous-")
+            and Path(target).name == "bundle"
+        ):
+            raise OSError(28, "No space left on device")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(bundle_module.os, "replace", failing_replace)
+    with pytest.raises(PipelineError, match="No space left on device"):
+        _build(tmp_path / "out", created_at=NOW + timedelta(hours=1))
+    monkeypatch.setattr(bundle_module.os, "replace", real_replace)
+    assert (tmp_path / "out" / "bundle" / "manifest.json").read_bytes() == before
+    assert validate_bundle_files(tmp_path / "out" / "bundle") == []
 
 
 def test_manifest_has_the_documented_keys_and_counts(tmp_path):

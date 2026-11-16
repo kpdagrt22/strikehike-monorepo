@@ -378,6 +378,57 @@ def test_macro_validation_rejects_schema_and_core_index_range(tmp_path):
     assert any(check["id"] == "core_index_range" and check["status"] == "fail" for check in result.checks)
 
 
+def test_macro_validation_rejects_out_of_range_strength_and_prices(tmp_path):
+    # A unit or parsing change upstream (a 0-1 score read as 0-100 twice, a
+    # price feed returning 0) must not reach /regime as a reading.
+    frame = pd.read_parquet(DATA)
+    frame.index = pd.to_datetime(frame.index, utc=True)
+    new_row = frame.iloc[[-1]].copy()
+    new_row.index = [frame.index.max() + pd.Timedelta(days=1)]
+    new_row["macro_strength"] = 4200.0
+    new_row["sp500_proxy"] = 0.0
+    advanced = pd.concat([frame, new_row])
+    path = tmp_path / "out-of-range.parquet"
+    _write_copy(path, advanced)
+    result = validate_macro_refresh(path, DATA)
+    assert not result.passed
+    check = next(item for item in result.checks if item["id"] == "value_ranges")
+    assert check["status"] == "fail"
+    assert "macro_strength: 1 values outside [0, 100]" in check["reason"]
+    assert "sp500_proxy: 1 values outside > 0" in check["reason"]
+
+
+def test_macro_validation_rejects_a_truncated_or_empty_refresh(tmp_path):
+    # A refresh that lost rows (a partial download) or came back empty never
+    # replaces the baseline, even when its last date is newer.
+    frame = pd.read_parquet(DATA)
+    frame.index = pd.to_datetime(frame.index, utc=True)
+    tail = frame.iloc[-400:].copy()
+    tail.index = tail.index + pd.Timedelta(days=7)
+    path = tmp_path / "truncated.parquet"
+    _write_copy(path, tail)
+    result = validate_macro_refresh(path, DATA)
+    assert not result.passed
+    row_check = next(item for item in result.checks if item["id"] == "row_count")
+    assert row_check["status"] == "fail"
+
+    empty = tmp_path / "empty.parquet"
+    _write_copy(empty, frame.iloc[0:0])
+    result = validate_macro_refresh(empty, DATA)
+    assert not result.passed
+    failed = {item["id"] for item in result.checks if item["status"] == "fail"}
+    assert {"row_count", "last_date", "core_index_range"} <= failed
+
+
+def test_macro_validation_value_ranges_pass_on_the_committed_parquet(tmp_path):
+    result = validate_macro_refresh(
+        DATA, DATA, allow_unchanged_reason="same file, range check only"
+    )
+    check = next(item for item in result.checks if item["id"] == "value_ranges")
+    assert check["status"] == "pass", check["reason"]
+    assert result.passed
+
+
 def test_service_loads_the_model_from_the_active_bundle(tmp_path, monkeypatch):
     runtime = tmp_path / "runtime"
     bundle = runtime / "bundles" / "testbundle"

@@ -22,6 +22,20 @@ CORE_COLUMNS = (
     "regime_state",
 )
 NAN_TOLERANCE = 0.10
+# Physical bounds beyond the Core Index check: the strength score is a
+# 0-100 scale by construction, and an index level is a positive price. A value
+# outside them is a unit or parsing change upstream, never a market move.
+# (low, high, rule): "closed" allows low itself; "open_low" requires > low.
+VALUE_RANGES: dict[str, tuple[float, float, str]] = {
+    "macro_strength": (0.0, 100.0, "closed"),
+    "sp500_proxy": (0.0, float("inf"), "open_low"),
+}
+
+
+def _range_text(low: float, high: float, rule: str) -> str:
+    if high == float("inf"):
+        return f"> {low:g}" if rule == "open_low" else f">= {low:g}"
+    return f"[{low:g}, {high:g}]"
 
 
 class MacroDataError(RuntimeError):
@@ -178,6 +192,34 @@ def validate_macro_refresh(
             "id": "core_index_range",
             "status": "pass" if range_ok else "fail",
             "reason": range_reason,
+        }
+    )
+
+    range_failures = []
+    for column, (low, high, rule) in VALUE_RANGES.items():
+        if column not in current.columns:
+            continue
+        values = pd.to_numeric(current[column], errors="coerce").dropna()
+        if not len(values):
+            continue
+        too_low = values < low if rule == "closed" else values <= low
+        too_high = values > high
+        bad = int(too_low.sum() + too_high.sum())
+        if bad:
+            first = values[too_low | too_high].index[0]
+            range_failures.append(
+                f"{column}: {bad} values outside {_range_text(low, high, rule)} "
+                f"(first {first.date().isoformat()})"
+            )
+    checks.append(
+        {
+            "id": "value_ranges",
+            "status": "fail" if range_failures else "pass",
+            "reason": (
+                "; ".join(range_failures)
+                if range_failures
+                else "macro strength within [0, 100]; S&P 500 proxy above 0"
+            ),
         }
     )
 

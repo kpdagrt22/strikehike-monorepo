@@ -53,8 +53,31 @@ export function daysOld(today, isoDate) {
   return Math.round((a - b) / 86_400_000);
 }
 
-function row(name, threshold, value, ok) {
-  return { name, threshold, value, ok };
+function row(name, threshold, value, ok, hint = null) {
+  return { name, threshold, value, ok, ...(hint && !ok ? { hint } : {}) };
+}
+
+/** The most recent Sunday on or before `today` (YYYY-MM-DD): the UTC date the
+ *  events-weekly cron (Sunday 21:30 UTC) builds for. */
+export function lastSunday(today) {
+  const day = new Date(`${today}T00:00:00Z`);
+  if (Number.isNaN(day.getTime())) return null;
+  day.setUTCDate(day.getUTCDate() - day.getUTCDay());
+  return day.toISOString().slice(0, 10);
+}
+
+/** What to run by hand when the Regime reading is stale. fresh-watch only
+ *  names it: publishing stays a human (or Claude) decision, never automatic.
+ *  GitHub can start the Sunday cron about 4 h late, which is why the
+ *  threshold is 9 days and not 7. */
+export function regimeDispatchHint(today) {
+  const sunday = lastSunday(today) ?? "YYYY-MM-DD";
+  return (
+    "The weekly events build (events-weekly.yml, Sunday 21:30 UTC) refreshes the Regime reading. " +
+    "Check its newest run first; if it was skipped or failed, run it by hand: " +
+    `\`gh workflow run events-weekly.yml -f today=${sunday}\`. ` +
+    "fresh-watch never dispatches it."
+  );
 }
 
 export function evaluate(input) {
@@ -76,6 +99,7 @@ export function evaluate(input) {
       `≤ ${THRESHOLDS.regimeDays} days`,
       regimeAsOf ? `${regimeAsOf} (${regimeAge} d)` : "missing",
       regimeAge !== null && regimeAge <= THRESHOLDS.regimeDays,
+      regimeDispatchHint(today),
     ),
   );
 
@@ -146,6 +170,11 @@ export function markdown(rows, baseUrl, today) {
   lines.push(
     `Overall: **${rows.every((item) => item.ok) ? "PASS" : "FAIL"}**`,
   );
+  const hints = rows.filter((item) => !item.ok && item.hint);
+  if (hints.length) {
+    lines.push("");
+    for (const item of hints) lines.push(`- **${item.name}:** ${item.hint}`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -213,6 +242,10 @@ export async function main() {
   const text = markdown(rows, baseUrl, today);
   process.stdout.write(text);
   if (summary) writeFileSync(summary, text, "utf8");
+  for (const item of rows) {
+    // A GitHub annotation, so the command is on the failed run's front page.
+    if (!item.ok && item.hint) console.log(`::error title=${item.name}::${item.hint}`);
+  }
   if (!rows.every((item) => item.ok)) process.exitCode = 1;
 }
 

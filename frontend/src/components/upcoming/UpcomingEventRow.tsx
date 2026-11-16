@@ -10,7 +10,8 @@ import type { UpcomingEventPayload } from "@/lib/seo/data";
 // column: a fixed 96 px date, the title on line 1, and the theme, local time
 // and source on line 2. The three actions stay available, revealed on hover or
 // focus on pointer devices (absolutely, so they add no row height); on touch
-// they sit under the second line, always visible.
+// they sit under the second line, always visible. The classes (.sh-row-*) are in
+// globals.css: a row repeats in both the HTML and the RSC payload (S3.2).
 export function UpcomingEventRow({
   event,
   themeSlug,
@@ -39,10 +40,10 @@ export function UpcomingEventRow({
   return (
     <li
       data-upcoming-row=""
-      className="group relative border-b border-(--sh-line-1) last:border-b-0"
+      className="group sh-row"
     >
-      <div className="flex min-h-16 items-start gap-3 py-2">
-        <span className="w-24 shrink-0 whitespace-nowrap pt-0.5 text-micro uppercase tracking-[0.08em] text-(--sh-text-3)">
+      <div className="sh-row-body">
+        <span className="sh-row-date">
           <LocalDateTime
             startDate={event.start_date}
             startTime={event.start_time}
@@ -53,13 +54,10 @@ export function UpcomingEventRow({
           />
         </span>
         <div className="min-w-0 flex-1">
-          <p
-            className="truncate text-body font-medium leading-snug text-(--sh-text-1)"
-            title={event.name}
-          >
+          <p className="sh-row-title" title={event.name}>
             {title}
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-(--sh-text-3)">
+          <div className="sh-row-meta">
             {themeName ? (
               <>
                 <Link
@@ -105,7 +103,7 @@ export function UpcomingEventRow({
                 status: event.status,
               }}
               themeSlug={themeSlug}
-              className="mt-1.5 pointer-fine:absolute pointer-fine:right-2 pointer-fine:top-1/2 pointer-fine:z-10 pointer-fine:mt-0 pointer-fine:-translate-y-1/2 pointer-fine:rounded-full pointer-fine:bg-(--sh-surface-overlay) pointer-fine:px-1 pointer-fine:shadow-(--sh-shadow-float) pointer-fine:backdrop-blur-xl"
+              className="sh-row-actions-float"
             />
           ) : null}
         </div>

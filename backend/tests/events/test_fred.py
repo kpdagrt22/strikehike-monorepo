@@ -255,3 +255,27 @@ def test_a_release_with_too_many_dates_a_month_fails_the_source():
     payload = _payload(every_other_day)
     with pytest.raises(fred.FredError, match="not a scheduled-release calendar"):
         _release_records(source, _release(), payload, start=TODAY, end=date(2027, 11, 3))
+
+
+def test_a_response_without_the_release_dates_key_is_a_schema_error():
+    # A renamed key used to read as "no dates" and flow on as an empty calendar.
+    payload = _payload(["2026-12-09"])
+    payload["dates"] = payload.pop("release_dates")
+    session = FakeSession([FakeResponse(200, payload)])
+    with pytest.raises(FredError, match="no release_dates key"):
+        _client(session).fetch_release_dates(
+            _release(), start=TODAY, end=date(2027, 11, 3), max_pages=3, page_limit=100
+        )
+
+
+def test_a_release_listing_no_future_date_is_not_an_error():
+    # FRED lists only the next one or two dates of a release, so one release
+    # with none is normal; an empty source as a whole is the gate's warning.
+    source = build_source(
+        source_id="fred_release_dates",
+        themes=(Theme.FINANCE,),
+        verification=Verification.VERIFIED,
+    )
+    assert _release_records(
+        source, _release(), _payload([]), start=TODAY, end=date(2027, 11, 3)
+    ) == []

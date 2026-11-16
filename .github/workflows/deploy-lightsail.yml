@@ -206,43 +206,10 @@ jobs:
 
       - name: Prepare a smoke events bundle
         working-directory: backend
+        # The same script builds a local stack's bundle, so the @deploy set sees
+        # the same Culture/Religion, Finance and Science dates locally as here.
         run: |
-          PYTHONPATH="src:." python - <<'PY'
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          from astro_finance.events.pipeline import PipelineOptions, run_pipeline
-          from astro_finance.events.store import upcoming_totals_by_theme
-
-          now = datetime.now(timezone.utc)
-          result = run_pipeline(
-              PipelineOptions(
-                  out_dir=Path("/tmp/smoke-events-build"),
-                  offline_dir=Path("tests/events/fixtures/offline"),
-                  now=now,
-                  created_at=now,
-                  execution_id="smoke-bundle",
-              )
-          )
-          runtime = Path("/tmp/smoke-events")
-          runtime.mkdir(parents=True, exist_ok=True)
-          (runtime / "current").write_text(
-              str(result.bundle_dir) + "\n", encoding="utf-8"
-          )
-          print(f"smoke bundle: {result.bundle_dir} ({result.bundle_version})")
-          counts = upcoming_totals_by_theme(
-              result.bundle_dir / "events.sqlite", None, today=now.date()
-          )
-          print(
-              "upcoming by theme: "
-              + ", ".join(f"{theme}={count}" for theme, count in counts.items())
-          )
-          if counts.get("Finance", 0) < 5 or counts.get("Science", 0) < 2:
-              print(
-                  "::warning::Smoke fixture is running out of future dates: "
-                  "refresh backend/tests/events/fixtures/offline"
-              )
-          PY
+          PYTHONPATH="src:." python -m scripts.smoke_events_bundle --out /tmp/smoke-events-build --runtime /tmp/smoke-events
 
       - name: Start the smoke backend
         working-directory: backend
@@ -358,43 +325,10 @@ jobs:
 
       - name: Prepare a smoke events bundle
         working-directory: backend
+        # The same script builds a local stack's bundle, so the @deploy set sees
+        # the same Culture/Religion, Finance and Science dates locally as here.
         run: |
-          PYTHONPATH="src:." python - <<'PY'
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          from astro_finance.events.pipeline import PipelineOptions, run_pipeline
-          from astro_finance.events.store import upcoming_totals_by_theme
-
-          now = datetime.now(timezone.utc)
-          result = run_pipeline(
-              PipelineOptions(
-                  out_dir=Path("/tmp/smoke-events-build"),
-                  offline_dir=Path("tests/events/fixtures/offline"),
-                  now=now,
-                  created_at=now,
-                  execution_id="smoke-bundle",
-              )
-          )
-          runtime = Path("/tmp/smoke-events")
-          runtime.mkdir(parents=True, exist_ok=True)
-          (runtime / "current").write_text(
-              str(result.bundle_dir) + "\n", encoding="utf-8"
-          )
-          print(f"smoke bundle: {result.bundle_dir} ({result.bundle_version})")
-          counts = upcoming_totals_by_theme(
-              result.bundle_dir / "events.sqlite", None, today=now.date()
-          )
-          print(
-              "upcoming by theme: "
-              + ", ".join(f"{theme}={count}" for theme, count in counts.items())
-          )
-          if counts.get("Finance", 0) < 5 or counts.get("Science", 0) < 2:
-              print(
-                  "::warning::Smoke fixture is running out of future dates: "
-                  "refresh backend/tests/events/fixtures/offline"
-              )
-          PY
+          PYTHONPATH="src:." python -m scripts.smoke_events_bundle --out /tmp/smoke-events-build --runtime /tmp/smoke-events
 
       - name: Start the smoke backend
         working-directory: backend

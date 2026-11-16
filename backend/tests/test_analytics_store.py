@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import sqlite3
 import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
 
 from astro_finance.analytics import store as store_module
 from astro_finance.analytics.schema import validate_batch
@@ -137,6 +142,92 @@ def test_retention_purges_old_events_on_the_first_insert_of_a_new_day(tmp_path):
         assert store.connection.execute("SELECT received_at FROM events").fetchone()[0] == new
     finally:
         store.close()
+
+
+class _FailingInsertConnection:
+    """The real connection, except that the batch insert fails (a full disk)."""
+
+    def __init__(self, connection):
+        self._connection = connection
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+    def __enter__(self):
+        return self._connection.__enter__()
+
+    def __exit__(self, *exc):
+        return self._connection.__exit__(*exc)
+
+    def executemany(self, *args, **kwargs):
+        raise sqlite3.OperationalError("database or disk is full")
+
+
+def _count(store, table="events"):
+    return store.connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+
+
+def test_purge_is_rolled_back_with_a_failed_insert(tmp_path):
+    # The purge and the insert share one transaction: a failure part-way
+    # leaves neither half applied, and the purge is retried on the next insert.
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    old = 1_600_000_000_000
+    new = old + (store_module.RETENTION_DAYS + 5) * 86_400_000
+    try:
+        put(store, batch(), now_ms=old)
+        real = store.connection
+        store.connection = _FailingInsertConnection(real)
+        with pytest.raises(sqlite3.OperationalError):
+            put(store, batch(aid="C" * 22), net="new", now_ms=new)
+        store.connection = real
+        assert _count(store) == 1
+        # The purge day was not recorded either, so the next insert retries it.
+        new_day = store_module._day(datetime.fromtimestamp(new / 1000, tz=timezone.utc))
+        recorded = real.execute(
+            "SELECT value FROM meta WHERE key='last_purge_day'"
+        ).fetchone()
+        assert recorded is None or recorded[0] != new_day
+
+        put(store, batch(aid="C" * 22), net="newer", now_ms=new)
+        assert _count(store) == 1
+        assert store.connection.execute("SELECT received_at FROM events").fetchone()[0] == new
+    finally:
+        store.close()
+
+
+def test_purge_keeps_every_row_inside_the_retention_window(tmp_path):
+    store = AnalyticsStore(tmp_path / "analytics.sqlite")
+    now = 1_700_000_000_000
+    cutoff = now - store_module.RETENTION_DAYS * 86_400_000
+    try:
+        put(store, batch(aid="D" * 22), net="a", now_ms=cutoff - 1)
+        put(store, batch(aid="E" * 22), net="b", now_ms=cutoff)
+        # A day later the purge runs: only the row older than the cutoff goes.
+        put(store, batch(aid="F" * 22), net="c", now_ms=now)
+        kept = [
+            row[0]
+            for row in store.connection.execute(
+                "SELECT received_at FROM events ORDER BY received_at"
+            )
+        ]
+        assert kept == [cutoff, now]
+    finally:
+        store.close()
+
+
+def test_retention_is_the_published_thirteen_months():
+    # The opt-out panel promises "deleted after 13 months"; a different
+    # constant would either break that promise or delete data too early.
+    assert store_module.RETENTION_DAYS == 395
+    toggle = (
+        Path(__file__).resolve().parents[2]
+        / "frontend"
+        / "src"
+        / "components"
+        / "analytics"
+        / "MeasurementToggle.jsx"
+    ).read_text(encoding="utf-8")
+    assert "Raw records are deleted after 13 months." in toggle
 
 
 def test_delete_aid_and_p95_for_a_25_event_batch(tmp_path):

@@ -142,7 +142,14 @@ class FredClient:
                     "offset": offset,
                 }
             )
-            batch = payload.get("release_dates", [])
+            # A missing key is a changed response, not "no dates": an empty
+            # calendar would otherwise flow on as zero Finance events.
+            if "release_dates" not in payload:
+                raise FredError(
+                    "FRED response has no release_dates key; the API response "
+                    "shape may have changed"
+                )
+            batch = payload["release_dates"]
             if not isinstance(batch, list):
                 raise FredError("FRED response has no release_dates list")
             if total is None:
@@ -207,6 +214,10 @@ def _release_records(
         if start <= value <= end:
             dates.append(value)
     dates = sorted(set(dates))
+    # No "empty calendar" refusal here: FRED lists only the next one or two
+    # dates of a release (the 16 Nov 2026 bundle had 1-2 each), so a release
+    # can briefly list none. The empty_result gate warns when the whole source
+    # lists nothing; the previous dates are kept by the lifecycle.
     month_counts = Counter(value.strftime("%Y-%m") for value in dates)
     # A scheduled-release calendar has a few dates a month. A release that lists
     # more is a data-update feed (FRED's FOMC release updates every few days),

@@ -8,8 +8,9 @@ import { eventCalendarPath, eventPath, skyDate, skyHref } from "@/lib/events/eve
 // This is a server component: the rows on /upcoming, /this-week and the date
 // pages are plain HTML. One EventActionTracker on the page records the clicks.
 const ACTION = "sh-row-action";
-const REVEAL =
-  "pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:duration-(--sh-dur-reveal) pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 motion-reduce:transition-none";
+// .sh-row-actions (globals.css): flex row, revealed on the row's hover or
+// focus-within on pointer devices, always visible on touch.
+const ACTIONS = "sh-row-actions";
 
 const SCOPES: Record<string, "all" | "science" | "finance" | "culture-religion"> = {
   all: "all",
@@ -43,7 +44,7 @@ export function EventActionLinks({
   return (
     <div
       data-event-actions
-      className={`flex flex-wrap items-center gap-1.5 ${REVEAL} ${className}`}
+      className={className ? `${ACTIONS} ${className}` : ACTIONS}
     >
       {sky ? (
         <Link

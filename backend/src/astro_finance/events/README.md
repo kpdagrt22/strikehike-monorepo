@@ -149,6 +149,7 @@ the bundle and quality reports, and the CLI exits `2`.
 | `duplicate_integrity` | No duplicate `event_id`; no two scheduled events share theme + normalised name + date. |
 | `source_freshness` | Every enabled source was fetched this run or succeeded within its `expected_freshness_days`. |
 | `distribution_shift` | Each theme's active upcoming count is within ±60% of the previous bundle; when the previous count is under 5 this only warns. |
+| `empty_result` | The bundle has at least one active upcoming event, and every `computed` source fetched this run returned at least one record. An `api` source that lists nothing only warns (FRED lists just the next one or two dates per release; the previous dates are kept), and a curated file may be empty. Unlike `distribution_shift`, this holds without a previous bundle. |
 | `safety` | No secret patterns in output files and every `source_url` is https. |
 
 ## Bundle

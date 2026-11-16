@@ -187,6 +187,96 @@ export function staleReading(as_of, weekStart, maxDays = 10) {
   return days > maxDays ? days : null;
 }
 
+// The Core Index is bounded to [-50, 50] by construction (the weekly macro
+// validation fails a parquet outside it); sky activity is a 0-100 score.
+export const CORE_INDEX_RANGE = [-50, 50];
+export const ACTIVITY_RANGE = [0, 100];
+
+const inRange = (value, [low, high]) =>
+  Number.isFinite(Number(value)) && Number(value) >= low && Number(value) <= high;
+
+/**
+ * Why a draft must not be written, as plain sentences (empty when it may).
+ * `buildRoundupV2` leaves a section out when its data is missing, which is
+ * right for a page; for the weekly draft a missing Regime reading or a
+ * changed payload shape is a failed source, not "nothing to say".
+ */
+export function draftRefusals({
+  atlas,
+  upcoming,
+  skyWeek,
+  roundup,
+  allowStale = false,
+  maxStaleDays = 10,
+}) {
+  const reasons = [];
+  const latest = atlas?.meta?.latest_core_index;
+  if (!latest || typeof latest !== "object") {
+    reasons.push(
+      "the Regime reading is missing: /api/v1/regime/macro-history has no meta.latest_core_index (the response shape may have changed)",
+    );
+  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(String(latest.date ?? ""))) {
+    reasons.push(
+      `the Regime reading has no valid date (${JSON.stringify(latest.date ?? null)})`,
+    );
+  } else if (!inRange(latest.score, CORE_INDEX_RANGE)) {
+    reasons.push(
+      `the Core Index reading ${JSON.stringify(latest.score ?? null)} is outside [${CORE_INDEX_RANGE.join(", ")}]`,
+    );
+  }
+  if (!Array.isArray(atlas?.timeline)) {
+    reasons.push(
+      "the Regime history has no timeline list (the response shape may have changed)",
+    );
+  }
+  const themes = upcoming?.themes;
+  if (!themes || typeof themes !== "object" || Array.isArray(themes)) {
+    reasons.push(
+      "/api/v1/events/upcoming has no themes object (the response shape may have changed)",
+    );
+  } else if (Object.values(themes).some((theme) => !Array.isArray(theme?.events))) {
+    reasons.push("/api/v1/events/upcoming has a theme without an events list");
+  }
+  const daily = skyWeek?.activity?.daily;
+  if (!Array.isArray(daily) || daily.length === 0) {
+    reasons.push(
+      "/api/v1/sky/week has no activity.daily list (the response shape may have changed)",
+    );
+  } else {
+    const bad = daily.filter((day) => !inRange(day?.score, ACTIVITY_RANGE));
+    if (bad.length) {
+      reasons.push(
+        `${bad.length} sky activity ${bad.length === 1 ? "score is" : "scores are"} outside [${ACTIVITY_RANGE.join(", ")}] (first ${JSON.stringify(bad[0]?.score ?? null)} on ${bad[0]?.date ?? "?"})`,
+      );
+    }
+  }
+  const stale = roundup?.regime
+    ? staleReading(roundup.regime.as_of, roundup.start, maxStaleDays)
+    : null;
+  if (stale != null && !allowStale) {
+    reasons.push(
+      `refusing stale reading: ${roundup.regime.as_of} is ${stale} days before ${roundup.start}; pass --allow-stale to draft anyway`,
+    );
+  }
+  return reasons;
+}
+
+/**
+ * Write `text` to `path` through a temporary file in the same directory and
+ * one rename, so a crash or a full disk leaves the previous draft whole
+ * instead of half a JSON file. `fs` is node:fs/promises (injectable in tests).
+ */
+export async function writeFileAtomic(path, text, fs) {
+  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await fs.writeFile(temporary, text, "utf8");
+    await fs.rename(temporary, path);
+  } catch (error) {
+    await fs.rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
 function dateSections(upcoming, range) {
   const events = Object.values(upcoming?.themes ?? {}).flatMap((theme) =>
     (theme?.events ?? []).filter((event) => {

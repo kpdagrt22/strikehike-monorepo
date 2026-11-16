@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import * as realFs from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildRoundup,
   buildRoundupV2,
+  draftRefusals,
   staleReading,
   weekRange,
+  writeFileAtomic,
 } from "./roundup-build.mjs";
 
 const event = (id, name, date, theme, extra = {}) => ({
@@ -553,4 +559,152 @@ test("from the record follows the fixed priority order", () => {
     }),
     "new-moon",
   );
+});
+
+// DATA-guards: what the weekly draft refuses, and how it writes.
+const draftInputs = (overrides = {}) => {
+  const atlas = {
+    meta: {
+      latest_core_index: { date: "2026-11-15", score: 13.18, bucket: "calm_bullish" },
+    },
+    timeline: [
+      { date: "2026-11-08", core_index: 14.9 },
+      { date: "2026-11-15", core_index: 13.18 },
+    ],
+  };
+  const upcoming = {
+    themes: {
+      Finance: { events: [event("finance:g", "GDP", "2026-11-25", "Finance")] },
+      "Natural Disasters": { schedulable: false, total_available: 0, events: [] },
+    },
+  };
+  const inputs = { atlas, upcoming, skyWeek: sky(), ...overrides };
+  const roundup = buildRoundupV2({ week: "2026-W48", ...inputs, claims });
+  return { ...inputs, roundup };
+};
+
+test("a complete, fresh draft has no refusals", () => {
+  assert.deepEqual(draftRefusals(draftInputs()), []);
+});
+
+test("a missing Regime reading or a changed atlas shape refuses the draft", () => {
+  // buildRoundupV2 drops the section silently; the stale gate then had
+  // nothing to check, so a missing reading used to pass as a draft.
+  const missing = draftInputs({ atlas: { meta: {}, timeline: [] } });
+  assert.equal(missing.roundup.regime, undefined);
+  assert.match(draftRefusals(missing).join("\n"), /Regime reading is missing/);
+
+  const renamed = draftInputs({
+    atlas: { meta: { latest: { date: "2026-11-15", score: 13.2 } }, points: [] },
+  });
+  const reasons = draftRefusals(renamed).join("\n");
+  assert.match(reasons, /no meta\.latest_core_index/);
+  assert.match(reasons, /no timeline list/);
+});
+
+test("an out-of-range Core Index or sky activity score refuses the draft", () => {
+  const atlas = {
+    meta: { latest_core_index: { date: "2026-11-15", score: 1318, bucket: "calm_bullish" } },
+    timeline: [],
+  };
+  assert.match(
+    draftRefusals(draftInputs({ atlas })).join("\n"),
+    /Core Index reading 1318 is outside \[-50, 50\]/,
+  );
+  const skyWeek = sky({
+    activity: { daily: [{ date: "2026-11-23", score: 140 }], min: 140, max: 140 },
+  });
+  assert.match(
+    draftRefusals(draftInputs({ skyWeek })).join("\n"),
+    /1 sky activity score is outside \[0, 100\] \(first 140 on 2026-11-23\)/,
+  );
+});
+
+test("a changed upcoming or sky shape refuses the draft", () => {
+  assert.match(
+    draftRefusals(draftInputs({ upcoming: { events: [] } })).join("\n"),
+    /upcoming has no themes object/,
+  );
+  assert.match(
+    draftRefusals(draftInputs({ upcoming: { themes: { Finance: { items: [] } } } })).join("\n"),
+    /a theme without an events list/,
+  );
+  assert.match(
+    draftRefusals(draftInputs({ skyWeek: { moon_phases: [] } })).join("\n"),
+    /no activity\.daily list/,
+  );
+});
+
+test("a stale reading refuses unless --allow-stale, and the reason names the flag", () => {
+  const atlas = {
+    meta: { latest_core_index: { date: "2026-11-08", score: 13.18, bucket: "calm_bullish" } },
+    timeline: [{ date: "2026-11-08", core_index: 13.18 }],
+  };
+  const stale = draftInputs({ atlas });
+  assert.deepEqual(draftRefusals(stale), [
+    "refusing stale reading: 2026-11-08 is 15 days before 2026-11-23; pass --allow-stale to draft anyway",
+  ]);
+  assert.deepEqual(draftRefusals({ ...stale, allowStale: true }), []);
+});
+
+test("writeFileAtomic replaces the file in one rename and leaves no temporary file", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "roundup-atomic-"));
+  try {
+    const path = join(dir, "2026-W48.json");
+    await writeFile(path, '{"old": true}\n', "utf8");
+    await writeFileAtomic(path, '{"new": true}\n', realFs);
+    assert.equal(await readFile(path, "utf8"), '{"new": true}\n');
+    assert.deepEqual(await readdir(dir), ["2026-W48.json"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failed write keeps the previous draft whole and removes the temporary file", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "roundup-atomic-"));
+  try {
+    const path = join(dir, "2026-W48.json");
+    await writeFile(path, '{"old": true}\n', "utf8");
+    const failing = {
+      ...realFs,
+      writeFile: async (target, text, encoding) => {
+        // Half the bytes reach the disk, then the write fails (a full disk).
+        await realFs.writeFile(target, text.slice(0, 5), encoding);
+        throw Object.assign(new Error("ENOSPC: no space left on device"), {
+          code: "ENOSPC",
+        });
+      },
+    };
+    await assert.rejects(writeFileAtomic(path, '{"new": true}\n', failing), /ENOSPC/);
+    assert.equal(await readFile(path, "utf8"), '{"old": true}\n');
+    assert.deepEqual(await readdir(dir), ["2026-W48.json"]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the draft script never redrafts an approved week (its hash is in the ledger)", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  const { mkdir } = await import("node:fs/promises");
+  const dir = await mkdtemp(join(tmpdir(), "roundup-approved-"));
+  try {
+    const roundups = join(dir, "content", "roundups");
+    await mkdir(roundups, { recursive: true });
+    const path = join(roundups, "2026-W48.json");
+    const approved = '{\n  "schema": 2,\n  "week": "2026-W48",\n  "approved": true\n}\n';
+    await writeFile(path, approved, "utf8");
+    const script = fileURLToPath(new URL("./roundup-draft.mjs", import.meta.url));
+    const result = spawnSync(process.execPath, [script, "--week", "2026-W48"], {
+      cwd: dir,
+      encoding: "utf8",
+      // Refused before any fetch: an unreachable API proves no request is needed.
+      env: { ...process.env, ROUNDUP_API_URL: "http://127.0.0.1:9", SKY_API_URL: "http://127.0.0.1:9" },
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /2026-W48 is already approved/);
+    assert.equal(await readFile(path, "utf8"), approved);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
