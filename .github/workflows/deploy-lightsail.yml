@@ -117,6 +117,10 @@ jobs:
         working-directory: .
         run: bash tests/deploy/test_restore_runtime.sh
 
+      - name: Off-host copy is encrypted, verified and trimmed (S3 stub)
+        working-directory: .
+        run: bash tests/deploy/test_backup_offsite.sh
+
   test-frontend:
     name: Frontend lint and build
     runs-on: ubuntu-24.04
@@ -453,6 +457,13 @@ jobs:
           DIGEST_REPLY_TO: ${{ vars.DIGEST_REPLY_TO }}
           INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
           CSP_MODE: ${{ vars.CSP_MODE }}
+          # OFFSITE (scripts/backup_offsite.sh): unset, the off-host copy is skipped.
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          BACKUP_S3_KEY_ID: ${{ secrets.BACKUP_S3_KEY_ID }}
+          BACKUP_S3_SECRET: ${{ secrets.BACKUP_S3_SECRET }}
+          BACKUP_RECIPIENT_CERT: ${{ vars.BACKUP_RECIPIENT_CERT }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
@@ -463,7 +474,7 @@ jobs:
           # test (and in every else branch). The script's own
           # `set -euo pipefail` handles failures correctly.
           command_timeout: 30m
-          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO,INDEXNOW_KEY,CSP_MODE
+          envs: REHEARSE_ROLLBACK,GROWTH_EXPORT_TOKEN,RESEND_API_KEY,DIGEST_TOKEN_SECRET,DIGEST_ENABLED,DIGEST_POSTAL_ADDRESS,DIGEST_REPLY_TO,INDEXNOW_KEY,CSP_MODE,BACKUP_S3_ENDPOINT,BACKUP_S3_BUCKET,BACKUP_S3_REGION,BACKUP_S3_KEY_ID,BACKUP_S3_SECRET,BACKUP_RECIPIENT_CERT
           script: |
             set -euo pipefail
 
@@ -553,6 +564,13 @@ jobs:
             if ! bash scripts/backup_runtime.sh; then
               echo "::warning::pre-deploy runtime backup failed; continuing without a backup"
             fi
+            # OFFSITE: the newest stamp, encrypted for the owner's offline key,
+            # to the owner's bucket. Unconfigured, it prints a notice and does
+            # nothing; a failure warns and never stops the deploy.
+            if ! bash scripts/backup_offsite.sh; then
+              echo "::warning::off-host backup failed; the local stamps are kept"
+            fi
+            unset BACKUP_S3_KEY_ID BACKUP_S3_SECRET
             if [ -n "${INDEXNOW_KEY:-}" ]; then
               # The key file must be served at /<key>.txt. It is generated on
               # the host so the key never lives in the repository.
