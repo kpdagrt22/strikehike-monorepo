@@ -23,3 +23,11 @@ Times are UTC and IST (Asia/Kolkata).
 - Checkout steps use `persist-credentials: false` unless the job must push.
 - Scheduled failures are surfaced by `pipeline-health.yml` (daily) as well as by GitHub's own red run and email.
 - `DIGEST_AUTOSEND` stays unset until W49; W48 is a manual dispatch.
+
+## CSP mode
+
+The repository variable `CSP_MODE` decides how the frontend is built: `report-only` (the default) or `enforce`.
+Production has enforced the policy since 24 Nov 2026, after a crawl of 70 pages at desktop and phone widths found no
+violation in report-only mode and none after the switch. The deploy's live verify step receives the same variable
+(`--expect-csp`) and fails when the header on the site is not the mode the deploy asked for. To go back: set the
+variable to `report-only` and dispatch `deploy-lightsail.yml` from `main`.
