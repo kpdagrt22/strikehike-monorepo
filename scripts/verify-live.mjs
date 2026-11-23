@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // LIVE-verify: prove a deploy from the outside.
 //
-//   node scripts/verify-live.mjs --base-url=https://strikehike.com --expect-sha=abc1234
+//   node scripts/verify-live.mjs --base-url=https://strikehike.com --expect-sha=abc1234 [--expect-csp=enforce|report-only]
 //
 // Read-only public GETs plus two deliberately invalid CSP POSTs (403 and 413).
 // No valid report body is ever sent to production.
@@ -30,16 +30,21 @@ export function hasThreeChunk(contents) {
   );
 }
 
-export function headerChecks(headers) {
+export function headerChecks(headers, expectCsp = "") {
   const value = (name) => headers.get(name) ?? "";
+  // CSP_MODE=enforce replaces the report-only header with the enforcing one: either carries the policy.
+  const enforced = value("content-security-policy");
+  const mode = enforced ? "enforce" : "report-only";
+  const csp = enforced || value("content-security-policy-report-only");
   return [
     { name: "HSTS", ok: value("strict-transport-security").includes("max-age="), value: value("strict-transport-security") },
     { name: "nosniff", ok: value("x-content-type-options") === "nosniff", value: value("x-content-type-options") },
     { name: "referrer", ok: Boolean(value("referrer-policy")), value: value("referrer-policy") },
     {
-      name: "CSP report-only",
-      ok: value("content-security-policy-report-only").includes("report-to"),
-      value: value("content-security-policy-report-only").slice(0, 80),
+      name: `CSP ${mode}`,
+      // With --expect-csp the deployed mode must also be the one the deploy asked for.
+      ok: csp.includes("report-to") && (!expectCsp || expectCsp === mode),
+      value: csp.slice(0, 80),
     },
     {
       name: "Reporting-Endpoints",
@@ -112,7 +117,7 @@ async function main() {
   record("unknown path", missing.status === 404, String(missing.status));
 
   const home = await get(base, "/");
-  const headers = headerChecks(home.headers);
+  const headers = headerChecks(home.headers, arg("expect-csp", ""));
   for (const item of headers) record(item.name, item.ok, item.value || "missing");
 
   const cross = await get(base, "/api/v1/csp-report", {

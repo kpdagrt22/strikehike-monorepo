@@ -46,3 +46,26 @@ test("headerChecks requires HSTS, nosniff, referrer, CSP report-to and Reporting
   const bad = new Headers({ "content-security-policy-report-only": "default-src 'self'" });
   assert.deepEqual(headerChecks(bad).map((item) => item.ok), [false, false, false, false, false]);
 });
+
+test("headerChecks accepts the enforcing CSP header and checks the expected mode", () => {
+  const base = {
+    "strict-transport-security": "max-age=31536000",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "reporting-endpoints": 'csp-endpoint="https://strikehike.com/api/v1/csp-report"',
+  };
+  const policy = "default-src 'self'; report-to csp-endpoint";
+  const enforced = new Headers({ ...base, "content-security-policy": policy });
+  const reportOnly = new Headers({ ...base, "content-security-policy-report-only": policy });
+  const csp = (headers, expect) => headerChecks(headers, expect)[3];
+
+  assert.equal(csp(enforced).ok, true);
+  assert.equal(csp(enforced).name, "CSP enforce");
+  assert.equal(csp(enforced, "enforce").ok, true);
+  assert.equal(csp(enforced, "report-only").ok, false);
+  assert.equal(csp(reportOnly).name, "CSP report-only");
+  assert.equal(csp(reportOnly, "report-only").ok, true);
+  assert.equal(csp(reportOnly, "enforce").ok, false);
+  // An enforcing policy that lost its report-to still fails.
+  assert.equal(csp(new Headers({ ...base, "content-security-policy": "default-src 'self'" })).ok, false);
+});

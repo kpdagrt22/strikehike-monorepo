@@ -249,6 +249,8 @@ while (queue.length > 0) {
       nosniff: response.headers.get("x-content-type-options") ?? "",
       referrer: response.headers.get("referrer-policy") ?? "",
       csp_report_only: response.headers.get("content-security-policy-report-only") ?? "",
+      // CSP_MODE=enforce sends the enforcing header instead of the report-only one.
+      csp: response.headers.get("content-security-policy") ?? "",
       cache_control: response.headers.get("cache-control") ?? "",
     },
   });
@@ -306,7 +308,7 @@ const summary = {
     missing_hsts: htmlPages.filter((page) => !page.headers?.hsts),
     missing_nosniff: htmlPages.filter((page) => page.headers?.nosniff !== "nosniff"),
     missing_referrer: htmlPages.filter((page) => !page.headers?.referrer),
-    missing_csp: htmlPages.filter((page) => !page.headers?.csp_report_only),
+    missing_csp: htmlPages.filter((page) => !page.headers?.csp && !page.headers?.csp_report_only),
     missing_cache_control: htmlPages.filter((page) => !page.headers?.cache_control),
   },
 };

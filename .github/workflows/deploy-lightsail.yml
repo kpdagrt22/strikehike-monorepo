@@ -939,8 +939,10 @@ jobs:
       - name: Verify the live build
         env:
           BUILD_SHA: ${{ github.sha }}
+          CSP_MODE: ${{ vars.CSP_MODE }}
         run: |
           node scripts/verify-live.mjs \
             --base-url=https://strikehike.com \
             --expect-sha="${BUILD_SHA::7}" \
+            --expect-csp="${CSP_MODE:-report-only}" \
             --timeout=120
